@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nowe Zdarzenie - Maciora {{ sow.ear_tag }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+    <div class="bg-white p-6 md:p-8 rounded-lg shadow-md w-full max-w-xl">
+
+        <header class="mb-6 border-b pb-4">
+            <h2 class="text-xl font-bold text-gray-800">Nowe zdarzenie w rejestrze</h2>
+            <p class="text-sm text-gray-500 mt-1">Dla maciory o numerze kolczyka: <strong class="text-blue-600">{{ sow.ear_tag }}</strong></p>
+        </header>
+
+        <form method="post" class="space-y-4">
+            {% csrf_token %}
+
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">{{ form.event_type.label }}</label>
+                <select name="event_type" id="id_event_type" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                    {% for value, text in form.fields.event_type.choices %}
+                        <option value="{{ value }}">{{ text }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">{{ form.event_date.label }}</label>
+                <input type="date" name="event_date" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+            </div>
+
+            <div id="sec_insemination" class="p-4 bg-yellow-50 rounded-lg border border-yellow-200 hidden">
+                <label class="block text-gray-700 text-sm font-bold mb-2">{{ form.technician.label }}</label>
+                <input type="text" name="technician" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-yellow-500">
+            </div>
+
+            <div id="sec_farrowing" class="p-4 bg-purple-50 rounded-lg border border-purple-200 hidden space-y-3">
+                <h4 class="text-sm font-bold text-purple-800">Statystyka miotu</h4>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-gray-600 text-xs font-bold mb-1">{{ form.born_alive.label }}</label>
+                        <input type="number" name="born_alive" value="0" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-gray-600 text-xs font-bold mb-1">{{ form.born_dead.label }}</label>
+                        <input type="number" name="born_dead" value="0" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    </div>
+                </div>
+            </div>
+
+            <div id="sec_weaning" class="p-4 bg-blue-50 rounded-lg border border-blue-200 hidden">
+                <label class="block text-gray-700 text-sm font-bold mb-2">{{ form.count.label }}</label>
+                <input type="number" name="count" value="0" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div class="flex justify-between items-center pt-4 border-t">
+                <a href="{% url 'sow_detail' sow.id %}" class="text-gray-500 hover:text-gray-800 text-sm font-bold">Anuluj</a>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded focus:outline-none shadow transition">
+                    Zapisz w bazie
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        const typeSelect = document.getElementById('id_event_type');
+        const secInsemination = document.getElementById('sec_insemination');
+        const secFarrowing = document.getElementById('sec_farrowing');
+        const secWeaning = document.getElementById('sec_weaning');
+
+        function toggleFields() {
+            const val = typeSelect.value;
+            secInsemination.classList.add('hidden');
+            secFarrowing.classList.add('hidden');
+            secWeaning.classList.add('hidden');
+
+            if (val === 'INSEMINATION') {
+                secInsemination.classList.remove('hidden');
+            } else if (val === 'FARROWING') {
+                secFarrowing.classList.remove('hidden');
+            } else if (val === 'WEANING') {
+                secWeaning.classList.remove('hidden');
+            }
+        }
+
+        typeSelect.addEventListener('change', toggleFields);
+        window.addEventListener('DOMContentLoaded', toggleFields);
+    </script>
+</body>
+</html>

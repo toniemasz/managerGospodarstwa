@@ -1,16 +1,14 @@
+# sows/models.py
 from django.db import models
-
-from django.db import models
-
+from datetime import date
 
 class SowModel(models.Model):
-    sow_id = models.CharField(max_length=50, unique=True, primary_key=True)
     ear_tag = models.CharField(max_length=50)
-    birth_date = models.DateField()
+    entry_date = models.DateField(default=date.today) # Domyślnie dzisiejsza data
+    created_at = models.DateTimeField(auto_now_add=True) # Automatyczna data utworzenia
 
     def __str__(self):
         return f"Maciora {self.ear_tag}"
-
 
 class SowEventModel(models.Model):
     EVENT_TYPES = [

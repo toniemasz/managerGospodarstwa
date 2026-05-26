@@ -33,7 +33,6 @@ LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'modules_home'
 
 
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',

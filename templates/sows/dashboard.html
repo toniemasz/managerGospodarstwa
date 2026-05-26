@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manager Gospodarstwa</title>
+    <title>Manager Gospodarstwa - Maciory</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 font-sans leading-normal tracking-normal">
@@ -12,14 +12,17 @@
 
         <header class="mb-6 flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
             <h1 class="text-xl md:text-2xl font-bold text-gray-800">🐖 Manager Gospodarstwa</h1>
-            <span class="text-sm bg-green-100 text-green-800 font-medium px-2.5 py-0.5 rounded">Moduł: Maciory</span>
+            <div>
+                <a href="{% url 'modules_home' %}" class="text-sm text-gray-600 hover:text-blue-600 mr-4">Wróć do Centrali</a>
+                <span class="text-sm bg-green-100 text-green-800 font-medium px-2.5 py-0.5 rounded">Moduł: Maciory</span>
+            </div>
         </header>
 
         {% if sows_to_vaccinate %}
         <div class="mb-6 bg-orange-50 border-l-4 border-orange-500 p-4 rounded shadow-sm">
             <div class="flex items-center mb-2">
                 <span class="text-orange-500 font-bold mr-2">⚠️ Alert:</span>
-                <h3 class="text-lg font-semibold text-orange-800">Pilne szczepienia (Wymagane na 3 tyg. przed porodem)</h3>
+                <h3 class="text-lg font-semibold text-orange-800">Pilne szczepienia</h3>
             </div>
             <ul class="divide-y divide-orange-200">
                 {% for sow in sows_to_vaccinate %}
@@ -38,39 +41,50 @@
                 <p class="text-2xl font-bold text-gray-800">{{ total_sows }}</p>
             </div>
             <div class="bg-white p-4 rounded-lg shadow-sm border-b-4 border-yellow-500">
-                <p class="text-xs uppercase text-gray-400 font-bold">Prośne (Inseminowane)</p>
+                <p class="text-xs uppercase text-gray-400 font-bold">Prośne</p>
                 <p class="text-2xl font-bold text-gray-800">{{ inseminated_count }}</p>
             </div>
             <div class="bg-white p-4 rounded-lg shadow-sm border-b-4 border-purple-500">
-                <p class="text-xs uppercase text-gray-400 font-bold">Karmiące (Laktacja)</p>
+                <p class="text-xs uppercase text-gray-400 font-bold">Karmiące</p>
                 <p class="text-2xl font-bold text-gray-800">{{ lactating_count }}</p>
             </div>
             <div class="bg-white p-4 rounded-lg shadow-sm border-b-4 border-green-500">
-                <p class="text-xs uppercase text-gray-400 font-bold">Jałowe (Oczekujące)</p>
+                <p class="text-xs uppercase text-gray-400 font-bold">Jałowe</p>
                 <p class="text-2xl font-bold text-gray-800">{{ idle_count }}</p>
             </div>
         </div>
 
         <div class="bg-white rounded-lg shadow-sm overflow-hidden">
-            <div class="p-4 border-b border-gray-200 flex justify-between items-center">
-                <h2 class="text-lg font-bold text-gray-700">Przegląd Stada</h2>
-                <button class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-1.5 px-3 rounded shadow">
-                    + Dodaj Maciorę
-                </button>
+            <div class="p-4 border-b border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4">
+                <h2 class="text-lg font-bold text-gray-700 whitespace-nowrap">Przegląd Stada</h2>
+
+                <div class="flex flex-col md:flex-row gap-2 w-full justify-end">
+                    <input type="text" id="searchInput" placeholder="Wyszukaj nr kolczyka..." class="shadow-sm border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <select id="statusFilter" class="shadow-sm border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="ALL">Wszystkie statusy</option>
+                        <option value="INSEMINATED">Prośna</option>
+                        <option value="LACTATING">Karmiąca</option>
+                        <option value="IDLE">Jałowa</option>
+                    </select>
+                    <a href="{% url 'add_sow' %}" class="bg-blue-600 hover:bg-blue-700 text-white text-center text-sm font-bold py-1.5 px-4 rounded shadow whitespace-nowrap transition">
+                        + Dodaj Maciorę
+                    </a>
+                </div>
             </div>
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200 text-left text-sm text-gray-600">
+                <table class="min-w-full divide-y divide-gray-200 text-left text-sm text-gray-600" id="sowsTable">
                     <thead class="bg-gray-50 text-xs uppercase text-gray-500 font-bold">
                         <tr>
                             <th class="p-4">Nr Kolczyka</th>
                             <th class="p-4">Status</th>
+                            <th class="p-4">W stadzie od</th>
                             <th class="p-4">Przewidywany Poród</th>
                             <th class="p-4 text-right">Urodzone żywe (Suma)</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200">
                         {% for sow in all_sows %}
-                        <tr class="hover:bg-gray-50">
+                        <tr class="hover:bg-blue-50 cursor-pointer transition sow-row" data-ear="{{ sow.ear_tag }}" data-status="{{ sow.status }}" onclick="window.location.href='{% url 'sow_detail' sow.id %}'">
                             <td class="p-4 font-semibold text-gray-900">{{ sow.ear_tag }}</td>
                             <td class="p-4">
                                 {% if sow.status == "INSEMINATED" %}
@@ -81,6 +95,7 @@
                                 <span class="bg-green-100 text-green-800 px-2 py-0.5 rounded text-xs font-medium">Jałowa</span>
                                 {% endif %}
                             </td>
+                            <td class="p-4 text-gray-500">{{ sow.entry_date|date:"d.m.Y" }}</td>
                             <td class="p-4 text-gray-500">
                                 {{ sow.expected_farrowing_date|default:"--" }}
                             </td>
@@ -88,14 +103,41 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="5" class="p-4 text-center text-gray-400">Brak macior w bazie danych. Dodaj pierwsze sztuki w panelu admina.</td>
+                            <td colspan="5" class="p-4 text-center text-gray-400">Brak macior w bazie danych.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
-
     </div>
+
+    <script>
+        const searchInput = document.getElementById('searchInput');
+        const statusFilter = document.getElementById('statusFilter');
+        const rows = document.querySelectorAll('.sow-row');
+
+        function filterTable() {
+            const query = searchInput.value.toLowerCase();
+            const status = statusFilter.value;
+
+            rows.forEach(row => {
+                const earTag = row.getAttribute('data-ear').toLowerCase();
+                const rowStatus = row.getAttribute('data-status');
+
+                const matchesSearch = earTag.includes(query);
+                const matchesStatus = status === 'ALL' || rowStatus === status;
+
+                if (matchesSearch && matchesStatus) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        searchInput.addEventListener('keyup', filterTable);
+        statusFilter.addEventListener('change', filterTable);
+    </script>
 </body>
 </html>
