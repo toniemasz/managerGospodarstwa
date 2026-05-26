@@ -27,7 +27,7 @@ DEBUG = env('DEBUG')
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['127.0.0.1', 'localhost'])
 
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'modules_home'
