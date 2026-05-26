@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manager Gospodarstwa</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans leading-normal tracking-normal">
+
+    <div class="container mx-auto p-4 md:p-6">
+
+        <header class="mb-6 flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
+            <h1 class="text-xl md:text-2xl font-bold text-gray-800">🐖 Manager Gospodarstwa</h1>
+            <span class="text-sm bg-green-100 text-green-800 font-medium px-2.5 py-0.5 rounded">Moduł: Maciory</span>
+        </header>
+
+        {% if sows_to_vaccinate %}
+        <div class="mb-6 bg-orange-50 border-l-4 border-orange-500 p-4 rounded shadow-sm">
+            <div class="flex items-center mb-2">
+                <span class="text-orange-500 font-bold mr-2">⚠️ Alert:</span>
+                <h3 class="text-lg font-semibold text-orange-800">Pilne szczepienia (Wymagane na 3 tyg. przed porodem)</h3>
+            </div>
+            <ul class="divide-y divide-orange-200">
+                {% for sow in sows_to_vaccinate %}
+                <li class="py-2 text-sm text-orange-700 flex justify-between items-center">
+                    <span>Maciora <strong>{{ sow.ear_tag }}</strong></span>
+                    <span class="font-medium">Poród za: {{ sow.expected_farrowing_date }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white p-4 rounded-lg shadow-sm border-b-4 border-blue-500">
+                <p class="text-xs uppercase text-gray-400 font-bold">Wszystkie maciory</p>
+                <p class="text-2xl font-bold text-gray-800">{{ total_sows }}</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow-sm border-b-4 border-yellow-500">
+                <p class="text-xs uppercase text-gray-400 font-bold">Prośne (Inseminowane)</p>
+                <p class="text-2xl font-bold text-gray-800">{{ inseminated_count }}</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow-sm border-b-4 border-purple-500">
+                <p class="text-xs uppercase text-gray-400 font-bold">Karmiące (Laktacja)</p>
+                <p class="text-2xl font-bold text-gray-800">{{ lactating_count }}</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow-sm border-b-4 border-green-500">
+                <p class="text-xs uppercase text-gray-400 font-bold">Jałowe (Oczekujące)</p>
+                <p class="text-2xl font-bold text-gray-800">{{ idle_count }}</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+                <h2 class="text-lg font-bold text-gray-700">Przegląd Stada</h2>
+                <button class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-1.5 px-3 rounded shadow">
+                    + Dodaj Maciorę
+                </button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 text-left text-sm text-gray-600">
+                    <thead class="bg-gray-50 text-xs uppercase text-gray-500 font-bold">
+                        <tr>
+                            <th class="p-4">Nr Kolczyka</th>
+                            <th class="p-4">Status</th>
+                            <th class="p-4">Przewidywany Poród</th>
+                            <th class="p-4 text-right">Urodzone żywe (Suma)</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        {% for sow in all_sows %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="p-4 font-semibold text-gray-900">{{ sow.ear_tag }}</td>
+                            <td class="p-4">
+                                {% if sow.status == "INSEMINATED" %}
+                                <span class="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded text-xs font-medium">Prośna</span>
+                                {% elif sow.status == "LACTATING" %}
+                                <span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-xs font-medium">Karmiąca</span>
+                                {% else %}
+                                <span class="bg-green-100 text-green-800 px-2 py-0.5 rounded text-xs font-medium">Jałowa</span>
+                                {% endif %}
+                            </td>
+                            <td class="p-4 text-gray-500">
+                                {{ sow.expected_farrowing_date|default:"--" }}
+                            </td>
+                            <td class="p-4 text-right font-medium text-gray-800">{{ sow.total_born_alive }} szt.</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="p-4 text-center text-gray-400">Brak macior w bazie danych. Dodaj pierwsze sztuki w panelu admina.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</body>
+</html>
