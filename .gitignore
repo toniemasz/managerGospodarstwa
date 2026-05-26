@@ -1,6 +1,31 @@
+cat << 'EOF' > .gitignore
+# Środowisko wirtualne
 .venv/
-*.pyc
-__pycache__/
-db.sqlite3
-.pytest_cache/
+venv/
+ENV/
+env/
+
+# Konfiguracja PyCharma / JetBrains
+.idea/
+
+# Pliki konfiguracyjne zawierające hasła i klucze (BARDZO WAŻNE)
 .env
+
+# Pliki bazy danych deweloperskiej
+*.sqlite3
+db.sqlite3
+
+# Pliki Pythona i pamięć podręczna
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Pliki systemowe macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Logi i pliki tymczasowe
+*.log
+EOF
