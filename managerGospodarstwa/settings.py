@@ -88,9 +88,25 @@ WSGI_APPLICATION = 'managerGospodarstwa.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': env.db()
-}
+import os
+import environ
+
+env = environ.Env()
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+
+# Twardy podział: lokalnie przy DEBUG=True używasz wyłącznie SQLite.
+# Na Renderze, gdzie DEBUG=False, Django weźmie bazę Supabase z DATABASE_URL.
+if DEBUG:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
+else:
+    DATABASES = {
+        'default': env.db('DATABASE_URL')
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
