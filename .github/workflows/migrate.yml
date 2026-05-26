@@ -1,4 +1,4 @@
-name: Django Remote Migrate
+nname: Django Remote Migrate
 
 on:
   push:
@@ -27,3 +27,13 @@ jobs:
         DEBUG: 'True'
       run: |
         python manage.py migrate
+
+    - name: Create Superuser
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        SECRET_KEY: 'temporary-key-for-migrations'
+        DJANGO_SUPERUSER_USERNAME: 'toniemasz'
+        DJANGO_SUPERUSER_EMAIL: 'tomaszf600@gmail.com'
+        DJANGO_SUPERUSER_PASSWORD: 'Skorpion2003!'
+      run: |
+        python manage.py createsuperuser --noinput || echo "Admin już istnieje lub wystąpił błąd"
