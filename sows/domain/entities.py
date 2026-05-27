@@ -8,7 +8,10 @@ class SowEvent:
         self.id = id
         self.event_type = event_type
         self.event_date = event_date
-        self.details = details if details is not None else {}
+        if isinstance(details, dict):
+            self.details = details
+        else:
+            self.details = {}
 
 
 class Sow:
@@ -87,15 +90,18 @@ class Sow:
                 self.status = "LACTATING"
                 self.last_farrowing_date = event.event_date
                 self.expected_farrowing_date = None
-                self.total_born_alive += int(event.details.get("born_alive", 0))
-                self.total_born_dead += int(event.details.get("born_dead", 0))
+                alive = event.details.get("born_alive")
+                dead = event.details.get("born_dead")
+                self.total_born_alive += int(alive) if alive is not None else 0
+                self.total_born_dead += int(dead) if dead is not None else 0
                 self.farrowing_count += 1
                 self.farrowings.append(event)
 
             elif event.event_type == "WEANING":
                 self.status = "IDLE"
                 self.last_weaning_date = event.event_date
-                self.total_weaned += int(event.details.get("count", 0))
+                weaned = event.details.get("count")
+                self.total_weaned += int(weaned) if weaned is not None else 0
                 self.weaning_count += 1
                 self.weanings.append(event)
 
@@ -148,7 +154,7 @@ class Sow:
 
         # Warunek 3: Szczepienie cykliczne (np. co 4 miesiące od wprowadzenia do stada lub ostatniej dawki)
         elif plan.get('interval_months') is not None:
-            base_date = self.entry_date
+            base_date = self.entry_date or date.today()
             # Szukamy ostatniego wykonanego szczepienia o tej samej nazwie
             same_vaccinations = [v for v in self.vaccinations if v.details.get('vaccine_name') == plan['name']]
             if same_vaccinations:

@@ -45,40 +45,44 @@ class SowDashboardService:
         to_check_count = 0
 
         for sow in sows:
-            sow.update_state_for_date(today)
-            # Klasyfikacja i zliczanie rozszerzonych statusów produkcyjnych
-            # Klasyfikacja statusów
-            if sow.status == "INSEMINATED":
-                inseminated_count += 1
-            elif sow.status == "PREGNANT":
-                pregnant_count += 1
-            elif sow.status == "LACTATING":
-                lactating_count += 1
-            elif sow.status == "IDLE":
-                idle_count += 1
-            elif sow.status == "TO_RECHECK":
-                to_recheck_count += 1
-            elif sow.status == "TO_CHECK":
-                to_check_count += 1
+            try:
+                sow.update_state_for_date(today)
+                # Klasyfikacja i zliczanie rozszerzonych statusów produkcyjnych
+                # Klasyfikacja statusów
+                if sow.status == "INSEMINATED":
+                    inseminated_count += 1
+                elif sow.status == "PREGNANT":
+                    pregnant_count += 1
+                elif sow.status == "LACTATING":
+                    lactating_count += 1
+                elif sow.status == "IDLE":
+                    idle_count += 1
+                elif sow.status == "TO_RECHECK":
+                    to_recheck_count += 1
+                elif sow.status == "TO_CHECK":
+                    to_check_count += 1
 
-            # 1. Sprawdzanie konieczności wykonania badania USG (>= 30 dni od inseminacji)
+                # 1. Sprawdzanie konieczności wykonania badania USG (>= 30 dni od inseminacji)
 
-            if sow.status == "TO_CHECK":
-                sows_to_check_usg.append(sow)
+                if sow.status == "TO_CHECK":
+                    sows_to_check_usg.append(sow)
 
-            # 2. Analiza zapotrzebowania na szczepienia ochronne i grupowanie
-            for plan_dict in plans:
-                vacc_status = sow.get_vaccination_status(plan_dict, current_date=today)
-                if vacc_status['should_display']:
-                    group_key = f"{plan_dict['name']} (Termin: {vacc_status['target_date'].strftime('%d.%m.%Y')})"
-                    vaccination_groups[group_key].append({
-                        'sow_id': sow.id,
-                        'ear_tag': sow.ear_tag,
-                        'status_display': sow.dynamic_status_display,  # Używamy nowej właściwości
-                        'cycle_id': vacc_status['cycle_id'],
-                        'vaccine_name': plan_dict['name'],
-                        'is_eligible': vacc_status['is_eligible']
-                    })
+                # 2. Analiza zapotrzebowania na szczepienia ochronne i grupowanie
+                for plan_dict in plans:
+                    vacc_status = sow.get_vaccination_status(plan_dict, current_date=today)
+                    if vacc_status['should_display']:
+                        group_key = f"{plan_dict['name']} (Termin: {vacc_status['target_date'].strftime('%d.%m.%Y')})"
+                        vaccination_groups[group_key].append({
+                            'sow_id': sow.id,
+                            'ear_tag': sow.ear_tag,
+                            'status_display': sow.dynamic_status_display,  # Używamy nowej właściwości
+                            'cycle_id': vacc_status['cycle_id'],
+                            'vaccine_name': plan_dict['name'],
+                            'is_eligible': vacc_status['is_eligible']
+                        })
+            except Exception as e:
+                print(f"Błąd przetwarzania maciory {sow.ear_tag} (ID: {sow.id}): {e}")
+            continue
 
         return {
             'total_sows': len(sows),

@@ -7,6 +7,8 @@ from .application.services import SowDashboardService
 from .infrastructure.repositories import SowRepository
 from .forms import SowForm, SowEventForm
 from .models import SowModel, SowEventModel
+from django.http import HttpResponse  # <-- DODAJ TO
+import traceback
 
 
 @login_required
@@ -16,9 +18,14 @@ def modules_home_view(request):
 
 @login_required
 def dashboard_view(request):
-    service = SowDashboardService()
-    context = service.get_dashboard_summary()
-    return render(request, 'sows/dashboard.html', context)
+    try:
+        service = SowDashboardService()
+        context = service.get_dashboard_summary()
+        return render(request, 'sows/dashboard.html', context)
+    except Exception as e:
+        # Ten kod przechwyci ukryty błąd 500 i wyświetli go na ekranie!
+        error_html = f"<h2>Wystąpił błąd w danych!</h2><br><b>Powód:</b> {str(e)}<br><br><b>Dokładne miejsce w kodzie:</b><br><pre>{traceback.format_exc()}</pre>"
+        return HttpResponse(error_html, status=500)
 
 
 @login_required
