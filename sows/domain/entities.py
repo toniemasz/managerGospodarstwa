@@ -6,9 +6,9 @@ from typing import List, Dict, Any, Optional
 class SowEvent:
     def __init__(self, event_type: str, event_date: date, details: Dict[str, Any], id: int = None):
         self.id = id
-        self.event_type = event_type  # INSEMINATION, PREGNANCY_CHECK, FARROWING, WEANING, VACCINATION
+        self.event_type = event_type
         self.event_date = event_date
-        self.details = details
+        self.details = details if details is not None else {}
 
 
 class Sow:
