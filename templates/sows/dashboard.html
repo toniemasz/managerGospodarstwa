@@ -1,143 +1,97 @@
-<!DOCTYPE html>
-<html lang="pl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manager Gospodarstwa - Maciory</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100 font-sans leading-normal tracking-normal">
+{% extends 'base.html' %}
+{% load static %}
 
-    <div class="container mx-auto p-4 md:p-6">
+{% block title %}Manager Gospodarstwa - Maciory{% endblock %}
 
-        <header class="mb-6 flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
-            <h1 class="text-xl md:text-2xl font-bold text-gray-800">🐖 Manager Gospodarstwa</h1>
-            <div>
-                <a href="{% url 'modules_home' %}" class="text-sm text-gray-600 hover:text-blue-600 mr-4">Wróć do Centrali</a>
-                <span class="text-sm bg-green-100 text-green-800 font-medium px-2.5 py-0.5 rounded">Moduł: Maciory</span>
-            </div>
-        </header>
-
-        {% if sows_to_vaccinate %}
-        <div class="mb-6 bg-orange-50 border-l-4 border-orange-500 p-4 rounded shadow-sm">
-            <div class="flex items-center mb-2">
-                <span class="text-orange-500 font-bold mr-2">⚠️ Alert:</span>
-                <h3 class="text-lg font-semibold text-orange-800">Pilne szczepienia</h3>
-            </div>
-            <ul class="divide-y divide-orange-200">
-                {% for sow in sows_to_vaccinate %}
-                <li class="py-2 text-sm text-orange-700 flex justify-between items-center">
-                    <span>Maciora <strong>{{ sow.ear_tag }}</strong></span>
-                    <span class="font-medium">Poród za: {{ sow.expected_farrowing_date }}</span>
-                </li>
-                {% endfor %}
-            </ul>
+{% block content %}
+<div class="container mx-auto p-4 md:p-6">
+    <header class="mb-6 flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
+        <h1 class="text-xl md:text-2xl font-bold text-gray-800">🐖 Manager Gospodarstwa</h1>
+        <div>
+            <a href="{% url 'modules_home' %}" class="text-sm text-gray-600 hover:text-blue-600 mr-4">Wróć do Centrali</a>
+            <span class="text-sm bg-green-100 text-green-800 font-medium px-2.5 py-0.5 rounded">Moduł: Maciory</span>
         </div>
-        {% endif %}
+    </header>
 
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div class="bg-white p-4 rounded-lg shadow-sm border-b-4 border-blue-500">
-                <p class="text-xs uppercase text-gray-400 font-bold">Wszystkie maciory</p>
-                <p class="text-2xl font-bold text-gray-800">{{ total_sows }}</p>
-            </div>
-            <div class="bg-white p-4 rounded-lg shadow-sm border-b-4 border-yellow-500">
-                <p class="text-xs uppercase text-gray-400 font-bold">Prośne</p>
-                <p class="text-2xl font-bold text-gray-800">{{ inseminated_count }}</p>
-            </div>
-            <div class="bg-white p-4 rounded-lg shadow-sm border-b-4 border-purple-500">
-                <p class="text-xs uppercase text-gray-400 font-bold">Karmiące</p>
-                <p class="text-2xl font-bold text-gray-800">{{ lactating_count }}</p>
-            </div>
-            <div class="bg-white p-4 rounded-lg shadow-sm border-b-4 border-green-500">
-                <p class="text-xs uppercase text-gray-400 font-bold">Jałowe</p>
-                <p class="text-2xl font-bold text-gray-800">{{ idle_count }}</p>
+    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+        <div class="p-4 border-b border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4">
+            <h2 class="text-lg font-bold text-gray-700 whitespace-nowrap">Przegląd Stada</h2>
+
+            <div class="flex flex-col md:flex-row gap-2 w-full justify-end items-center">
+                <select id="limitSelect" class="shadow-sm border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500">
+                    <option value="10">10 na stronę</option>
+                    <option value="25">25 na stronę</option>
+                    <option value="50">50 na stronę</option>
+                </select>
+
+                <input type="text" id="searchInput" placeholder="Wyszukaj nr kolczyka..." class="shadow-sm border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500">
+                <select id="statusFilter" class="shadow-sm border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500">
+                    <option value="ALL">Wszystkie statusy</option>
+                    <option value="INSEMINATED">Prośna</option>
+                    <option value="LACTATING">Karmiąca</option>
+                    <option value="IDLE">Jałowa</option>
+                </select>
+                <a href="{% url 'add_sow' %}" class="bg-blue-600 hover:bg-blue-700 text-white text-center text-sm font-bold py-1.5 px-4 rounded shadow whitespace-nowrap transition">
+                    + Dodaj Maciorę
+                </a>
             </div>
         </div>
-
-        <div class="bg-white rounded-lg shadow-sm overflow-hidden">
-            <div class="p-4 border-b border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4">
-                <h2 class="text-lg font-bold text-gray-700 whitespace-nowrap">Przegląd Stada</h2>
-
-                <div class="flex flex-col md:flex-row gap-2 w-full justify-end">
-                    <input type="text" id="searchInput" placeholder="Wyszukaj nr kolczyka..." class="shadow-sm border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <select id="statusFilter" class="shadow-sm border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="ALL">Wszystkie statusy</option>
-                        <option value="INSEMINATED">Prośna</option>
-                        <option value="LACTATING">Karmiąca</option>
-                        <option value="IDLE">Jałowa</option>
-                    </select>
-                    <a href="{% url 'add_sow' %}" class="bg-blue-600 hover:bg-blue-700 text-white text-center text-sm font-bold py-1.5 px-4 rounded shadow whitespace-nowrap transition">
-                        + Dodaj Maciorę
-                    </a>
-                </div>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200 text-left text-sm text-gray-600" id="sowsTable">
-                    <thead class="bg-gray-50 text-xs uppercase text-gray-500 font-bold">
-                        <tr>
-                            <th class="p-4">Nr Kolczyka</th>
-                            <th class="p-4">Status</th>
-                            <th class="p-4">W stadzie od</th>
-                            <th class="p-4">Przewidywany Poród</th>
-                            <th class="p-4 text-right">Urodzone żywe (Suma)</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200">
-                        {% for sow in all_sows %}
-                        <tr class="hover:bg-blue-50 cursor-pointer transition sow-row" data-ear="{{ sow.ear_tag }}" data-status="{{ sow.status }}" onclick="window.location.href='{% url 'sow_detail' sow.id %}'">
-                            <td class="p-4 font-semibold text-gray-900">{{ sow.ear_tag }}</td>
-                            <td class="p-4">
-                                {% if sow.status == "INSEMINATED" %}
-                                <span class="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded text-xs font-medium">Prośna</span>
-                                {% elif sow.status == "LACTATING" %}
-                                <span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-xs font-medium">Karmiąca</span>
-                                {% else %}
-                                <span class="bg-green-100 text-green-800 px-2 py-0.5 rounded text-xs font-medium">Jałowa</span>
-                                {% endif %}
-                            </td>
-                            <td class="p-4 text-gray-500">{{ sow.entry_date|date:"d.m.Y" }}</td>
-                            <td class="p-4 text-gray-500">
-                                {{ sow.expected_farrowing_date|default:"--" }}
-                            </td>
-                            <td class="p-4 text-right font-medium text-gray-800">{{ sow.total_born_alive }} szt.</td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="5" class="p-4 text-center text-gray-400">Brak macior w bazie danych.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 text-left text-sm text-gray-600" id="sowsTable">
+                <thead class="bg-gray-50 text-xs uppercase text-gray-500 font-bold">
+                    <tr>
+                        <th class="p-4">Nr Kolczyka</th>
+                        <th class="p-4">Status</th>
+                        <th class="p-4">W stadzie od</th>
+                        <th class="p-4">Przewidywany Poród</th>
+                        <th class="p-4 text-right">Urodzone żywe (Suma)</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for sow in all_sows %}
+                    <tr class="hover:bg-blue-50 cursor-pointer transition sow-row" 
+                        data-search="{{ sow.ear_tag }}" 
+                        data-filter="{{ sow.status }}" 
+                        onclick="window.location.href='{% url 'sow_detail' sow.id %}'">
+                        <td class="p-4 font-semibold text-gray-900">{{ sow.ear_tag }}</td>
+                        <td class="p-4">
+                            {% if sow.status == "INSEMINATED" %}
+                            <span class="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded text-xs font-medium">Prośna</span>
+                            {% elif sow.status == "LACTATING" %}
+                            <span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-xs font-medium">Karmiąca</span>
+                            {% else %}
+                            <span class="bg-green-100 text-green-800 px-2 py-0.5 rounded text-xs font-medium">Jałowa</span>
+                            {% endif %}
+                        </td>
+                        <td class="p-4 text-gray-500">{{ sow.entry_date|date:"d.m.Y" }}</td>
+                        <td class="p-4 text-gray-500">{{ sow.expected_farrowing_date|default:"--" }}</td>
+                        <td class="p-4 text-right font-medium text-gray-800">{{ sow.total_born_alive }} szt.</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="p-4 text-center text-gray-400">Brak macior w bazie danych.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
+        
+        <div id="paginationControls" class="p-4 flex justify-center border-t bg-gray-50"></div>
     </div>
+</div>
+{% endblock %}
 
-    <script>
-        const searchInput = document.getElementById('searchInput');
-        const statusFilter = document.getElementById('statusFilter');
-        const rows = document.querySelectorAll('.sow-row');
-
-        function filterTable() {
-            const query = searchInput.value.toLowerCase();
-            const status = statusFilter.value;
-
-            rows.forEach(row => {
-                const earTag = row.getAttribute('data-ear').toLowerCase();
-                const rowStatus = row.getAttribute('data-status');
-
-                const matchesSearch = earTag.includes(query);
-                const matchesStatus = status === 'ALL' || rowStatus === status;
-
-                if (matchesSearch && matchesStatus) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
-            });
-        }
-
-        searchInput.addEventListener('keyup', filterTable);
-        statusFilter.addEventListener('change', filterTable);
-    </script>
-</body>
-</html>
+{% block scripts %}
+<script src="{% static 'sows/js/table_manager.js' %}"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        new PaginationTable({
+            rowSelector: '.sow-row',
+            searchInputId: 'searchInput',
+            filterSelectId: 'statusFilter',
+            limitSelectId: 'limitSelect',
+            paginationContainerId: 'paginationControls'
+        });
+    });
+</script>
+{% endblock %}

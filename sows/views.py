@@ -55,18 +55,23 @@ def sow_detail_view(request, sow_id):
 def add_event_view(request, sow_id):
     db_sow = get_object_or_404(SowModel, id=sow_id)
 
+
+    repo = SowRepository()
+    domain_sow = repo.get_sow_by_id(sow_id)
+
     if request.method == 'POST':
-        form = SowEventForm(request.POST)
+
+        form = SowEventForm(request.POST, sow_status=domain_sow.status)
         if form.is_valid():
             event = form.save(commit=False)
             event.sow = db_sow
             event.save()
             return redirect('sow_detail', sow_id=sow_id)
     else:
-        form = SowEventForm()
+
+        form = SowEventForm(sow_status=domain_sow.status)
 
     return render(request, 'sows/add_event.html', {'form': form, 'sow': db_sow})
-
 
 @login_required
 def delete_sow_view(request, sow_id):

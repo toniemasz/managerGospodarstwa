@@ -1,265 +1,353 @@
-<!DOCTYPE html>
-<html lang="pl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Karta Maciory - {{ sow.ear_tag }}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100 font-sans p-4 md:p-6">
-    <div class="container mx-auto max-w-5xl">
+{% extends 'base.html' %}
+{% load static %}
 
-        <form method="post" id="sowForm" class="mb-6 bg-white p-6 rounded-lg shadow-sm border-l-4 border-blue-600 transition-all duration-300">
-            {% csrf_token %}
-            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full lg:max-w-xl">
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Numer Kolczyka</label>
-                        <input type="text" name="ear_tag" id="ear_tag_input" value="{{ form.ear_tag.value }}"
-                               class="w-full border rounded px-3 py-1.5 text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 bg-gray-100 cursor-not-allowed transition" readonly>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Data wprowadzenia do stada</label>
-                        <input type="date" name="entry_date" id="entry_date_input" value="{{ form.entry_date.value|date:'Y-m-d' }}"
-                               class="w-full border rounded px-3 py-1.5 text-gray-800 focus:ring-2 focus:ring-blue-500 bg-gray-100 cursor-not-allowed transition" readonly>
-                    </div>
-                </div>
+{% block title %}Karta Maciory - {{ sow.ear_tag }}{% endblock %}
 
-                <div class="flex flex-wrap gap-2 w-full lg:w-auto justify-end items-center">
+{% block content %}
+<div class="container mx-auto max-w-5xl p-4 md:p-6">
 
-                    <a href="{% url 'add_event' sow.id %}" id="btnAddEvent" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-extrabold py-2.5 px-5 rounded-lg shadow-md hover:shadow-lg transition transform hover:-translate-y-0.5">
-                        🚀 + Dodaj zdarzenie
-                    </a>
-                    <button type="button" id="btnEditData" onclick="toggleEditMode()" class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 text-sm font-medium py-2 px-4 rounded-lg shadow-sm transition">
-                        ✏️ Edytuj dane
-                    </button>
-                    <a href="{% url 'dashboard' %}" id="btnGoBack" class="bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm font-bold py-2 px-4 rounded-lg shadow transition">
-                        Wróć
-                    </a>
-
-                    <button type="button" id="btnDeleteSow" onclick="openDeleteModal()" class="hidden bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 px-4 rounded-lg shadow transition">
-                        🗑️ Usuń
-                    </button>
-                    <button type="button" id="btnCancelEdit" onclick="cancelEditMode()" class="hidden bg-gray-400 hover:bg-gray-500 text-white text-sm font-bold py-2 px-4 rounded-lg shadow transition">
-                        Anuluj
-                    </button>
-                    <button type="submit" id="btnSaveEdit" name="edit_sow" class="hidden bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 px-4 rounded-lg shadow transition">
-                        💾 Zapisz zmiany
-                    </button>
-                </div>
-            </div>
-            <p class="text-xs text-gray-400 mt-3">ID systemu: {{ sow.id }} | Data utworzenia profilu: {{ sow.created_at|date:"d.m.Y H:i" }}</p>
-        </form>
-
-        <h2 class="text-lg font-bold text-gray-700 mb-3">Statystyki produkcyjne (Średnie na cykl)</h2>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-green-500">
-                <p class="text-xs uppercase text-gray-400 font-bold">Urodzone Żywe</p>
-                <p class="text-2xl font-bold text-gray-800">{{ sow.avg_born_alive }} <span class="text-sm font-normal text-gray-500">szt.</span></p>
-            </div>
-            <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-red-500">
-                <p class="text-xs uppercase text-gray-400 font-bold">Urodzone Martwe</p>
-                <p class="text-2xl font-bold text-gray-800">{{ sow.avg_born_dead }} <span class="text-sm font-normal text-gray-500">szt.</span></p>
-            </div>
-            <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-blue-500">
-                <p class="text-xs uppercase text-gray-400 font-bold">Odsadzone</p>
-                <p class="text-2xl font-bold text-gray-800">{{ sow.avg_weaned }} <span class="text-sm font-normal text-gray-500">szt.</span></p>
-            </div>
-            <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-orange-500">
-                <p class="text-xs uppercase text-gray-400 font-bold">Upadki przed odsadzeniem</p>
-                <p class="text-2xl font-bold text-gray-800">{{ sow.avg_loss_before_weaning }} <span class="text-sm font-normal text-gray-500">szt.</span></p>
-            </div>
-        </div>
-
-        <div class="bg-white rounded-lg shadow-sm overflow-hidden border-t-4 border-indigo-500 mb-8">
-            <div class="p-4 bg-gray-50 border-b border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4">
-                <h3 class="text-md font-bold text-gray-700 flex items-center">📅 Rejestr Zdarzeń (Chronologicznie)</h3>
-
+    <form method="post" id="sowForm" class="mb-6 bg-white p-6 rounded-lg shadow-sm border-l-4 border-blue-600 transition-all duration-300">
+        {% csrf_token %}
+        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full lg:max-w-xl">
                 <div>
-                    <label for="eventFilter" class="text-sm font-bold text-gray-500 mr-2">Filtruj:</label>
-                    <select id="eventFilter" onchange="filterEvents()" class="shadow-sm border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                        <option value="ALL">Wszystkie zdarzenia</option>
-                        <option value="INSEMINATION">Tylko Inseminacje</option>
-                        <option value="FARROWING">Tylko Oproszenia</option>
-                        <option value="WEANING">Tylko Odsadzenia</option>
-                    </select>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Numer Kolczyka</label>
+                    <input type="text" name="ear_tag" id="ear_tag_input" value="{{ form.ear_tag.value }}"
+                           class="w-full border rounded px-3 py-1.5 text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 bg-gray-100 cursor-not-allowed transition" readonly>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Data wprowadzenia do stada</label>
+                    <input type="date" name="entry_date" id="entry_date_input" value="{{ form.entry_date.value|date:'Y-m-d' }}"
+                           class="w-full border rounded px-3 py-1.5 text-gray-800 focus:ring-2 focus:ring-blue-500 bg-gray-100 cursor-not-allowed transition" readonly>
                 </div>
             </div>
 
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200 text-left text-sm text-gray-600">
-                    <thead class="bg-gray-100 text-xs uppercase text-gray-500 font-bold">
-                        <tr>
-                            <th class="p-4">Data zdarzenia</th>
-                            <th class="p-4">Typ</th>
-                            <th class="p-4">Szczegóły</th>
-                            <th class="p-4 text-center action-col hidden transition">Akcje</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200" id="eventsTableBody">
-                        {% for event in sow.all_events %}
-                        <tr class="hover:bg-gray-50 event-row" data-type="{{ event.event_type }}">
-                            <td class="p-4 font-semibold text-gray-800 whitespace-nowrap">{{ event.event_date }}</td>
-                            <td class="p-4 whitespace-nowrap">
-                                {% if event.event_type == 'INSEMINATION' %}
-                                    <span class="bg-yellow-100 text-yellow-800 px-2.5 py-1 rounded-full text-xs font-bold border border-yellow-200">🧬 Inseminacja</span>
-                                {% elif event.event_type == 'FARROWING' %}
-                                    <span class="bg-purple-100 text-purple-800 px-2.5 py-1 rounded-full text-xs font-bold border border-purple-200">🍼 Oproszenie</span>
-                                {% elif event.event_type == 'WEANING' %}
-                                    <span class="bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full text-xs font-bold border border-blue-200">🐖 Odsadzenie</span>
-                                {% endif %}
-                            </td>
-                            <td class="p-4 text-gray-700">
-                                {% if event.event_type == 'INSEMINATION' %}
-                                    Inseminator/Technik: <strong class="text-gray-900">{{ event.details.technician|default:"Brak danych" }}</strong>
-                                {% elif event.event_type == 'FARROWING' %}
-                                    Urodzone żywe: <strong class="text-green-600">{{ event.details.born_alive|default:"0" }}</strong>,
-                                    Martwe: <strong class="text-red-500">{{ event.details.born_dead|default:"0" }}</strong>
-                                    (Łącznie: <strong>{{ event.details.born_alive|default:"0"|add:event.details.born_dead|default:"0" }}</strong>)
-                                {% elif event.event_type == 'WEANING' %}
-                                    Liczba odsadzonych prosiąt: <strong class="text-blue-600">{{ event.details.count|default:"0" }} szt.</strong>
-                                {% endif %}
-                            </td>
-                            <td class="p-4 action-col hidden transition">
-                                <div class="flex justify-center items-center gap-4">
-                                    <a href="{% url 'edit_event' event.id %}" class="text-indigo-500 hover:text-indigo-700 font-bold transition">✏️ Edytuj</a>
-                                    <form method="post" action="{% url 'delete_event' event.id %}" class="inline" onsubmit="return confirm('Czy na pewno chcesz bezpowrotnie usunąć to zdarzenie z historii maciory?');">
-                                        {% csrf_token %}
-                                        <button type="submit" class="text-red-500 hover:text-red-700 font-bold transition">🗑️ Usuń</button>
-                                    </form>
-                                </div>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="4" class="p-4 text-center text-gray-400 italic">Brak zarejestrowanych zdarzeń w historii.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
+            <div class="flex flex-wrap gap-2 w-full lg:w-auto justify-end items-center">
+                <a href="{% url 'add_event' sow.id %}" id="btnAddEvent" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-extrabold py-2.5 px-5 rounded-lg shadow-md hover:shadow-lg transition transform hover:-translate-y-0.5">
+                    🚀 + Dodaj zdarzenie
+                </a>
+                <button type="button" id="btnEditData" onclick="toggleEditMode()" class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 text-sm font-medium py-2 px-4 rounded-lg shadow-sm transition">
+                    ✏️ Edytuj dane
+                </button>
+                <a href="{% url 'dashboard' %}" id="btnGoBack" class="bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm font-bold py-2 px-4 rounded-lg shadow transition">
+                    Wróć
+                </a>
 
-    <div id="deleteModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex justify-center items-center">
-        <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md relative">
-            <h3 class="text-xl font-bold text-red-600 mb-4">⚠️ Usuwanie maciory</h3>
-            <p class="text-gray-700 mb-4">
-                Czy na pewno chcesz usunąć maciorę o numerze <strong>{{ sow.ear_tag }}</strong>? Ta operacja jest nieodwracalna i usunie również historię jej zdarzeń!
-            </p>
-            <p class="text-sm text-gray-500 mb-2">Aby potwierdzić, przepisz poniżej jej numer kolczyka:</p>
-
-            <input type="text" id="confirmEarTag" placeholder="{{ sow.ear_tag }}"
-                   class="w-full border rounded px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-red-500 mb-4"
-                   oninput="checkDeleteConfirmation('{{ sow.ear_tag }}')">
-
-            <div class="flex justify-end gap-3">
-                <button type="button" onclick="closeDeleteModal()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded transition">
+                <button type="button" id="btnDeleteSow" onclick="openDeleteModal()" class="hidden bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 px-4 rounded-lg shadow transition">
+                    🗑️ Usuń
+                </button>
+                <button type="button" id="btnCancelEdit" onclick="cancelEditMode()" class="hidden bg-gray-400 hover:bg-gray-500 text-white text-sm font-bold py-2 px-4 rounded-lg shadow transition">
                     Anuluj
                 </button>
-                <form method="post" action="{% url 'delete_sow' sow.id %}" class="inline">
-                    {% csrf_token %}
-                    <button type="submit" id="deleteBtn" disabled class="bg-gray-400 text-white font-bold py-2 px-4 rounded cursor-not-allowed transition">
-                        Usuń bezpowrotnie
-                    </button>
-                </form>
+                <button type="submit" id="btnSaveEdit" name="edit_sow" class="hidden bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 px-4 rounded-lg shadow transition">
+                    💾 Zapisz zmiany
+                </button>
             </div>
+        </div>
+        <p class="text-xs text-gray-400 mt-3">ID systemu: {{ sow.id }} | Data utworzenia profilu: {{ sow.created_at|date:"d.m.Y H:i" }}</p>
+    </form>
+
+    <h2 class="text-lg font-bold text-gray-700 mb-3">Statystyki produkcyjne (Średnie na cykl)</h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-green-500">
+            <p class="text-xs uppercase text-gray-400 font-bold">Urodzone Żywe</p>
+            <p class="text-2xl font-bold text-gray-800">{{ sow.avg_born_alive }} <span class="text-sm font-normal text-gray-500">szt.</span></p>
+        </div>
+        <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-red-500">
+            <p class="text-xs uppercase text-gray-400 font-bold">Urodzone Martwe</p>
+            <p class="text-2xl font-bold text-gray-800">{{ sow.avg_born_dead }} <span class="text-sm font-normal text-gray-500">szt.</span></p>
+        </div>
+        <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-blue-500">
+            <p class="text-xs uppercase text-gray-400 font-bold">Odsadzone</p>
+            <p class="text-2xl font-bold text-gray-800">{{ sow.avg_weaned }} <span class="text-sm font-normal text-gray-500">szt.</span></p>
+        </div>
+        <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-orange-500">
+            <p class="text-xs uppercase text-gray-400 font-bold">Upadki przed odsadzeniem</p>
+            <p class="text-2xl font-bold text-gray-800">{{ sow.avg_loss_before_weaning }} <span class="text-sm font-normal text-gray-500">szt.</span></p>
         </div>
     </div>
 
-    <script>
-        function toggleEditMode() {
-            const earInput = document.getElementById('ear_tag_input');
-            const dateInput = document.getElementById('entry_date_input');
+    <div class="bg-white rounded-lg shadow-sm overflow-hidden border-t-4 border-indigo-500 mb-8">
 
-            [earInput, dateInput].forEach(input => {
-                input.removeAttribute('readonly');
-                input.classList.remove('bg-gray-100', 'cursor-not-allowed');
-                input.classList.add('bg-white');
-            });
+        <div class="p-4 bg-gray-50 border-b border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4">
+            <h3 class="text-md font-bold text-gray-700 flex items-center">📅 Rejestr Zdarzeń (Chronologicznie)</h3>
 
+            <div class="flex items-center gap-2">
+                <label for="eventFilter" class="text-sm font-bold text-gray-500">Filtruj:</label>
+                <select id="eventFilter" class="shadow-sm border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                    <option value="ALL">Wszystkie zdarzenia</option>
+                    <option value="INSEMINATION">Tylko Inseminacje</option>
+                    <option value="FARROWING">Tylko Oproszenia</option>
+                    <option value="WEANING">Tylko Odsadzenia</option>
+                </select>
+            </div>
+        </div>
 
-            document.getElementById('btnEditData').classList.add('hidden');
-            document.getElementById('btnAddEvent').classList.add('hidden');
-            document.getElementById('btnGoBack').classList.add('hidden');
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 text-left text-sm text-gray-600">
+                <thead class="bg-gray-100 text-xs uppercase text-gray-500 font-bold">
+                    <tr>
+                        <th class="p-4">Data zdarzenia</th>
+                        <th class="p-4">Typ</th>
+                        <th class="p-4">Szczegóły</th>
+                        <th class="p-4 text-center action-col hidden transition">Akcje</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200" id="eventsTableBody">
+                    {% for event in sow.all_events %}
+                    <tr class="hover:bg-gray-50 event-row" data-filter="{{ event.event_type }}" data-search="{{ event.event_date }}">
+                        <td class="p-4 font-semibold text-gray-800 whitespace-nowrap">{{ event.event_date }}</td>
+                        <td class="p-4 whitespace-nowrap">
+                            {% if event.event_type == 'INSEMINATION' %}
+                                <span class="bg-yellow-100 text-yellow-800 px-2.5 py-1 rounded-full text-xs font-bold border border-yellow-200">🧬 Inseminacja</span>
+                            {% elif event.event_type == 'FARROWING' %}
+                                <span class="bg-purple-100 text-purple-800 px-2.5 py-1 rounded-full text-xs font-bold border border-purple-200">🍼 Oproszenie</span>
+                            {% elif event.event_type == 'WEANING' %}
+                                <span class="bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full text-xs font-bold border border-blue-200">🐖 Odsadzenie</span>
+                            {% endif %}
+                        </td>
+                        <td class="p-4 text-gray-700">
+                            {% if event.event_type == 'INSEMINATION' %}
+                                Inseminator/Technik: <strong class="text-gray-900">{{ event.details.technician|default:"Brak danych" }}</strong>
+                            {% elif event.event_type == 'FARROWING' %}
+                                Urodzone żywe: <strong class="text-green-600">{{ event.details.born_alive|default:"0" }}</strong>,
+                                Martwe: <strong class="text-red-500">{{ event.details.born_dead|default:"0" }}</strong>
+                                (Łącznie: <strong>{{ event.details.born_alive|default:"0"|add:event.details.born_dead|default:"0" }}</strong>)
+                            {% elif event.event_type == 'WEANING' %}
+                                Liczba odsadzonych prosiąt: <strong class="text-blue-600">{{ event.details.count|default:"0" }} szt.</strong>
+                            {% endif %}
+                        </td>
+                        <td class="p-4 action-col hidden transition">
+                            <div class="flex justify-center items-center gap-4">
+                                <a href="{% url 'edit_event' event.id %}" class="text-indigo-500 hover:text-indigo-700 font-bold transition">✏️ Edytuj</a>
+                                <form method="post" action="{% url 'delete_event' event.id %}" class="inline" onsubmit="return confirm('Czy na pewno chcesz bezpowrotnie usunąć to zdarzenie z historii maciory?');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="text-red-500 hover:text-red-700 font-bold transition">🗑️ Usuń</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="p-4 text-center text-gray-400 italic">Brak zarejestrowanych zdarzeń w historii.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
 
+        <div class="p-4 flex flex-col sm:flex-row justify-between items-center border-t bg-gray-50 gap-4">
+            <div class="flex items-center gap-2">
+                <label for="eventLimitSelect" class="text-xs text-gray-500 font-bold uppercase tracking-wider">Wierszy na stronę:</label>
+                <select id="eventLimitSelect" class="shadow-sm border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-gray-700">
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                </select>
+            </div>
 
-            document.getElementById('btnDeleteSow').classList.remove('hidden');
-            document.getElementById('btnCancelEdit').classList.remove('hidden');
-            document.getElementById('btnSaveEdit').classList.remove('hidden');
+            <div id="eventPaginationControls" class="flex gap-1"></div>
+        </div>
 
+    </div>
+<div id="deleteModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex justify-center items-center">
+    <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md relative">
+        <h3 class="text-xl font-bold text-red-600 mb-4">⚠️ Usuwanie maciory</h3>
+        <p class="text-gray-700 mb-4">
+            Czy na pewno chcesz usunąć maciorę o numerze <strong>{{ sow.ear_tag }}</strong>? Ta operacja jest nieodwracalna i usunie również historię jej zdarzeń!
+        </p>
+        <p class="text-sm text-gray-500 mb-2">Aby potwierdzić, przepisz poniżej jej numer kolczyka:</p>
 
-            document.querySelectorAll('.action-col').forEach(col => {
-                col.classList.remove('hidden');
-            });
+        <input type="text" id="confirmEarTag" placeholder="{{ sow.ear_tag }}"
+               class="w-full border rounded px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-red-500 mb-4"
+               oninput="checkDeleteConfirmation('{{ sow.ear_tag }}')">
+
+        <div class="flex justify-end gap-3">
+            <button type="button" onclick="closeDeleteModal()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded transition">
+                Anuluj
+            </button>
+            <form method="post" action="{% url 'delete_sow' sow.id %}" class="inline">
+                {% csrf_token %}
+                <button type="submit" id="deleteBtn" disabled class="bg-gray-400 text-white font-bold py-2 px-4 rounded cursor-not-allowed transition">
+                    Usuń bezpowrotnie
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function toggleEditMode() {
+        const earInput = document.getElementById('ear_tag_input');
+        const dateInput = document.getElementById('entry_date_input');
+
+        [earInput, dateInput].forEach(input => {
+            input.removeAttribute('readonly');
+            input.classList.remove('bg-gray-100', 'cursor-not-allowed');
+            input.classList.add('bg-white');
+        });
+
+        document.getElementById('btnEditData').classList.add('hidden');
+        document.getElementById('btnAddEvent').classList.add('hidden');
+        document.getElementById('btnGoBack').classList.add('hidden');
+
+        document.getElementById('btnDeleteSow').classList.remove('hidden');
+        document.getElementById('btnCancelEdit').classList.remove('hidden');
+        document.getElementById('btnSaveEdit').classList.remove('hidden');
+
+        document.querySelectorAll('.action-col').forEach(col => {
+            col.classList.remove('hidden');
+        });
+    }
+
+    function cancelEditMode() {
+        document.getElementById('sowForm').reset();
+
+        const earInput = document.getElementById('ear_tag_input');
+        const dateInput = document.getElementById('entry_date_input');
+
+        [earInput, dateInput].forEach(input => {
+            input.setAttribute('readonly', 'true');
+            input.classList.add('bg-gray-100', 'cursor-not-allowed');
+            input.classList.remove('bg-white');
+        });
+
+        document.getElementById('btnEditData').classList.remove('hidden');
+        document.getElementById('btnAddEvent').classList.remove('hidden');
+        document.getElementById('btnGoBack').classList.remove('hidden');
+        document.getElementById('btnDeleteSow').classList.add('hidden');
+        document.getElementById('btnCancelEdit').classList.add('hidden');
+        document.getElementById('btnSaveEdit').classList.add('hidden');
+
+        document.querySelectorAll('.action-col').forEach(col => {
+            col.classList.add('hidden');
+        });
+    }
+
+    function openDeleteModal() {
+        document.getElementById('deleteModal').classList.remove('hidden');
+        document.getElementById('confirmEarTag').focus();
+    }
+
+    var controlEarTagValue = '{{ sow.ear_tag }}';
+
+    function closeDeleteModal() {
+        document.getElementById('deleteModal').classList.add('hidden');
+        document.getElementById('confirmEarTag').value = '';
+        checkDeleteConfirmation(controlEarTagValue);
+    }
+
+    function checkDeleteConfirmation(expectedValue) {
+        const input = document.getElementById('confirmEarTag').value;
+        const btn = document.getElementById('deleteBtn');
+
+        if (input === expectedValue) {
+            btn.disabled = false;
+            btn.classList.remove('bg-gray-400', 'cursor-not-allowed');
+            btn.classList.add('bg-red-600', 'hover:bg-red-700');
+        } else {
+            btn.disabled = true;
+            btn.classList.add('bg-gray-400', 'cursor-not-allowed');
+            btn.classList.remove('bg-red-600', 'hover:bg-red-700');
+        }
+    }
+
+    // 2. KLASA DO OBSŁUGI PAGINACJI I FILTROWANIA WBUDOWANA W SZABLON
+    class PaginationTable {
+        constructor(config) {
+            this.rows = Array.from(document.querySelectorAll(config.rowSelector));
+            this.searchInput = config.searchInputId ? document.getElementById(config.searchInputId) : null;
+            this.filterSelect = config.filterSelectId ? document.getElementById(config.filterSelectId) : null;
+            this.limitSelect = config.limitSelectId ? document.getElementById(config.limitSelectId) : null;
+            this.paginationContainer = document.getElementById(config.paginationContainerId);
+
+            this.currentPage = 1;
+            this.limit = this.limitSelect ? parseInt(this.limitSelect.value) : 10;
+            this.filteredRows = [...this.rows];
+
+            this.initEvents();
+            this.updateTable();
         }
 
-        function cancelEditMode() {
-            document.getElementById('sowForm').reset();
-
-            const earInput = document.getElementById('ear_tag_input');
-            const dateInput = document.getElementById('entry_date_input');
-
-            [earInput, dateInput].forEach(input => {
-                input.setAttribute('readonly', 'true');
-                input.classList.add('bg-gray-100', 'cursor-not-allowed');
-                input.classList.remove('bg-white');
-            });
-
-
-            document.getElementById('btnEditData').classList.remove('hidden');
-            document.getElementById('btnAddEvent').classList.remove('hidden');
-            document.getElementById('btnGoBack').classList.remove('hidden');
-            document.getElementById('btnDeleteSow').classList.add('hidden');
-            document.getElementById('btnCancelEdit').classList.add('hidden');
-            document.getElementById('btnSaveEdit').classList.add('hidden');
-
-
-            document.querySelectorAll('.action-col').forEach(col => {
-                col.classList.add('hidden');
-            });
-        }
-
-
-        function openDeleteModal() {
-            document.getElementById('deleteModal').classList.remove('hidden');
-            document.getElementById('confirmEarTag').focus();
-        }
-
-        function closeDeleteModal() {
-            document.getElementById('deleteModal').classList.add('hidden');
-            document.getElementById('confirmEarTag').value = '';
-            checkDeleteConfirmation('{{ sow.ear_tag }}');
-        }
-
-        function checkDeleteConfirmation(expectedValue) {
-            const input = document.getElementById('confirmEarTag').value;
-            const btn = document.getElementById('deleteBtn');
-
-            if (input === expectedValue) {
-                btn.disabled = false;
-                btn.classList.remove('bg-gray-400', 'cursor-not-allowed');
-                btn.classList.add('bg-red-600', 'hover:bg-red-700');
-            } else {
-                btn.disabled = true;
-                btn.classList.add('bg-gray-400', 'cursor-not-allowed');
-                btn.classList.remove('bg-red-600', 'hover:bg-red-700');
+        initEvents() {
+            if (this.searchInput) this.searchInput.addEventListener('input', () => this.filterData());
+            if (this.filterSelect) this.filterSelect.addEventListener('change', () => this.filterData());
+            if (this.limitSelect) {
+                this.limitSelect.addEventListener('change', (e) => {
+                    this.limit = parseInt(e.target.value);
+                    this.currentPage = 1;
+                    this.updateTable();
+                });
             }
         }
 
-        function filterEvents() {
-            const filterValue = document.getElementById('eventFilter').value;
-            const rows = document.querySelectorAll('.event-row');
+        filterData() {
+            const query = this.searchInput ? this.searchInput.value.toLowerCase() : '';
+            const filterValue = this.filterSelect ? this.filterSelect.value : 'ALL';
 
-            rows.forEach(row => {
-                const eventType = row.getAttribute('data-type');
-                if (filterValue === 'ALL' || eventType === filterValue) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
+            this.filteredRows = this.rows.filter(row => {
+                const searchData = (row.dataset.search || '').toLowerCase();
+                const filterData = row.dataset.filter || 'ALL';
+
+                const matchesSearch = searchData.includes(query);
+                const matchesFilter = filterValue === 'ALL' || filterData === filterValue;
+
+                return matchesSearch && matchesFilter;
             });
+
+            this.currentPage = 1;
+            this.updateTable();
         }
-    </script>
-</body>
-</html>
+
+        updateTable() {
+            // Ukryj wszystkie wiersze
+            this.rows.forEach(row => row.style.display = 'none');
+
+            // Oblicz indeksy dla stron
+            const start = (this.currentPage - 1) * this.limit;
+            const end = start + this.limit;
+            const rowsToShow = this.filteredRows.slice(start, end);
+
+            // Pokaż tylko te z bieżącej strony
+            rowsToShow.forEach(row => row.style.display = '');
+
+            this.renderPagination();
+        }
+
+        renderPagination() {
+            if (!this.paginationContainer) return;
+            this.paginationContainer.innerHTML = '';
+
+            const totalPages = Math.ceil(this.filteredRows.length / this.limit);
+            if (totalPages <= 1) return;
+
+            for (let i = 1; i <= totalPages; i++) {
+                const btn = document.createElement('button');
+                btn.innerText = i;
+                btn.className = `px-3 py-1 border rounded mx-1 text-sm font-medium transition-colors ${
+                    i === this.currentPage
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow'
+                    : 'bg-white text-gray-700 hover:bg-gray-100 border-gray-300'
+                }`;
+                btn.onclick = () => {
+                    this.currentPage = i;
+                    this.updateTable();
+                };
+                this.paginationContainer.appendChild(btn);
+            }
+        }
+    }
+
+    // 3. INICJALIZACJA TABELI PO ZAŁADOWANIU STRONY
+    document.addEventListener("DOMContentLoaded", () => {
+        new PaginationTable({
+            rowSelector: '.event-row',
+            filterSelectId: 'eventFilter',
+            limitSelectId: 'eventLimitSelect',
+            paginationContainerId: 'eventPaginationControls'
+        });
+    });
+</script>
+{% endblock %}
