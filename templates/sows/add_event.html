@@ -34,7 +34,7 @@
                 {% endif %}
             </div>
 
-           <div>
+            <div>
                <label class="block text-gray-700 text-sm font-bold mb-2">{{ form.event_date.label }}</label>
                 <input type="date" name="event_date" value="{% if form.is_bound %}{{ form.event_date.value|default:'' }}{% else %}{{ form.event_date.value|date:'Y-m-d'|default:'' }}{% endif %}" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" required>
             </div>
@@ -42,6 +42,20 @@
             <div id="sec_insemination" class="p-4 bg-yellow-50 rounded-lg border border-yellow-200 hidden">
                 <label class="block text-gray-700 text-sm font-bold mb-2">{{ form.technician.label }}</label>
                 <input type="text" name="technician" value="{{ form.technician.value|default:'' }}" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-yellow-500">
+            </div>
+
+            <div id="sec_pregnancy_check" class="p-4 bg-green-50 rounded-lg border border-green-200 hidden/ space-y-3">
+                <label class="block text-gray-700 text-sm font-bold mb-2">{{ form.pregnancy_result.label }}</label>
+                <select name="pregnancy_result" id="id_pregnancy_result" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-green-500">
+                    {% for value, text in form.fields.pregnancy_result.choices %}
+                        <option value="{{ value }}" {% if form.pregnancy_result.value == value %}selected{% endif %}>{{ text }}</option>
+                    {% endfor %}
+                </select>
+                {% if form.pregnancy_result.errors %}
+                    <p class="text-red-600 text-sm font-bold mt-2 bg-red-50 border-l-4 border-red-500 p-2 rounded">
+                        {{ form.pregnancy_result.errors.0 }}
+                    </p>
+                {% endif %}
             </div>
 
             <div id="sec_farrowing" class="p-4 bg-purple-50 rounded-lg border border-purple-200 hidden space-y-3">
@@ -63,6 +77,16 @@
                 <input type="number" name="count" value="{{ form.count.value|default:'0' }}" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
 
+            <div id="sec_vaccination" class="p-4 bg-teal-50 rounded-lg border border-teal-200 hidden">
+                <label class="block text-gray-700 text-sm font-bold mb-2">{{ form.vaccine_name.label }}</label>
+                <input type="text" name="vaccine_name" value="{{ form.vaccine_name.value|default:'' }}" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Wpisz nazwę szczepionki">
+                {% if form.vaccine_name.errors %}
+                    <p class="text-red-600 text-sm font-bold mt-2 bg-red-50 border-l-4 border-red-500 p-2 rounded">
+                        {{ form.vaccine_name.errors.0 }}
+                    </p>
+                {% endif %}
+            </div>
+
             <div class="flex justify-between items-center pt-4 border-t">
                 <a href="{% url 'sow_detail' sow.id %}" class="text-gray-500 hover:text-gray-800 text-sm font-bold">Anuluj</a>
                 <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded focus:outline-none shadow transition">
@@ -75,21 +99,32 @@
     <script>
     const typeSelect = document.getElementById('id_event_type');
     const secInsemination = document.getElementById('sec_insemination');
+    const secPregnancyCheck = document.getElementById('sec_pregnancy_check');
     const secFarrowing = document.getElementById('sec_farrowing');
     const secWeaning = document.getElementById('sec_weaning');
+    const secVaccination = document.getElementById('sec_vaccination');
 
     function toggleFields() {
         const val = typeSelect.value;
+
+        // Ukryj domyślnie wszystkie sekcje dodatkowe
         secInsemination.classList.add('hidden');
+        secPregnancyCheck.classList.add('hidden');
         secFarrowing.classList.add('hidden');
         secWeaning.classList.add('hidden');
+        secVaccination.classList.add('hidden');
 
+        // Aktywuj sekcję powiązaną z wybranym typem zdarzenia
         if (val === 'INSEMINATION') {
             secInsemination.classList.remove('hidden');
+        } else if (val === 'PREGNANCY_CHECK') {
+            secPregnancyCheck.classList.remove('hidden');
         } else if (val === 'FARROWING') {
             secFarrowing.classList.remove('hidden');
         } else if (val === 'WEANING') {
             secWeaning.classList.remove('hidden');
+        } else if (val === 'VACCINATION') {
+            secVaccination.classList.remove('hidden');
         }
     }
 
@@ -106,6 +141,6 @@
         }
         toggleFields();
     });
-        </script>
+    </script>
 </body>
 </html>
