@@ -9,31 +9,43 @@
 <body class="bg-gray-100 font-sans p-4 md:p-6">
     <div class="container mx-auto max-w-5xl">
 
-        <form method="post" class="mb-6 bg-white p-6 rounded-lg shadow-sm border-l-4 border-blue-600">
+        <form method="post" id="sowForm" class="mb-6 bg-white p-6 rounded-lg shadow-sm border-l-4 border-blue-600 transition-all duration-300">
             {% csrf_token %}
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full md:max-w-xl">
+            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full lg:max-w-xl">
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Numer Kolczyka</label>
-                        <input type="text" name="ear_tag" value="{{ form.ear_tag.value }}" class="w-full border rounded px-3 py-1.5 text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500">
+                        <input type="text" name="ear_tag" id="ear_tag_input" value="{{ form.ear_tag.value }}"
+                               class="w-full border rounded px-3 py-1.5 text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 bg-gray-100 cursor-not-allowed transition" readonly>
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Data wprowadzenia do stada</label>
-                        <input type="date" name="entry_date" value="{{ form.entry_date.value|date:'Y-m-d' }}" class="w-full border rounded px-3 py-1.5 text-gray-800 focus:ring-2 focus:ring-blue-500">
+                        <input type="date" name="entry_date" id="entry_date_input" value="{{ form.entry_date.value|date:'Y-m-d' }}"
+                               class="w-full border rounded px-3 py-1.5 text-gray-800 focus:ring-2 focus:ring-blue-500 bg-gray-100 cursor-not-allowed transition" readonly>
                     </div>
                 </div>
 
-                <div class="flex flex-wrap gap-2 w-full md:w-auto justify-end">
-                    <button type="submit" name="edit_sow" class="bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 px-4 rounded shadow transition">
-                        💾 Zapisz zmiany
-                    </button>
-                    <a href="{% url 'add_event' sow.id %}" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 px-4 rounded shadow transition">
-                        + Dodaj zdarzenie
+                <div class="flex flex-wrap gap-2 w-full lg:w-auto justify-end items-center">
+
+                    <a href="{% url 'add_event' sow.id %}" id="btnAddEvent" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-extrabold py-2.5 px-5 rounded-lg shadow-md hover:shadow-lg transition transform hover:-translate-y-0.5">
+                        🚀 + Dodaj zdarzenie
                     </a>
-                    <button type="button" onclick="openDeleteModal()" class="bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 px-4 rounded shadow transition">
+                    <button type="button" id="btnEditData" onclick="toggleEditMode()" class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 text-sm font-medium py-2 px-4 rounded-lg shadow-sm transition">
+                        ✏️ Edytuj dane
+                    </button>
+                    <a href="{% url 'dashboard' %}" id="btnGoBack" class="bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm font-bold py-2 px-4 rounded-lg shadow transition">
+                        Wróć
+                    </a>
+
+                    <button type="button" id="btnDeleteSow" onclick="openDeleteModal()" class="hidden bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 px-4 rounded-lg shadow transition">
                         🗑️ Usuń
                     </button>
-                    <a href="{% url 'dashboard' %}" class="bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm font-bold py-2 px-4 rounded shadow transition">Wróć</a>
+                    <button type="button" id="btnCancelEdit" onclick="cancelEditMode()" class="hidden bg-gray-400 hover:bg-gray-500 text-white text-sm font-bold py-2 px-4 rounded-lg shadow transition">
+                        Anuluj
+                    </button>
+                    <button type="submit" id="btnSaveEdit" name="edit_sow" class="hidden bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 px-4 rounded-lg shadow transition">
+                        💾 Zapisz zmiany
+                    </button>
                 </div>
             </div>
             <p class="text-xs text-gray-400 mt-3">ID systemu: {{ sow.id }} | Data utworzenia profilu: {{ sow.created_at|date:"d.m.Y H:i" }}</p>
@@ -81,7 +93,7 @@
                             <th class="p-4">Data zdarzenia</th>
                             <th class="p-4">Typ</th>
                             <th class="p-4">Szczegóły</th>
-                            <th class="p-4 text-center">Akcje</th>
+                            <th class="p-4 text-center action-col hidden transition">Akcje</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200" id="eventsTableBody">
@@ -108,13 +120,14 @@
                                     Liczba odsadzonych prosiąt: <strong class="text-blue-600">{{ event.details.count|default:"0" }} szt.</strong>
                                 {% endif %}
                             </td>
-                            <td class="p-4 text-center whitespace-nowrap">
-                                <a href="{% url 'edit_event' event.id %}" class="text-indigo-500 hover:text-indigo-700 font-bold transition">✏️ Edytuj</a>
-
-                                <form method="post" action="{% url 'delete_event' event.id %}" class="inline" onsubmit="return confirm('Czy na pewno chcesz bezpowrotnie usunąć to zdarzenie z historii maciory?');">
-                                    {% csrf_token %}
-                                    <button type="submit" class="text-red-500 hover:text-red-700 font-bold transition">🗑️ Usuń</button>
-                                </form>
+                            <td class="p-4 action-col hidden transition">
+                                <div class="flex justify-center items-center gap-4">
+                                    <a href="{% url 'edit_event' event.id %}" class="text-indigo-500 hover:text-indigo-700 font-bold transition">✏️ Edytuj</a>
+                                    <form method="post" action="{% url 'delete_event' event.id %}" class="inline" onsubmit="return confirm('Czy na pewno chcesz bezpowrotnie usunąć to zdarzenie z historii maciory?');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="text-red-500 hover:text-red-700 font-bold transition">🗑️ Usuń</button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                         {% empty %}
@@ -155,6 +168,59 @@
     </div>
 
     <script>
+        function toggleEditMode() {
+            const earInput = document.getElementById('ear_tag_input');
+            const dateInput = document.getElementById('entry_date_input');
+
+            [earInput, dateInput].forEach(input => {
+                input.removeAttribute('readonly');
+                input.classList.remove('bg-gray-100', 'cursor-not-allowed');
+                input.classList.add('bg-white');
+            });
+
+
+            document.getElementById('btnEditData').classList.add('hidden');
+            document.getElementById('btnAddEvent').classList.add('hidden');
+            document.getElementById('btnGoBack').classList.add('hidden');
+
+
+            document.getElementById('btnDeleteSow').classList.remove('hidden');
+            document.getElementById('btnCancelEdit').classList.remove('hidden');
+            document.getElementById('btnSaveEdit').classList.remove('hidden');
+
+
+            document.querySelectorAll('.action-col').forEach(col => {
+                col.classList.remove('hidden');
+            });
+        }
+
+        function cancelEditMode() {
+            document.getElementById('sowForm').reset();
+
+            const earInput = document.getElementById('ear_tag_input');
+            const dateInput = document.getElementById('entry_date_input');
+
+            [earInput, dateInput].forEach(input => {
+                input.setAttribute('readonly', 'true');
+                input.classList.add('bg-gray-100', 'cursor-not-allowed');
+                input.classList.remove('bg-white');
+            });
+
+
+            document.getElementById('btnEditData').classList.remove('hidden');
+            document.getElementById('btnAddEvent').classList.remove('hidden');
+            document.getElementById('btnGoBack').classList.remove('hidden');
+            document.getElementById('btnDeleteSow').classList.add('hidden');
+            document.getElementById('btnCancelEdit').classList.add('hidden');
+            document.getElementById('btnSaveEdit').classList.add('hidden');
+
+
+            document.querySelectorAll('.action-col').forEach(col => {
+                col.classList.add('hidden');
+            });
+        }
+
+
         function openDeleteModal() {
             document.getElementById('deleteModal').classList.remove('hidden');
             document.getElementById('confirmEarTag').focus();

@@ -34,9 +34,9 @@
                 {% endif %}
             </div>
 
-            <div>
-                <label class="block text-gray-700 text-sm font-bold mb-2">{{ form.event_date.label }}</label>
-                <input type="date" name="event_date" value="{{ form.event_date.value|date:'Y-m-d'|default:'' }}" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+           <div>
+               <label class="block text-gray-700 text-sm font-bold mb-2">{{ form.event_date.label }}</label>
+                <input type="date" name="event_date" value="{% if form.is_bound %}{{ form.event_date.value|default:'' }}{% else %}{{ form.event_date.value|date:'Y-m-d'|default:'' }}{% endif %}" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" required>
             </div>
 
             <div id="sec_insemination" class="p-4 bg-yellow-50 rounded-lg border border-yellow-200 hidden">
@@ -73,28 +73,39 @@
     </div>
 
     <script>
-        const typeSelect = document.getElementById('id_event_type');
-        const secInsemination = document.getElementById('sec_insemination');
-        const secFarrowing = document.getElementById('sec_farrowing');
-        const secWeaning = document.getElementById('sec_weaning');
+    const typeSelect = document.getElementById('id_event_type');
+    const secInsemination = document.getElementById('sec_insemination');
+    const secFarrowing = document.getElementById('sec_farrowing');
+    const secWeaning = document.getElementById('sec_weaning');
 
-        function toggleFields() {
-            const val = typeSelect.value;
-            secInsemination.classList.add('hidden');
-            secFarrowing.classList.add('hidden');
-            secWeaning.classList.add('hidden');
+    function toggleFields() {
+        const val = typeSelect.value;
+        secInsemination.classList.add('hidden');
+        secFarrowing.classList.add('hidden');
+        secWeaning.classList.add('hidden');
 
-            if (val === 'INSEMINATION') {
-                secInsemination.classList.remove('hidden');
-            } else if (val === 'FARROWING') {
-                secFarrowing.classList.remove('hidden');
-            } else if (val === 'WEANING') {
-                secWeaning.classList.remove('hidden');
-            }
+        if (val === 'INSEMINATION') {
+            secInsemination.classList.remove('hidden');
+        } else if (val === 'FARROWING') {
+            secFarrowing.classList.remove('hidden');
+        } else if (val === 'WEANING') {
+            secWeaning.classList.remove('hidden');
         }
+    }
 
-        typeSelect.addEventListener('change', toggleFields);
-        window.addEventListener('DOMContentLoaded', toggleFields);
-    </script>
+    typeSelect.addEventListener('change', toggleFields);
+
+    window.addEventListener('DOMContentLoaded', () => {
+        const dateInput = document.querySelector('input[name="event_date"]');
+        if (dateInput && !dateInput.value) {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            dateInput.value = `${yyyy}-${mm}-${dd}`;
+        }
+        toggleFields();
+    });
+        </script>
 </body>
 </html>
