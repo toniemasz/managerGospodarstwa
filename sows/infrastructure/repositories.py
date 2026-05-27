@@ -7,7 +7,7 @@ class SowRepository:
     def _map_to_domain(self, db_sow: SowModel) -> Sow:
         sow = Sow(id=db_sow.id, ear_tag=db_sow.ear_tag, entry_date=db_sow.entry_date, created_at=db_sow.created_at)
         events = [
-            SowEvent(event_type=e.event_type, event_date=e.event_date, details=e.details)
+            SowEvent(event_type=e.event_type, event_date=e.event_date, details=e.details, id=e.id)  # <--- dodaj id=e.id
             for e in db_sow.events.all()
         ]
         sow.load_history(events)

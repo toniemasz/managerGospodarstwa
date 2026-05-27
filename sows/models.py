@@ -1,6 +1,17 @@
 # sows/models.py
+
 from django.db import models
 from datetime import date
+
+
+class VaccinationPlanModel(models.Model):
+    """Słownik planowanych szczepień dla całego stada."""
+    name = models.CharField(max_length=100, verbose_name="Nazwa szczepienia")
+    days_before_farrowing = models.IntegerField(null=True, blank=True, help_text="Ile dni przed porodem?")
+    interval_months = models.IntegerField(null=True, blank=True, help_text="Cyklicznie co X miesięcy?")
+
+    def __str__(self):
+        return self.name
 
 class SowModel(models.Model):
     ear_tag = models.CharField(max_length=50)
@@ -13,8 +24,10 @@ class SowModel(models.Model):
 class SowEventModel(models.Model):
     EVENT_TYPES = [
         ('INSEMINATION', 'Inseminacja'),
+        ('PREGNANCY_CHECK', 'Badanie'),
         ('FARROWING', 'Oproszenie'),
         ('WEANING', 'Odsadzenie'),
+        ('VACCINATION', 'Szczepienie'),
     ]
 
     sow = models.ForeignKey(SowModel, on_delete=models.CASCADE, related_name='events')
