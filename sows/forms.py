@@ -1,6 +1,7 @@
 # sows/forms.py
 from django import forms
 from .models import SowModel, SowEventModel
+from django.core.exceptions import ValidationError
 
 
 class SowForm(forms.ModelForm):
@@ -32,6 +33,29 @@ class SowEventForm(forms.ModelForm):
         widgets = {
             'event_date': forms.DateInput(attrs={'type': 'date'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        self.sow_status = kwargs.pop('sow_status', None)
+        super().__init__(*args, **kwargs)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        event_type = cleaned_data.get('event_type')
+
+
+        if not self.instance.pk and self.sow_status and event_type:
+            if self.sow_status == 'LACTATING' and event_type != 'WEANING':
+                self.add_error('event_type',
+                               "Błąd: Maciora jest po oproszeniu (karmiąca). Następnym krokiem musi być 'Odsadzenie'!")
+
+            elif self.sow_status == 'IDLE' and event_type != 'INSEMINATION':
+                self.add_error('event_type', "Błąd: Maciora jest jałowa. Rozpocznij cykl wybierając 'Inseminacja'.")
+
+            elif self.sow_status == 'INSEMINATED' and event_type not in ['FARROWING', 'INSEMINATION']:
+                self.add_error('event_type', "Błąd: Maciora jest prośna. Następnym krokiem musi być 'Oproszenie'.")
+
+        return cleaned_data
+
 
     def save(self, commit=True):
         instance = super().save(commit=False)

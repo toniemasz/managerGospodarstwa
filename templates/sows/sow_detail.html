@@ -30,7 +30,10 @@
                     <a href="{% url 'add_event' sow.id %}" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 px-4 rounded shadow transition">
                         + Dodaj zdarzenie
                     </a>
-                    <a href="{% url 'dashboard' %}" class="bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm font-bold py-2 px-4 rounded shadow transition">Wróć do listy</a>
+                    <button type="button" onclick="openDeleteModal()" class="bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 px-4 rounded shadow transition">
+                        🗑️ Usuń
+                    </button>
+                    <a href="{% url 'dashboard' %}" class="bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm font-bold py-2 px-4 rounded shadow transition">Wróć</a>
                 </div>
             </div>
             <p class="text-xs text-gray-400 mt-3">ID systemu: {{ sow.id }} | Data utworzenia profilu: {{ sow.created_at|date:"d.m.Y H:i" }}</p>
@@ -56,101 +59,141 @@
             </div>
         </div>
 
-        <div class="space-y-8">
+        <div class="bg-white rounded-lg shadow-sm overflow-hidden border-t-4 border-indigo-500 mb-8">
+            <div class="p-4 bg-gray-50 border-b border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4">
+                <h3 class="text-md font-bold text-gray-700 flex items-center">📅 Rejestr Zdarzeń (Chronologicznie)</h3>
 
-            <div class="bg-white rounded-lg shadow-sm overflow-hidden border-t-4 border-yellow-500">
-                <div class="p-4 bg-gray-50 border-b border-gray-200">
-                    <h3 class="text-md font-bold text-gray-700 flex items-center">🧬 Rejestr Inseminacji</h3>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200 text-left text-sm text-gray-600">
-                        <thead class="bg-gray-100 text-xs uppercase text-gray-500 font-bold">
-                            <tr>
-                                <th class="p-4">Data krycia</th>
-                                <th class="p-4">Przewidywany poród</th>
-                                <th class="p-4">Inseminator / Technik</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-200">
-                            {% for event in sow.inseminations %}
-                            <tr class="hover:bg-gray-50">
-                                <td class="p-4 font-semibold text-gray-800">{{ event.event_date }}</td>
-                                <td class="p-4 text-gray-500">{{ sow.expected_farrowing_date|default:"--" }}</td>
-                                <td class="p-4">{{ event.details.technician|default:"Brak danych" }}</td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="3" class="p-4 text-center text-gray-400 italic">Brak zarejestrowanych inseminacji.</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                <div>
+                    <label for="eventFilter" class="text-sm font-bold text-gray-500 mr-2">Filtruj:</label>
+                    <select id="eventFilter" onchange="filterEvents()" class="shadow-sm border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="ALL">Wszystkie zdarzenia</option>
+                        <option value="INSEMINATION">Tylko Inseminacje</option>
+                        <option value="FARROWING">Tylko Oproszenia</option>
+                        <option value="WEANING">Tylko Odsadzenia</option>
+                    </select>
                 </div>
             </div>
 
-            <div class="bg-white rounded-lg shadow-sm overflow-hidden border-t-4 border-purple-500">
-                <div class="p-4 bg-gray-50 border-b border-gray-200">
-                    <h3 class="text-md font-bold text-gray-700 flex items-center">🍼 Rejestr Oproszeń</h3>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200 text-left text-sm text-gray-600">
-                        <thead class="bg-gray-100 text-xs uppercase text-gray-500 font-bold">
-                            <tr>
-                                <th class="p-4">Data porodu</th>
-                                <th class="p-4 text-center text-green-700">Urodzone Żywe</th>
-                                <th class="p-4 text-center text-red-600">Urodzone Martwe</th>
-                                <th class="p-4 text-right font-bold">Łącznie miot</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-200">
-                            {% for event in sow.farrowings %}
-                            <tr class="hover:bg-gray-50">
-                                <td class="p-4 font-semibold text-gray-800">{{ event.event_date }}</td>
-                                <td class="p-4 text-center text-green-600 font-medium">{{ event.details.born_alive|default:"0" }} szt.</td>
-                                <td class="p-4 text-center text-red-500 font-medium">{{ event.details.born_dead|default:"0" }} szt.</td>
-                                <td class="p-4 text-right font-bold text-gray-900">
-                                    {{ event.details.born_alive|default:"0"|add:event.details.born_dead|default:"0" }} szt.
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="4" class="p-4 text-center text-gray-400 italic">Brak zarejestrowanych wyproszeń.</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 text-left text-sm text-gray-600">
+                    <thead class="bg-gray-100 text-xs uppercase text-gray-500 font-bold">
+                        <tr>
+                            <th class="p-4">Data zdarzenia</th>
+                            <th class="p-4">Typ</th>
+                            <th class="p-4">Szczegóły</th>
+                            <th class="p-4 text-center">Akcje</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200" id="eventsTableBody">
+                        {% for event in sow.all_events %}
+                        <tr class="hover:bg-gray-50 event-row" data-type="{{ event.event_type }}">
+                            <td class="p-4 font-semibold text-gray-800 whitespace-nowrap">{{ event.event_date }}</td>
+                            <td class="p-4 whitespace-nowrap">
+                                {% if event.event_type == 'INSEMINATION' %}
+                                    <span class="bg-yellow-100 text-yellow-800 px-2.5 py-1 rounded-full text-xs font-bold border border-yellow-200">🧬 Inseminacja</span>
+                                {% elif event.event_type == 'FARROWING' %}
+                                    <span class="bg-purple-100 text-purple-800 px-2.5 py-1 rounded-full text-xs font-bold border border-purple-200">🍼 Oproszenie</span>
+                                {% elif event.event_type == 'WEANING' %}
+                                    <span class="bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full text-xs font-bold border border-blue-200">🐖 Odsadzenie</span>
+                                {% endif %}
+                            </td>
+                            <td class="p-4 text-gray-700">
+                                {% if event.event_type == 'INSEMINATION' %}
+                                    Inseminator/Technik: <strong class="text-gray-900">{{ event.details.technician|default:"Brak danych" }}</strong>
+                                {% elif event.event_type == 'FARROWING' %}
+                                    Urodzone żywe: <strong class="text-green-600">{{ event.details.born_alive|default:"0" }}</strong>,
+                                    Martwe: <strong class="text-red-500">{{ event.details.born_dead|default:"0" }}</strong>
+                                    (Łącznie: <strong>{{ event.details.born_alive|default:"0"|add:event.details.born_dead|default:"0" }}</strong>)
+                                {% elif event.event_type == 'WEANING' %}
+                                    Liczba odsadzonych prosiąt: <strong class="text-blue-600">{{ event.details.count|default:"0" }} szt.</strong>
+                                {% endif %}
+                            </td>
+                            <td class="p-4 text-center whitespace-nowrap">
+                                <a href="{% url 'edit_event' event.id %}" class="text-indigo-500 hover:text-indigo-700 font-bold transition">✏️ Edytuj</a>
 
-            <div class="bg-white rounded-lg shadow-sm overflow-hidden border-t-4 border-blue-500">
-                <div class="p-4 bg-gray-50 border-b border-gray-200">
-                    <h3 class="text-md font-bold text-gray-700 flex items-center">🐖 Rejestr Odsadzeń Prosiąt</h3>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200 text-left text-sm text-gray-600">
-                        <thead class="bg-gray-100 text-xs uppercase text-gray-500 font-bold">
-                            <tr>
-                                <th class="p-4">Data odsadzenia</th>
-                                <th class="p-4 font-bold text-blue-700">Liczba odsadzonych prosiąt</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-200">
-                            {% for event in sow.weanings %}
-                            <tr class="hover:bg-gray-50">
-                                <td class="p-4 font-semibold text-gray-800">{{ event.event_date }}</td>
-                                <td class="p-4 font-bold text-blue-600">{{ event.details.count|default:"0" }} szt.</td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="2" class="p-4 text-center text-gray-400 italic">Brak zarejestrowanych odsadzeń.</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+                                <form method="post" action="{% url 'delete_event' event.id %}" class="inline" onsubmit="return confirm('Czy na pewno chcesz bezpowrotnie usunąć to zdarzenie z historii maciory?');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="text-red-500 hover:text-red-700 font-bold transition">🗑️ Usuń</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="p-4 text-center text-gray-400 italic">Brak zarejestrowanych zdarzeń w historii.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
-
         </div>
     </div>
+
+    <div id="deleteModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex justify-center items-center">
+        <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md relative">
+            <h3 class="text-xl font-bold text-red-600 mb-4">⚠️ Usuwanie maciory</h3>
+            <p class="text-gray-700 mb-4">
+                Czy na pewno chcesz usunąć maciorę o numerze <strong>{{ sow.ear_tag }}</strong>? Ta operacja jest nieodwracalna i usunie również historię jej zdarzeń!
+            </p>
+            <p class="text-sm text-gray-500 mb-2">Aby potwierdzić, przepisz poniżej jej numer kolczyka:</p>
+
+            <input type="text" id="confirmEarTag" placeholder="{{ sow.ear_tag }}"
+                   class="w-full border rounded px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-red-500 mb-4"
+                   oninput="checkDeleteConfirmation('{{ sow.ear_tag }}')">
+
+            <div class="flex justify-end gap-3">
+                <button type="button" onclick="closeDeleteModal()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded transition">
+                    Anuluj
+                </button>
+                <form method="post" action="{% url 'delete_sow' sow.id %}" class="inline">
+                    {% csrf_token %}
+                    <button type="submit" id="deleteBtn" disabled class="bg-gray-400 text-white font-bold py-2 px-4 rounded cursor-not-allowed transition">
+                        Usuń bezpowrotnie
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openDeleteModal() {
+            document.getElementById('deleteModal').classList.remove('hidden');
+            document.getElementById('confirmEarTag').focus();
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').classList.add('hidden');
+            document.getElementById('confirmEarTag').value = '';
+            checkDeleteConfirmation('{{ sow.ear_tag }}');
+        }
+
+        function checkDeleteConfirmation(expectedValue) {
+            const input = document.getElementById('confirmEarTag').value;
+            const btn = document.getElementById('deleteBtn');
+
+            if (input === expectedValue) {
+                btn.disabled = false;
+                btn.classList.remove('bg-gray-400', 'cursor-not-allowed');
+                btn.classList.add('bg-red-600', 'hover:bg-red-700');
+            } else {
+                btn.disabled = true;
+                btn.classList.add('bg-gray-400', 'cursor-not-allowed');
+                btn.classList.remove('bg-red-600', 'hover:bg-red-700');
+            }
+        }
+
+        function filterEvents() {
+            const filterValue = document.getElementById('eventFilter').value;
+            const rows = document.querySelectorAll('.event-row');
+
+            rows.forEach(row => {
+                const eventType = row.getAttribute('data-type');
+                if (filterValue === 'ALL' || eventType === filterValue) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+    </script>
 </body>
 </html>

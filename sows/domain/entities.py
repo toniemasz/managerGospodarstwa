@@ -4,7 +4,8 @@ from typing import List, Dict, Any, Optional
 
 
 class SowEvent:
-    def __init__(self, event_type: str, event_date: date, details: Dict[str, Any]):
+    def __init__(self, event_type: str, event_date: date, details: Dict[str, Any], id: int = None):
+        self.id = id
         self.event_type = event_type
         self.event_date = event_date
         self.details = details
@@ -30,8 +31,12 @@ class Sow:
         self.farrowings: List[SowEvent] = []
         self.weanings: List[SowEvent] = []
 
+        self.all_events: List[SowEvent] = []
+
     def load_history(self, events: List[SowEvent]) -> None:
         sorted_events = sorted(events, key=lambda x: x.event_date)
+
+        self.all_events = sorted(events, key=lambda x: x.event_date, reverse=True)
 
         for event in sorted_events:
             if event.event_type == "INSEMINATION":
