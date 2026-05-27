@@ -75,11 +75,11 @@
             <div class="flex items-center gap-2">
                 <label for="eventFilter" class="text-sm font-bold text-gray-500">Filtruj:</label>
                 <select id="eventFilter" class="shadow-sm border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
-                    <option value="ALL">Wszystkie zdarzenia</option>
-                    <option value="INSEMINATION">Tylko Inseminacje</option>
-                    <option value="FARROWING">Tylko Oproszenia</option>
-                    <option value="WEANING">Tylko Odsadzenia</option>
-                </select>
+                        <option value="ALL">Wszystkie zdarzenia</option>
+                        <option value="INSEMINATION">Tylko Inseminacje</option>
+                        <option value="PREGNANCY_CHECK">Tylko Badania USG</option> <option value="FARROWING">Tylko Oproszenia</option>
+                        <option value="WEANING">Tylko Odsadzenia</option>
+                        <option value="VACCINATION">Tylko Szczepienia</option> </select>
             </div>
         </div>
 
@@ -100,21 +100,42 @@
                         <td class="p-4 whitespace-nowrap">
                             {% if event.event_type == 'INSEMINATION' %}
                                 <span class="bg-yellow-100 text-yellow-800 px-2.5 py-1 rounded-full text-xs font-bold border border-yellow-200">🧬 Inseminacja</span>
+                            {% elif event.event_type == 'PREGNANCY_CHECK' %}
+                                <span class="bg-green-100 text-green-800 px-2.5 py-1 rounded-full text-xs font-bold border border-green-200">🩺 Badanie USG</span>
                             {% elif event.event_type == 'FARROWING' %}
                                 <span class="bg-purple-100 text-purple-800 px-2.5 py-1 rounded-full text-xs font-bold border border-purple-200">🍼 Oproszenie</span>
                             {% elif event.event_type == 'WEANING' %}
                                 <span class="bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full text-xs font-bold border border-blue-200">🐖 Odsadzenie</span>
+                            {% elif event.event_type == 'VACCINATION' %}
+                                <span class="bg-teal-100 text-teal-800 px-2.5 py-1 rounded-full text-xs font-bold border border-teal-200">💉 Szczepienie</span>
                             {% endif %}
                         </td>
                         <td class="p-4 text-gray-700">
                             {% if event.event_type == 'INSEMINATION' %}
                                 Inseminator/Technik: <strong class="text-gray-900">{{ event.details.technician|default:"Brak danych" }}</strong>
+
+                            {% elif event.event_type == 'PREGNANCY_CHECK' %}
+                                Wynik:
+                                {% if event.details.result == 'TAK' %}
+                                    <strong class="text-green-600">Prośna (TAK)</strong>
+                                {% elif event.details.result == 'NIE' %}
+                                    <strong class="text-red-600">Jałowa (NIE)</strong>
+                                {% elif event.details.result == '?' %}
+                                    <strong class="text-orange-500">Do rebadania (?)</strong>
+                                {% else %}
+                                    <strong class="text-gray-500">Brak danych</strong>
+                                {% endif %}
+
                             {% elif event.event_type == 'FARROWING' %}
                                 Urodzone żywe: <strong class="text-green-600">{{ event.details.born_alive|default:"0" }}</strong>,
                                 Martwe: <strong class="text-red-500">{{ event.details.born_dead|default:"0" }}</strong>
                                 (Łącznie: <strong>{{ event.details.born_alive|default:"0"|add:event.details.born_dead|default:"0" }}</strong>)
+
                             {% elif event.event_type == 'WEANING' %}
                                 Liczba odsadzonych prosiąt: <strong class="text-blue-600">{{ event.details.count|default:"0" }} szt.</strong>
+
+                            {% elif event.event_type == 'VACCINATION' %}
+                                Nazwa: <strong class="text-teal-700">{{ event.details.vaccine_name|default:"Brak nazwy" }}</strong>
                             {% endif %}
                         </td>
                         <td class="p-4 action-col hidden transition">
