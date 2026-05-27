@@ -79,14 +79,41 @@ def add_event_view(request, sow_id):
 
 
 @login_required
+def bulk_pregnancy_check_view(request):
+    """Zwraca ekran do masowego wprowadzania wyników badań USG i zapisuje je."""
+    service = SowDashboardService()
+    context = service.get_dashboard_summary()
+    sows_to_check = context['sows_to_check_usg']
+
+    if request.method == 'POST':
+        for sow in sows_to_check:
+
+            result = request.POST.get(f'result_{sow.id}')
+
+
+            if result in ['TAK', 'NIE', '?']:
+                db_sow = get_object_or_404(SowModel, id=sow.id)
+                SowEventModel.objects.create(
+                    sow=db_sow,
+                    event_type='PREGNANCY_CHECK',
+                    event_date=date.today(),
+                    details={'result': result}
+                )
+        return redirect('dashboard')
+
+    return render(request, 'sows/bulk_pregnancy.html', {'sows': sows_to_check})
+
+
+@login_required
 def bulk_vaccinate_view(request):
-    """Rejestruje zdarzenie szczepienia ochronnego dla całej zaznaczonej grupy macior."""
+    """Odbiera żądanie z dashboardu, wyświetla ekran potwierdzenia i zapisuje zdarzenia."""
     if request.method == 'POST':
         sow_ids = request.POST.getlist('sow_ids')
         vaccine_name = request.POST.get('vaccine_name')
         cycle_id = request.POST.get('cycle_id')
 
-        if sow_ids and vaccine_name:
+        # Jeśli kliknięto przycisk "Zapisz szczepienia" na ekranie potwierdzenia
+        if request.POST.get('confirm') == 'yes':
             for s_id in sow_ids:
                 db_sow = get_object_or_404(SowModel, id=s_id)
                 SowEventModel.objects.create(
@@ -98,8 +125,18 @@ def bulk_vaccinate_view(request):
                         'cycle_id': cycle_id
                     }
                 )
-    return redirect('dashboard')
+            return redirect('dashboard')
 
+
+        else:
+            sows = SowModel.objects.filter(id__in=sow_ids)
+            return render(request, 'sows/bulk_vaccinate.html', {
+                'sows': sows,
+                'vaccine_name': vaccine_name,
+                'cycle_id': cycle_id
+            })
+
+    return redirect('dashboard')
 
 @login_required
 def edit_event_view(request, event_id):

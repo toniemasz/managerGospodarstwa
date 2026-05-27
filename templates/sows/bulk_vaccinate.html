@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zatwierdź szczepienie grupowe</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-4 md:p-8">
+    <div class="max-w-3xl mx-auto bg-white rounded-lg shadow-md p-6">
+        <header class="mb-6 border-b pb-4">
+            <h2 class="text-2xl font-bold text-gray-800">💉 Potwierdzenie szczepienia grupowego</h2>
+        </header>
+
+        <form method="post" action="{% url 'bulk_vaccinate' %}">
+            {% csrf_token %}
+            <!-- Ukryte wartości potrzebne do zapisu -->
+            <input type="hidden" name="vaccine_name" value="{{ vaccine_name }}">
+            <input type="hidden" name="cycle_id" value="{{ cycle_id }}">
+            <input type="hidden" name="confirm" value="yes">
+
+            <!-- Osobne, wyraźne pole z informacją co szczepimy -->
+            <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded-r">
+                <p class="text-sm text-blue-700 font-bold uppercase tracking-wide">Podawana szczepionka:</p>
+                <p class="text-2xl font-black text-blue-900 mt-1">{{ vaccine_name }}</p>
+            </div>
+
+            <h3 class="font-bold text-gray-700 mb-3">Lista macior kwalifikujących się do zabiegu:</h3>
+            <div class="bg-gray-50 border rounded p-4 mb-6 max-h-96 overflow-y-auto">
+                <div class="space-y-3">
+                    {% for sow in sows %}
+                    <label class="flex items-center p-2 hover:bg-gray-100 rounded cursor-pointer transition">
+                        <input type="checkbox" name="sow_ids" value="{{ sow.id }}" checked class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500">
+                        <span class="ml-3 text-gray-800 text-lg">Maciora Nr: <strong>{{ sow.ear_tag }}</strong></span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center pt-4 border-t">
+                <a href="{% url 'dashboard' %}" class="text-gray-500 hover:text-gray-800 text-sm font-bold">Anuluj</a>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded shadow-lg transition text-lg">
+                    Zatwierdź i zapisz w rejestrze
+                </button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

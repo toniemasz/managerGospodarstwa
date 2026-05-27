@@ -27,9 +27,12 @@
                 <input type="text" id="searchInput" placeholder="Wyszukaj nr kolczyka..." class="shadow-sm border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500">
                 <select id="statusFilter" class="shadow-sm border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500">
                     <option value="ALL">Wszystkie statusy</option>
-                    <option value="INSEMINATED">Prośna</option>
-                    <option value="LACTATING">Karmiąca</option>
                     <option value="IDLE">Jałowa</option>
+                    <option value="INSEMINATED">Po inseminacji</option>
+                    <option value="TO_CHECK">Do badania (USG)</option>
+                    <option value="PREGNANT">Prośna (Potwierdzona)</option>
+                    <option value="TO_RECHECK">Do rebadania (?)</option>
+                    <option value="LACTATING">Karmiąca</option>
                 </select>
                 <a href="{% url 'add_sow' %}" class="bg-blue-600 hover:bg-blue-700 text-white text-center text-sm font-bold py-1.5 px-4 rounded shadow whitespace-nowrap transition">
                     + Dodaj Maciorę
@@ -37,15 +40,14 @@
             </div>
         </div>
         {% if sows_to_check_usg %}
-<div class="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-lg shadow-sm">
-    <h3 class="text-red-800 font-bold mb-2">⚠️ Wymagane badanie USG (Minęło 30 dni od inseminacji)</h3>
-    <div class="flex flex-wrap gap-2">
-        {% for sow in sows_to_check_usg %}
-            <a href="{% url 'sow_detail' sow.id %}" class="bg-white border border-red-200 text-red-700 px-3 py-1 rounded text-sm hover:bg-red-100 transition">
-                Maciora: <strong>{{ sow.ear_tag }}</strong>
-            </a>
-        {% endfor %}
+<div class="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-lg shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div>
+        <h3 class="text-red-800 font-bold mb-2">⚠️ Wymagane badanie USG (Minęło 30 dni od inseminacji)</h3>
+        <p class="text-sm text-red-700">Liczba macior oczekujących na wynik: <strong>{{ sows_to_check_usg|length }}</strong></p>
     </div>
+    <a href="{% url 'bulk_pregnancy_check' %}" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded shadow font-bold transition whitespace-nowrap">
+        Przejdź do panelu badań
+    </a>
 </div>
 {% endif %}
 
@@ -54,22 +56,24 @@
     <h3 class="text-gray-800 font-bold mb-4">💉 Planowane szczepienia grupowe</h3>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         {% for group_name, sows_list in vaccination_groups.items %}
-        <form method="post" action="{% url 'bulk_vaccinate' %}" class="bg-blue-50 p-4 rounded border border-blue-100">
+        <form method="post" action="{% url 'bulk_vaccinate' %}" class="bg-blue-50 p-4 rounded border border-blue-100 flex flex-col justify-between">
             {% csrf_token %}
             <input type="hidden" name="vaccine_name" value="{{ sows_list.0.vaccine_name }}">
             <input type="hidden" name="cycle_id" value="{{ sows_list.0.cycle_id }}">
 
-            <h4 class="font-bold text-blue-800 mb-2">{{ group_name }}</h4>
-            <div class="space-y-2 mb-4 max-h-32 overflow-y-auto">
-                {% for s in sows_list %}
-                <label class="flex items-center space-x-2 text-sm text-gray-700">
-                    <input type="checkbox" name="sow_ids" value="{{ s.sow_id }}" checked class="rounded text-blue-600 focus:ring-blue-500">
-                    <span>Nr: <strong>{{ s.ear_tag }}</strong> ({{ s.status_display }})</span>
-                </label>
-                {% endfor %}
+            <div>
+                <h4 class="font-bold text-blue-800 mb-2">{{ group_name }}</h4>
+                <p class="text-sm text-gray-600 mb-4">Liczba zwierząt w grupie: <strong>{{ sows_list|length }}</strong></p>
+                <div class="hidden">
+                    <!-- Ukrywamy checkboxy na dashboardzie, użytkownik potwierdzi je na nowym ekranie -->
+                    {% for s in sows_list %}
+                        <input type="checkbox" name="sow_ids" value="{{ s.sow_id }}" checked>
+                    {% endfor %}
+                </div>
             </div>
-            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm transition">
-                Zarejestruj szczepienie dla zaznaczonych
+
+            <button type="submit" class="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm transition">
+                Przejdź do zatwierdzenia &rarr;
             </button>
         </form>
         {% endfor %}
@@ -126,7 +130,6 @@
     </div>
 </div>
 {% endblock %}
-
 {% block scripts %}
 <script>
     document.addEventListener("DOMContentLoaded", () => {
