@@ -73,50 +73,57 @@ class SowEventForm(forms.ModelForm):
             if event_type == 'VACCINATION':
                 return cleaned_data
 
-            if self.sow_status == 'LACTATING' and event_type != 'WEANING':
-                self.add_error('event_type',
-                               "Błąd: Maciora jest w okresie laktacji (karmiąca). Następnym krokiem w cyklu musi być 'Odsadzenie'!")
+            # Mapowanie stanów i dozwolonych typów zdarzeń
+            state_validation = {
+                'LACTATING': {
+                    'allowed': ['WEANING'],
+                    'message': "Błąd: Maciora jest w okresie laktacji (karmiąca). Następnym krokiem w cyklu musi być 'Odsadzenie'!"
+                },
+                'IDLE': {
+                    'allowed': ['INSEMINATION'],
+                    'message': "Błąd: Maciora jest jałowa. Rozpocznij nowy cykl produkcyjny wybierając 'Inseminacja'."
+                },
+                'INSEMINATED': {
+                    'allowed': ['PREGNANCY_CHECK', 'INSEMINATION'],
+                    'message': "Błąd: Maciora jest po inseminacji. Następnym krokiem powinno być 'Badanie USG' (potwierdzenie ciąży) lub ponowna 'Inseminacja'."
+                },
+                'TO_RECHECK': {
+                    'allowed': ['PREGNANCY_CHECK', 'INSEMINATION'],
+                    'message': "Błąd: Status maciory to 'Do rebadania (?)'. Wybierz ponowne 'Badanie USG' lub nową 'Inseminację'."
+                },
+                'PREGNANT': {
+                    'allowed': ['FARROWING', 'INSEMINATION'],
+                    'message': "Błąd: Maciora ma potwierdzoną ciążę (Prośna). Naturalnym następnym krokiem jest 'Oproszenie'."
+                },
+            }
 
-            elif self.sow_status == 'IDLE' and event_type != 'INSEMINATION':
-                self.add_error('event_type',
-                               "Błąd: Maciora jest jałowa. Rozpocznij nowy cykl produkcyjny wybierając 'Inseminacja'.")
+            if self.sow_status in state_validation:
+                validation_rule = state_validation[self.sow_status]
+                if event_type not in validation_rule['allowed']:
+                    self.add_error('event_type', validation_rule['message'])
 
-            elif self.sow_status == 'INSEMINATED' and event_type not in ['PREGNANCY_CHECK', 'INSEMINATION']:
-                self.add_error('event_type',
-                               "Błąd: Maciora jest po inseminacji. Następnym krokiem powinno być 'Badanie USG' (potwierdzenie ciąży) lub ponowna 'Inseminacja'.")
-
-            elif self.sow_status == 'TO_RECHECK' and event_type not in ['PREGNANCY_CHECK', 'INSEMINATION']:
-                self.add_error('event_type',
-                               "Błąd: Status maciory to 'Do rebadania (?)'. Wybierz ponowne 'Badanie USG' lub nową 'Inseminację'.")
-
-            elif self.sow_status == 'PREGNANT' and event_type not in ['FARROWING', 'INSEMINATION']:
-                self.add_error('event_type',
-                               "Błąd: Maciora ma potwierdzoną ciążę (Prośna). Naturalnym następnym krokiem jest 'Oproszenie'.")
-            elif self.sow_status in ['INSEMINATED', 'TO_CHECK', 'TO_RECHECK'] and event_type not in ['PREGNANCY_CHECK',
-                                                                                                     'INSEMINATION']:
-                self.add_error('event_type',
-                               "Błąd: Maciora oczekuje na weryfikację ciąży. Następnym krokiem powinno być 'Badanie USG' lub ponowna 'Inseminacja'.")
         return cleaned_data
 
     def save(self, commit=True):
         instance = super().save(commit=False)
         event_type = self.cleaned_data.get('event_type')
-        details = {}
-
-        # Mapowanie danych dynamicznych do pola JSONB na podstawie typu zdarzenia
-        if event_type == 'INSEMINATION':
-            details['technician'] = self.cleaned_data.get('technician') or ""
-        elif event_type == 'PREGNANCY_CHECK':
-            details['result'] = self.cleaned_data.get('pregnancy_result') or ""
-        elif event_type == 'FARROWING':
-            details['born_alive'] = self.cleaned_data.get('born_alive') or 0
-            details['born_dead'] = self.cleaned_data.get('born_dead') or 0
-        elif event_type == 'WEANING':
-            details['count'] = self.cleaned_data.get('count') or 0
-        elif event_type == 'VACCINATION':
-            details['vaccine_name'] = self.cleaned_data.get('vaccine_name') or ""
+        details = self._build_event_details(event_type)
 
         instance.details = details
         if commit:
             instance.save()
         return instance
+
+    def _build_event_details(self, event_type: str) -> dict:
+        """Mapuje dane dynamiczne do pola JSONB na podstawie typu zdarzenia."""
+        details_mapping = {
+            'INSEMINATION': {'technician': self.cleaned_data.get('technician') or ""},
+            'PREGNANCY_CHECK': {'result': self.cleaned_data.get('pregnancy_result') or ""},
+            'FARROWING': {
+                'born_alive': self.cleaned_data.get('born_alive') or 0,
+                'born_dead': self.cleaned_data.get('born_dead') or 0
+            },
+            'WEANING': {'count': self.cleaned_data.get('count') or 0},
+            'VACCINATION': {'vaccine_name': self.cleaned_data.get('vaccine_name') or ""},
+        }
+        return details_mapping.get(event_type, {})
