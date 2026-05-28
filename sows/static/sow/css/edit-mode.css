@@ -1,0 +1,19 @@
+/* Edit mode styles for sow detail page */
+
+.edit-input {
+    background-color: white !important;
+    cursor: text !important;
+}
+
+.readonly-input {
+    background-color: #f3f4f6 !important;
+    cursor: not-allowed !important;
+}
+
+.hidden-button {
+    display: none !important;
+}
+
+.visible-button {
+    display: inline-block !important;
+}
