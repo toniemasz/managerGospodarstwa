@@ -79,7 +79,11 @@
 
             <div id="sec_vaccination" class="p-4 bg-teal-50 rounded-lg border border-teal-200 hidden">
                 <label class="block text-gray-700 text-sm font-bold mb-2">{{ form.vaccine_name.label }}</label>
-                <input type="text" name="vaccine_name" value="{{ form.vaccine_name.value|default:'' }}" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Wpisz nazwę szczepionki">
+                <select name="vaccine_name" id="id_vaccine_name" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-teal-500">
+                    {% for value, text in form.fields.vaccine_name.choices %}
+                        <option value="{{ value }}" {% if form.vaccine_name.value == value %}selected{% endif %}>{{ text }}</option>
+                    {% endfor %}
+                </select>
                 {% if form.vaccine_name.errors %}
                     <p class="text-red-600 text-sm font-bold mt-2 bg-red-50 border-l-4 border-red-500 p-2 rounded">
                         {{ form.vaccine_name.errors.0 }}

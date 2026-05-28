@@ -5,9 +5,9 @@ from datetime import date
 
 from .application.services import SowDashboardService
 from .infrastructure.repositories import SowRepository
-from .forms import SowForm, SowEventForm
+from .forms import SowForm, SowEventForm, VaccinationPlanForm
 from .models import SowModel, SowEventModel
-from django.http import HttpResponse  # <-- DODAJ TO
+from django.http import HttpResponse
 import traceback
 
 
@@ -23,7 +23,6 @@ def dashboard_view(request):
         context = service.get_dashboard_summary()
         return render(request, 'sows/dashboard.html', context)
     except Exception as e:
-        # Ten kod przechwyci ukryty błąd 500 i wyświetli go na ekranie!
         error_html = f"<h2>Wystąpił błąd w danych!</h2><br><b>Powód:</b> {str(e)}<br><br><b>Dokładne miejsce w kodzie:</b><br><pre>{traceback.format_exc()}</pre>"
         return HttpResponse(error_html, status=500)
 
@@ -40,6 +39,18 @@ def add_sow_view(request):
     return render(request, 'sows/add_sow.html', {'form': form})
 
 
+@login_required
+def add_vaccination_plan_view(request):
+    """Widok odpowiedzialny za konfigurację nowych szczepień cyklicznych."""
+    if request.method == 'POST':
+        form = VaccinationPlanForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('dashboard')
+    else:
+        form = VaccinationPlanForm()
+
+    return render(request, 'sows/add_vaccination_plan.html', {'form': form})
 @login_required
 def sow_detail_view(request, sow_id):
     db_sow = get_object_or_404(SowModel, id=sow_id)
@@ -112,7 +123,6 @@ def bulk_vaccinate_view(request):
         vaccine_name = request.POST.get('vaccine_name')
         cycle_id = request.POST.get('cycle_id')
 
-        # Jeśli kliknięto przycisk "Zapisz szczepienia" na ekranie potwierdzenia
         if request.POST.get('confirm') == 'yes':
             for s_id in sow_ids:
                 db_sow = get_object_or_404(SowModel, id=s_id)

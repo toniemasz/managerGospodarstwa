@@ -1,8 +1,46 @@
 # sows/forms.py
 from django import forms
-from .models import SowModel, SowEventModel
+
+from .infrastructure.repositories import VaccinationPlanRepository
+from .models import SowModel, SowEventModel, VaccinationPlanModel
 from django.core.exceptions import ValidationError
 
+
+class VaccinationPlanForm(forms.ModelForm):
+    class Meta:
+        model = VaccinationPlanModel
+        fields = ['name', 'days_before_farrowing', 'days_after_event', 'event_source', 'interval_months',
+                  'reminder_days_ahead']
+        labels = {
+            'name': 'Nazwa szczepienia',
+            'days_before_farrowing': 'Dni przed porodem',
+            'days_after_event': 'Dni po zdarzeniu',
+            'event_source': 'Typ zdarzenia (jeśli po zdarzeniu)',
+            'interval_months': 'Interwał cykliczny (w miesiącach)',
+            'reminder_days_ahead': 'Wyprzedzenie przypomnienia (dni)'
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        dbf = cleaned_data.get('days_before_farrowing')
+        dae = cleaned_data.get('days_after_event')
+        src = cleaned_data.get('event_source')
+        im = cleaned_data.get('interval_months')
+
+        # Walidacja logiki biznesowej: przynajmniej jeden warunek musi być wybrany,
+        # i nie mogą się one ze sobą logicznie wykluczać.
+        conditions = [bool(dbf), bool(dae), bool(im)]
+        if sum(conditions) > 1:
+            raise ValidationError(
+                "Wybierz tylko jedną metodę wyzwalania szczepienia (albo przed porodem, albo po zdarzeniu, albo cyklicznie).")
+
+        if sum(conditions) == 0:
+            raise ValidationError("Musisz zdefiniować przynajmniej jeden warunek uruchomienia szczepienia.")
+
+        if dae and not src:
+            self.add_error('event_source', "Podaj, od jakiego zdarzenia mają być liczone dni.")
+
+        return cleaned_data
 
 class SowForm(forms.ModelForm):
     class Meta:
@@ -19,6 +57,8 @@ class SowForm(forms.ModelForm):
 
 class SowEventForm(forms.ModelForm):
     # Dotychczasowe pola dodatkowe
+
+    vaccine_name = forms.ChoiceField(label="Nazwa szczepienia / Szczepionka", required=False)
     technician = forms.CharField(label="Inseminator / Technik", required=False)
     born_alive = forms.IntegerField(label="Urodzone żywe", min_value=0, required=False)
     born_dead = forms.IntegerField(label="Urodzone martwe", min_value=0, required=False)
@@ -51,6 +91,10 @@ class SowEventForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.sow_status = kwargs.pop('sow_status', None)
         super().__init__(*args, **kwargs)
+
+
+        repo = VaccinationPlanRepository()
+        self.fields['vaccine_name'].choices = repo.get_plan_choices()
 
     def clean(self):
         cleaned_data = super().clean()

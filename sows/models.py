@@ -5,10 +5,18 @@ from datetime import date
 
 
 class VaccinationPlanModel(models.Model):
-    """Słownik planowanych szczepień dla całego stada."""
-    name = models.CharField(max_length=100, verbose_name="Nazwa szczepienia")
+    """Konfiguracja cyklicznych szczepień dla stada."""
+    EVENT_SOURCES = [
+        ('FARROWING', 'Oproszenie'),
+        ('INSEMINATION', 'Inseminacja'),
+    ]
+
+    name = models.CharField(max_length=100, verbose_name="Nazwa szczepienia", unique=True)
     days_before_farrowing = models.IntegerField(null=True, blank=True, help_text="Ile dni przed porodem?")
+    days_after_event = models.IntegerField(null=True, blank=True, help_text="Ile dni po zdarzeniu?")
+    event_source = models.CharField(max_length=20, choices=EVENT_SOURCES, null=True, blank=True, help_text="Zdarzenie odniesienia")
     interval_months = models.IntegerField(null=True, blank=True, help_text="Cyklicznie co X miesięcy?")
+    reminder_days_ahead = models.IntegerField(default=7, help_text="Ile dni wcześniej wyświetlać przypomnienie?")
 
     def __str__(self):
         return self.name
