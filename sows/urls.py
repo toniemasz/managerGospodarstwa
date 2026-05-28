@@ -11,7 +11,8 @@ from .views import (
     edit_event_view,
     delete_event_view,
     bulk_vaccinate_view,
-    bulk_pregnancy_check_view
+    bulk_pregnancy_check_view,
+    add_vaccination_plan_view
 
 )
 
@@ -23,7 +24,7 @@ urlpatterns = [
     path('zdarzenie/<int:event_id>/edytuj/', edit_event_view, name='edit_event'),
     path('zdarzenie/<int:event_id>/usun/', delete_event_view, name='delete_event'),
 
-    # Zmiana na <int:sow_id>
+
     path('maciory/<int:sow_id>/', sow_detail_view, name='sow_detail'),
     path('maciory/szczepienie-grupowe/', bulk_vaccinate_view, name='bulk_vaccinate'),
     path('maciory/badania-grupowe/', bulk_pregnancy_check_view, name='bulk_pregnancy_check'),
@@ -31,4 +32,5 @@ urlpatterns = [
 
     path('login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(next_page='login'), name='logout'),
+    path('konfiguracja/szczepienie/dodaj/', add_vaccination_plan_view, name='add_vaccination_plan'),
 ]

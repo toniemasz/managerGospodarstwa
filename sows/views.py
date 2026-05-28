@@ -6,10 +6,10 @@ from datetime import date
 
 from .application.services import SowDashboardService
 from .infrastructure.repositories import SowRepository
-from .forms import SowForm, SowEventForm
+from .forms import SowForm, SowEventForm, VaccinationPlanForm
 from .models import SowModel, SowEventModel
-
-logger = logging.getLogger(__name__)
+from django.http import HttpResponse
+import traceback
 
 
 @login_required
@@ -24,8 +24,8 @@ def dashboard_view(request):
         context = service.get_dashboard_summary()
         return render(request, 'sows/dashboard.html', context)
     except Exception as e:
-        logger.error(f"Error loading dashboard: {str(e)}", exc_info=True)
-        return render(request, 'sows/error.html', {'error_message': 'Błąd podczas ładowania dashboardu.'}, status=500)
+        error_html = f"<h2>Wystąpił błąd w danych!</h2><br><b>Powód:</b> {str(e)}<br><br><b>Dokładne miejsce w kodzie:</b><br><pre>{traceback.format_exc()}</pre>"
+        return HttpResponse(error_html, status=500)
 
 
 @login_required
@@ -40,6 +40,18 @@ def add_sow_view(request):
     return render(request, 'sows/add_sow.html', {'form': form})
 
 
+@login_required
+def add_vaccination_plan_view(request):
+    """Widok odpowiedzialny za konfigurację nowych szczepień cyklicznych."""
+    if request.method == 'POST':
+        form = VaccinationPlanForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('dashboard')
+    else:
+        form = VaccinationPlanForm()
+
+    return render(request, 'sows/add_vaccination_plan.html', {'form': form})
 @login_required
 def sow_detail_view(request, sow_id):
     db_sow = get_object_or_404(SowModel, id=sow_id)
@@ -111,7 +123,6 @@ def bulk_vaccinate_view(request):
         vaccine_name = request.POST.get('vaccine_name')
         cycle_id = request.POST.get('cycle_id')
 
-        # Jeśli kliknięto przycisk "Zapisz szczepienia" na ekranie potwierdzenia
         if request.POST.get('confirm') == 'yes':
             _create_vaccination_events(sow_ids, vaccine_name, cycle_id)
             return redirect('dashboard')

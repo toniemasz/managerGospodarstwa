@@ -20,3 +20,19 @@ class SowRepository:
     def get_sow_by_id(self, sow_id: int) -> Sow:
         db_sow = get_object_or_404(SowModel.objects.prefetch_related('events'), id=sow_id)
         return self._map_to_domain(db_sow)
+
+
+from sows.models import VaccinationPlanModel
+from typing import List, Tuple
+
+
+class VaccinationPlanRepository:
+    """Repozytorium do zarządzania regułami szczepień cyklicznych."""
+
+    def get_all_plans(self) -> List[VaccinationPlanModel]:
+        return list(VaccinationPlanModel.objects.all().order_by('name'))
+
+    def get_plan_choices(self) -> List[Tuple[str, str]]:
+        """Zwraca listę krotek (wartość, etykieta) do formularzy ChoiceField."""
+        plans = VaccinationPlanModel.objects.values_list('name', 'name').order_by('name')
+        return [('', '--- Wybierz szczepienie cykliczne ---')] + list(plans)
