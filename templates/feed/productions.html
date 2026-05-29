@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block title %}Historia Śrutowania{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-4 md:p-6">
+    <h1 class="text-2xl font-bold mb-2">🚜 Zarządzanie Produkcją Paszy</h1>
+    {% include 'feed/_feed_nav.html' %}
+
+    <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold text-gray-700">Rejestr Śrutowania</h2>
+        <div class="flex gap-2">
+            <select id="limitSelect" class="shadow-sm border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+                <option value="10">10 na stronę</option>
+                <option value="25">25 na stronę</option>
+            </select>
+            <a href="{% url 'add_production' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow font-bold transition">+ Zarejestruj Śrutowanie</a>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-sm overflow-hidden border-t-4 border-gray-700">
+        <table class="min-w-full text-left text-sm text-gray-600">
+            <thead class="bg-gray-100 uppercase text-gray-500 font-bold">
+                <tr>
+                    <th class="p-4">Data Produkcji</th>
+                    <th class="p-4">Użyta Receptura</th>
+                    <th class="p-4 text-right">Wyprodukowano (kg)</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for prod in productions %}
+                <tr class="hover:bg-gray-50 prod-row">
+                    <td class="p-4 font-bold text-gray-800">{{ prod.date|date:"d.m.Y" }}</td>
+                    <td class="p-4 text-blue-700 font-semibold">{{ prod.recipe.name }}</td>
+                    <td class="p-4 text-right font-black text-gray-900">{{ prod.quantity_kg|floatformat:2 }} kg</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="3" class="p-4 text-center text-gray-500">Brak zarejestrowanych śrutowań.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div id="prodPagination" class="p-4 flex justify-center bg-gray-50 border-t mt-4 rounded"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        new PaginationTable({
+            rowSelector: '.prod-row',
+            limitSelectId: 'limitSelect',
+            paginationContainerId: 'prodPagination'
+        });
+    });
+</script>
+{% endblock %}
