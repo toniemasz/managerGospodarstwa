@@ -26,15 +26,24 @@
                 </div>
             </a>
 
-            <div class="bg-gray-50 p-6 rounded-lg border border-dashed border-gray-300 opacity-60">
+            <a href="{% url 'sales_list' %}" class="block bg-white p-6 rounded-lg shadow-sm hover:shadow-md border-t-4 border-green-500 transition">
+                <div class="flex items-center space-x-4">
+                    <span class="text-4xl">📈</span>
+                    <div>
+                        <h3 class="text-xl font-bold text-gray-800">Moduł: Sprzedaż</h3>
+                        <p class="text-sm text-gray-500 mt-1">Rejestracja sprzedaży tuczników, wagi, klas mięsności i analiza przychodów.</p>
+                    </div>
+                </div>
+            </a>
+            <a href="{% url 'feed_inventory' %}" class="block bg-white p-6 rounded-lg shadow-sm hover:shadow-md border-t-4 border-yellow-500 transition">
                 <div class="flex items-center space-x-4">
                     <span class="text-4xl">🚜</span>
                     <div>
-                        <h3 class="text-xl font-bold text-gray-400">Moduł: Magazyn i Pasze</h3>
-                        <p class="text-sm text-gray-400 mt-1">Dostępne wkrótce. Kontrola stanów magazynowych komponentów paszowych i silosów.</p>
+                        <h3 class="text-xl font-bold text-gray-800">Moduł: Pasze i Magazyn</h3>
+                        <p class="text-sm text-gray-500 mt-1">Receptury, zarządzanie magazynem składników, rejestr śrutowania i kalkulator kosztów paszy.</p>
                     </div>
                 </div>
-            </div>
+            </a>
         </div>
     </div>
 </body>

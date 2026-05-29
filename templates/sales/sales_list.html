@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Sprzedaż Świń{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-4 md:p-6">
+    <header class="mb-6 flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
+        <h1 class="text-xl md:text-2xl font-bold text-gray-800">📈 Moduł Sprzedaży</h1>
+        <div>
+            <a href="{% url 'modules_home' %}" class="text-sm text-gray-600 hover:text-blue-600 mr-4">Wróć do Centrali</a>
+            <span class="text-sm bg-blue-100 text-blue-800 font-medium px-2.5 py-0.5 rounded">Sprzedaż</span>
+        </div>
+    </header>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-green-500">
+            <p class="text-xs uppercase text-gray-400 font-bold">Sprzedane (szt.)</p>
+            <p class="text-2xl font-bold text-gray-800">{{ stats.total_pigs }}</p>
+        </div>
+        <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-blue-500">
+            <p class="text-xs uppercase text-gray-400 font-bold">Suma wagi (kg)</p>
+            <p class="text-2xl font-bold text-gray-800">{{ stats.total_weight }}</p>
+        </div>
+        <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-purple-500">
+            <p class="text-xs uppercase text-gray-400 font-bold">Przychód ogółem</p>
+            <p class="text-2xl font-bold text-gray-800">{{ stats.total_revenue }} <span class="text-sm text-gray-500">PLN</span></p>
+        </div>
+        <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-yellow-500">
+            <p class="text-xs uppercase text-gray-400 font-bold">Średnia cena/kg</p>
+            <p class="text-2xl font-bold text-gray-800">{{ stats.avg_price_per_kg }} <span class="text-sm text-gray-500">PLN</span></p>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+        <div class="p-4 border-b border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4">
+            <h2 class="text-lg font-bold text-gray-700">Rejestr Sprzedaży</h2>
+            <div class="flex flex-col md:flex-row gap-2 w-full justify-end items-center">
+                <select id="limitSelect" class="shadow-sm border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500">
+                    <option value="10">10 na stronę</option>
+                    <option value="25">25 na stronę</option>
+                </select>
+                <select id="classFilter" class="shadow-sm border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500">
+                    <option value="ALL">Wszystkie klasy</option>
+                    <option value="S">Klasa S</option>
+                    <option value="E">Klasa E</option>
+                    <option value="U">Klasa U</option>
+                    <option value="R">Klasa R</option>
+                    <option value="INNA">Inne</option>
+                </select>
+                <a href="{% url 'add_sale' %}" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-1.5 px-4 rounded shadow transition">
+                    + Zarejestruj sprzedaż
+                </a>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 text-left text-sm text-gray-600">
+                <thead class="bg-gray-50 text-xs uppercase text-gray-500 font-bold">
+                    <tr>
+                        <th class="p-4">Data</th>
+                        <th class="p-4">Klasa</th>
+                        <th class="p-4 text-right">Ilość sztuk</th>
+                        <th class="p-4 text-right">Waga (kg)</th>
+                        <th class="p-4 text-right">Cena (PLN/kg)</th>
+                        <th class="p-4 text-right">Wartość całkowita</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for sale in sales %}
+                    <tr class="hover:bg-blue-50 transition sale-row" data-filter="{{ sale.meat_class }}">
+                        <td class="p-4 font-semibold text-gray-900">{{ sale.sale_date|date:"d.m.Y" }}</td>
+                        <td class="p-4"><span class="bg-gray-100 text-gray-800 px-2 py-0.5 rounded font-bold">{{ sale.meat_class }}</span></td>
+                        <td class="p-4 text-right">{{ sale.quantity }}</td>
+                        <td class="p-4 text-right">{{ sale.total_weight }}</td>
+                        <td class="p-4 text-right text-blue-600 font-bold">{{ sale.price_per_kg }}</td>
+                        <td class="p-4 text-right text-green-600 font-bold">{{ sale.total_price }} PLN</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6" class="p-4 text-center text-gray-400">Brak danych o sprzedaży.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div id="paginationControls" class="p-4 flex justify-center border-t bg-gray-50"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        new PaginationTable({
+            rowSelector: '.sale-row',
+            filterSelectId: 'classFilter',
+            limitSelectId: 'limitSelect',
+            paginationContainerId: 'paginationControls'
+        });
+    });
+</script>
+{% endblock %}

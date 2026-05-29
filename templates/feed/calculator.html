@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mx-auto p-4 md:p-6">
+    <h1 class="text-2xl font-bold mb-2">🚜 Zarządzanie Produkcją Paszy</h1>
+    {% include 'feed/_feed_nav.html' %}
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white p-6 rounded shadow-sm">
+            <h2 class="text-lg font-bold mb-4">🧮 Koszty Paszy wg Receptur</h2>
+            <ul class="space-y-3">
+                {% for cost in costs %}
+                <li class="p-3 bg-gray-50 rounded border">
+                    <span class="font-bold text-gray-800">{{ cost.recipe_name }}</span>
+                    <div class="mt-1 text-sm text-gray-600">
+                        Koszt za 1 kg: <strong class="text-blue-600">{{ cost.cost_per_kg|floatformat:4 }} PLN</strong><br>
+                        Koszt za 1 Tonę: <strong class="text-green-600">{{ cost.cost_per_ton|floatformat:2 }} PLN</strong>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="bg-white p-6 rounded shadow-sm">
+            <h2 class="text-lg font-bold mb-4">⚙️ Konfiguracja cen składników</h2>
+            <form method="post" class="space-y-4">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <button type="submit" class="bg-gray-800 text-white px-4 py-2 rounded shadow font-bold w-full">Zaktualizuj Cenę</button>
+            </form>
+            <p class="text-xs text-gray-500 mt-4">Wskazówka: Ceny podane w dostawach są tylko informacyjne. System używa cen ustawionych tutaj do symulacji kosztów śrutowania.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
