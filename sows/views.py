@@ -1,4 +1,5 @@
 # sows/views.py
+import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from datetime import date
@@ -76,6 +77,7 @@ def add_event_view(request, sow_id):
     repo = SowRepository()
     domain_sow = repo.get_sow_by_id(sow_id)
     domain_sow.update_state_for_date(date.today())
+    
     if request.method == 'POST':
         form = SowEventForm(request.POST, sow_status=domain_sow.status)
         if form.is_valid():
@@ -98,9 +100,7 @@ def bulk_pregnancy_check_view(request):
 
     if request.method == 'POST':
         for sow in sows_to_check:
-
             result = request.POST.get(f'result_{sow.id}')
-
 
             if result in ['TAK', 'NIE', '?']:
                 db_sow = get_object_or_404(SowModel, id=sow.id)
@@ -124,20 +124,8 @@ def bulk_vaccinate_view(request):
         cycle_id = request.POST.get('cycle_id')
 
         if request.POST.get('confirm') == 'yes':
-            for s_id in sow_ids:
-                db_sow = get_object_or_404(SowModel, id=s_id)
-                SowEventModel.objects.create(
-                    sow=db_sow,
-                    event_type='VACCINATION',
-                    event_date=date.today(),
-                    details={
-                        'vaccine_name': vaccine_name,
-                        'cycle_id': cycle_id
-                    }
-                )
+            _create_vaccination_events(sow_ids, vaccine_name, cycle_id)
             return redirect('dashboard')
-
-
         else:
             sows = SowModel.objects.filter(id__in=sow_ids)
             return render(request, 'sows/bulk_vaccinate.html', {
@@ -147,6 +135,7 @@ def bulk_vaccinate_view(request):
             })
 
     return redirect('dashboard')
+
 
 @login_required
 def edit_event_view(request, event_id):
@@ -159,19 +148,7 @@ def edit_event_view(request, event_id):
             form.save()
             return redirect('sow_detail', sow_id=sow_id)
     else:
-        initial_data = {}
-        if db_event.event_type == 'INSEMINATION':
-            initial_data['technician'] = db_event.details.get('technician', '')
-        elif db_event.event_type == 'PREGNANCY_CHECK':
-            initial_data['pregnancy_result'] = db_event.details.get('result', '')
-        elif db_event.event_type == 'FARROWING':
-            initial_data['born_alive'] = db_event.details.get('born_alive', 0)
-            initial_data['born_dead'] = db_event.details.get('born_dead', 0)
-        elif db_event.event_type == 'WEANING':
-            initial_data['count'] = db_event.details.get('count', 0)
-        elif db_event.event_type == 'VACCINATION':
-            initial_data['vaccine_name'] = db_event.details.get('vaccine_name', '')
-
+        initial_data = _get_event_initial_data(db_event)
         form = SowEventForm(instance=db_event, initial=initial_data)
 
     return render(request, 'sows/add_event.html', {
@@ -198,3 +175,34 @@ def delete_event_view(request, event_id):
         db_event.delete()
         return redirect('sow_detail', sow_id=sow_id)
     return redirect('dashboard')
+
+
+# Helper functions
+def _create_vaccination_events(sow_ids: list, vaccine_name: str, cycle_id: str) -> None:
+    """Tworzy zdarzenia szczepienia dla wskazanych macior."""
+    for s_id in sow_ids:
+        db_sow = get_object_or_404(SowModel, id=s_id)
+        SowEventModel.objects.create(
+            sow=db_sow,
+            event_type='VACCINATION',
+            event_date=date.today(),
+            details={
+                'vaccine_name': vaccine_name,
+                'cycle_id': cycle_id
+            }
+        )
+
+
+def _get_event_initial_data(db_event: SowEventModel) -> dict:
+    """Przygotowuje dane początkowe formularza na podstawie typu zdarzenia."""
+    event_details_mapping = {
+        'INSEMINATION': {'technician': db_event.details.get('technician', '')},
+        'PREGNANCY_CHECK': {'pregnancy_result': db_event.details.get('result', '')},
+        'FARROWING': {
+            'born_alive': db_event.details.get('born_alive', 0),
+            'born_dead': db_event.details.get('born_dead', 0)
+        },
+        'WEANING': {'count': db_event.details.get('count', 0)},
+        'VACCINATION': {'vaccine_name': db_event.details.get('vaccine_name', '')},
+    }
+    return event_details_mapping.get(db_event.event_type, {})

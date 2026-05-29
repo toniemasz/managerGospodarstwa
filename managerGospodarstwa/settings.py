@@ -10,8 +10,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
-import environ
 import os
+import environ
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -24,8 +24,6 @@ environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 SECRET_KEY = env('SECRET_KEY')
 DEBUG = env('DEBUG')
-BASE_DIR = Path(__file__).resolve().parent.parent
-
 
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['127.0.0.1', 'localhost'])
 
@@ -98,14 +96,6 @@ WSGI_APPLICATION = 'managerGospodarstwa.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-import os
-import environ
-
-env = environ.Env()
-environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
-
-# Twardy podział: lokalnie przy DEBUG=True używasz wyłącznie SQLite.
-# Na Renderze, gdzie DEBUG=False, Django weźmie bazę Supabase z DATABASE_URL.
 if DEBUG:
     DATABASES = {
         'default': {
@@ -147,10 +137,3 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 
 USE_TZ = True
-
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/6.0/howto/static-files/
-
-STATIC_URL = 'static/'
-
