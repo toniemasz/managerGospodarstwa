@@ -120,7 +120,7 @@
                             {% endif %}
                         </td>
                         <td class="p-4 text-gray-500">{{ sow.entry_date|date:"d.m.Y" }}</td>
-                        <td class="p-4 text-gray-500">{{ sow.expected_farrowing_date|default:"--" }}</td>
+                        <td class="p-4 text-gray-500">{{ sow.expected_farrowing_date|date:"d.m.Y"|default:"--" }}</td>
                         <td class="p-4 text-right font-medium text-gray-800">{{ sow.total_born_alive }} szt.</td>
                     </tr>
                     {% empty %}
