@@ -151,19 +151,29 @@ function closeDeleteModal() {
 function checkDeleteConfirmation(expectedValue) {
     const input = document.getElementById('confirmEarTag').value;
     const btn = document.getElementById('deleteBtn');
+    const isArchived = document.querySelector('input[name="archive"]').checked;
 
     if (input === expectedValue) {
         btn.disabled = false;
         btn.classList.remove('bg-gray-400', 'cursor-not-allowed');
-        btn.classList.add('bg-red-600', 'hover:bg-red-700');
+
+        if (isArchived) {
+            btn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+            btn.classList.remove('bg-red-600', 'hover:bg-red-700');
+            btn.innerText = "Zarchiwizuj bezpiecznie";
+        } else {
+            btn.classList.add('bg-red-600', 'hover:bg-red-700');
+            btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+            btn.innerText = "Usuń bezpowrotnie";
+        }
     } else {
         btn.disabled = true;
         btn.classList.add('bg-gray-400', 'cursor-not-allowed');
-        btn.classList.remove('bg-red-600', 'hover:bg-red-700');
+        btn.classList.remove('bg-red-600', 'hover:bg-red-700', 'bg-blue-600', 'hover:bg-blue-700');
     }
 }
 
-// Ustaw globalną wartość po załadowaniu strony
+
 document.addEventListener('DOMContentLoaded', () => {
     const earTagInput = document.getElementById('confirmEarTag');
     if (earTagInput) {

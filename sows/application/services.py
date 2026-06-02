@@ -52,6 +52,16 @@ class SowDashboardService:
             'all_sows': sows,
         }
 
+    def get_archived_sows_list(self) -> list:
+        """Pobiera i aktualizuje statusy dla zarchiwizowanych macior."""
+        sows = self.repository.get_archived_sows()
+        for sow in sows:
+            try:
+                sow.update_state_for_date(date.today())
+            except Exception as e:
+                print(f"Błąd przetwarzania zarchiwizowanej maciory {sow.ear_tag}: {e}")
+        return sows
+
     @staticmethod
     def _build_vaccination_plans(db_plans) -> list:
         """Konwertuje modele planów szczepień na słowniki z wartościami domyślnymi."""
