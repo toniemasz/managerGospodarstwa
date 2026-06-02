@@ -25,6 +25,8 @@ class SowModel(models.Model):
     ear_tag = models.CharField(max_length=50)
     entry_date = models.DateField(default=date.today) # Domyślnie dzisiejsza data
     created_at = models.DateTimeField(auto_now_add=True) # Automatyczna data utworzenia
+    is_archived = models.BooleanField(default=False, verbose_name="Czy zarchiwizowana?")
+    archived_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Maciora {self.ear_tag}"

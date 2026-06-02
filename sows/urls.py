@@ -12,7 +12,7 @@ from .views import (
     delete_event_view,
     bulk_vaccinate_view,
     bulk_pregnancy_check_view,
-    add_vaccination_plan_view
+    add_vaccination_plan_view, archived_sows_view
 
 )
 
@@ -24,7 +24,7 @@ urlpatterns = [
     path('zdarzenie/<int:event_id>/edytuj/', edit_event_view, name='edit_event'),
     path('zdarzenie/<int:event_id>/usun/', delete_event_view, name='delete_event'),
 
-
+    path('maciory/archiwum/', archived_sows_view, name='archived_sows'),
     path('maciory/<int:sow_id>/', sow_detail_view, name='sow_detail'),
     path('maciory/szczepienie-grupowe/', bulk_vaccinate_view, name='bulk_vaccinate'),
     path('maciory/badania-grupowe/', bulk_pregnancy_check_view, name='bulk_pregnancy_check'),

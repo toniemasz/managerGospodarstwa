@@ -15,11 +15,12 @@ class SowEvent:
 
 
 class Sow:
-    def __init__(self, id: int, ear_tag: str, entry_date: date, created_at: date):
+    def __init__(self, id: int, ear_tag: str, entry_date: date, created_at: date, is_archived: bool = False):
         self.id = id
         self.ear_tag = ear_tag
         self.entry_date = entry_date
         self.created_at = created_at
+        self.is_archived = is_archived
 
         # Podstawowy status produkcyjny maciory
         self.status = "IDLE"  # Dostępne: IDLE (Jałowa), INSEMINATION (Inseminowana), PREGNANT (Prośna), TO_RECHECK (Do rebadania), LACTATING (Karmiąca)

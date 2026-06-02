@@ -10,6 +10,7 @@ from .forms import SowForm, SowEventForm, VaccinationPlanForm
 from .models import SowModel, SowEventModel
 from django.http import HttpResponse
 import traceback
+from django.utils import timezone
 
 
 @login_required
@@ -162,10 +163,27 @@ def edit_event_view(request, event_id):
 def delete_sow_view(request, sow_id):
     if request.method == 'POST':
         db_sow = get_object_or_404(SowModel, id=sow_id)
-        db_sow.delete()
+
+        if request.POST.get('archive') == 'on':
+            db_sow.is_archived = True
+            db_sow.archived_at = timezone.now()
+            db_sow.save()
+        else:
+            db_sow.delete()
+
         return redirect('dashboard')
     return redirect('sow_detail', sow_id=sow_id)
 
+@login_required
+def archived_sows_view(request):
+    try:
+        service = SowDashboardService()
+        archived_sows = service.get_archived_sows_list()
+        return render(request, 'sows/archived_sows.html', {'archived_sows': archived_sows})
+    except Exception as e:
+        import traceback
+        error_html = f"<h2>Wystąpił błąd!</h2><br><b>Powód:</b> {str(e)}<br><pre>{traceback.format_exc()}</pre>"
+        return HttpResponse(error_html, status=500)
 
 @login_required
 def delete_event_view(request, event_id):
