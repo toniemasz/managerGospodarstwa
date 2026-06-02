@@ -12,7 +12,7 @@ from .views import (
     delete_event_view,
     bulk_vaccinate_view,
     bulk_pregnancy_check_view,
-    add_vaccination_plan_view, archived_sows_view
+    add_vaccination_plan_view, archived_sows_view, general_statistics_view
 
 )
 
@@ -29,7 +29,7 @@ urlpatterns = [
     path('maciory/szczepienie-grupowe/', bulk_vaccinate_view, name='bulk_vaccinate'),
     path('maciory/badania-grupowe/', bulk_pregnancy_check_view, name='bulk_pregnancy_check'),
     path('maciory/<int:sow_id>/zdarzenie/dodaj/', add_event_view, name='add_event'),
-
+    path('maciory/statystyki/', general_statistics_view, name='general_statistics'),
     path('login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(next_page='login'), name='logout'),
     path('konfiguracja/szczepienie/dodaj/', add_vaccination_plan_view, name='add_vaccination_plan'),

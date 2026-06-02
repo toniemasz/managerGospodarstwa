@@ -1,6 +1,8 @@
 # sows/application/services.py
-from datetime import date
+from datetime import date, timedelta
 from collections import defaultdict
+
+from sows.application.metrics import METRICS_REGISTRY, MetricDescriptor
 from sows.infrastructure.repositories import SowRepository
 from sows.models import VaccinationPlanModel
 
@@ -114,3 +116,59 @@ class SowDashboardService:
                     'vaccine_name': plan_dict['name'],
                     'is_eligible': vacc_status['is_eligible']
                 })
+
+
+    def get_general_statistics(self, metric_key: str, months_limit: int = 6, order: str = 'desc') -> dict:
+        """Generuje modularne statystyki okresowe oraz ranking dla wybranej metryki."""
+        if metric_key not in METRICS_REGISTRY:
+            metric_key = list(METRICS_REGISTRY.keys())[0]
+
+        metric: MetricDescriptor = METRICS_REGISTRY[metric_key]
+        sows = self.repository.get_all_sows()
+
+
+
+        monthly_data = defaultdict(int)
+        top_sows_list = []
+
+        if months_limit == 0:
+            cutoff_date = date.min
+        else:
+            cutoff_date = date.today() - timedelta(days=months_limit * 30)
+
+        for sow in sows:
+            sow_total = 0
+            for event in sow.all_events:
+                if event.event_type == metric.event_type and event.event_date >= cutoff_date:
+                    val = metric.value_extractor(event.details)
+                    sow_total += val
+
+                    month_key = event.event_date.strftime('%Y-%m')
+                    monthly_data[month_key] += val
+
+            # Wrzucamy do rankingu tylko jeśli były jakieś dane
+            if sow_total > 0 or sow.status != "ARCHIVED":  # Ubezpieczenie przed odrzuceniem zerowych jeśli chcemy szukać najgorszych
+                top_sows_list.append({
+                    'id': sow.id,
+                    'ear_tag': sow.ear_tag,
+                    'total_value': sow_total,
+                    'status': sow.dynamic_status_display
+                })
+
+        # Sortowanie na podstawie wybranego trybu
+        reverse_sort = True if order == 'desc' else False
+        top_sows_list = sorted(top_sows_list, key=lambda x: x['total_value'], reverse=reverse_sort)[:10]
+
+        sorted_months = sorted(monthly_data.keys())
+        chart_labels = sorted_months
+        chart_values = [monthly_data[m] for m in sorted_months]
+
+        return {
+            'current_metric': metric,
+            'available_metrics': METRICS_REGISTRY.values(),
+            'current_months_limit': months_limit,
+            'current_order': order,
+            'top_sows': top_sows_list,
+            'chart_labels': chart_labels,
+            'chart_values': chart_values,
+        }
