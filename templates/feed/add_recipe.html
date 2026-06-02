@@ -1,29 +1,169 @@
 {% extends 'base.html' %}
+{% block title %}{% if is_edit %}Edycja Receptury{% else %}Nowa Receptura{% endif %}{% endblock %}
+
 {% block content %}
-<div class="container mx-auto p-4 md:max-w-2xl">
-    <div class="bg-white p-6 rounded shadow-md">
-        <h2 class="text-xl font-bold mb-4">Tworzenie nowej receptury</h2>
-        <form method="post">
+<div class="container mx-auto p-4 md:p-6 max-w-3xl">
+    <header class="mb-6 flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+        <h1 class="text-xl font-bold text-gray-800">🧪 {% if is_edit %}Edycja Receptury{% else %}Tworzenie Nowej Receptury{% endif %}</h1>
+        <a href="{% url 'feed_recipes' %}" class="text-sm text-gray-500 hover:text-gray-700 font-semibold">← Powrót do listy</a>
+    </header>
+
+    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <form method="post" class="space-y-6" id="recipe-form">
             {% csrf_token %}
-            <div class="mb-4">{{ form.as_p }}</div>
-            
-            <h3 class="font-bold text-gray-700 border-b pb-2 mb-4">Wybierz Składniki (%)</h3>
-            {{ formset.management_form }}
-            <div class="space-y-2">
-                {% for item_form in formset %}
-                <div class="flex gap-2 items-center bg-gray-50 p-2 rounded">
-                    {{ item_form.id }}
-                    <div class="w-1/2">{{ item_form.ingredient }}</div>
-                    <div class="w-1/3">{{ item_form.percentage }} %</div>
+
+            <!-- Główny formularz nagłówka receptury -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="flex flex-col space-y-1">
+                    <label class="text-sm font-bold text-gray-700">{{ form.name.label }}</label>
+                    {{ form.name }}
+                    <p class="text-xs text-red-500">{{ form.name.errors.as_text }}</p>
                 </div>
-                {% endfor %}
+                <div class="flex flex-col space-y-1 md:col-span-2">
+                    <label class="text-sm font-bold text-gray-700">{{ form.description.label }}</label>
+                    {{ form.description }}
+                    <p class="text-xs text-red-500">{{ form.description.errors.as_text }}</p>
+                </div>
             </div>
-            
-            <div class="mt-6 flex justify-between">
-                <a href="{% url 'feed_recipes' %}" class="text-gray-500 font-bold">Anuluj</a>
-                <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded font-bold shadow">Zapisz Recepturę</button>
+
+            <!-- Zarządzanie składowymi za pomocą FormSet -->
+            <div class="border-t pt-4">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-md font-bold text-gray-800">Składniki paszy (wartości w %):</h3>
+                    <button type="button" id="add-ingredient-btn" class="text-sm bg-green-100 hover:bg-green-200 text-green-800 font-bold py-1 px-3 rounded shadow-sm transition">
+                        + Dodaj kolejny składnik
+                    </button>
+                </div>
+
+                <!-- Pola zarządzające FormSetem (Management Form) -->
+                {{ formset.management_form }}
+
+                <div id="ingredient-forms-container" class="space-y-3">
+                    {% for f in formset %}
+                    <div class="ingredient-row flex flex-wrap md:flex-nowrap items-center gap-4 bg-gray-50 p-3 rounded-md border border-gray-200 transition-all">
+                        {{ f.id }} <!-- Ukryte ID dla edycji istniejących rekordów -->
+
+                        <div class="flex-1 min-w-[200px]">
+                            <label class="block text-xs font-bold text-gray-500 mb-1">Składnik</label>
+                            {{ f.ingredient }}
+                            <p class="text-xs text-red-500">{{ f.ingredient.errors.as_text }}</p>
+                        </div>
+                        <div class="w-32">
+                            <label class="block text-xs font-bold text-gray-500 mb-1">Udział (%)</label>
+                            {{ f.percentage }}
+                            <p class="text-xs text-red-500">{{ f.percentage.errors.as_text }}</p>
+                        </div>
+
+                        <!-- Obsługa usuwania (ukrywamy domyślny checkbox i dajemy ładny przycisk) -->
+                        <div class="flex items-end justify-center pt-5">
+                            <div class="hidden">
+                                {{ f.DELETE }}
+                            </div>
+                            <button type="button" class="remove-row-btn text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded transition" title="Usuń ten wiersz">
+                                🗑️ Usuń
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Ukryty szablon dla nowego wiersza generowany przez Django (empty_form) -->
+            <div id="empty-form-template" class="hidden">
+                <div class="ingredient-row flex flex-wrap md:flex-nowrap items-center gap-4 bg-gray-50 p-3 rounded-md border border-gray-200 transition-all border-l-4 border-l-green-400">
+                    {{ formset.empty_form.id }}
+                    <div class="flex-1 min-w-[200px]">
+                        <label class="block text-xs font-bold text-gray-500 mb-1">Składnik</label>
+                        {{ formset.empty_form.ingredient }}
+                    </div>
+                    <div class="w-32">
+                        <label class="block text-xs font-bold text-gray-500 mb-1">Udział (%)</label>
+                        {{ formset.empty_form.percentage }}
+                    </div>
+                    <div class="flex items-end justify-center pt-5">
+                        <div class="hidden">
+                            {{ formset.empty_form.DELETE }}
+                        </div>
+                        <button type="button" class="remove-row-btn text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded transition" title="Usuń ten wiersz">
+                            🗑️ Usuń
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-6 border-t flex justify-end gap-3">
+                <a href="{% url 'feed_recipes' %}" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded font-bold transition">Anuluj</a>
+                <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold shadow transition">💾 Zapisz Recepturę</button>
             </div>
         </form>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 1. Aplikowanie klas Tailwind do renderowanych inputów i selectów
+    function styleInputs(container) {
+        container.querySelectorAll('input:not([type="checkbox"]):not([type="hidden"]), select, textarea').forEach(el => {
+            el.classList.add('w-full', 'px-3', 'py-2', 'border', 'border-gray-300', 'rounded-md', 'focus:outline-none', 'focus:ring-2', 'focus:ring-blue-500', 'text-sm', 'bg-white');
+        });
+    }
+
+    // Stylowanie formy na start
+    styleInputs(document.getElementById('recipe-form'));
+
+    // 2. Obsługa dynamicznego dodawania nowych rzędów (Dynamic Formset)
+    const container = document.getElementById('ingredient-forms-container');
+    const totalFormsInput = document.querySelector('input[name$="-TOTAL_FORMS"]');
+    const addBtn = document.getElementById('add-ingredient-btn');
+    const emptyFormTemplate = document.getElementById('empty-form-template').innerHTML;
+
+    addBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+
+        // Pobierz aktualną liczbę formularzy
+        const currentFormCount = parseInt(totalFormsInput.value);
+
+        // Zastąp prefix domyślny __prefix__ na aktualny index (np. 0, 1, 2)
+        const newRowHtml = emptyFormTemplate.replace(/__prefix__/g, currentFormCount);
+
+        // Stwórz tymczasowy wrapper aby przetworzyć HTML
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = newRowHtml;
+        const newRowNode = tempDiv.firstElementChild;
+
+        // Ostyluj nowe inputy i dodaj do widoku
+        styleInputs(newRowNode);
+        container.appendChild(newRowNode);
+
+        // Zaktualizuj licznik formularzy dla backendu (wymagane przez Django)
+        totalFormsInput.value = currentFormCount + 1;
+    });
+
+    // 3. Obsługa dynamicznego usuwania (Delegacja zdarzeń)
+    container.addEventListener('click', function(e) {
+        // Zabezpieczenie aby reagować tylko na kliknięcie przycisku "Usuń"
+        const removeBtn = e.target.closest('.remove-row-btn');
+        if (removeBtn) {
+            e.preventDefault();
+            const row = removeBtn.closest('.ingredient-row');
+
+            // Poszukaj domyślnego checkboxa DELETE od Django
+            const deleteCheckbox = row.querySelector('input[type="checkbox"][name$="-DELETE"]');
+
+            if (deleteCheckbox) {
+                // Jeśli wiersz jest już w bazie (ma id), zaznaczamy do usunięcia
+                deleteCheckbox.checked = true;
+                row.style.display = 'none'; // Ukrywamy wiersz wizualnie
+            } else {
+                // Jeżeli wiersz był dopiero co dodany plusem, można go po prostu usunąć (choć Django toleruje puste usunięte indexy)
+                row.style.display = 'none';
+
+
+                const hiddenDeleteNode = row.querySelector('input[name$="-DELETE"]');
+                if(hiddenDeleteNode) hiddenDeleteNode.checked = true;
+            }
+        }
+    });
+});
+</script>
 {% endblock %}
