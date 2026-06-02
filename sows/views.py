@@ -185,6 +185,28 @@ def archived_sows_view(request):
         error_html = f"<h2>Wystąpił błąd!</h2><br><b>Powód:</b> {str(e)}<br><pre>{traceback.format_exc()}</pre>"
         return HttpResponse(error_html, status=500)
 
+
+
+@login_required
+def general_statistics_view(request):
+    try:
+        metric_key = request.GET.get('metric', 'born_alive')
+        order = request.GET.get('order', 'desc')
+
+        try:
+            months = int(request.GET.get('months', '6'))
+        except ValueError:
+            months = 6
+
+        service = SowDashboardService()
+        context = service.get_general_statistics(metric_key=metric_key, months_limit=months, order=order)
+        return render(request, 'sows/analytics.html', context)
+    except Exception as e:
+        import traceback
+        error_html = f"<h2>Błąd podczas generowania statystyk</h2><pre>{traceback.format_exc()}</pre>"
+        return HttpResponse(error_html, status=500)
+
+
 @login_required
 def delete_event_view(request, event_id):
     if request.method == 'POST':
