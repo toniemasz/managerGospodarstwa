@@ -229,5 +229,14 @@ class Sow:
     def avg_loss_before_weaning(self) -> float:
         if self.weaning_count == 0:
             return 0.0
-        total_loss = self.total_born_alive - self.total_weaned
+
+        completed_born_alive = self.total_born_alive
+
+        if self.status == "LACTATING" and self.farrowing_count > self.weaning_count:
+            if self.last_farrowing_date:
+                last_farrow = next((f for f in self.farrowings if f.event_date == self.last_farrowing_date), None)
+                if last_farrow:
+                    completed_born_alive -= int(last_farrow.details.get("born_alive", 0))
+
+        total_loss = completed_born_alive - self.total_weaned
         return round(max(0, total_loss) / self.weaning_count, 2)

@@ -56,3 +56,13 @@ class TestSowEntity:
         empty_sow.load_history(events)
 
         assert empty_sow.is_due_for_pregnancy_check(date.today()) is False
+
+
+    def test_avg_loss_before_weaning_ignores_current_lactation(self, empty_sow):
+        events = [
+            SowEvent(event_type="FARROWING", event_date=date(2023, 1, 1), details={"born_alive": 10, "born_dead": 1}),
+            SowEvent(event_type="WEANING", event_date=date(2023, 2, 1), details={"count": 8}),
+            SowEvent(event_type="FARROWING", event_date=date(2023, 6, 1), details={"born_alive": 12, "born_dead": 0})
+        ]
+        empty_sow.load_history(events)
+        assert empty_sow.avg_loss_before_weaning == 2.0

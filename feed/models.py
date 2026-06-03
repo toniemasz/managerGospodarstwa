@@ -1,59 +1,98 @@
+# feed/models.py
+from decimal import Decimal
+
 from django.db import models
-from datetime import date
+from django.db.models import JSONField
 from django.core.validators import MinValueValidator, MaxValueValidator
 
+
 class IngredientModel(models.Model):
-    """Słownik składników (np. Pszenica, Jęczmień, Kukurydza, Soja, Premiks)."""
     name = models.CharField(max_length=100, unique=True, verbose_name="Nazwa składnika")
-    description = models.TextField(blank=True, null=True, verbose_name="Opis/Uwagi")
+    description = models.TextField(blank=True, null=True, verbose_name="Opis")
+
+    # NOWE POLE: Rozróżnienie, czy składnik sypiemy z binu (silosu), czy z worka ręcznie
+    is_in_bin = models.BooleanField(default=False, verbose_name="Przechowywane w binie (silosie)")
 
     def __str__(self):
-        return self.name
+        storage_type = "BIN" if self.is_in_bin else "WOREK"
+        return f"{self.name} [{storage_type}]"
+
+
+class DeliveryModel(models.Model):
+    date = models.DateField(verbose_name="Data dostawy")
+    ingredient = models.ForeignKey(IngredientModel, on_delete=models.RESTRICT, related_name='deliveries',
+                                   verbose_name="Składnik")
+    quantity_kg = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Ilość (kg)")
+    price_per_kg = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Cena za kg", null=True,
+                                       blank=True)
+
+    def __str__(self):
+        return f"Dostawa: {self.ingredient.name} - {self.quantity_kg}kg ({self.date})"
+
+
+class IngredientPriceConfigModel(models.Model):
+    ingredient = models.OneToOneField(IngredientModel, on_delete=models.CASCADE, related_name='price_config',
+                                      verbose_name="Składnik")
+    price_per_kg = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Domyślna cena za kg")
+
+    def __str__(self):
+        return f"Cena: {self.ingredient.name} - {self.price_per_kg} PLN/kg"
+
 
 class RecipeModel(models.Model):
-    """Definicja receptury."""
-    name = models.CharField(max_length=100, unique=True, verbose_name="Nazwa receptury")
+    name = models.CharField(max_length=150, unique=True, verbose_name="Nazwa receptury")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.name
 
+
 class RecipeItemModel(models.Model):
-    """Składniki wchodzące w skład receptury z określeniem procentowym."""
-    recipe = models.ForeignKey(RecipeModel, related_name='items', on_delete=models.CASCADE)
-    ingredient = models.ForeignKey(IngredientModel, on_delete=models.PROTECT)
+    recipe = models.ForeignKey('RecipeModel', on_delete=models.CASCADE, related_name='items', verbose_name="Receptura")
+    ingredient = models.ForeignKey('IngredientModel', on_delete=models.RESTRICT, verbose_name="Składnik")
     percentage = models.DecimalField(
-        max_digits=5, decimal_places=2,
-        validators=[MinValueValidator(0.01), MaxValueValidator(100.00)],
-        verbose_name="Procent (%)"
+        max_digits=5,
+        decimal_places=2,
+        verbose_name="Procentowy udział (%)",
+        validators=[MinValueValidator(Decimal('0.01')), MaxValueValidator(Decimal('100.00'))] # <-- To jest kluczowe!
     )
 
     def __str__(self):
         return f"{self.recipe.name} - {self.ingredient.name} ({self.percentage}%)"
 
-class DeliveryModel(models.Model):
-    """Dostawa składnika do magazynu."""
-    ingredient = models.ForeignKey(IngredientModel, on_delete=models.PROTECT, verbose_name="Składnik")
-    date = models.DateField(default=date.today, verbose_name="Data dostawy")
-    quantity_kg = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Ilość (kg)")
-    price_per_kg = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, verbose_name="Cena za kg (informacyjnie)")
-
-    def __str__(self):
-        return f"Dostawa {self.ingredient.name} - {self.quantity_kg} kg"
 
 class ProductionModel(models.Model):
-    """Śrutowanie - produkcja paszy na podstawie receptury."""
-    recipe = models.ForeignKey(RecipeModel, on_delete=models.PROTECT, verbose_name="Receptura")
-    date = models.DateField(default=date.today, verbose_name="Data śrutowania")
-    quantity_kg = models.DecimalField(max_digits=10, decimal_places=2, default=2000.00, verbose_name="Ilość (kg)")
+    class Statuses(models.TextChoices):
+        QUEUED = 'QUEUED', 'W kolejce'
+        STAGE_1_DONE = 'STAGE_1_DONE', 'Etap 1 zakończony (Biny)'
+        COMPLETED = 'COMPLETED', 'Zakończone'
+
+    date = models.DateField(verbose_name="Data zaplanowania/produkcji")
+    time = models.TimeField(verbose_name="Godzina (Kolejność)", null=True, blank=True)
+    recipe = models.ForeignKey(RecipeModel, on_delete=models.RESTRICT, verbose_name="Bazuje na recepturze")
+    quantity_kg = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Ilość (kg)")
+
+    custom_recipe_data = JSONField(
+        blank=True,
+        null=True,
+        verbose_name="Jednorazowo zmienione proporcje",
+        help_text="Format: {'id_skladnika': procent_udzialu}"
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=Statuses.choices,
+        default=Statuses.QUEUED,
+        verbose_name="Status"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def status_label(self) -> str:
+        """Jawne mapowanie klucza statusu na czytelną dla człowieka etykietę."""
+        return dict(self.Statuses.choices).get(self.status, self.status)
 
     def __str__(self):
-        return f"Śrutowanie {self.recipe.name} - {self.quantity_kg} kg"
-
-class IngredientPriceConfigModel(models.Model):
-    """Konfiguracja cen składników do kalkulatora kosztów."""
-    ingredient = models.OneToOneField(IngredientModel, on_delete=models.CASCADE, related_name='price_config')
-    price_per_kg = models.DecimalField(max_digits=8, decimal_places=4, default=0.0000, verbose_name="Cena za kg do kalkulatora")
-
-    def __str__(self):
-        return f"Cena {self.ingredient.name}: {self.price_per_kg} PLN/kg"
+        return f"Śrutowanie: {self.recipe.name} ({self.quantity_kg}kg) - {self.status_label}"
