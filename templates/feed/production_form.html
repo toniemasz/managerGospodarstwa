@@ -1,0 +1,282 @@
+{% extends 'base.html' %}
+{% block title %}{% if is_edit %}Edycja Śrutowania{% else %}Planowanie Śrutowania{% endif %}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-4 md:p-6 max-w-3xl">
+    <header class="mb-6 bg-white p-4 rounded-lg shadow-sm">
+        <h1 class="text-xl md:text-2xl font-bold text-gray-800">
+            {% if is_edit %}✏️ Edycja Zaplanowanego Śrutowania{% else %}⚙️ Nowe Zlecenie Śrutowania{% endif %}
+        </h1>
+        <p class="text-sm text-gray-500 mt-1">Ustaw parametry, wybierz recepturę i opcjonalnie zmodyfikuj proporcje składników.</p>
+    </header>
+
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <form method="post" id="productionForm" class="space-y-4">
+            {% csrf_token %}
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Data</label>
+                    {{ form.date }}
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Godzina</label>
+                    {{ form.time }}
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Ilość wyprodukowana (kg)</label>
+                    {{ form.quantity_kg }}
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-bold text-gray-700 mb-1">Bazowa Receptura</label>
+                <select name="recipe" id="id_recipe" class="w-full border border-gray-300 rounded p-2 focus:ring-blue-500 focus:border-blue-500" required>
+                    <option value="">-- Wybierz z listy --</option>
+                    {% for r in recipes %}
+                        <option value="{{ r.id }}" {% if form.instance.recipe_id == r.id %}selected{% endif %}>{{ r.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div id="modify-btn-container" class="mt-4 hidden">
+                <button type="button" id="showEditorBtn" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded border border-gray-300 transition text-sm">
+                    ✏️ Zmodyfikuj proporcje tylko dla tego śrutowania
+                </button>
+            </div>
+
+            <input type="hidden" name="custom_recipe_data" id="id_custom_recipe_data" value="{{ form.instance.custom_recipe_data|default:'' }}">
+
+            <div id="recipe-editor" class="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4 hidden">
+                <div class="flex justify-between items-start mb-4 border-b border-gray-200 pb-2">
+                    <h4 class="text-md font-bold text-gray-800">Tymczasowa modyfikacja proporcji</h4>
+                    <button type="button" id="hideEditorBtn" class="text-red-500 hover:text-red-700 font-bold text-sm transition">✖ Anuluj modyfikację</button>
+                </div>
+
+                <div id="ingredients-container" class="space-y-2 mb-4"></div>
+
+                <div class="flex justify-between items-center border-t border-gray-200 pt-3">
+                    <strong class="text-gray-700">Suma: <span id="total-percentage" class="text-lg font-black">0</span>% </strong>
+                    <span id="error-msg" class="text-red-600 font-bold text-sm hidden">Proporcje muszą wynosić równo 100%!</span>
+                </div>
+            </div>
+
+            <div class="mt-6 bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                <label class="flex items-center cursor-pointer">
+                    <input type="checkbox" name="instant_complete" id="instantCompleteCheckbox" class="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300">
+                    <span class="ml-3 font-bold text-emerald-800">Od razu zatwierdź i ukończ śrutowanie</span>
+                </label>
+                <p class="text-xs text-emerald-600 mt-1 ml-8">Zaznacz, jeśli pasza została już zrobiona. Pomija to etap kolejki (Biny i Worki) i natychmiastowo ściąga składniki z magazynu.</p>
+
+                <input type="checkbox" name="force_inventory" id="force_inventory" class="rounded text-red-600">
+                <label for="force_inventory">Wymuś śrutowanie mimo braków na magazynie</label>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-6">
+                <a href="{% url 'feed_productions' %}" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 font-bold transition shadow-sm">Anuluj</a>
+                <button type="submit" id="submitBtn" class="px-5 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold transition shadow-md">
+                    Zapisz do kolejki
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.querySelectorAll('input[type="date"], input[type="number"], select').forEach(el => {
+        el.classList.add('w-full', 'border', 'border-gray-300', 'rounded', 'p-2', 'focus:ring-blue-500', 'focus:border-blue-500');
+    });
+
+    const recipesData = {
+        {% for r in recipes %}
+            "{{ r.id }}": [
+                {% for item in r.items.all %}
+                    {"id": "{{ item.ingredient.id }}", "name": "{{ item.ingredient.name }}", "percent": parseFloat("{{ item.percentage }}")},
+                {% endfor %}
+            ],
+        {% endfor %}
+    };
+
+    const recipeSelect = document.getElementById('id_recipe');
+    const modifyBtnContainer = document.getElementById('modify-btn-container');
+    const showEditorBtn = document.getElementById('showEditorBtn');
+    const hideEditorBtn = document.getElementById('hideEditorBtn');
+    const editorDiv = document.getElementById('recipe-editor');
+    const container = document.getElementById('ingredients-container');
+    const totalSpan = document.getElementById('total-percentage');
+    const errorMsg = document.getElementById('error-msg');
+    const form = document.getElementById('productionForm');
+    const hiddenData = document.getElementById('id_custom_recipe_data');
+    const instantCompleteCheckbox = document.getElementById('instantCompleteCheckbox');
+    const submitBtn = document.getElementById('submitBtn');
+
+    let currentItems = [];
+    let isEditorActive = false; // Flaga określająca czy włączono tryb edycji
+
+    function initEditor() {
+        const recipeId = recipeSelect.value;
+        if (!recipeId) {
+            modifyBtnContainer.classList.add('hidden');
+            editorDiv.classList.add('hidden');
+            isEditorActive = false;
+            return;
+        }
+
+        currentItems = JSON.parse(JSON.stringify(recipesData[recipeId]));
+
+        let existingCustomData = {};
+        try {
+            if(hiddenData.value) existingCustomData = JSON.parse(hiddenData.value);
+        } catch(e) {}
+
+        // Jeśli to edycja zapisu z bazy i istnieją niestandardowe proporcje, od razu otwieramy edytor
+        if(Object.keys(existingCustomData).length > 0) {
+            currentItems.forEach(item => {
+                if(existingCustomData[item.id] !== undefined) {
+                    item.percent = parseFloat(existingCustomData[item.id]);
+                }
+            });
+            modifyBtnContainer.classList.add('hidden');
+            editorDiv.classList.remove('hidden');
+            isEditorActive = true;
+        } else {
+            // Tryb standardowy - pokazujemy tylko przycisk
+            modifyBtnContainer.classList.remove('hidden');
+            editorDiv.classList.add('hidden');
+            isEditorActive = false;
+        }
+
+        renderEditor();
+    }
+
+    // Aktywacja edytora po kliknięciu przycisku
+    showEditorBtn.addEventListener('click', function() {
+        modifyBtnContainer.classList.add('hidden');
+        editorDiv.classList.remove('hidden');
+        isEditorActive = true;
+
+        // Odświeżenie na świeżych danych (na wypadek anulowania i ponownego otwarcia)
+        const recipeId = recipeSelect.value;
+        if (recipeId) {
+            currentItems = JSON.parse(JSON.stringify(recipesData[recipeId]));
+            renderEditor();
+        }
+    });
+
+    // Anulowanie modyfikacji
+    hideEditorBtn.addEventListener('click', function() {
+        editorDiv.classList.add('hidden');
+        modifyBtnContainer.classList.remove('hidden');
+        isEditorActive = false;
+        hiddenData.value = ""; // Czyścimy ukryty JSON
+
+        // Renderujemy ponownie oryginalne dane by pozbyć się błędów
+        const recipeId = recipeSelect.value;
+        if (recipeId) {
+            currentItems = JSON.parse(JSON.stringify(recipesData[recipeId]));
+            renderEditor();
+        }
+    });
+
+    function renderEditor() {
+        container.innerHTML = '';
+        let total = 0;
+
+        currentItems.forEach((item, index) => {
+            total += item.percent;
+
+            const div = document.createElement('div');
+            div.className = 'flex justify-between items-center bg-white p-2 border border-gray-100 rounded shadow-sm';
+            div.innerHTML = `
+                <label class="text-sm font-bold text-gray-700 w-1/2">${item.name}</label>
+                <div class="flex items-center w-1/3">
+                    <input type="number" step="0.01" min="0" max="100" class="w-full border border-gray-300 rounded p-1 text-right percent-input focus:ring-blue-500 focus:border-blue-500 font-medium"
+                           data-index="${index}" value="${item.percent.toFixed(2)}">
+                    <span class="ml-2 text-gray-500 font-bold">%</span>
+                </div>
+            `;
+            container.appendChild(div);
+        });
+
+        updateTotalDisplay(total);
+
+        document.querySelectorAll('.percent-input').forEach(input => {
+            input.addEventListener('input', function() {
+                currentItems[this.dataset.index].percent = parseFloat(this.value) || 0;
+                const sum = currentItems.reduce((acc, curr) => acc + curr.percent, 0);
+                updateTotalDisplay(sum);
+            });
+        });
+    }
+
+    function updateTotalDisplay(sum) {
+        totalSpan.innerText = sum.toFixed(2);
+
+        // Blokada zapisywania działa tylko jeśli edytor jest włączony
+        if (Math.abs(sum - 100) > 0.01 && isEditorActive) {
+            errorMsg.classList.remove('hidden');
+            totalSpan.classList.add('text-red-600');
+            totalSpan.classList.remove('text-green-600');
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        } else {
+            errorMsg.classList.add('hidden');
+            totalSpan.classList.add('text-green-600');
+            totalSpan.classList.remove('text-red-600');
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+    }
+
+    recipeSelect.addEventListener('change', () => {
+        hiddenData.value = "";
+        initEditor();
+    });
+
+    if (instantCompleteCheckbox) {
+        instantCompleteCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                submitBtn.innerText = 'Zapisz i Pobierz z Magazynu';
+                submitBtn.classList.replace('bg-blue-600', 'bg-emerald-600');
+                submitBtn.classList.replace('hover:bg-blue-700', 'hover:bg-emerald-700');
+            } else {
+                submitBtn.innerText = 'Zapisz do kolejki';
+                submitBtn.classList.replace('bg-emerald-600', 'bg-blue-600');
+                submitBtn.classList.replace('hover:bg-emerald-700', 'hover:bg-blue-700');
+            }
+        });
+    }
+
+    form.addEventListener('submit', function(e) {
+        if (recipeSelect.value) {
+            if (isEditorActive) {
+                const sum = currentItems.reduce((acc, curr) => acc + curr.percent, 0);
+                if (Math.abs(sum - 100) > 0.01) {
+                    e.preventDefault();
+                    alert("Proporcje składników muszą sumować się dokładnie do 100%!");
+                    return;
+                }
+
+                let isModified = false;
+                const original = recipesData[recipeSelect.value];
+                for(let i=0; i<original.length; i++) {
+                    if(original[i].percent !== currentItems[i].percent) isModified = true;
+                }
+
+                if(isModified) {
+                    let finalData = {};
+                    currentItems.forEach(item => { finalData[item.id] = item.percent; });
+                    hiddenData.value = JSON.stringify(finalData);
+                } else {
+                    hiddenData.value = "";
+                }
+            } else {
+                // Jeśli edytor był schowany, to niezależnie co wpisano, wysyłamy pusty JSON
+                hiddenData.value = "";
+            }
+        }
+    });
+
+    if(recipeSelect.value) initEditor();
+</script>
+{% endblock %}

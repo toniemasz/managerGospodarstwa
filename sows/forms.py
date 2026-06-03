@@ -56,7 +56,6 @@ class SowForm(forms.ModelForm):
 
 
 class SowEventForm(forms.ModelForm):
-    # Dotychczasowe pola dodatkowe
 
     vaccine_name = forms.ChoiceField(label="Nazwa szczepienia / Szczepionka", required=False)
     technician = forms.CharField(label="Inseminator / Technik", required=False)
@@ -64,7 +63,6 @@ class SowEventForm(forms.ModelForm):
     born_dead = forms.IntegerField(label="Urodzone martwe", min_value=0, required=False)
     count = forms.IntegerField(label="Liczba odsadzonych prosiąt", min_value=0, required=False)
 
-    # Nowe pola dla badania USG oraz szczepień
     pregnancy_result = forms.ChoiceField(
         label="Wynik badania USG",
         choices=[
@@ -75,7 +73,6 @@ class SowEventForm(forms.ModelForm):
         ],
         required=False
     )
-    vaccine_name = forms.CharField(label="Nazwa szczepienia / Szczepionka", max_length=100, required=False)
 
     class Meta:
         model = SowEventModel

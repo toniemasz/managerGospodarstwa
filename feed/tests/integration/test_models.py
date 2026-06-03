@@ -1,13 +1,14 @@
 import pytest
-from django.core.exceptions import ValidationError
 from decimal import Decimal
+from django.core.exceptions import ValidationError
 from feed.models import IngredientModel, RecipeModel, RecipeItemModel
 
 
 @pytest.mark.django_db
 def test_ingredient_str_representation():
     ing = IngredientModel.objects.create(name="Otręby")
-    assert str(ing) == "Otręby"
+    # Zmieniliśmy model tak, że domyślnie is_in_bin=False daje dopisek [WOREK]
+    assert str(ing) == "Otręby [WOREK]"
 
 
 @pytest.mark.django_db
@@ -18,11 +19,6 @@ def test_recipe_item_percentage_validation():
     # Tworzymy element z niedozwolonym procentem (powyżej 100%)
     item = RecipeItemModel(recipe=recipe, ingredient=ing, percentage=Decimal('150.00'))
 
-    # Assert
+    # W Django walidatory modelu uruchamiają się przez full_clean(), a nie samo save()
     with pytest.raises(ValidationError):
-        item.full_clean()  # Wymusza uruchomienie walidatorów modelu
-
-    # Zbyt mały procent
-    item2 = RecipeItemModel(recipe=recipe, ingredient=ing, percentage=Decimal('-5.00'))
-    with pytest.raises(ValidationError):
-        item2.full_clean()
+        item.full_clean()

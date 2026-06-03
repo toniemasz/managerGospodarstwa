@@ -1,6 +1,17 @@
-<nav class="flex gap-4 mb-6 border-b pb-2">
-    <a href="{% url 'feed_inventory' %}" class="text-gray-600 hover:text-blue-600 font-bold px-2 py-1">📦 Magazyn</a>
-    <a href="{% url 'feed_recipes' %}" class="text-gray-600 hover:text-blue-600 font-bold px-2 py-1">🧪 Receptury</a>
-    <a href="{% url 'feed_productions' %}" class="text-gray-600 hover:text-blue-600 font-bold px-2 py-1">⚙️ Śrutowanie</a>
-    <a href="{% url 'feed_calculator' %}" class="text-gray-600 hover:text-blue-600 font-bold px-2 py-1">🧮 Kalkulator i Ustawienia</a>
+<nav class="flex gap-4 mb-6 border-b pb-2 overflow-x-auto">
+    <a href="{% url 'ingredient_list' %}" class="text-gray-600 hover:text-blue-600 font-bold px-2 py-1 whitespace-nowrap">🌾 Składniki</a>
+    <a href="{% url 'feed_inventory' %}" class="text-gray-600 hover:text-blue-600 font-bold px-2 py-1 whitespace-nowrap">📦 Magazyn</a>
+    <a href="{% url 'feed_recipes' %}" class="text-gray-600 hover:text-blue-600 font-bold px-2 py-1 whitespace-nowrap">🧪 Receptury</a>
+    <a href="{% url 'feed_productions' %}" class="text-gray-600 hover:text-blue-600 font-bold px-2 py-1 whitespace-nowrap">⚙️ Śrutowanie</a>
+    <a href="{% url 'feed_calculator' %}" class="text-gray-600 hover:text-blue-600 font-bold px-2 py-1 whitespace-nowrap">🧮 Kalkulator</a>
 </nav>
+
+{% if messages %}
+<div class="mb-4">
+    {% for message in messages %}
+    <div class="p-4 rounded-lg shadow-sm font-bold {% if message.tags == 'error' %}bg-red-100 text-red-800{% else %}bg-green-100 text-green-800{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}

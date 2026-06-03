@@ -1,53 +1,81 @@
 {% extends 'base.html' %}
-{% block title %}Magazyn Paszowy{% endblock %}
+{% block title %}Magazyn Składników{% endblock %}
 
 {% block content %}
 <div class="container mx-auto p-4 md:p-6">
     <header class="mb-6 flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
         <h1 class="text-xl md:text-2xl font-bold text-gray-800">🚜 Zarządzanie Produkcją Paszy</h1>
-        <div>
-            <a href="{% url 'modules_home' %}" class="text-sm text-gray-600 hover:text-blue-600 mr-4">Wróć do Centrali</a>
-            <span class="text-sm bg-yellow-100 text-yellow-800 font-medium px-2.5 py-0.5 rounded">Moduł: Pasze</span>
-        </div>
+        <span class="text-sm bg-yellow-100 text-yellow-800 font-medium px-2.5 py-0.5 rounded">Moduł: Pasze</span>
     </header>
 
     {% include 'feed/_feed_nav.html' %}
 
     <div class="flex justify-between items-center mb-4">
-        <h2 class="text-xl font-bold text-gray-700">Stan Magazynowy Składników</h2>
-        <a href="{% url 'add_delivery' %}" class="bg-blue-600 text-white px-4 py-2 rounded shadow font-bold">+ Dodaj Dostawę</a>
+        <h2 class="text-xl font-bold text-gray-700">Aktualny Stan Magazynowy</h2>
+        <a href="{% url 'add_delivery' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow font-bold transition">+ Przyjmij Dostawę</a>
     </div>
 
-    {% if low_stock_alerts %}
-    <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded text-red-800">
-        <p class="font-bold">⚠️ Uwaga! Niski stan magazynowy (< 500 kg) dla:</p>
-        <ul class="list-disc ml-5 text-sm">
-            {% for item in low_stock_alerts %}
-            <li>{{ item.ingredient_name }} ({{ item.current_stock|floatformat:2 }} kg)</li>
-            {% endfor %}
-        </ul>
-    </div>
-    {% endif %}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <a href="{% url 'feed_full_inventory' %}" class="block bg-blue-600 hover:bg-blue-700 transition p-6 rounded-lg shadow-md flex justify-between items-center text-white cursor-pointer transform hover:-translate-y-1">
+            <div>
+                <h3 class="font-bold text-xl mb-1">Łączny stan magazynu</h3>
+                <p class="text-blue-100 text-sm">Kliknij, aby zobaczyć szczegóły</p>
+            </div>
+            <div class="text-right">
+                <span class="text-3xl font-black">{{ total_inventory_kg|floatformat:0 }}</span>
+                <span class="text-sm font-bold opacity-80">kg</span>
+            </div>
+        </a>
 
-    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+        {% if low_stock_alerts %}
+        <div class="col-span-1 md:col-span-2 bg-red-50 p-4 rounded-lg shadow-sm border border-red-200">
+            <h3 class="font-bold text-red-800 mb-2">⚠️ Niski stan surowców:</h3>
+            <div class="flex flex-wrap gap-2">
+                {% for alert in low_stock_alerts %}
+                <span class="bg-white text-red-700 border border-red-300 px-3 py-1 rounded-full text-sm font-bold shadow-sm">
+                    {{ alert.name }}: {{ alert.current_stock|floatformat:0 }} kg
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="mb-4">
+        <h2 class="text-xl font-bold text-gray-700">Historia Zarejestrowanych Dostaw</h2>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200">
         <table class="min-w-full text-left text-sm text-gray-600">
-            <thead class="bg-gray-100 uppercase text-gray-500">
+            <thead class="bg-gray-100 uppercase text-gray-500 font-bold border-b border-gray-200">
                 <tr>
+                    <th class="p-4">Data</th>
                     <th class="p-4">Składnik</th>
-                    <th class="p-4 text-right">Suma Dostaw (kg)</th>
-                    <th class="p-4 text-right">Zużyto do śrutowania (kg)</th>
-                    <th class="p-4 text-right font-bold">Stan Obecny (kg)</th>
+                    <th class="p-4 text-right">Ilość (kg)</th>
+                    <th class="p-4 text-right">Cena/kg</th>
+                    <th class="p-4 text-center">Akcje</th>
                 </tr>
             </thead>
-            <tbody class="divide-y">
-                {% for item in inventory %}
-                <tr class="hover:bg-gray-50">
-                    <td class="p-4 font-bold text-gray-800">{{ item.ingredient_name }}</td>
-                    <td class="p-4 text-right">{{ item.total_delivered|floatformat:2 }}</td>
-                    <td class="p-4 text-right">{{ item.total_used|floatformat:2 }}</td>
-                    <td class="p-4 text-right font-bold {% if item.current_stock < 500 %}text-red-600{% else %}text-green-600{% endif %}">
-                        {{ item.current_stock|floatformat:2 }}
+            <tbody class="divide-y divide-gray-200">
+                {% for delivery in deliveries %}
+                <tr class="hover:bg-gray-50 transition">
+                    <td class="p-4">{{ delivery.date|date:"d.m.Y" }}</td>
+                    <td class="p-4 font-bold text-gray-800">{{ delivery.ingredient.name }}</td>
+                    <td class="p-4 text-right font-black text-gray-700">{{ delivery.quantity_kg|floatformat:2 }} kg</td>
+                    <td class="p-4 text-right">{{ delivery.price_per_kg|default:"-" }} PLN</td>
+                    <td class="p-4 text-center">
+                        <div class="flex justify-center items-center gap-3">
+                            <a href="{% url 'edit_delivery' delivery.id %}" class="text-indigo-600 hover:text-indigo-900 font-bold transition">✏️ Edytuj</a>
+                            <form method="post" action="{% url 'delete_delivery' delivery.id %}" class="inline" onsubmit="return confirm('Usunięcie tej dostawy zmniejszy stan magazynowy składnika {{ delivery.ingredient.name }} o {{ delivery.quantity_kg }} kg. Kontynuować?');">
+                                {% csrf_token %}
+                                <button type="submit" class="text-red-600 hover:text-red-900 font-bold transition">🗑️ Usuń</button>
+                            </form>
+                        </div>
                     </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="p-8 text-center text-gray-400 italic">Brak historii wprowadzonych dostaw.</td>
                 </tr>
                 {% endfor %}
             </tbody>

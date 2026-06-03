@@ -1,56 +1,55 @@
 from decimal import Decimal
-from django.db.models import Sum, F, DecimalField
-from feed.models import IngredientModel, DeliveryModel, ProductionModel, RecipeModel, IngredientPriceConfigModel
-from feed.domain.entities import InventoryItem, RecipeCostInfo
+from django.db.models import Sum
+from feed.models import IngredientModel, DeliveryModel, ProductionModel
 
 
 class FeedRepository:
+    """
+    Abstrakcja bazy danych. Tylko ta klasa ma prawo używać Django ORM
+    (np. .objects.filter, .annotate, .save).
+    """
 
-    def get_inventory_state(self) -> list[InventoryItem]:
-        ingredients = IngredientModel.objects.all()
-        inventory = []
+    def get_all_ingredients(self):
+        return IngredientModel.objects.all()
 
-        for ing in ingredients:
-            # Suma dostaw
-            delivered = DeliveryModel.objects.filter(ingredient=ing).aggregate(
-                total=Sum('quantity_kg')
-            )['total'] or Decimal('0.00')
+    def get_delivery_aggregates(self) -> dict:
+        """Zwraca słownik {ingredient_id: sum_of_deliveries}"""
+        deliveries_agg = DeliveryModel.objects.values('ingredient_id').annotate(total_kg=Sum('quantity_kg'))
+        return {item['ingredient_id']: (item['total_kg'] or Decimal('0.00')) for item in deliveries_agg}
 
-        
-            used = Decimal('0.00')
-            productions = ProductionModel.objects.filter(recipe__items__ingredient=ing).annotate(
-                percentage=F('recipe__items__percentage')
-            )
+    def get_completed_productions(self):
+        return ProductionModel.objects.filter(
+            status=ProductionModel.Statuses.COMPLETED
+        ).prefetch_related('recipe__items__ingredient')
 
-            for prod in productions:
-                used += (prod.quantity_kg * (prod.percentage / Decimal('100.00')))
+    def get_production_for_processing(self, production_id: int, lock_for_update: bool = False):
+        """Pobiera produkcję wraz z recepturą. Może zablokować wiersz w transakcji."""
+        qs = ProductionModel.objects.select_related('recipe').prefetch_related('recipe__items__ingredient')
+        if lock_for_update:
+            qs = qs.select_for_update()
+        return qs.get(pk=production_id)
 
-            inventory.append(InventoryItem(
-                ingredient_id=ing.id,
-                ingredient_name=ing.name,
-                total_delivered=delivered,
-                total_used=used
-            ))
+    def save_production(self, production: ProductionModel):
+        production.save()
 
-        return inventory
+    def get_recipes_with_items(self):
+        """Tylko pobiera receptury z bazy z prefetch."""
+        from feed.models import RecipeModel
+        return RecipeModel.objects.prefetch_related('items__ingredient').all()
 
-    def get_recipe_costs(self) -> list[RecipeCostInfo]:
-        recipes = RecipeModel.objects.prefetch_related('items__ingredient__price_config').all()
-        costs = []
+    def get_ingredient_prices_map(self) -> dict:
+        """Pobiera ceny i zwraca jako prosty słownik {id: cena}."""
+        from feed.models import IngredientPriceConfigModel
+        configs = IngredientPriceConfigModel.objects.all()
+        return {config.ingredient_id: config.price_per_kg for config in configs}
 
-        for recipe in recipes:
-            total_cost_per_kg = Decimal('0.00')
-            for item in recipe.items.all():
-                try:
-                    price = item.ingredient.price_config.price_per_kg
-                except IngredientPriceConfigModel.DoesNotExist:
-                    price = Decimal('0.00')
+    def get_recipes_with_items(self):
+        """Tylko pobiera receptury z bazy z prefetch."""
+        from feed.models import RecipeModel
+        return RecipeModel.objects.prefetch_related('items__ingredient').all()
 
-                percentage = item.percentage / Decimal('100.00')
-                total_cost_per_kg += (price * percentage)
-
-            costs.append(RecipeCostInfo(
-                recipe_name=recipe.name,
-                cost_per_kg=total_cost_per_kg
-            ))
-        return costs
+    def get_ingredient_prices_map(self) -> dict:
+        """Pobiera ceny i zwraca jako prosty słownik {id: cena}."""
+        from feed.models import IngredientPriceConfigModel
+        configs = IngredientPriceConfigModel.objects.all()
+        return {config.ingredient_id: config.price_per_kg for config in configs}
