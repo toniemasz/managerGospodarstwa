@@ -56,10 +56,12 @@ class FeedManagementService:
             ))
 
         low_stock = [item for item in inventory_state if item.current_stock < 500]
+        total_inventory_kg = sum((item.current_stock for item in inventory_state), Decimal('0.00'))
 
         return {
             'inventory': inventory_state,
-            'low_stock_alerts': low_stock
+            'low_stock_alerts': low_stock,
+            'total_inventory_kg': total_inventory_kg
         }
 
     def validate_production_capacity(self, production_id: int) -> tuple[bool, list[str]]:
@@ -139,7 +141,8 @@ class FeedManagementService:
         return True, "Zakończono pobieranie z binów. Gotowe do Etapu 2."
 
     @transaction.atomic
-    def complete_production(self, production_id: int, skip_stages: bool = False) -> tuple[bool, str]:
+    def complete_production(self, production_id: int, skip_stages: bool = False, force_inventory: bool = False) -> \
+    tuple[bool, str]:
         production = self.repository.get_production_for_processing(production_id, lock_for_update=True)
 
         if not skip_stages and production.status != 'STAGE_1_DONE':
@@ -148,9 +151,10 @@ class FeedManagementService:
         if production.status == 'COMPLETED':
             return False, "To śrutowanie zostało już wcześniej zaksięgowane."
 
-        is_possible, errors = self.validate_production_capacity(production_id)
-        if not is_possible:
-            return False, "Brak wystarczającej ilości składników na magazynie: " + " | ".join(errors)
+        if not force_inventory:
+            is_possible, errors = self.validate_production_capacity(production_id)
+            if not is_possible:
+                return False, "Brak wystarczającej ilości składników na magazynie: " + " | ".join(errors)
 
         production.status = 'COMPLETED'
         production.completed_at = timezone.now()

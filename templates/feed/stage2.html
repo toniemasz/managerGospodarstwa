@@ -40,8 +40,8 @@
                 {% csrf_token %}
                 <div class="mb-4">
                     <label class="flex items-center text-sm text-gray-700 cursor-pointer">
-                        <input type="checkbox" name="skip_stages" class="rounded text-emerald-600 focus:ring-emerald-500 mr-2 w-4 h-4">
-                        Wymuś zakończenie (Opcja awaryjna - pomija ostrzeżenia o brakach na magazynie)
+                        <input type="checkbox" name="force_inventory" id="force_inventory" class="rounded text-red-600">
+                        <label for="force_inventory">Wymuś śrutowanie mimo braków na magazynie</label>
                     </label>
                 </div>
 

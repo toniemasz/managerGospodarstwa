@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block title %}Pełny Stan Magazynu{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-4 md:p-6 max-w-5xl">
+    <header class="mb-6 flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
+        <h1 class="text-xl md:text-2xl font-bold text-gray-800">📦 Pełny Stan Magazynu</h1>
+        <a href="{% url 'feed_inventory' %}" class="bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm font-bold py-2 px-4 rounded transition">← Wróć do Magazynu</a>
+    </header>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for item in inventory %}
+        <div class="bg-white p-5 rounded-lg shadow-sm border border-gray-200 flex justify-between items-center transition hover:shadow-md">
+            <div>
+                <h3 class="font-bold text-gray-800 text-lg">{{ item.name }}</h3>
+                <span class="text-xs font-bold px-2 py-0.5 rounded mt-1 inline-block {% if item.is_in_bin %}bg-blue-100 text-blue-800 border border-blue-200{% else %}bg-orange-100 text-orange-800 border border-orange-200{% endif %}">
+                    {% if item.is_in_bin %}Silos (BIN){% else %}Worek (Ręcznie){% endif %}
+                </span>
+            </div>
+            <div class="text-right">
+                <span class="text-2xl font-black {% if item.current_stock < 500 %}text-red-600{% else %}text-blue-600{% endif %}">{{ item.current_stock|floatformat:2 }}</span>
+                <span class="text-sm font-bold text-gray-500 block">kg</span>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-span-full bg-white p-6 text-center text-gray-400 italic rounded-lg border">
+            Brak zdefiniowanych składników. Dodaj je w module "Składniki".
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

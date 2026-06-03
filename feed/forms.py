@@ -60,13 +60,14 @@ class DeliveryForm(forms.ModelForm):
     class Meta:
         model = DeliveryModel
         fields = ['date', 'ingredient', 'quantity_kg', 'price_per_kg']
-        widgets = {'date': forms.DateInput(attrs={'type': 'date'})}
-
+        widgets = {
+            'date': forms.DateInput(attrs={'type': 'date'}),
+            'price_per_kg': forms.NumberInput(attrs={'step': '0.00001'})
+        }
 
 class ProductionForm(forms.ModelForm):
     class Meta:
         model = ProductionModel
-        # Dodane custom_recipe_data dla tymczasowych zmian na etapie dodawania do kolejki
         fields = ['date', 'time', 'recipe', 'quantity_kg', 'custom_recipe_data']
         widgets = {
             'date': forms.DateInput(attrs={'type': 'date'}),
@@ -96,3 +97,6 @@ class PriceConfigForm(forms.ModelForm):
     class Meta:
         model = IngredientPriceConfigModel
         fields = ['ingredient', 'price_per_kg']
+        widgets = {
+            'price_per_kg': forms.NumberInput(attrs={'step': '0.00001'})
+        }

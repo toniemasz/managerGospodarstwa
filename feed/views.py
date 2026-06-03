@@ -182,8 +182,12 @@ def add_production_view(request):
         if form.is_valid():
             production = form.save()
             if request.POST.get('instant_complete') == 'on':
+                # Przechwyć checkbox z HTML (upewnij się, że w HTML checkbox ma name="force_inventory")
+                force_inventory = request.POST.get('force_inventory') == 'on'
+
                 service = FeedManagementService()
-                success, message = service.complete_production(production.id, skip_stages=True)
+                success, message = service.complete_production(production.id, skip_stages=True,
+                                                               force_inventory=force_inventory)
                 if success:
                     messages.success(request, "Śrutowanie zostało od razu zatwierdzone.")
                 else:
@@ -261,7 +265,10 @@ def process_stage2_view(request, pk):
     if request.method == 'POST':
         service = FeedManagementService()
         skip_stages = request.POST.get('skip_stages') == 'on'
-        success, message = service.complete_production(pk, skip_stages=skip_stages)
+
+        force_inventory = request.POST.get('force_inventory') == 'on'
+
+        success, message = service.complete_production(pk, skip_stages=skip_stages, force_inventory=force_inventory)
         if success:
             messages.success(request, message)
         else:
@@ -289,3 +296,11 @@ def feed_calculator_view(request):
         form = PriceConfigForm()
 
     return render(request, 'feed/calculator.html', {'costs': costs, 'form': form})
+
+
+@login_required
+def feed_full_inventory_view(request):
+    """Widok wyświetlający pełny stan każdego surowca na magazynie."""
+    service = FeedManagementService()
+    context = service.get_inventory_dashboard()
+    return render(request, 'feed/full_inventory.html', context)

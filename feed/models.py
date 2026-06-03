@@ -23,7 +23,7 @@ class DeliveryModel(models.Model):
     ingredient = models.ForeignKey(IngredientModel, on_delete=models.RESTRICT, related_name='deliveries',
                                    verbose_name="Składnik")
     quantity_kg = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Ilość (kg)")
-    price_per_kg = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Cena za kg", null=True,
+    price_per_kg = models.DecimalField(max_digits=14, decimal_places=5, verbose_name="Cena za kg", null=True,
                                        blank=True)
 
     def __str__(self):
@@ -33,7 +33,7 @@ class DeliveryModel(models.Model):
 class IngredientPriceConfigModel(models.Model):
     ingredient = models.OneToOneField(IngredientModel, on_delete=models.CASCADE, related_name='price_config',
                                       verbose_name="Składnik")
-    price_per_kg = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Domyślna cena za kg")
+    price_per_kg = models.DecimalField(max_digits=14, decimal_places=5, verbose_name="Domyślna cena za kg")
 
     def __str__(self):
         return f"Cena: {self.ingredient.name} - {self.price_per_kg} PLN/kg"
@@ -51,7 +51,7 @@ class RecipeItemModel(models.Model):
     recipe = models.ForeignKey('RecipeModel', on_delete=models.CASCADE, related_name='items', verbose_name="Receptura")
     ingredient = models.ForeignKey('IngredientModel', on_delete=models.RESTRICT, verbose_name="Składnik")
     percentage = models.DecimalField(
-        max_digits=5,
+        max_digits=12,
         decimal_places=2,
         verbose_name="Procentowy udział (%)",
         validators=[MinValueValidator(Decimal('0.01')), MaxValueValidator(Decimal('100.00'))] # <-- To jest kluczowe!
