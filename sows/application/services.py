@@ -1,10 +1,105 @@
 # sows/application/services.py
 from datetime import date, timedelta
 from collections import defaultdict
+from django.utils import timezone
 
 from sows.application.metrics import METRICS_REGISTRY, MetricDescriptor
 from sows.infrastructure.repositories import SowRepository
-from sows.models import VaccinationPlanModel
+from sows.models import VaccinationPlanModel, SowModel, SowEventModel
+
+
+class SowManagementService:
+    """Serwis odpowiedzialny za logikę tworzenia, aktualizacji i usuwania danych."""
+
+    @staticmethod
+    def create_sow(form_data: dict) -> SowModel:
+        return SowModel.objects.create(**form_data)
+
+    @staticmethod
+    def update_sow(sow_id: int, form_data: dict) -> SowModel:
+        sow = SowModel.objects.get(id=sow_id)
+        for field, value in form_data.items():
+            setattr(sow, field, value)
+        sow.save()
+        return sow
+
+    @staticmethod
+    def delete_or_archive_sow(sow_id: int, is_archived: bool) -> None:
+        sow = SowModel.objects.get(id=sow_id)
+        if is_archived:
+            sow.is_archived = True
+            sow.archived_at = timezone.now()
+            sow.save()
+        else:
+            sow.delete()
+
+    @staticmethod
+    def create_vaccination_plan(form_data: dict) -> VaccinationPlanModel:
+        return VaccinationPlanModel.objects.create(**form_data)
+
+    @staticmethod
+    def create_sow_event(sow_id: int, form_data: dict) -> SowEventModel:
+        sow = SowModel.objects.get(id=sow_id)
+        return SowEventModel.objects.create(sow=sow, **form_data)
+
+    @staticmethod
+    def update_sow_event(event_id: int, form_data: dict) -> SowEventModel:
+        event = SowEventModel.objects.get(id=event_id)
+        for field, value in form_data.items():
+            setattr(event, field, value)
+        event.save()
+        return event
+
+    @staticmethod
+    def delete_sow_event(event_id: int) -> int:
+        """Usuwa zdarzenie i zwraca ID maciory (przydatne do przekierowania)."""
+        event = SowEventModel.objects.get(id=event_id)
+        sow_id = event.sow.id
+        event.delete()
+        return sow_id
+
+    @staticmethod
+    def bulk_pregnancy_check(check_results: dict) -> None:
+        """Zapisuje masowe wyniki badań USG. Słownik wejściowy to {sow_id: result}."""
+        for sow_id, result in check_results.items():
+            if result in ['TAK', 'NIE', '?']:
+                sow = SowModel.objects.get(id=sow_id)
+                SowEventModel.objects.create(
+                    sow=sow,
+                    event_type='PREGNANCY_CHECK',
+                    event_date=date.today(),
+                    details={'result': result}
+                )
+
+    @staticmethod
+    def bulk_vaccinate(sow_ids: list, vaccine_name: str, cycle_id: str) -> None:
+        """Tworzy zdarzenia masowego szczepienia."""
+        for s_id in sow_ids:
+            sow = SowModel.objects.get(id=s_id)
+            SowEventModel.objects.create(
+                sow=sow,
+                event_type='VACCINATION',
+                event_date=date.today(),
+                details={
+                    'vaccine_name': vaccine_name,
+                    'cycle_id': cycle_id
+                }
+            )
+
+    @staticmethod
+    def get_event_initial_data(db_event: SowEventModel) -> dict:
+        """Przygotowuje dane początkowe formularza na podstawie typu zdarzenia."""
+        event_details_mapping = {
+            'INSEMINATION': {'technician': db_event.details.get('technician', '')},
+            'PREGNANCY_CHECK': {'pregnancy_result': db_event.details.get('result', '')},
+            'FARROWING': {
+                'born_alive': db_event.details.get('born_alive', 0),
+                'born_dead': db_event.details.get('born_dead', 0)
+            },
+            'WEANING': {'count': db_event.details.get('count', 0)},
+            'VACCINATION': {'vaccine_name': db_event.details.get('vaccine_name', '')},
+        }
+        return event_details_mapping.get(db_event.event_type, {})
 
 
 class SowDashboardService:
@@ -17,7 +112,6 @@ class SowDashboardService:
         today = date.today()
         sows = self.repository.get_all_sows()
 
-        # Pobranie słownika planów szczepień z bazy danych
         db_plans = VaccinationPlanModel.objects.all()
         plans = self._build_vaccination_plans(db_plans)
 
@@ -55,7 +149,6 @@ class SowDashboardService:
         }
 
     def get_archived_sows_list(self) -> list:
-        """Pobiera i aktualizuje statusy dla zarchiwizowanych macior."""
         sows = self.repository.get_archived_sows()
         for sow in sows:
             try:
@@ -66,7 +159,6 @@ class SowDashboardService:
 
     @staticmethod
     def _build_vaccination_plans(db_plans) -> list:
-        """Konwertuje modele planów szczepień na słowniki z wartościami domyślnymi."""
         plans = []
         for plan in db_plans:
             plans.append({
@@ -82,7 +174,6 @@ class SowDashboardService:
 
     @staticmethod
     def _classify_sow_status(sow, status_counts: dict) -> None:
-        """Klasyfikuje status maciory i aktualizuje liczniki."""
         status_mapping = {
             'INSEMINATED': 'inseminated_count',
             'PREGNANT': 'pregnant_count',
@@ -91,19 +182,16 @@ class SowDashboardService:
             'TO_RECHECK': 'to_recheck_count',
             'TO_CHECK': 'to_check_count',
         }
-        
         if sow.status in status_mapping:
             status_counts[status_mapping[sow.status]] += 1
 
     @staticmethod
     def _check_pregnancy_requirements(sow, sows_to_check_usg: list) -> None:
-        """Sprawdza czy maciora wymaga badania USG."""
         if sow.status == "TO_CHECK":
             sows_to_check_usg.append(sow)
 
     @staticmethod
     def _group_vaccinations(sow, plans: list, vaccination_groups: dict, current_date: date) -> None:
-        """Grupuje szczepienia dla maciory na podstawie planów."""
         for plan_dict in plans:
             vacc_status = sow.get_vaccination_status(plan_dict, current_date=current_date)
             if vacc_status['should_display']:
@@ -117,16 +205,12 @@ class SowDashboardService:
                     'is_eligible': vacc_status['is_eligible']
                 })
 
-
     def get_general_statistics(self, metric_key: str, months_limit: int = 6, order: str = 'desc') -> dict:
-        """Generuje modularne statystyki okresowe oraz ranking dla wybranej metryki."""
         if metric_key not in METRICS_REGISTRY:
             metric_key = list(METRICS_REGISTRY.keys())[0]
 
         metric: MetricDescriptor = METRICS_REGISTRY[metric_key]
         sows = self.repository.get_all_sows()
-
-
 
         monthly_data = defaultdict(int)
         top_sows_list = []
@@ -146,8 +230,7 @@ class SowDashboardService:
                     month_key = event.event_date.strftime('%Y-%m')
                     monthly_data[month_key] += val
 
-            # Wrzucamy do rankingu tylko jeśli były jakieś dane
-            if sow_total > 0 or sow.status != "ARCHIVED":  # Ubezpieczenie przed odrzuceniem zerowych jeśli chcemy szukać najgorszych
+            if sow_total > 0 or sow.status != "ARCHIVED":
                 top_sows_list.append({
                     'id': sow.id,
                     'ear_tag': sow.ear_tag,
@@ -155,7 +238,6 @@ class SowDashboardService:
                     'status': sow.dynamic_status_display
                 })
 
-        # Sortowanie na podstawie wybranego trybu
         reverse_sort = True if order == 'desc' else False
         top_sows_list = sorted(top_sows_list, key=lambda x: x['total_value'], reverse=reverse_sort)[:10]
 
