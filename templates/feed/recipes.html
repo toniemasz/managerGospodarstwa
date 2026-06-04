@@ -38,10 +38,7 @@
 
             <div class="mt-6 pt-3 border-t border-gray-100 flex justify-end gap-4">
                 <a href="{% url 'edit_recipe' recipe.id %}" class="text-indigo-600 hover:text-indigo-900 font-bold text-sm transition">✏️ Edytuj Strukture</a>
-                <form method="post" action="{% url 'delete_recipe' recipe.id %}" class="inline" onsubmit="return confirm('Czy na pewno chcesz bezpowrotnie usunąć recepturę: {{ recipe.name }}?');">
-                    {% csrf_token %}
-                    <button type="submit" class="text-red-600 hover:text-red-900 font-bold text-sm transition">🗑️ Usuń</button>
-                </form>
+                {% include 'components/_action_buttons.html' with edit_url=recipe.get_edit_url delete_url=recipe.get_delete_url item_name=recipe.name %}
             </div>
         </div>
         {% empty %}
