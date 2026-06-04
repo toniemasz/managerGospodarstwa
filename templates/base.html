@@ -7,12 +7,15 @@
     <title>{% block title %}Manager Gospodarstwa{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="{% static 'sow/js/table_manager.js' %}"></script>
+    <script src="{% static 'js/delete_manager.js' %}"></script>
     {% block extra_head %}{% endblock %}
 
 </head>
 <body class="bg-gray-100 font-sans leading-normal tracking-normal">
     {% block content %}{% endblock %}
 
+    {% include 'components/_delete_modal.html' %}
+    
     {% block scripts %}{% endblock %}
 </body>
 </html>
