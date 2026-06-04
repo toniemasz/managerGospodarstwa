@@ -1,0 +1,26 @@
+{# Reusable component for edit and delete action buttons #}
+{# Usage: {% include 'components/_action_buttons.html' with edit_url=obj.edit_url delete_url=obj.delete_url item_name="item" %} #}
+
+<div class="flex justify-center items-center gap-3">
+    {% if edit_url %}
+    <a href="{{ edit_url }}" 
+       class="text-indigo-600 hover:text-indigo-800 font-bold transition"
+       title="Edytuj {{ item_name|default:'element' }}">
+        ✏️ Edytuj
+    </a>
+    {% endif %}
+    
+    {% if delete_url %}
+    <form method="post" 
+          action="{{ delete_url }}" 
+          class="inline delete-form"
+          data-delete-item="{{ item_name|default:'element' }}">
+        {% csrf_token %}
+        <button type="submit" 
+                class="text-red-600 hover:text-red-800 font-bold transition delete-btn"
+                title="Usuń {{ item_name|default:'element' }}">
+            🗑️ Usuń
+        </button>
+    </form>
+    {% endif %}
+</div>
