@@ -1,21 +1,25 @@
 # feed/models.py
 from decimal import Decimal
-
 from django.db import models
 from django.db.models import JSONField
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.urls import reverse
 
 
 class IngredientModel(models.Model):
     name = models.CharField(max_length=100, unique=True, verbose_name="Nazwa składnika")
     description = models.TextField(blank=True, null=True, verbose_name="Opis")
-
-    # NOWE POLE: Rozróżnienie, czy składnik sypiemy z binu (silosu), czy z worka ręcznie
     is_in_bin = models.BooleanField(default=False, verbose_name="Przechowywane w binie (silosie)")
 
     def __str__(self):
         storage_type = "BIN" if self.is_in_bin else "WOREK"
         return f"{self.name} [{storage_type}]"
+
+    def get_edit_url(self):
+        return reverse('edit_ingredient', kwargs={'pk': self.pk})
+
+    def get_delete_url(self):
+        return reverse('delete_ingredient', kwargs={'pk': self.pk})
 
 
 class DeliveryModel(models.Model):
@@ -28,6 +32,12 @@ class DeliveryModel(models.Model):
 
     def __str__(self):
         return f"Dostawa: {self.ingredient.name} - {self.quantity_kg}kg ({self.date})"
+
+    def get_edit_url(self):
+        return reverse('edit_delivery', kwargs={'pk': self.pk})
+
+    def get_delete_url(self):
+        return reverse('delete_delivery', kwargs={'pk': self.pk})
 
 
 class IngredientPriceConfigModel(models.Model):
@@ -46,6 +56,12 @@ class RecipeModel(models.Model):
     def __str__(self):
         return self.name
 
+    def get_edit_url(self):
+        return reverse('edit_recipe', kwargs={'pk': self.pk})
+
+    def get_delete_url(self):
+        return reverse('delete_recipe', kwargs={'pk': self.pk})
+
 
 class RecipeItemModel(models.Model):
     recipe = models.ForeignKey('RecipeModel', on_delete=models.CASCADE, related_name='items', verbose_name="Receptura")
@@ -54,7 +70,7 @@ class RecipeItemModel(models.Model):
         max_digits=12,
         decimal_places=2,
         verbose_name="Procentowy udział (%)",
-        validators=[MinValueValidator(Decimal('0.01')), MaxValueValidator(Decimal('100.00'))] # <-- To jest kluczowe!
+        validators=[MinValueValidator(Decimal('0.01')), MaxValueValidator(Decimal('100.00'))]
     )
 
     def __str__(self):
