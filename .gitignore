@@ -30,3 +30,6 @@ __pycache__/
 # Logi i pliki tymczasowe
 *.log
 EOF
+
+/staticfiles/
+staticfiles/
