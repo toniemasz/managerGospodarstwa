@@ -192,19 +192,28 @@ def feed_recipes_view(request):
 @login_required
 def add_recipe_view(request):
     if request.method == 'POST':
+        # Inicjalizujemy oba formularze od razu, by zawsze istniały
         form = RecipeForm(request.POST)
-        if form.is_valid():
+        formset = RecipeItemFormSet(request.POST)
+
+        # Sprawdzamy poprawność OBU formularzy jednocześnie
+        if form.is_valid() and formset.is_valid():
             recipe = form.save()
-            formset = RecipeItemFormSet(request.POST, instance=recipe)
-            if formset.is_valid():
-                formset.save()
-                messages.success(request, "Receptura została utworzona.")
-                return redirect('feed_recipes')
+            # Przypinamy nowo utworzoną recepturę do formsetu i zapisujemy go
+            formset.instance = recipe
+            formset.save()
+
+            messages.success(request, "Receptura została utworzona.")
+            return redirect('feed_recipes')
     else:
         form = RecipeForm()
         formset = RecipeItemFormSet()
-    return render(request, 'feed/add_recipe.html', {'form': form, 'formset': formset, 'is_edit': False})
 
+    return render(request, 'feed/add_recipe.html', {
+        'form': form,
+        'formset': formset,
+        'is_edit': False
+    })
 
 @login_required
 def edit_recipe_view(request, pk):
@@ -302,11 +311,10 @@ def delete_production_view(request, pk):
     production = get_object_or_404(ProductionModel, pk=pk)
     if request.method == 'POST':
         if production.status == ProductionModel.Statuses.COMPLETED:
-            messages.error(request,
-                           "Zakończone śrutowanie odjęło już towar z magazynu. Operacja usunięcia zablokowana.")
+            messages.error(request, "Zakończone śrutowanie odjęło już towar z magazynu. Operacja usunięcia zablokowana.")
         else:
             production.delete()
-            messages.success(request, "Usunięto planowane śrutowanie.")
+            messages.success(request, "Usunięto planowane śrutowanie z kolejki.")
     return redirect('feed_productions')
 
 
