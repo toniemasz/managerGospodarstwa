@@ -32,13 +32,7 @@
                     <td class="p-4 font-bold text-gray-800">{{ ingredient.name }}</td>
                     <td class="p-4">{{ ingredient.description|default:"-" }}</td>
                     <td class="p-4 text-center">
-                        <div class="flex justify-center items-center gap-3">
-                            <a href="{% url 'edit_ingredient' ingredient.id %}" class="text-indigo-600 hover:text-indigo-800 font-bold transition">✏️ Edytuj</a>
-                            <form method="post" action="{% url 'delete_ingredient' ingredient.id %}" class="inline" onsubmit="return confirm('Czy na pewno usunąć ten składnik?');">
-                                {% csrf_token %}
-                                <button type="submit" class="text-red-600 hover:text-red-800 font-bold transition">🗑️ Usuń</button>
-                            </form>
-                        </div>
+                        {% include 'components/_action_buttons.html' with edit_url=ingredient.get_edit_url delete_url=ingredient.get_delete_url item_name=ingredient.name %}
                     </td>
                 </tr>
                 {% empty %}
