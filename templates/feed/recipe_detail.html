@@ -18,22 +18,44 @@
 
     {% include 'feed/_feed_nav.html' %}
 
+    <section class="panel compact-panel">
+        <form method="get" action="{% url 'recipe_detail' recipe.id %}" class="filter-bar sales-filter-bar">
+            <div class="table-control">
+                <label for="period">Okres statystyk</label>
+                <select id="period" name="period">
+                    {% for value, label in period_options %}
+                        <option value="{{ value }}" {% if date_filter.period == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="table-control">
+                <label for="date_from">Od</label>
+                <input id="date_from" type="date" name="date_from" value="{{ date_filter.date_from_value }}">
+            </div>
+            <div class="table-control">
+                <label for="date_to">Do</label>
+                <input id="date_to" type="date" name="date_to" value="{{ date_filter.date_to_value }}">
+            </div>
+            <button type="submit" class="button button-primary">Pokaż</button>
+        </form>
+    </section>
+
     <section class="stats-grid">
         <div class="stat-tile">
-            <span>Wytworzono</span>
+            <span>Wyprodukowane</span>
             <strong>{{ stats.completed_kg|floatformat:0 }} kg</strong>
+        </div>
+        <div class="stat-tile">
+            <span>Łączny koszt paszy</span>
+            <strong>{{ stats.completed_cost|floatformat:2 }}</strong>
+        </div>
+        <div class="stat-tile">
+            <span>Średni koszt tony</span>
+            <strong>{{ cost.cost_per_ton|floatformat:2 }}</strong>
         </div>
         <div class="stat-tile">
             <span>W kolejce</span>
             <strong>{{ stats.queued_kg|floatformat:0 }} kg</strong>
-        </div>
-        <div class="stat-tile">
-            <span>W toku</span>
-            <strong>{{ stats.in_progress_kg|floatformat:0 }} kg</strong>
-        </div>
-        <div class="stat-tile">
-            <span>Koszt tony</span>
-            <strong>{{ cost.cost_per_ton|floatformat:2 }}</strong>
         </div>
     </section>
 
@@ -96,6 +118,10 @@
                     <dd>{{ stats.completed_count }} / {{ stats.completed_kg|floatformat:0 }} kg</dd>
                 </div>
                 <div>
+                    <dt>Łączny koszt zakończonych</dt>
+                    <dd>{{ stats.completed_cost|floatformat:2 }} PLN</dd>
+                </div>
+                <div>
                     <dt>W kolejce</dt>
                     <dd>{{ stats.queued_count }} / {{ stats.queued_kg|floatformat:0 }} kg</dd>
                 </div>
@@ -142,4 +168,22 @@
         </div>
     </section>
 </main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const periodSelect = document.getElementById('period');
+    const dateInputs = [document.getElementById('date_from'), document.getElementById('date_to')];
+    function syncDateInputs() {
+        const isCustom = periodSelect.value === 'custom';
+        dateInputs.forEach(input => {
+            input.disabled = !isCustom;
+            input.closest('.table-control').classList.toggle('is-muted', !isCustom);
+        });
+    }
+    periodSelect.addEventListener('change', syncDateInputs);
+    syncDateInputs();
+});
+</script>
 {% endblock %}

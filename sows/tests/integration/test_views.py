@@ -173,3 +173,42 @@ class TestSowViews:
         assert response.status_code == 200
         assert "OWN-1" in response.content.decode()
         assert "OTHER-1" not in response.content.decode()
+
+    def test_bulk_sow_events_view_creates_valid_events(self, setup_client):
+        sow = SowModel.objects.create(ear_tag="BULK-1", farm=setup_client.farm)
+
+        response = setup_client.post(reverse('bulk_sow_events'), {
+            'events-TOTAL_FORMS': '1',
+            'events-INITIAL_FORMS': '0',
+            'events-MIN_NUM_FORMS': '0',
+            'events-MAX_NUM_FORMS': '1000',
+            'events-0-sow_ear_tag': sow.ear_tag,
+            'events-0-event_type': 'INSEMINATION',
+            'events-0-event_date': '2026-06-20',
+            'events-0-technician': 'Jan',
+        })
+
+        assert response.status_code == 302
+        assert SowEventModel.objects.filter(
+            sow=sow,
+            event_type='INSEMINATION',
+            details={'technician': 'Jan'},
+        ).exists()
+
+    def test_bulk_sow_events_view_blocks_invalid_cycle_event(self, setup_client):
+        sow = SowModel.objects.create(ear_tag="BULK-BLOCK", farm=setup_client.farm)
+
+        response = setup_client.post(reverse('bulk_sow_events'), {
+            'events-TOTAL_FORMS': '1',
+            'events-INITIAL_FORMS': '0',
+            'events-MIN_NUM_FORMS': '0',
+            'events-MAX_NUM_FORMS': '1000',
+            'events-0-sow_ear_tag': sow.ear_tag,
+            'events-0-event_type': 'FARROWING',
+            'events-0-event_date': '2026-06-20',
+            'events-0-born_alive': '10',
+            'events-0-born_dead': '1',
+        })
+
+        assert response.status_code == 200
+        assert not SowEventModel.objects.filter(sow=sow, event_type='FARROWING').exists()

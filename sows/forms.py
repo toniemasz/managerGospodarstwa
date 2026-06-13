@@ -1,5 +1,6 @@
 # sows/forms.py
 from django import forms
+from django.forms import formset_factory
 
 from .services.sow_repository import VaccinationPlanRepository
 from .models import SowModel, SowEventModel, VaccinationPlanModel
@@ -143,6 +144,10 @@ class SowEventForm(forms.ModelForm):
                     'allowed': ['PREGNANCY_CHECK', 'INSEMINATION'],
                     'message': "Błąd: Maciora jest po inseminacji. Następnym krokiem powinno być 'Badanie USG' (potwierdzenie ciąży) lub ponowna 'Inseminacja'."
                 },
+                'TO_CHECK': {
+                    'allowed': ['PREGNANCY_CHECK', 'INSEMINATION'],
+                    'message': "Błąd: Maciora oczekuje na badanie USG. Wybierz 'Badanie USG' lub ponowną 'Inseminację'."
+                },
                 'TO_RECHECK': {
                     'allowed': ['PREGNANCY_CHECK', 'INSEMINATION'],
                     'message': "Błąd: Status maciory to 'Do rebadania (?)'. Wybierz ponowne 'Badanie USG' lub nową 'Inseminację'."
@@ -183,3 +188,102 @@ class SowEventForm(forms.ModelForm):
             'VACCINATION': {'vaccine_name': self.cleaned_data.get('vaccine_name') or ""},
         }
         return details_mapping.get(event_type, {})
+
+
+class BulkSowEventRowForm(forms.Form):
+    sow_ear_tag = forms.CharField(label="Maciora", required=False, max_length=50)
+    event_type = forms.ChoiceField(label="Typ zdarzenia", choices=[('', '---')] + SowEventModel.EVENT_TYPES, required=False)
+    event_date = forms.DateField(label="Data", required=False, widget=forms.DateInput(attrs={'type': 'date'}))
+    technician = forms.CharField(label="Inseminator", required=False)
+    pregnancy_result = forms.ChoiceField(
+        label="Wynik USG",
+        choices=[
+            ('', '---'),
+            ('TAK', 'Prośna'),
+            ('NIE', 'Jałowa'),
+            ('?', 'Do rebadania'),
+        ],
+        required=False,
+    )
+    born_alive = forms.IntegerField(label="Żywe", min_value=0, required=False)
+    born_dead = forms.IntegerField(label="Martwe", min_value=0, required=False)
+    count = forms.IntegerField(label="Odsadzone", min_value=0, required=False)
+    vaccine_name = forms.ChoiceField(label="Szczepienie", required=False)
+
+    meaningful_fields = [
+        'sow_ear_tag',
+        'event_type',
+        'event_date',
+        'technician',
+        'pregnancy_result',
+        'born_alive',
+        'born_dead',
+        'count',
+        'vaccine_name',
+    ]
+
+    def __init__(self, *args, farm=None, **kwargs):
+        self.farm = farm
+        super().__init__(*args, **kwargs)
+        repo = VaccinationPlanRepository(farm=self.farm)
+        self.fields['vaccine_name'].choices = repo.get_plan_choices()
+        for field in self.fields.values():
+            existing = field.widget.attrs.get('class', '')
+            field.widget.attrs['class'] = f'{existing} bulk-event-input'.strip()
+
+    def has_row_data(self) -> bool:
+        if hasattr(self, 'cleaned_data'):
+            return any(self.cleaned_data.get(field) not in (None, '') for field in self.meaningful_fields)
+        return any(self.data.get(self.add_prefix(field)) for field in self.meaningful_fields)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not self.has_row_data():
+            return cleaned_data
+
+        required_fields = ['sow_ear_tag', 'event_type', 'event_date']
+        for field in required_fields:
+            if not cleaned_data.get(field):
+                self.add_error(field, "Uzupełnij pole albo zostaw cały wiersz pusty.")
+
+        event_type = cleaned_data.get('event_type')
+        if event_type == 'PREGNANCY_CHECK' and not cleaned_data.get('pregnancy_result'):
+            self.add_error('pregnancy_result', "Podaj wynik badania.")
+        if event_type == 'VACCINATION' and not cleaned_data.get('vaccine_name'):
+            self.add_error('vaccine_name', "Wybierz szczepienie.")
+
+        if self.farm and cleaned_data.get('sow_ear_tag'):
+            sow = SowModel.objects.filter(
+                farm=self.farm,
+                ear_tag__iexact=cleaned_data['sow_ear_tag'].strip(),
+                is_archived=False,
+            ).first()
+            if not sow:
+                self.add_error('sow_ear_tag', "Nie znaleziono aktywnej maciory o takim numerze.")
+            else:
+                cleaned_data['sow'] = sow
+                if cleaned_data.get('event_date') and cleaned_data['event_date'] < sow.entry_date:
+                    self.add_error('event_date', "Data zdarzenia nie może być wcześniejsza niż data wprowadzenia maciory.")
+
+        return cleaned_data
+
+    def build_details(self) -> dict:
+        event_type = self.cleaned_data.get('event_type')
+        details_mapping = {
+            'INSEMINATION': {'technician': self.cleaned_data.get('technician') or ""},
+            'PREGNANCY_CHECK': {'result': self.cleaned_data.get('pregnancy_result') or ""},
+            'FARROWING': {
+                'born_alive': self.cleaned_data.get('born_alive') or 0,
+                'born_dead': self.cleaned_data.get('born_dead') or 0,
+            },
+            'WEANING': {'count': self.cleaned_data.get('count') or 0},
+            'VACCINATION': {'vaccine_name': self.cleaned_data.get('vaccine_name') or ""},
+        }
+        return details_mapping.get(event_type, {})
+
+
+BulkSowEventFormSet = formset_factory(BulkSowEventRowForm, extra=0, can_delete=True)
+
+
+def empty_bulk_event_initials(count: int = 8) -> list[dict]:
+    return [{'event_date': None} for _ in range(count)]

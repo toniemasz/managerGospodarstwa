@@ -25,43 +25,70 @@
     <form method="post" enctype="multipart/form-data" class="responsive-form" id="sale-form">
         {% csrf_token %}
 
-        <section class="panel">
-            <div class="section-heading">
-                <div>
-                    <h2>Dane dokumentu</h2>
-                    <p>Data sprzedaży może zostać uzupełniona później.</p>
+        <section class="sale-document-layout">
+            <div class="panel">
+                <div class="section-heading">
+                    <div>
+                        <h2>Dane dokumentu</h2>
+                        <p>Data sprzedaży może zostać uzupełniona później.</p>
+                    </div>
+                    {% if sale.no_settlement %}
+                        <span class="status-pill status-amber">Rozliczenie do importu</span>
+                    {% endif %}
                 </div>
-                {% if sale.no_settlement %}
-                    <span class="status-pill status-amber">Rozliczenie do importu</span>
-                {% endif %}
+
+                <div class="form-grid three-columns">
+                    <div class="form-field">
+                        <label for="{{ form.sale_date.id_for_label }}">{{ form.sale_date.label }}</label>
+                        {{ form.sale_date }}
+                        {{ form.sale_date.errors }}
+                    </div>
+                    <div class="form-field">
+                        <label for="{{ form.slaughter_date.id_for_label }}">{{ form.slaughter_date.label }}</label>
+                        {{ form.slaughter_date }}
+                        {{ form.slaughter_date.errors }}
+                    </div>
+                    <div class="form-field">
+                        <label for="{{ form.document_number.id_for_label }}">{{ form.document_number.label }}</label>
+                        {{ form.document_number }}
+                        {{ form.document_number.errors }}
+                    </div>
+                    <div class="form-field">
+                        <label for="{{ form.tattoo.id_for_label }}">{{ form.tattoo.label }}</label>
+                        {{ form.tattoo }}
+                        {{ form.tattoo.errors }}
+                    </div>
+                    <div class="form-field form-field-wide">
+                        <label for="{{ form.supplier_name.id_for_label }}">{{ form.supplier_name.label }}</label>
+                        {{ form.supplier_name }}
+                        {{ form.supplier_name.errors }}
+                    </div>
+                    <div class="form-field">
+                        <label for="{{ form.avg_meatiness_seurop.id_for_label }}">{{ form.avg_meatiness_seurop.label }}</label>
+                        {{ form.avg_meatiness_seurop }}
+                        {{ form.avg_meatiness_seurop.errors }}
+                    </div>
+                    <div class="form-field">
+                        <label for="{{ form.live_weight.id_for_label }}">{{ form.live_weight.label }}</label>
+                        {{ form.live_weight }}
+                        {{ form.live_weight.errors }}
+                    </div>
+                    <div class="form-field">
+                        <label for="{{ form.dressing_percentage.id_for_label }}">{{ form.dressing_percentage.label }}</label>
+                        {{ form.dressing_percentage }}
+                        {{ form.dressing_percentage.errors }}
+                    </div>
+                </div>
             </div>
 
-            <div class="form-grid three-columns">
-                <div class="form-field">
-                    <label for="{{ form.sale_date.id_for_label }}">{{ form.sale_date.label }}</label>
-                    {{ form.sale_date }}
-                    {{ form.sale_date.errors }}
+            <aside class="panel sale-side-panel">
+                <div class="section-heading">
+                    <div>
+                        <h2>Rozliczenie</h2>
+                        <p>Import PDF lub zapis pustego dokumentu do późniejszego uzupełnienia.</p>
+                    </div>
                 </div>
-                <div class="form-field">
-                    <label for="{{ form.slaughter_date.id_for_label }}">{{ form.slaughter_date.label }}</label>
-                    {{ form.slaughter_date }}
-                    {{ form.slaughter_date.errors }}
-                </div>
-                <div class="form-field">
-                    <label for="{{ form.document_number.id_for_label }}">{{ form.document_number.label }}</label>
-                    {{ form.document_number }}
-                    {{ form.document_number.errors }}
-                </div>
-                <div class="form-field">
-                    <label for="{{ form.tattoo.id_for_label }}">{{ form.tattoo.label }}</label>
-                    {{ form.tattoo }}
-                    {{ form.tattoo.errors }}
-                </div>
-                <div class="form-field">
-                    <label for="{{ form.supplier_name.id_for_label }}">{{ form.supplier_name.label }}</label>
-                    {{ form.supplier_name }}
-                    {{ form.supplier_name.errors }}
-                </div>
+
                 <label class="option-box sale-option">
                     <span class="checkbox-row">
                         {{ form.no_settlement }}
@@ -69,39 +96,19 @@
                     </span>
                     {{ form.no_settlement.errors }}
                 </label>
-                <div class="form-field">
-                    <label for="{{ form.avg_meatiness_seurop.id_for_label }}">{{ form.avg_meatiness_seurop.label }}</label>
-                    {{ form.avg_meatiness_seurop }}
-                    {{ form.avg_meatiness_seurop.errors }}
-                </div>
-                <div class="form-field">
-                    <label for="{{ form.live_weight.id_for_label }}">{{ form.live_weight.label }}</label>
-                    {{ form.live_weight }}
-                    {{ form.live_weight.errors }}
-                </div>
-                <div class="form-field">
-                    <label for="{{ form.dressing_percentage.id_for_label }}">{{ form.dressing_percentage.label }}</label>
-                    {{ form.dressing_percentage }}
-                    {{ form.dressing_percentage.errors }}
-                </div>
-            </div>
-        </section>
 
-        <section class="panel">
-            <div class="section-heading">
-                <div>
-                    <h2>Import rozliczenia</h2>
-                    <p>PDF uzupełnia datę uboju, dane dokumentu, podsumowanie i tabelę klas.</p>
-                </div>
-            </div>
-            <div class="import-row">
                 <div class="form-field">
                     <label for="{{ form.settlement_pdf.id_for_label }}">{{ form.settlement_pdf.label }}</label>
                     {{ form.settlement_pdf }}
                     {{ form.settlement_pdf.errors }}
                 </div>
                 <button type="submit" name="import_pdf" value="1" class="button button-secondary">Importuj PDF</button>
-            </div>
+
+                <div class="sale-side-note">
+                    <strong>Status dokumentu</strong>
+                    <span>{% if sale.no_settlement %}Rozliczenie do importu{% else %}Gotowy do zapisu{% endif %}</span>
+                </div>
+            </aside>
         </section>
 
         <section class="panel table-panel">

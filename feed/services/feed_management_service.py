@@ -85,18 +85,40 @@ class FeedManagementService:
 
     def get_production_details_for_stages(self, production_id: int) -> dict:
         production = self.repository.get_production_for_processing(production_id)
+        price_map = self.repository.get_latest_delivery_prices_map()
 
         sorted_reqs = sorted(self._calculator_for_production(production).get_requirements(), key=lambda x: x.name)
 
-        stage1_items = [{'id': r.ingredient_id, 'name': r.name, 'is_in_bin': r.is_in_bin, 'percentage': r.percentage,
-                         'weight_kg': r.required_kg} for r in sorted_reqs if r.is_in_bin]
-        stage2_items = [{'id': r.ingredient_id, 'name': r.name, 'is_in_bin': r.is_in_bin, 'percentage': r.percentage,
-                         'weight_kg': r.required_kg} for r in sorted_reqs if not r.is_in_bin]
+        enriched_reqs = []
+        total_cost = Decimal('0.00')
+        for req in sorted_reqs:
+            price = price_map.get(req.ingredient_id, Decimal('0.00'))
+            cost = req.required_kg * price
+            total_cost += cost
+            enriched_reqs.append({
+                'id': req.ingredient_id,
+                'name': req.name,
+                'is_in_bin': req.is_in_bin,
+                'percentage': req.percentage,
+                'weight_kg': req.required_kg,
+                'price_per_kg': price,
+                'cost': cost,
+            })
+
+        stage1_items = [item for item in enriched_reqs if item['is_in_bin']]
+        stage2_items = [item for item in enriched_reqs if not item['is_in_bin']]
+        cost_per_kg = (total_cost / production.quantity_kg) if production.quantity_kg else Decimal('0.00')
 
         return {
             'production': production,
             'stage1_items': stage1_items,
-            'stage2_items': stage2_items
+            'stage2_items': stage2_items,
+            'all_items': enriched_reqs,
+            'production_cost': {
+                'total_cost': total_cost,
+                'cost_per_kg': cost_per_kg,
+                'cost_per_ton': cost_per_kg * Decimal('1000.00'),
+            },
         }
 
     @transaction.atomic
@@ -183,7 +205,7 @@ class FeedManagementService:
             })
         return rows
 
-    def get_recipe_detail(self, recipe_id: int) -> dict:
+    def get_recipe_detail(self, recipe_id: int, date_from=None, date_to=None) -> dict:
         recipe = self.repository.get_recipe_with_items(recipe_id)
         prices_map = self.repository.get_latest_delivery_prices_map()
 
@@ -203,6 +225,10 @@ class FeedManagementService:
         ).calculate_cost()
 
         productions = self.repository.get_productions_for_recipe(recipe_id)
+        if date_from is not None:
+            productions = productions.filter(date__gte=date_from)
+        if date_to is not None:
+            productions = productions.filter(date__lte=date_to)
         aggregate = productions.aggregate(
             total_count=Count('id'),
             total_planned_kg=Sum('quantity_kg'),
@@ -230,6 +256,7 @@ class FeedManagementService:
                 'total_planned_kg': aggregate['total_planned_kg'] or Decimal('0.00'),
                 'completed_count': completed['count'] or 0,
                 'completed_kg': completed['quantity_kg'] or Decimal('0.00'),
+                'completed_cost': (completed['quantity_kg'] or Decimal('0.00')) * cost.cost_per_kg,
                 'queued_count': queued['count'] or 0,
                 'queued_kg': queued['quantity_kg'] or Decimal('0.00'),
                 'in_progress_count': in_progress['count'] or 0,

@@ -126,7 +126,14 @@ class SowDashboardService:
                     'is_eligible': vacc_status['is_eligible']
                 })
 
-    def get_general_statistics(self, metric_key: str, months_limit: int = 6, order: str = 'desc') -> dict:
+    def get_general_statistics(
+        self,
+        metric_key: str,
+        months_limit: int = 6,
+        order: str = 'desc',
+        date_from=None,
+        date_to=None,
+    ) -> dict:
         """Generuje modularne statystyki okresowe oraz ranking dla wybranej metryki."""
         if metric_key not in METRICS_REGISTRY:
             metric_key = list(METRICS_REGISTRY.keys())[0]
@@ -137,15 +144,20 @@ class SowDashboardService:
         monthly_data = defaultdict(int)
         top_sows_list = []
 
-        if months_limit == 0:
+        if date_from is not None or date_to is not None:
+            cutoff_date = date_from or date.min
+            end_date = date_to or date.max
+        elif months_limit == 0:
             cutoff_date = date.min
+            end_date = date.max
         else:
             cutoff_date = date.today() - timedelta(days=months_limit * 30)
+            end_date = date.today()
 
         for sow in sows:
             sow_total = 0
             for event in sow.all_events:
-                if event.event_type == metric.event_type and event.event_date >= cutoff_date:
+                if event.event_type == metric.event_type and cutoff_date <= event.event_date <= end_date:
                     val = metric.value_extractor(event.details)
                     sow_total += val
 

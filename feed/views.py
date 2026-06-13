@@ -9,6 +9,7 @@ from .models import RecipeModel, ProductionModel, IngredientModel, DeliveryModel
 from .forms import IngredientForm, RecipeForm, RecipeItemFormSet, DeliveryForm, ProductionForm
 from .services.feed_management_service import FeedManagementService
 from farms.services.farm_service import get_or_create_user_farm
+from farms.services.date_range import PERIOD_OPTIONS, parse_date_range
 
 
 def _current_farm(request):
@@ -141,8 +142,11 @@ def feed_recipes_view(request):
 @login_required
 def recipe_detail_view(request, pk):
     farm = _current_farm(request)
+    date_range = parse_date_range(request.GET, default_period='6m')
     service = FeedManagementService(farm=farm)
-    context = service.get_recipe_detail(pk)
+    context = service.get_recipe_detail(pk, date_from=date_range.date_from, date_to=date_range.date_to)
+    context['date_filter'] = date_range
+    context['period_options'] = PERIOD_OPTIONS
     return render(request, 'feed/recipe_detail.html', context)
 
 

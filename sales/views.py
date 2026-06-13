@@ -10,6 +10,7 @@ from .models import PigSaleModel, SaleClassRowModel
 from .services.pdf_import_service import SaleSettlementPdfParser
 from .services.sale_dashboard_service import SaleDashboardService
 from farms.services.farm_service import get_or_create_user_farm
+from farms.services.date_range import PERIOD_OPTIONS, parse_date_range
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +26,14 @@ def _current_farm(request):
 @login_required
 def sales_list_view(request):
     try:
+        date_range = parse_date_range(request.GET, default_period='6m')
         service = SaleDashboardService(farm=_current_farm(request))
-        context = service.get_dashboard_summary()
+        context = service.get_dashboard_summary(
+            date_from=date_range.date_from,
+            date_to=date_range.date_to,
+        )
+        context['date_filter'] = date_range
+        context['period_options'] = PERIOD_OPTIONS
         return render(request, 'sales/sales_list.html', context)
     except Exception:
         logger.exception("Error in sales dashboard")

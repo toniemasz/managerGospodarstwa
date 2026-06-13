@@ -27,6 +27,14 @@ body {
     letter-spacing: 0;
 }
 
+body,
+button,
+input,
+select,
+textarea {
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
 a {
     color: inherit;
 }
@@ -183,6 +191,53 @@ textarea {
     box-shadow: var(--shadow);
 }
 
+.quick-actions-panel {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    border: 1px solid #cbd9e6;
+    border-radius: 0.5rem;
+    background: linear-gradient(180deg, #ffffff, #f7fbff);
+    box-shadow: var(--shadow);
+}
+
+.quick-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.quick-action {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    padding: 0.9rem;
+    border: 1px solid var(--line);
+    border-radius: 0.5rem;
+    color: var(--text);
+    background: #fff;
+    text-decoration: none;
+}
+
+.quick-action:hover {
+    border-color: rgba(35, 100, 170, 0.45);
+    transform: translateY(-1px);
+}
+
+.quick-action strong,
+.quick-action small {
+    display: block;
+}
+
+.quick-action strong {
+    font-weight: 900;
+}
+
+.quick-action small {
+    margin-top: 0.15rem;
+    color: var(--muted);
+    font-size: 0.82rem;
+}
+
 .compact-panel {
     margin-bottom: 1rem;
     padding: 1rem;
@@ -217,6 +272,10 @@ textarea {
 .form-field {
     display: grid;
     gap: 0.35rem;
+}
+
+.form-field-wide {
+    grid-column: span 2;
 }
 
 .form-field label,
@@ -434,6 +493,16 @@ textarea {
     line-height: 1;
 }
 
+.stat-link {
+    color: inherit;
+    text-decoration: none;
+}
+
+.stat-link:hover {
+    border-color: rgba(35, 100, 170, 0.45);
+    transform: translateY(-1px);
+}
+
 .notice {
     display: flex;
     align-items: center;
@@ -466,6 +535,11 @@ textarea {
     background: #fff6f6;
 }
 
+.notice-warning {
+    border-color: #f3d08c;
+    background: #fff9ea;
+}
+
 .button-danger {
     color: #fff;
     background: var(--danger);
@@ -481,6 +555,36 @@ textarea {
     justify-content: space-between;
     gap: 1rem;
     margin-bottom: 1rem;
+}
+
+.subnav {
+    display: flex;
+    gap: 0.35rem;
+    margin: 0 0 1rem;
+    padding: 0.35rem;
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 0.5rem;
+    background: rgba(255, 255, 255, 0.7);
+}
+
+.subnav a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.35rem;
+    padding: 0.5rem 0.8rem;
+    border-radius: 0.4rem;
+    color: #344054;
+    font-size: 0.88rem;
+    font-weight: 850;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.subnav a:hover {
+    background: #fff;
+    color: var(--primary-dark);
 }
 
 .group-grid {
@@ -636,6 +740,27 @@ textarea {
     border-radius: 0.45rem;
     padding: 0.55rem 0.7rem;
     background: #fff;
+}
+
+.table-control.is-muted {
+    opacity: 0.55;
+}
+
+.filter-bar {
+    display: grid;
+    grid-template-columns: minmax(10rem, 1.2fr) repeat(4, minmax(8rem, 1fr)) auto;
+    gap: 0.75rem;
+    align-items: end;
+}
+
+.sales-filter-bar {
+    grid-template-columns: repeat(3, minmax(9rem, 1fr)) auto;
+}
+
+.chart-box {
+    height: 18rem;
+    min-height: 18rem;
+    position: relative;
 }
 
 .pagination-controls {
@@ -839,6 +964,37 @@ textarea {
     text-decoration: underline;
 }
 
+.row-actions {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+}
+
+.row-actions form {
+    margin: 0;
+}
+
+.link-button-danger {
+    border: 0;
+    padding: 0;
+    color: var(--danger);
+    background: transparent;
+    font-weight: 850;
+    cursor: pointer;
+}
+
+.link-button-danger:hover {
+    text-decoration: underline;
+}
+
+.muted-small {
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
 .calculator-price-panel {
     position: sticky;
     top: 5rem;
@@ -905,6 +1061,42 @@ textarea {
     align-items: end;
 }
 
+.sale-document-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
+    gap: 1rem;
+    align-items: start;
+}
+
+.sale-side-panel {
+    display: grid;
+    gap: 1rem;
+    position: sticky;
+    top: 5rem;
+}
+
+.sale-side-panel .button {
+    width: 100%;
+}
+
+.sale-side-note {
+    display: grid;
+    gap: 0.15rem;
+    padding: 0.85rem;
+    border: 1px solid #d5e4d9;
+    border-radius: 0.45rem;
+    background: #f5faf6;
+}
+
+.sale-side-note strong {
+    font-size: 0.82rem;
+}
+
+.sale-side-note span {
+    color: var(--muted);
+    font-size: 0.84rem;
+}
+
 .settlement-table {
     min-width: 1120px;
 }
@@ -923,6 +1115,89 @@ textarea {
     padding: 0.45rem 0.5rem;
     background: #fff;
     font-size: 0.84rem;
+}
+
+.bulk-event-table {
+    min-width: 1240px;
+}
+
+.bulk-event-table th,
+.bulk-event-table td {
+    padding: 0.55rem;
+}
+
+.bulk-event-input {
+    width: 100%;
+    min-width: 5.75rem;
+    min-height: 2.35rem;
+    border: 1px solid #cfd8cf;
+    border-radius: 0.4rem;
+    padding: 0.45rem 0.5rem;
+    background: #fff;
+    font-size: 0.84rem;
+}
+
+.bulk-event-row td:first-child .bulk-event-input {
+    min-width: 8rem;
+}
+
+.bulk-cell-with-action {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 2rem;
+    gap: 0.35rem;
+}
+
+.mini-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    min-height: 2.35rem;
+    border: 1px solid var(--line);
+    border-radius: 0.4rem;
+    color: var(--primary-dark);
+    background: #f7fbff;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.mini-button:hover {
+    border-color: var(--primary);
+    background: #edf6ff;
+}
+
+.bulk-event-row .errorlist {
+    margin: 0.35rem 0 0;
+    padding: 0;
+    color: var(--danger);
+    font-size: 0.75rem;
+    font-weight: 800;
+    list-style: none;
+}
+
+.production-stage-table {
+    min-width: 820px;
+}
+
+.ingredient-row.is-complete {
+    color: #667085;
+    background: #f1f4f1;
+}
+
+.ingredient-checkbox {
+    width: 1.15rem;
+    height: 1.15rem;
+    accent-color: var(--primary);
+}
+
+.stage-actions {
+    margin-top: 1rem;
+}
+
+.stage-confirm-panel {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1rem;
 }
 
 .settlement-row td:first-child .settlement-input {
@@ -1026,12 +1301,14 @@ textarea {
     }
 
     .module-grid,
+    .quick-actions-grid,
     .form-grid.three-columns,
     .stats-grid,
     .group-grid,
     .recipe-grid,
     .detail-layout,
     .calculator-layout,
+    .sale-document-layout,
     .import-row {
         grid-template-columns: 1fr;
     }
@@ -1040,7 +1317,19 @@ textarea {
         grid-template-columns: 1fr;
     }
 
+    .form-field-wide {
+        grid-column: auto;
+    }
+
+    .filter-bar {
+        grid-template-columns: 1fr;
+    }
+
     .calculator-price-panel {
+        position: static;
+    }
+
+    .sale-side-panel {
         position: static;
     }
 }

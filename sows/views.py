@@ -5,12 +5,21 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.utils import timezone
+from django.contrib import messages
 
 from .services.sow_dashboard_service import SowDashboardService
 from .services.sow_repository import SowRepository
-from .forms import SowForm, SowEventForm, VaccinationPlanForm
+from .services.bulk_event_service import BulkSowEventService
+from .forms import (
+    BulkSowEventFormSet,
+    SowForm,
+    SowEventForm,
+    VaccinationPlanForm,
+    empty_bulk_event_initials,
+)
 from .models import SowModel, SowEventModel
 from farms.services.farm_service import get_or_create_user_farm
+from farms.services.date_range import PERIOD_OPTIONS, parse_date_range
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +119,49 @@ def add_event_view(request, sow_id):
         form = SowEventForm(sow_status=sow.status, farm=farm, initial={'event_date': date.today()})
 
     return render(request, 'sows/add_event.html', {'form': form, 'sow': db_sow})
+
+
+@login_required
+def bulk_sow_events_view(request):
+    farm = _current_farm(request)
+    service = BulkSowEventService(farm=farm)
+    sows = SowModel.objects.filter(farm=farm, is_archived=False).order_by('ear_tag')
+
+    try:
+        initial_count = max(1, min(20, int(request.GET.get('rows', '8'))))
+    except ValueError:
+        initial_count = 8
+
+    if request.method == 'POST':
+        formset = BulkSowEventFormSet(request.POST, prefix='events', form_kwargs={'farm': farm})
+        if formset.is_valid():
+            rows = service.build_rows_from_formset(formset)
+            if not rows:
+                formset.non_form_errors()
+                messages.error(request, "Dodaj przynajmniej jeden wiersz zdarzenia.")
+            else:
+                validation = service.validate_rows(rows)
+                if validation.is_valid:
+                    created_count = service.create_events(rows)
+                    messages.success(request, f"Zapisano {created_count} zdarzeń.")
+                    return redirect('dashboard')
+
+                for form_index, row_errors in validation.errors.items():
+                    for error in row_errors:
+                        formset.forms[form_index].add_error(None, error)
+                messages.error(request, "Nie zapisano zdarzeń. Popraw oznaczone wiersze.")
+    else:
+        formset = BulkSowEventFormSet(
+            prefix='events',
+            initial=empty_bulk_event_initials(initial_count),
+            form_kwargs={'farm': farm},
+        )
+
+    return render(request, 'sows/bulk_events.html', {
+        'formset': formset,
+        'sows': sows,
+        'is_single': initial_count == 1,
+    })
 
 
 @login_required
@@ -214,14 +266,21 @@ def general_statistics_view(request):
     try:
         metric_key = request.GET.get('metric', 'born_alive')
         order = request.GET.get('order', 'desc')
+        date_range = parse_date_range(request.GET, default_period='6m')
 
-        try:
-            months = int(request.GET.get('months', '6'))
-        except ValueError:
-            months = 6
+        months_by_period = {'3m': 3, '6m': 6, '12m': 12, 'all': 0}
+        months = months_by_period.get(date_range.period, 6)
 
         service = SowDashboardService(farm=_current_farm(request))
-        context = service.get_general_statistics(metric_key=metric_key, months_limit=months, order=order)
+        context = service.get_general_statistics(
+            metric_key=metric_key,
+            months_limit=months,
+            order=order,
+            date_from=date_range.date_from,
+            date_to=date_range.date_to,
+        )
+        context['date_filter'] = date_range
+        context['period_options'] = PERIOD_OPTIONS
         return render(request, 'sows/analytics.html', context)
     except Exception:
         logger.exception("Błąd podczas generowania statystyk")

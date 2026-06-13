@@ -11,6 +11,31 @@
         </div>
     </section>
 
+    <section class="quick-actions-panel">
+        <div class="section-heading">
+            <div>
+                <h2>Szybkie akcje</h2>
+                <p>Najczęstsze operacje dostępne od razu po wejściu do systemu.</p>
+            </div>
+        </div>
+        <div class="quick-actions-grid">
+            <a href="{% url 'bulk_sow_events' %}?rows=1" class="quick-action">
+                <span class="module-icon">Z</span>
+                <div>
+                    <strong>Utwórz zdarzenie maciory</strong>
+                    <small>Bez wchodzenia w kartę konkretnej maciory.</small>
+                </div>
+            </a>
+            <a href="{% url 'add_production' %}" class="quick-action">
+                <span class="module-icon amber">Ś</span>
+                <div>
+                    <strong>Zleć śrutowanie</strong>
+                    <small>Dodaj nowe śrutowanie do kolejki pasz.</small>
+                </div>
+            </a>
+        </div>
+    </section>
+
     <section class="module-grid">
         <a href="{% url 'dashboard' %}" class="module-card">
             <span class="module-icon">M</span>

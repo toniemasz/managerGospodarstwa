@@ -1,148 +1,146 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Ogólne Statystyki Stada{% endblock %}
+{% block title %}Statystyki stada{% endblock %}
 
 {% block content %}
-<div class="container mx-auto max-w-6xl p-4 md:p-6">
-    
-    <header class="mb-6 bg-white p-6 rounded-lg shadow-sm border-b-4 border-indigo-600">
-        <form method="get" action="{% url 'general_statistics' %}" id="analyticsFilterForm" class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-                <h1 class="text-xl md:text-2xl font-bold text-gray-800">📊 Panel Analityczny Stada</h1>
-                <p class="text-xs text-gray-400 mt-1">Dynamiczna analiza efektywności i wydajności produkcyjnej</p>
+<main class="app-page">
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Maciory</p>
+            <h1>Statystyki stada</h1>
+            <p class="page-subtitle">Trend i ranking macior w wybranym zakresie dat.</p>
+        </div>
+        <a href="{% url 'dashboard' %}" class="button button-secondary">Wróć</a>
+    </section>
+
+    <section class="panel compact-panel">
+        <form method="get" action="{% url 'general_statistics' %}" class="filter-bar">
+            <div class="table-control">
+                <label for="metric">Metryka</label>
+                <select id="metric" name="metric">
+                    {% for m in available_metrics %}
+                        <option value="{{ m.key }}" {% if m.key == current_metric.key %}selected{% endif %}>{{ m.display_name }}</option>
+                    {% endfor %}
+                </select>
             </div>
-            
-            <div class="flex flex-wrap gap-3 items-center w-full md:w-auto">
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Analizowana metryka</label>
-                    <select name="metric" onchange="this.form.submit()" class="border rounded px-3 py-1.5 text-sm bg-gray-50 font-medium text-gray-700 focus:ring-2 focus:ring-indigo-500">
-                        {% for m in available_metrics %}
-                            <option value="{{ m.key }}" {% if m.key == current_metric.key %}selected{% endif %}>{{ m.display_name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Zakres wstecz</label>
-                    <select name="months" onchange="this.form.submit()" class="border rounded px-3 py-1.5 text-sm bg-gray-50 font-medium text-gray-700 focus:ring-2 focus:ring-indigo-500">
-                        <option value="3" {% if current_months_limit == 3 %}selected{% endif %}>Ostatnie 3 miesiące</option>
-                        <option value="6" {% if current_months_limit == 6 %}selected{% endif %}>Ostatnie 6 miesięcy</option>
-                        <option value="12" {% if current_months_limit == 12 %}selected{% endif %}>Ostatni rok</option>
-                        <option value="0" {% if current_months_limit == 0 %}selected{% endif %}>Cały okres</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Ranking</label>
-                    <select name="order" onchange="this.form.submit()" class="border rounded px-3 py-1.5 text-sm bg-gray-50 font-medium text-gray-700 focus:ring-2 focus:ring-indigo-500">
-                        <option value="desc" {% if current_order == 'desc' %}selected{% endif %}>Najlepsze 10</option>
-                        <option value="asc" {% if current_order == 'asc' %}selected{% endif %}>Najgorsze 10</option>
-                    </select>
-                </div>
-
-                <div class="pt-4">
-                    <a href="{% url 'dashboard' %}" class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-bold py-2 px-4 rounded-lg transition">Wróć</a>
-                </div>
+            <div class="table-control">
+                <label for="period">Okres</label>
+                <select id="period" name="period">
+                    {% for value, label in period_options %}
+                        <option value="{{ value }}" {% if date_filter.period == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
             </div>
+            <div class="table-control">
+                <label for="date_from">Od</label>
+                <input id="date_from" type="date" name="date_from" value="{{ date_filter.date_from_value }}">
+            </div>
+            <div class="table-control">
+                <label for="date_to">Do</label>
+                <input id="date_to" type="date" name="date_to" value="{{ date_filter.date_to_value }}">
+            </div>
+            <div class="table-control">
+                <label for="order">Ranking</label>
+                <select id="order" name="order">
+                    <option value="desc" {% if current_order == 'desc' %}selected{% endif %}>Najlepsze</option>
+                    <option value="asc" {% if current_order == 'asc' %}selected{% endif %}>Najgorsze</option>
+                </select>
+            </div>
+            <button type="submit" class="button button-primary">Pokaż</button>
         </form>
-    </header>
+    </section>
 
-    <div class="bg-white p-6 rounded-lg shadow-sm mb-8">
-        <h3 class="text-md font-bold text-gray-700 mb-4">📈 Trend czasowy: {{ current_metric.display_name }} ({{ current_metric.unit }})</h3>
-        <div class="h-64 relative w-full">
+    <section class="panel">
+        <div class="section-heading">
+            <div>
+                <h2>Trend: {{ current_metric.display_name }}</h2>
+                <p>Wartości zagregowane według miesięcy.</p>
+            </div>
+        </div>
+        <div class="chart-box">
             <canvas id="trendChart"></canvas>
         </div>
-    </div>
+    </section>
 
-    <div class="bg-white rounded-lg shadow-sm overflow-hidden border-t-4 border-amber-500">
-        <div class="p-4 bg-gray-50 border-b border-gray-200">
-            <h3 class="text-md font-bold text-gray-700">
-                {% if current_order == 'desc' %}
-                    🏆 Najlepsze 10 Macior
-                {% else %}
-                    📉 Najgorsze 10 Macior
-                {% endif %}
-                — Wynik w wybranym okresie
-            </h3>
+    <section class="panel table-panel">
+        <div class="section-heading">
+            <div>
+                <h2>{% if current_order == 'desc' %}Najlepsze maciory{% else %}Najsłabsze wyniki{% endif %}</h2>
+                <p>Ranking w wybranym okresie.</p>
+            </div>
         </div>
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200 text-left text-sm text-gray-600">
-                <thead class="bg-gray-100 text-xs uppercase text-gray-500 font-bold">
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead>
                     <tr>
-                        <th class="p-4 text-center w-16">Pozycja</th>
-                        <th class="p-4">Numer Kolczyka</th>
-                        <th class="p-4">Status bieżący</th>
-                        <th class="p-4 text-right">Łączny wynik (w wybranym okresie)</th>
+                        <th>Pozycja</th>
+                        <th>Numer kolczyka</th>
+                        <th>Status</th>
+                        <th class="text-right">Wynik</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200">
+                <tbody>
                     {% for item in top_sows %}
-                    <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location.href='{% url 'sow_detail' item.id %}'">
-                        <td class="p-4 text-center font-bold text-gray-500">
-                            {% if current_order == 'desc' %}
-                                {% if forloop.counter == 1 %}🥇{% elif forloop.counter == 2 %}🥈{% elif forloop.counter == 3 %}🥉{% else %}{{ forloop.counter }}{% endif %}
-                            {% else %}
-                                <span class="text-red-500 font-black">{{ forloop.counter }}</span>
-                            {% endif %}
-                        </td>
-                        <td class="p-4 font-semibold text-gray-900">{{ item.ear_tag }}</td>
-                        <td class="p-4">
-                            <span class="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-xs font-semibold">{{ item.status }}</span>
-                        </td>
-                        <td class="p-4 text-right font-extrabold text-indigo-600 text-md">
-                            {{ item.total_value }} <span class="text-xs font-normal text-gray-400">{{ current_metric.unit }}</span>
-                        </td>
+                    <tr class="clickable-row" onclick="window.location.href='{% url 'sow_detail' item.id %}'">
+                        <td>{{ forloop.counter }}</td>
+                        <td><strong>{{ item.ear_tag }}</strong></td>
+                        <td><span class="status-pill">{{ item.status }}</span></td>
+                        <td class="text-right"><strong>{{ item.total_value }}</strong> {{ current_metric.unit }}</td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="p-4 text-center text-gray-400 italic">Brak wystarczających danych w wybranym okresie do utworzenia rankingu.</td>
+                        <td colspan="4" class="empty-table">Brak danych w wybranym okresie.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-    </div>
-</div>
+    </section>
+</main>
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    document.addEventListener("DOMContentLoaded", () => {
-        const ctx = document.getElementById('trendChart').getContext('2d');
-        
-        // Dane wstrzykiwane bezpośrednio z kontekstu widoku Django
-        const labels = {{ chart_labels|safe }};
-        const values = {{ chart_values|safe }};
-        
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: '{{ current_metric.display_name }}',
-                    data: values,
-                    borderColor: '#4f46e5',
-                    backgroundColor: 'rgba(79, 70, 229, 0.1)',
-                    borderWidth: 3,
-                    tension: 0.2,
-                    fill: true,
-                    pointBackgroundColor: '#4f46e5',
-                    pointRadius: 5
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: { stepSize: 1 }
-                    }
-                }
-            }
+document.addEventListener("DOMContentLoaded", () => {
+    const periodSelect = document.getElementById('period');
+    const dateInputs = [document.getElementById('date_from'), document.getElementById('date_to')];
+
+    function syncDateInputs() {
+        const isCustom = periodSelect.value === 'custom';
+        dateInputs.forEach(input => {
+            input.disabled = !isCustom;
+            input.closest('.table-control').classList.toggle('is-muted', !isCustom);
         });
+    }
+    periodSelect.addEventListener('change', syncDateInputs);
+    syncDateInputs();
+
+    const ctx = document.getElementById('trendChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: {{ chart_labels|safe }},
+            datasets: [{
+                label: '{{ current_metric.display_name }}',
+                data: {{ chart_values|safe }},
+                borderColor: '#2364aa',
+                backgroundColor: 'rgba(35, 100, 170, 0.12)',
+                borderWidth: 3,
+                tension: 0.25,
+                fill: true,
+                pointRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
     });
+});
 </script>
 {% endblock %}
