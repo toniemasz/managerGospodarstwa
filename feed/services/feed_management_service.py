@@ -256,7 +256,7 @@ class FeedManagementService:
                 'total_planned_kg': aggregate['total_planned_kg'] or Decimal('0.00'),
                 'completed_count': completed['count'] or 0,
                 'completed_kg': completed['quantity_kg'] or Decimal('0.00'),
-                'completed_ton': (completed['quantity_kg'] or Decimal('0.00'))/ Decimal('1000.00'),
+                'completed_t': (completed['quantity_kg'] or Decimal('0.00'))/ Decimal('1000.00'),
                 'completed_cost': (completed['quantity_kg'] or Decimal('0.00')) * cost.cost_per_kg,
                 'queued_count': queued['count'] or 0,
                 'queued_kg': queued['quantity_kg'] or Decimal('0.00'),
