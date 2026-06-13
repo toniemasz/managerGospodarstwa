@@ -204,10 +204,51 @@ function checkDeleteConfirmation(expectedValue) {
     }
 }
 
+function enhanceDataTable(table) {
+    if (table.dataset.enhanced === 'true') {
+        return;
+    }
+
+    table.dataset.enhanced = 'true';
+    table.classList.add('app-table');
+
+    const parent = table.parentElement;
+    const alreadyWrapped = parent && (
+        parent.classList.contains('data-table-scroll') ||
+        parent.classList.contains('overflow-x-auto')
+    );
+
+    if (!alreadyWrapped && table.parentNode) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'data-table-scroll';
+        table.parentNode.insertBefore(wrapper, table);
+        wrapper.appendChild(table);
+    }
+
+    const shell = table.closest('.bg-white, .table-card');
+    if (shell) {
+        shell.classList.add('table-card');
+    }
+
+    const headers = Array.from(table.querySelectorAll('thead th')).map((header) => header.textContent.trim());
+    table.querySelectorAll('tbody tr').forEach((row) => {
+        Array.from(row.children).forEach((cell, index) => {
+            if (headers[index] && !cell.dataset.label) {
+                cell.dataset.label = headers[index];
+            }
+        });
+    });
+}
+
+function enhanceDataTables() {
+    document.querySelectorAll('table').forEach(enhanceDataTable);
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     const earTagInput = document.getElementById('confirmEarTag');
     if (earTagInput) {
         controlEarTagValue = earTagInput.placeholder;
     }
+
+    enhanceDataTables();
 });
