@@ -20,10 +20,8 @@ class PigSaleForm(forms.ModelForm):
         model = PigSaleModel
         fields = [
             'sale_date',
-            'slaughter_date',
             'document_number',
             'tattoo',
-            'supplier_name',
             'no_settlement',
             'avg_meatiness_seurop',
             'live_weight',
@@ -32,7 +30,6 @@ class PigSaleForm(forms.ModelForm):
         ]
         labels = {
             'sale_date': 'Data sprzedaży',
-            'slaughter_date': 'Data uboju',
             'document_number': 'Numer dokumentu',
             'tattoo': 'Tatuaż',
             'supplier_name': 'Dostawca',
@@ -42,8 +39,10 @@ class PigSaleForm(forms.ModelForm):
             'dressing_percentage': 'Wybój (%)',
         }
         widgets = {
-            'sale_date': forms.DateInput(attrs={'type': 'date'}),
-            'slaughter_date': forms.DateInput(attrs={'type': 'date'}),
+            'sale_date': forms.DateInput(
+                    format='%Y-%m-%d',
+                    attrs={'type': 'date'}
+                ),
             'no_settlement': forms.CheckboxInput(attrs={'class': 'checkbox-input'}),
         }
 

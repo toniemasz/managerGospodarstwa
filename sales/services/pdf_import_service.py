@@ -163,7 +163,7 @@ class SaleSettlementPdfParser:
 
         slaughter_match = re.search(r'Data uboju:\s*(\d{4}-\d{2}-\d{2})', text)
         if slaughter_match:
-            fields['slaughter_date'] = self._parse_date(slaughter_match.group(1))
+            fields['sale_date'] = self._parse_date(slaughter_match.group(1))
 
         document_match = re.search(r'Dokument nr:\s*([^\n]+)', text)
         if document_match:
@@ -174,12 +174,6 @@ class SaleSettlementPdfParser:
             tattoo = self._nearest_right_item(items, tattoo_label)
             if tattoo:
                 fields['tattoo'] = tattoo.text
-
-        supplier_label = self._find_item(items, 'Dostawca:')
-        if supplier_label:
-            supplier = self._nearest_right_item(items, supplier_label)
-            if supplier:
-                fields['supplier_name'] = supplier.text
 
         return fields
 

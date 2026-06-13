@@ -10,7 +10,6 @@ class PigSaleEntity:
     total_weight: Decimal
     meat_class: str
     price_per_kg: Decimal
-    slaughter_date: date | None = None
     document_number: str = ''
     no_settlement: bool = False
     settlement_status: str = ''

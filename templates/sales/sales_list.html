@@ -90,7 +90,6 @@
                         data-filter="{% if sale.no_settlement %}PENDING{% else %}READY{% endif %}"
                         onclick="window.location.href='{% url 'edit_sale' sale.id %}'">
                         <td><strong>{{ sale.sale_date|date:"d.m.Y"|default:"--" }}</strong></td>
-                        <td>{{ sale.slaughter_date|date:"d.m.Y"|default:"--" }}</td>
                         <td>{{ sale.document_number|default:"--" }}</td>
                         <td>
                             {% if sale.no_settlement %}

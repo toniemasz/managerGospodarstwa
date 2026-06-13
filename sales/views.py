@@ -181,10 +181,8 @@ def _initial_rows_for_sale(sale: PigSaleModel) -> list[dict]:
 def _form_initial_from_post(post_data) -> dict:
     fields = [
         'sale_date',
-        'slaughter_date',
         'document_number',
         'tattoo',
-        'supplier_name',
         'avg_meatiness_seurop',
         'live_weight',
         'dressing_percentage',
