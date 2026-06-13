@@ -191,19 +191,47 @@
         const template = document.getElementById('settlement-row-template');
         const totalForms = document.getElementById('id_rows-TOTAL_FORMS');
 
+        function resizeInput(input) {
+            if (!input || input.type === 'checkbox' || input.tagName === 'SELECT') return;
+
+            const valueLength = input.value ? input.value.length : 0;
+            const placeholderLength = input.placeholder ? input.placeholder.length : 0;
+            const minLength = 6;
+
+            const finalLength = Math.max(valueLength, placeholderLength, minLength);
+
+            input.style.width = `${finalLength + 2}ch`;
+        }
+
+        function resizeSettlementInputs(container = document) {
+            container.querySelectorAll('.settlement-table input').forEach(input => {
+                resizeInput(input);
+
+                input.addEventListener('input', () => {
+                    resizeInput(input);
+                });
+            });
+        }
+
+        resizeSettlementInputs();
+
         if (!addButton || !rows || !template || !totalForms) return;
 
         addButton.addEventListener('click', () => {
             const index = parseInt(totalForms.value, 10);
             const html = template.innerHTML.replaceAll('__prefix__', index);
+
             rows.insertAdjacentHTML('beforeend', html);
             totalForms.value = index + 1;
 
             const newRow = rows.lastElementChild;
+
             const lineInput = newRow.querySelector('input[name$="-line_no"]');
             if (lineInput && !lineInput.value) {
                 lineInput.value = index + 1;
             }
+
+            resizeSettlementInputs(newRow);
         });
     });
 </script>
