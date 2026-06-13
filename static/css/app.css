@@ -197,3 +197,50 @@ input[type="checkbox"] { width: 1rem; height: 1rem; accent-color: var(--primary)
         flex-direction: row;
     }
 }
+/* Tabela rozliczenia - inputy dopasowane do zawartości */
+.settlement-table {
+    table-layout: auto;
+    width: max-content;
+    min-width: 100%;
+}
+
+.settlement-table th,
+.settlement-table td {
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.settlement-table input,
+.settlement-table select {
+    width: auto;
+    min-width: 8ch;
+    max-width: none;
+    box-sizing: content-box;
+}
+
+.settlement-table input[type="checkbox"] {
+    width: auto;
+    min-width: auto;
+}
+
+.settlement-table input[name$="-line_no"] {
+    min-width: 4ch;
+}
+
+.settlement-table input[name$="-quantity"] {
+    min-width: 7ch;
+}
+
+.settlement-table input[name$="-weight"],
+.settlement-table input[name$="-avg_weight"],
+.settlement-table input[name$="-avg_meatiness"],
+.settlement-table input[name$="-price_per_kg"],
+.settlement-table input[name$="-net_value"],
+.settlement-table input[name$="-vat_value"],
+.settlement-table input[name$="-gross_value"] {
+    min-width: 10ch;
+}
+
+.table-scroll {
+    overflow-x: auto;
+}
