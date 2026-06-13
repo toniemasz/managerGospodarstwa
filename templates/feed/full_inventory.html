@@ -18,8 +18,21 @@
                 </span>
             </div>
             <div class="text-right">
-                <span class="text-2xl font-black {% if item.current_stock < 500 %}text-red-600{% else %}text-blue-600{% endif %}">{{ item.current_stock|floatformat:2 }}</span>
-                <span class="text-sm font-bold text-gray-500 block">kg</span>
+                <span class="text-2xl font-black {% if item.current_stock < 500 %}text-red-600{% else %}text-blue-600{% endif %}">
+                    {% if item.current_stock > 1000 %}
+                        {{ item.current_stock_in_t|floatformat:2 }}
+                    {% else %}
+                        {{ item.current_stock|floatformat:2 }}
+                    {% endif %}
+                </span>
+
+                <span class="text-sm font-bold text-gray-500 block">
+                    {% if item.current_stock > 1000 %}
+                        t
+                    {% else %}
+                        kg
+                    {% endif %}
+                </span>
             </div>
         </div>
         {% empty %}

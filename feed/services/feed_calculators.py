@@ -16,6 +16,10 @@ class InventoryItem:
     def current_stock(self) -> Decimal:
         return self.total_delivered - self.total_used
 
+    def current_stock_in_t(self) -> Decimal:
+        return self.current_stock/Decimal('1000.00')
+
+
 
 @dataclass
 class RecipeCostInfo:

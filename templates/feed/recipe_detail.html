@@ -43,15 +43,15 @@
     <section class="stats-grid">
         <div class="stat-tile">
             <span>Wyprodukowane</span>
-            <strong>{{ stats.completed_kg|floatformat:0 }} kg</strong>
+            <strong>{{ stats.completed_t|floatformat:0 }} t</strong>
         </div>
         <div class="stat-tile">
             <span>Łączny koszt paszy</span>
-            <strong>{{ stats.completed_cost|floatformat:2 }}</strong>
+            <strong>{{ stats.completed_cost|floatformat:2 }} zł</strong>
         </div>
         <div class="stat-tile">
             <span>Średni koszt tony</span>
-            <strong>{{ cost.cost_per_ton|floatformat:2 }}</strong>
+            <strong>{{ cost.cost_per_ton|floatformat:2 }} zł</strong>
         </div>
         <div class="stat-tile">
             <span>W kolejce</span>
@@ -115,7 +115,7 @@
                 </div>
                 <div>
                     <dt>Zakończone</dt>
-                    <dd>{{ stats.completed_count }} / {{ stats.completed_t|floatformat:0 }} t</dd>
+                    <dd>{{ stats.completed_count }} / {{ stats.completed_kg|floatformat:0 }} kg</dd>
                 </div>
                 <div>
                     <dt>Łączny koszt zakończonych</dt>
