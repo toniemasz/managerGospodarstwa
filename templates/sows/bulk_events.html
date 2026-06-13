@@ -1,0 +1,249 @@
+{% extends 'base.html' %}
+{% block title %}{% if is_single %}Dodaj zdarzenie{% else %}Masowe zdarzenia macior{% endif %}{% endblock %}
+
+{% block content %}
+<main class="app-page">
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Maciory</p>
+            <h1>{% if is_single %}Dodaj zdarzenie{% else %}Masowe dodawanie zdarzeń{% endif %}</h1>
+            <p class="page-subtitle">Wpisuj numery macior w tabeli albo wybieraj je z podpowiedzi istniejących rekordów.</p>
+        </div>
+        <div class="header-actions">
+            <a href="{% url 'bulk_sow_events' %}?rows=1" class="button button-secondary">Jedno zdarzenie</a>
+            <a href="{% url 'bulk_sow_events' %}" class="button button-secondary">Tryb masowy</a>
+            <a href="{% url 'dashboard' %}" class="button button-secondary">Wróć</a>
+        </div>
+    </section>
+
+    {% if messages %}
+    <section class="message-stack">
+        {% for message in messages %}
+        <div class="alert {% if message.tags == 'error' %}alert-error{% else %}alert-success{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </section>
+    {% endif %}
+
+    <datalist id="sow-ear-tags">
+        {% for sow in sows %}
+            <option value="{{ sow.ear_tag }}"></option>
+        {% endfor %}
+    </datalist>
+
+    <form method="post" class="responsive-form">
+        {% csrf_token %}
+        <section class="panel table-panel">
+            <div class="section-heading">
+                <div>
+                    <h2>Tabela zdarzeń</h2>
+                    <p>Zapis nastąpi dopiero wtedy, gdy wszystkie wypełnione wiersze przejdą walidację cyklu maciory.</p>
+                </div>
+                <button type="button" id="add-bulk-event-row" class="button button-secondary">Dodaj wiersz</button>
+            </div>
+
+            {{ formset.management_form }}
+            <div class="table-scroll">
+                <table class="data-table bulk-event-table">
+                    <thead>
+                        <tr>
+                            <th>Maciora</th>
+                            <th>Typ</th>
+                            <th>Data</th>
+                            <th>Inseminator</th>
+                            <th>Wynik USG</th>
+                            <th>Żywe</th>
+                            <th>Martwe</th>
+                            <th>Odsadzone</th>
+                            <th>Szczepienie</th>
+                            <th>Usuń</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bulk-event-rows">
+                        {% for form in formset %}
+                        <tr class="bulk-event-row">
+                            <td>
+                                <div class="bulk-cell-with-action">
+                                    {{ form.sow_ear_tag }}
+                                    <button type="button" class="mini-button copy-sow" title="Skopiuj maciorę z wiersza wyżej">↥</button>
+                                </div>
+                                {{ form.sow_ear_tag.errors }}
+                                {{ form.non_field_errors }}
+                            </td>
+                            <td>{{ form.event_type }}{{ form.event_type.errors }}</td>
+                            <td>{{ form.event_date }}{{ form.event_date.errors }}</td>
+                            <td>{{ form.technician }}{{ form.technician.errors }}</td>
+                            <td>{{ form.pregnancy_result }}{{ form.pregnancy_result.errors }}</td>
+                            <td>{{ form.born_alive }}{{ form.born_alive.errors }}</td>
+                            <td>{{ form.born_dead }}{{ form.born_dead.errors }}</td>
+                            <td>{{ form.count }}{{ form.count.errors }}</td>
+                            <td>{{ form.vaccine_name }}{{ form.vaccine_name.errors }}</td>
+                            <td class="delete-cell">{{ form.DELETE }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <template id="bulk-event-row-template">
+            <tr class="bulk-event-row">
+                <td>
+                    <div class="bulk-cell-with-action">
+                        {{ formset.empty_form.sow_ear_tag }}
+                        <button type="button" class="mini-button copy-sow" title="Skopiuj maciorę z wiersza wyżej">↥</button>
+                    </div>
+                </td>
+                <td>{{ formset.empty_form.event_type }}</td>
+                <td>{{ formset.empty_form.event_date }}</td>
+                <td>{{ formset.empty_form.technician }}</td>
+                <td>{{ formset.empty_form.pregnancy_result }}</td>
+                <td>{{ formset.empty_form.born_alive }}</td>
+                <td>{{ formset.empty_form.born_dead }}</td>
+                <td>{{ formset.empty_form.count }}</td>
+                <td>{{ formset.empty_form.vaccine_name }}</td>
+                <td class="delete-cell">{{ formset.empty_form.DELETE }}</td>
+            </tr>
+        </template>
+
+        <div class="form-actions">
+            <a href="{% url 'dashboard' %}" class="button button-secondary">Anuluj</a>
+            <button type="submit" class="button button-primary">Zapisz zdarzenia</button>
+        </div>
+    </form>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const totalForms = document.getElementById('id_events-TOTAL_FORMS');
+    const rows = document.getElementById('bulk-event-rows');
+    const template = document.getElementById('bulk-event-row-template');
+    const addButton = document.getElementById('add-bulk-event-row');
+
+    const detailFieldRules = {
+        INSEMINATION: ['technician'],
+        PREGNANCY_CHECK: ['pregnancy_result'],
+        FARROWING: ['born_alive', 'born_dead'],
+        WEANING: ['count'],
+        VACCINATION: ['vaccine_name']
+    };
+
+    const allDetailFields = [
+        'technician',
+        'pregnancy_result',
+        'born_alive',
+        'born_dead',
+        'count',
+        'vaccine_name'
+    ];
+
+    function getField(row, fieldName) {
+        return row.querySelector(`[name$="-${fieldName}"]`);
+    }
+
+    function setFieldState(field, enabled, shouldClear) {
+        if (!field) return;
+
+        const cell = field.closest('td');
+
+        field.disabled = !enabled;
+
+        if (cell) {
+            cell.classList.toggle('opacity-40', !enabled);
+            cell.classList.toggle('bg-slate-50', !enabled);
+        }
+
+        field.classList.toggle('cursor-not-allowed', !enabled);
+
+        if (!enabled) {
+            field.setAttribute('aria-disabled', 'true');
+
+            if (shouldClear) {
+                if (field.tagName === 'SELECT') {
+                    field.selectedIndex = 0;
+                } else if (field.type === 'checkbox') {
+                    field.checked = false;
+                } else {
+                    field.value = '';
+                }
+            }
+        } else {
+            field.removeAttribute('aria-disabled');
+        }
+    }
+
+    function updateRowFields(row, shouldClear = false) {
+        const eventTypeField = getField(row, 'event_type');
+        const eventType = eventTypeField ? eventTypeField.value : '';
+        const enabledFields = detailFieldRules[eventType] || [];
+
+        allDetailFields.forEach((fieldName) => {
+            const field = getField(row, fieldName);
+            setFieldState(field, enabledFields.includes(fieldName), shouldClear);
+        });
+    }
+
+    function prepareRow(row) {
+        const sowInput = getField(row, 'sow_ear_tag');
+        const eventTypeField = getField(row, 'event_type');
+
+        if (sowInput) {
+            sowInput.setAttribute('list', 'sow-ear-tags');
+            sowInput.setAttribute('placeholder', 'Nr kolczyka');
+        }
+
+        if (eventTypeField && !eventTypeField.dataset.dynamicFieldsBound) {
+            eventTypeField.dataset.dynamicFieldsBound = 'true';
+            eventTypeField.addEventListener('change', () => updateRowFields(row, true));
+        }
+
+        updateRowFields(row, false);
+    }
+
+    function copyPreviousSow(button) {
+        const row = button.closest('tr');
+        const previous = row.previousElementSibling;
+        if (!previous) return;
+
+        const source = getField(previous, 'sow_ear_tag');
+        const target = getField(row, 'sow_ear_tag');
+
+        if (source && target) target.value = source.value;
+    }
+
+    function enableAllFieldsBeforeSubmit(form) {
+        form.querySelectorAll(':disabled').forEach((field) => {
+            field.disabled = false;
+        });
+    }
+
+    rows.querySelectorAll('.bulk-event-row').forEach(prepareRow);
+
+    rows.addEventListener('click', (event) => {
+        if (event.target.classList.contains('copy-sow')) {
+            copyPreviousSow(event.target);
+        }
+    });
+
+    addButton.addEventListener('click', () => {
+        const index = parseInt(totalForms.value, 10);
+        const html = template.innerHTML.replaceAll('__prefix__', index);
+
+        rows.insertAdjacentHTML('beforeend', html);
+        totalForms.value = index + 1;
+
+        prepareRow(rows.lastElementChild);
+    });
+
+    const form = rows.closest('form');
+    if (form) {
+        form.addEventListener('submit', () => {
+            enableAllFieldsBeforeSubmit(form);
+        });
+    }
+});
+</script>
+{% endblock %}

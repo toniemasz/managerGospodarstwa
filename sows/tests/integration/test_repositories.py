@@ -1,7 +1,7 @@
 from datetime import date
 
-from sows.infrastructure.repositories import SowRepository
-from sows.models import SowModel, SowEventModel
+from sows.services.sow_repository import SowRepository, VaccinationPlanRepository
+from sows.models import SowModel, SowEventModel, VaccinationPlanModel
 import pytest
 
 
@@ -40,14 +40,29 @@ class TestSowRepository:
 
 
         assert len(sows) == 1
-        domain_sow = sows[0]
-        assert domain_sow.ear_tag == "MAP-1"
-        assert domain_sow.status == "INSEMINATED"  
-        assert len(domain_sow.all_events) == 1
+        sow = sows[0]
+        assert sow.ear_tag == "MAP-1"
+        assert sow.status == "INSEMINATED"
+        assert len(sow.all_events) == 1
 
     def test_get_sow_by_id(self):
         db_sow = SowModel.objects.create(ear_tag="ID-TEST")
         repo = SowRepository()
 
-        domain_sow = repo.get_sow_by_id(db_sow.id)
-        assert domain_sow.ear_tag == "ID-TEST"
+        sow = repo.get_sow_by_id(db_sow.id)
+        assert sow.ear_tag == "ID-TEST"
+
+
+@pytest.mark.django_db
+def test_vaccination_plan_repository_public_methods():
+    VaccinationPlanModel.objects.create(name="ZZZ", days_before_farrowing=21)
+    VaccinationPlanModel.objects.create(name="AAA", interval_months=4)
+
+    repo = VaccinationPlanRepository()
+
+    assert [plan.name for plan in repo.get_all_plans()] == ["AAA", "ZZZ"]
+    assert repo.get_plan_choices() == [
+        ('', '--- Wybierz szczepienie cykliczne ---'),
+        ('AAA', 'AAA'),
+        ('ZZZ', 'ZZZ'),
+    ]

@@ -1,6 +1,6 @@
 import pytest
 from decimal import Decimal
-from feed.domain.entities import ProductionCalculator, RecipeCostCalculator
+from feed.services.feed_calculators import ProductionCalculator, RecipeCostCalculator
 
 
 class TestProductionCalculator:

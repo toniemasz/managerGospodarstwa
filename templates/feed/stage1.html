@@ -1,62 +1,95 @@
 {% extends 'base.html' %}
-{% block title %}Etap 1 - Silosy/Biny{% endblock %}
+{% block title %}Etap 1 śrutowania{% endblock %}
 
 {% block content %}
-<div class="container mx-auto p-4 md:p-6 max-w-2xl">
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-
-        <div class="bg-indigo-600 p-4 text-white">
-            <h2 class="text-xl font-bold">Etap 1: Pobieranie z Silosów (Binów)</h2>
-            <p class="text-indigo-100 text-sm mt-1">Śrutowanie: {{ production.recipe.name }} ({{ production.quantity_kg }} kg)</p>
+<main class="mx-auto w-full max-w-7xl px-4 py-6 md:px-6">
+    <section class="mb-5 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:flex-row md:items-center md:justify-between">
+        <div>
+            <p class="mb-1 text-xs font-black uppercase tracking-widest text-emerald-700">Śrutowanie</p>
+            <h1 class="text-3xl font-black tracking-tight text-slate-900 md:text-4xl">Etap 1: silosy i biny</h1>
+            <p class="mt-2 text-base font-semibold text-slate-500">{{ production.recipe.name }} · {{ production.quantity_kg|floatformat:0 }} kg</p>
         </div>
+        <a href="{% url 'feed_productions' %}" class="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 font-black text-slate-700 transition hover:bg-slate-50 hover:text-blue-600">Wróć</a>
+    </section>
 
-        <div class="p-6">
-            {% if production.custom_recipe_data %}
-                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
-                    <div class="flex">
-                        <div class="flex-shrink-0">⚠️</div>
-                        <div class="ml-3">
-                            <p class="text-sm text-yellow-700 font-bold">Zmienione proporcje!</p>
-                            <p class="text-sm text-yellow-600 mt-1">To śrutowanie korzysta z jednorazowo zmodyfikowanej receptury.</p>
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
-
-            <p class="text-gray-700 font-medium mb-4">Odhaczaj surowce, które zostały już przygotowane lub pobrane:</p>
-
-            <ul class="space-y-3 mb-8">
-                {% for item in stage1_items %}
-                    <li class="ingredient-row flex justify-between items-center bg-gray-50 p-3 rounded border border-gray-200 transition-all">
-                        <div class="flex items-center gap-4">
-                            <input type="checkbox" class="ingredient-checkbox w-6 h-6 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500 cursor-pointer" data-id="{{ item.id }}">
-                            <div>
-                                <span class="block font-bold text-gray-800 text-lg row-name">{{ item.name }}</span>
-                                <span class="text-sm text-gray-500">Proporcja: {{ item.percentage|floatformat:2 }}%</span>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <span class="block font-black text-indigo-700 text-xl">{{ item.weight_kg|floatformat:2 }} kg</span>
-                            <span class="text-xs text-gray-500 bg-white px-2 py-0.5 rounded shadow-sm border border-gray-200">Z Silosu</span>
-                        </div>
-                    </li>
-                {% empty %}
-                    <li class="text-gray-500 italic p-4 text-center bg-gray-50 rounded">Brak składników przypisanych do silosów w tej recepturze.</li>
-                {% endfor %}
-            </ul>
-
-            <form method="post" id="stageForm" class="border-t border-gray-100 pt-6 flex justify-end gap-3">
-                {% csrf_token %}
-                <a href="{% url 'feed_productions' %}" class="px-5 py-2 bg-gray-100 text-gray-700 font-bold rounded hover:bg-gray-200 transition">Wróc do listy</a>
-                <button type="submit" class="px-5 py-2 bg-indigo-600 text-white font-bold rounded hover:bg-indigo-700 transition shadow-md">
-                    Zatwierdź pobór i zakończ Etap 1
-                </button>
-            </form>
+    <section class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <span class="text-xs font-black uppercase tracking-wider text-slate-500">Ilość produkcji</span>
+            <strong class="mt-2 block text-2xl font-black text-slate-900">{{ production.quantity_kg|floatformat:0 }} kg</strong>
         </div>
-    </div>
-</div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <span class="text-xs font-black uppercase tracking-wider text-slate-500">Łączny koszt paszy</span>
+            <strong class="mt-2 block text-2xl font-black text-slate-900">{{ production_cost.total_cost|floatformat:2 }}</strong>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <span class="text-xs font-black uppercase tracking-wider text-slate-500">Koszt 1 kg</span>
+            <strong class="mt-2 block text-2xl font-black text-slate-900">{{ production_cost.cost_per_kg|floatformat:4 }}</strong>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <span class="text-xs font-black uppercase tracking-wider text-slate-500">Koszt tony</span>
+            <strong class="mt-2 block text-2xl font-black text-slate-900">{{ production_cost.cost_per_ton|floatformat:2 }}</strong>
+        </div>
+    </section>
 
+    {% if production.custom_recipe_data %}
+    <section class="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+        <div>
+            <h2 class="text-base font-black text-amber-900">Zmienione proporcje</h2>
+            <p class="mt-1 text-sm font-medium text-amber-800">To śrutowanie korzysta z jednorazowo zmodyfikowanej receptury.</p>
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="border-b border-slate-200 bg-slate-50 p-5">
+            <div>
+                <h2 class="text-xl font-black text-slate-900">Składniki z silosów</h2>
+                <p class="mt-1 text-sm font-medium text-slate-500">Odhacz surowce pobrane do śrutowania.</p>
+            </div>
+        </div>
+        <div class="w-full overflow-x-auto">
+            <table class="min-w-[760px] w-full border-separate border-spacing-0 text-sm text-slate-700">
+                <thead class="bg-slate-100">
+                    <tr>
+                        <th class="whitespace-nowrap border-b border-slate-200 px-4 py-3 text-left text-xs font-black uppercase tracking-wider text-slate-500">Gotowe</th>
+                        <th class="whitespace-nowrap border-b border-slate-200 px-4 py-3 text-left text-xs font-black uppercase tracking-wider text-slate-500">Składnik</th>
+                        <th class="whitespace-nowrap border-b border-slate-200 px-4 py-3 text-right text-xs font-black uppercase tracking-wider text-slate-500">Udział</th>
+                        <th class="whitespace-nowrap border-b border-slate-200 px-4 py-3 text-right text-xs font-black uppercase tracking-wider text-slate-500">Ilość</th>
+                        <th class="whitespace-nowrap border-b border-slate-200 px-4 py-3 text-right text-xs font-black uppercase tracking-wider text-slate-500">Cena/kg</th>
+                        <th class="whitespace-nowrap border-b border-slate-200 px-4 py-3 text-right text-xs font-black uppercase tracking-wider text-slate-500">Koszt</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in stage1_items %}
+                    <tr class="ingredient-row transition hover:bg-blue-50">
+                        <td class="border-b border-slate-100 px-4 py-4"><input type="checkbox" class="ingredient-checkbox h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" data-id="{{ item.id }}"></td>
+                        <td class="border-b border-slate-100 px-4 py-4"><strong class="row-name font-black text-slate-900">{{ item.name }}</strong></td>
+                        <td class="border-b border-slate-100 px-4 py-4 text-right">{{ item.percentage|floatformat:2 }}%</td>
+                        <td class="border-b border-slate-100 px-4 py-4 text-right"><strong class="font-black text-slate-900">{{ item.weight_kg|floatformat:2 }}</strong> kg</td>
+                        <td class="border-b border-slate-100 px-4 py-4 text-right">{{ item.price_per_kg|floatformat:5 }} PLN</td>
+                        <td class="border-b border-slate-100 px-4 py-4 text-right">{{ item.cost|floatformat:2 }} PLN</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="px-4 py-8 text-center font-bold italic text-slate-400">Brak składników przypisanych do silosów.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <form method="post" id="stageForm" class="flex justify-end gap-3">
+        {% csrf_token %}
+        <a href="{% url 'feed_productions' %}" class="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 font-black text-slate-700 transition hover:bg-slate-50 hover:text-blue-600">Anuluj</a>
+        <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-xl bg-blue-600 px-4 py-2 font-black text-white shadow-sm transition hover:bg-blue-700">Zatwierdź etap 1</button>
+    </form>
+</main>
+{% endblock %}
+
+{% block scripts %}
 <script>
+document.addEventListener('DOMContentLoaded', () => {
     const prodId = "{{ production.id }}";
     const storageKey = `feed_prod_${prodId}_stage1`;
     let checkedState = JSON.parse(localStorage.getItem(storageKey)) || {};
@@ -64,24 +97,20 @@
     function toggleRowStyle(checkbox) {
         const row = checkbox.closest('.ingredient-row');
         const nameText = row.querySelector('.row-name');
-        if (checkbox.checked) {
-            row.classList.add('bg-gray-200', 'opacity-60');
-            row.classList.remove('bg-gray-50');
-            nameText.classList.add('line-through');
-        } else {
-            row.classList.remove('bg-gray-200', 'opacity-60');
-            row.classList.add('bg-gray-50');
-            nameText.classList.remove('line-through');
+
+        row.classList.toggle('bg-emerald-50', checkbox.checked);
+        row.classList.toggle('opacity-75', checkbox.checked);
+
+        if (nameText) {
+            nameText.classList.toggle('line-through', checkbox.checked);
+            nameText.classList.toggle('text-emerald-700', checkbox.checked);
         }
     }
 
     document.querySelectorAll('.ingredient-checkbox').forEach(cb => {
         const itemId = cb.dataset.id;
-        if (checkedState[itemId]) {
-            cb.checked = true;
-            toggleRowStyle(cb);
-        }
-
+        cb.checked = Boolean(checkedState[itemId]);
+        toggleRowStyle(cb);
         cb.addEventListener('change', function() {
             checkedState[itemId] = this.checked;
             localStorage.setItem(storageKey, JSON.stringify(checkedState));
@@ -89,9 +118,9 @@
         });
     });
 
-    // Czyszczenie pamięci po zatwierdzeniu formularza
     document.getElementById('stageForm').addEventListener('submit', function() {
         localStorage.removeItem(storageKey);
     });
+});
 </script>
 {% endblock %}

@@ -8,6 +8,7 @@ class TestSowModels:
         sow = SowModel.objects.create(ear_tag="TEST-123", entry_date=date.today())
         assert sow.id is not None
         assert str(sow) == "Maciora TEST-123"
+        assert sow.is_archived is False
 
     def test_create_sow_event(self):
         sow = SowModel.objects.create(ear_tag="TEST-123")
@@ -20,6 +21,7 @@ class TestSowModels:
         assert event.id is not None
         assert event.sow.ear_tag == "TEST-123"
         assert event.details["technician"] == "Jan Kowalski"
+        assert str(event).startswith("INSEMINATION")
 
     def test_create_vaccination_plan(self):
         plan = VaccinationPlanModel.objects.create(

@@ -18,6 +18,7 @@ urlpatterns = [
     # Receptury
     path('receptury/', views.feed_recipes_view, name='feed_recipes'),
     path('receptury/dodaj/', views.add_recipe_view, name='add_recipe'),
+    path('receptury/<int:pk>/', views.recipe_detail_view, name='recipe_detail'),
     path('receptury/<int:pk>/edytuj/', views.edit_recipe_view, name='edit_recipe'),
     path('receptury/<int:pk>/usun/', views.delete_recipe_view, name='delete_recipe'),
 
@@ -27,7 +28,7 @@ urlpatterns = [
     path('srutowanie/<int:pk>/edytuj/', views.edit_production_view, name='edit_production'),
     path('srutowanie/<int:pk>/usun/', views.delete_production_view, name='delete_production'),
 
-    # NOWE: Etapy Śrutowania
+    # Etapy śrutowania
     path('srutowanie/<int:pk>/etap1/', views.process_stage1_view, name='process_stage1'),
     path('srutowanie/<int:pk>/etap2/', views.process_stage2_view, name='process_stage2'),
 

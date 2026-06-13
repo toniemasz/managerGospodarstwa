@@ -1,24 +1,210 @@
 {% extends 'base.html' %}
-{% block title %}Nowa Sprzedaż{% endblock %}
+{% block title %}{% if is_edit %}Edycja sprzedaży{% else %}Nowa sprzedaż{% endif %}{% endblock %}
 
 {% block content %}
-<div class="flex items-center justify-center min-h-screen p-4">
-    <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-lg">
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">Dodaj dokument sprzedaży</h2>
-        <form method="post" class="space-y-4">
-            {% csrf_token %}
-            {% for field in form %}
-            <div>
-                <label class="block text-gray-700 text-sm font-bold mb-2">{{ field.label }}</label>
-                {{ field.errors }}
-                {{ field }}
+<main class="app-page">
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Sprzedaż</p>
+            <h1>{% if is_edit %}Edycja dokumentu{% else %}Nowy dokument sprzedaży{% endif %}</h1>
+            <p class="page-subtitle">Daty, rozliczenie klas i podsumowanie dokumentu.</p>
+        </div>
+        <a href="{% url 'sales_list' %}" class="button button-secondary">Wróć</a>
+    </section>
+
+    {% if messages %}
+    <section class="message-stack">
+        {% for message in messages %}
+        <div class="alert {% if message.tags == 'error' %}alert-error{% else %}alert-success{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </section>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" class="responsive-form" id="sale-form">
+        {% csrf_token %}
+
+        <section class="sale-document-layout">
+            <div class="panel">
+                <div class="section-heading">
+                    <div>
+                        <h2>Dane dokumentu</h2>
+                        <p>Data sprzedaży może zostać uzupełniona później.</p>
+                    </div>
+                    {% if sale.no_settlement %}
+                        <span class="status-pill status-amber">Rozliczenie do importu</span>
+                    {% endif %}
+                </div>
+
+                <div class="form-grid three-columns">
+                    <div class="form-field">
+                        <label for="{{ form.sale_date.id_for_label }}">{{ form.sale_date.label }}</label>
+                        {{ form.sale_date }}
+                        {{ form.sale_date.errors }}
+                    </div>
+                    <div class="form-field">
+                        <label for="{{ form.slaughter_date.id_for_label }}">{{ form.slaughter_date.label }}</label>
+                        {{ form.slaughter_date }}
+                        {{ form.slaughter_date.errors }}
+                    </div>
+                    <div class="form-field">
+                        <label for="{{ form.document_number.id_for_label }}">{{ form.document_number.label }}</label>
+                        {{ form.document_number }}
+                        {{ form.document_number.errors }}
+                    </div>
+                    <div class="form-field">
+                        <label for="{{ form.tattoo.id_for_label }}">{{ form.tattoo.label }}</label>
+                        {{ form.tattoo }}
+                        {{ form.tattoo.errors }}
+                    </div>
+                    <div class="form-field form-field-wide">
+                        <label for="{{ form.supplier_name.id_for_label }}">{{ form.supplier_name.label }}</label>
+                        {{ form.supplier_name }}
+                        {{ form.supplier_name.errors }}
+                    </div>
+                    <div class="form-field">
+                        <label for="{{ form.avg_meatiness_seurop.id_for_label }}">{{ form.avg_meatiness_seurop.label }}</label>
+                        {{ form.avg_meatiness_seurop }}
+                        {{ form.avg_meatiness_seurop.errors }}
+                    </div>
+                    <div class="form-field">
+                        <label for="{{ form.live_weight.id_for_label }}">{{ form.live_weight.label }}</label>
+                        {{ form.live_weight }}
+                        {{ form.live_weight.errors }}
+                    </div>
+                    <div class="form-field">
+                        <label for="{{ form.dressing_percentage.id_for_label }}">{{ form.dressing_percentage.label }}</label>
+                        {{ form.dressing_percentage }}
+                        {{ form.dressing_percentage.errors }}
+                    </div>
+                </div>
             </div>
-            {% endfor %}
-            <div class="flex justify-between items-center pt-4 border-t">
-                <a href="{% url 'sales_list' %}" class="text-gray-500 hover:text-gray-800 text-sm font-bold">Anuluj</a>
-                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded shadow">Zapisz</button>
+
+            <aside class="panel sale-side-panel">
+                <div class="section-heading">
+                    <div>
+                        <h2>Rozliczenie</h2>
+                        <p>Import PDF lub zapis pustego dokumentu do późniejszego uzupełnienia.</p>
+                    </div>
+                </div>
+
+                <label class="option-box sale-option">
+                    <span class="checkbox-row">
+                        {{ form.no_settlement }}
+                        {{ form.no_settlement.label }}
+                    </span>
+                    {{ form.no_settlement.errors }}
+                </label>
+
+                <div class="form-field">
+                    <label for="{{ form.settlement_pdf.id_for_label }}">{{ form.settlement_pdf.label }}</label>
+                    {{ form.settlement_pdf }}
+                    {{ form.settlement_pdf.errors }}
+                </div>
+                <button type="submit" name="import_pdf" value="1" class="button button-secondary">Importuj PDF</button>
+
+                <div class="sale-side-note">
+                    <strong>Status dokumentu</strong>
+                    <span>{% if sale.no_settlement %}Rozliczenie do importu{% else %}Gotowy do zapisu{% endif %}</span>
+                </div>
+            </aside>
+        </section>
+
+        <section class="panel table-panel">
+            <div class="section-heading">
+                <div>
+                    <h2>Tabela klas</h2>
+                    <p>Wiersze są edytowalne do momentu zapisu dokumentu i później w edycji.</p>
+                </div>
+                <button type="button" class="button button-secondary" id="add-settlement-row">Dodaj wiersz</button>
             </div>
-        </form>
-    </div>
-</div>
+
+            {{ row_formset.management_form }}
+            <div class="table-scroll">
+                <table class="data-table settlement-table">
+                    <thead>
+                        <tr>
+                            <th>Lp</th>
+                            <th>Klasa</th>
+                            <th>Ilość</th>
+                            <th>Waga</th>
+                            <th>Śr. waga</th>
+                            <th>Śr. mięsność</th>
+                            <th>Cena</th>
+                            <th>Wartość</th>
+                            <th>VAT</th>
+                            <th>Wartość brutto</th>
+                            <th>Usuń</th>
+                        </tr>
+                    </thead>
+                    <tbody id="settlement-rows">
+                        {% for row_form in row_formset %}
+                        <tr class="settlement-row">
+                            <td>{{ row_form.line_no }}</td>
+                            <td>{{ row_form.meat_class }}</td>
+                            <td>{{ row_form.quantity }}</td>
+                            <td>{{ row_form.weight }}</td>
+                            <td>{{ row_form.avg_weight }}</td>
+                            <td>{{ row_form.avg_meatiness }}</td>
+                            <td>{{ row_form.price_per_kg }}</td>
+                            <td>{{ row_form.net_value }}</td>
+                            <td>{{ row_form.vat_value }}</td>
+                            <td>{{ row_form.gross_value }}</td>
+                            <td class="delete-cell">{{ row_form.DELETE }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <template id="settlement-row-template">
+            <tr class="settlement-row">
+                <td>{{ row_formset.empty_form.line_no }}</td>
+                <td>{{ row_formset.empty_form.meat_class }}</td>
+                <td>{{ row_formset.empty_form.quantity }}</td>
+                <td>{{ row_formset.empty_form.weight }}</td>
+                <td>{{ row_formset.empty_form.avg_weight }}</td>
+                <td>{{ row_formset.empty_form.avg_meatiness }}</td>
+                <td>{{ row_formset.empty_form.price_per_kg }}</td>
+                <td>{{ row_formset.empty_form.net_value }}</td>
+                <td>{{ row_formset.empty_form.vat_value }}</td>
+                <td>{{ row_formset.empty_form.gross_value }}</td>
+                <td class="delete-cell">{{ row_formset.empty_form.DELETE }}</td>
+            </tr>
+        </template>
+
+        <div class="form-actions">
+            <a href="{% url 'sales_list' %}" class="button button-secondary">Anuluj</a>
+            <button type="submit" name="save_sale" value="1" class="button button-primary">Zapisz sprzedaż</button>
+        </div>
+    </form>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const addButton = document.getElementById('add-settlement-row');
+        const rows = document.getElementById('settlement-rows');
+        const template = document.getElementById('settlement-row-template');
+        const totalForms = document.getElementById('id_rows-TOTAL_FORMS');
+
+        if (!addButton || !rows || !template || !totalForms) return;
+
+        addButton.addEventListener('click', () => {
+            const index = parseInt(totalForms.value, 10);
+            const html = template.innerHTML.replaceAll('__prefix__', index);
+            rows.insertAdjacentHTML('beforeend', html);
+            totalForms.value = index + 1;
+
+            const newRow = rows.lastElementChild;
+            const lineInput = newRow.querySelector('input[name$="-line_no"]');
+            if (lineInput && !lineInput.value) {
+                lineInput.value = index + 1;
+            }
+        });
+    });
+</script>
 {% endblock %}

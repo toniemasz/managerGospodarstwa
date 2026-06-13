@@ -1,11 +1,8 @@
 from decimal import Decimal
-from unittest.mock import Mock
-from feed.domain.entities import InventoryItem
 import pytest
-from decimal import Decimal
 from django.utils import timezone
 from feed.models import IngredientModel, DeliveryModel, RecipeModel, RecipeItemModel, ProductionModel
-from feed.application.services import FeedManagementService
+from feed.services.feed_management_service import FeedManagementService
 
 
 @pytest.fixture
@@ -52,7 +49,6 @@ class TestFeedManagementService:
             status=ProductionModel.Statuses.QUEUED
         )
 
-        # ZMIANA TUTAJ: przekazujemy production.id
         is_possible, errors = service.validate_production_capacity(production.id)
         assert is_possible is True
         assert len(errors) == 0
@@ -137,3 +133,76 @@ class TestFeedManagementService:
         # Upewniamy się, że status się NIE zmienił
         production.refresh_from_db()
         assert production.status == ProductionModel.Statuses.STAGE_1_DONE
+
+    def test_get_production_details_for_stages_splits_bin_and_bag_items(self, service, setup_data):
+        production = ProductionModel.objects.create(
+            date=timezone.now().date(),
+            recipe=setup_data['recipe'],
+            quantity_kg=1000,
+            status=ProductionModel.Statuses.QUEUED
+        )
+
+        details = service.get_production_details_for_stages(production.id)
+
+        assert details['production'] == production
+        assert details['stage1_items'][0]['name'] == "Kukurydza"
+        assert details['stage1_items'][0]['weight_kg'] == Decimal('800.00')
+        assert details['stage2_items'][0]['name'] == "Koncentrat"
+        assert details['stage2_items'][0]['weight_kg'] == Decimal('200.00')
+
+    def test_process_stage_1_rejects_non_queued_production(self, service, setup_data):
+        production = ProductionModel.objects.create(
+            date=timezone.now().date(),
+            recipe=setup_data['recipe'],
+            quantity_kg=1000,
+            status=ProductionModel.Statuses.STAGE_1_DONE
+        )
+
+        success, message = service.process_production_stage_1(production.id)
+
+        assert success is False
+        assert "kolejce początkowej" in message
+
+    def test_complete_production_rejects_before_stage_1(self, service, setup_data):
+        production = ProductionModel.objects.create(
+            date=timezone.now().date(),
+            recipe=setup_data['recipe'],
+            quantity_kg=100,
+            status=ProductionModel.Statuses.QUEUED
+        )
+
+        success, message = service.complete_production(production.id)
+
+        assert success is False
+        assert "przed wykonaniem Etapu 1" in message
+
+    def test_complete_production_rejects_already_completed(self, service, setup_data):
+        production = ProductionModel.objects.create(
+            date=timezone.now().date(),
+            recipe=setup_data['recipe'],
+            quantity_kg=100,
+            status=ProductionModel.Statuses.COMPLETED
+        )
+
+        success, message = service.complete_production(production.id, skip_stages=True)
+
+        assert success is False
+        assert "wcześniej zaksięgowane" in message
+
+    def test_get_calculator_data_returns_recipe_costs(self, service, setup_data):
+        from feed.models import IngredientPriceConfigModel
+
+        IngredientPriceConfigModel.objects.create(
+            ingredient=setup_data['ing_bin'],
+            price_per_kg=Decimal('1.00')
+        )
+        IngredientPriceConfigModel.objects.create(
+            ingredient=setup_data['ing_bag'],
+            price_per_kg=Decimal('3.00')
+        )
+
+        costs = service.get_calculator_data()
+
+        assert len(costs) == 1
+        assert costs[0].recipe_name == "Standardowa"
+        assert costs[0].cost_per_kg == Decimal('1.40')

@@ -1,62 +1,66 @@
 {% extends 'base.html' %}
-{% block title %}Lista Składników{% endblock %}
+{% block title %}Składniki{% endblock %}
 
 {% block content %}
-<div class="container mx-auto p-4 md:p-6">
-    <header class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-5 rounded-xl shadow-sm">
+<main class="app-page">
+    <section class="page-header">
         <div>
-            <p class="text-xs font-black uppercase tracking-widest text-emerald-700 mb-1">Pasze</p>
-            <h1 class="text-xl md:text-2xl font-black text-gray-800">Składniki</h1>
-            <p class="text-sm text-gray-500 mt-1">Lista surowców wykorzystywanych w recepturach i magazynie.</p>
+            <p class="eyebrow">Pasze</p>
+            <h1>Składniki</h1>
+            <p class="page-subtitle">Surowce używane w recepturach i śrutowaniu.</p>
         </div>
-        <div class="flex items-center gap-3">
-            <a href="{% url 'modules_home' %}" class="text-sm text-gray-600 hover:text-blue-600 font-bold">Wróć do Centrali</a>
-            <span class="text-sm bg-yellow-100 text-yellow-800 font-medium px-2.5 py-0.5 rounded-full">Moduł: Pasze</span>
-        </div>
-    </header>
+        <a href="{% url 'add_ingredient' %}" class="button button-primary">Dodaj składnik</a>
+    </section>
+
     {% include 'feed/_feed_nav.html' %}
 
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-        <div>
-            <h2 class="text-xl font-bold text-gray-700">Lista składników</h2>
-            <p class="text-sm text-gray-500">Kliknij edycję, aby zmienić nazwę lub opis surowca.</p>
+    <section class="panel table-panel">
+        <div class="section-heading">
+            <div>
+                <h2>Lista składników</h2>
+                <p>Składniki są przypisane do bieżącego gospodarstwa.</p>
+            </div>
         </div>
-        <a href="{% url 'add_ingredient' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow font-bold transition whitespace-nowrap">+ Dodaj składnik</a>
-    </div>
-
-    <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200">
-        <div class="overflow-x-auto">
-            <table class="min-w-full text-left text-sm text-gray-600">
+        <div class="table-scroll">
+            <table class="data-table">
                 <thead>
                     <tr>
-                        <th class="p-4">Nazwa składnika</th>
-                        <th class="p-4">Opis</th>
-                        <th class="p-4 text-center">Akcje</th>
+                        <th>Nazwa</th>
+                        <th>Opis</th>
+                        <th>Przechowywanie</th>
+                        <th class="text-right">Akcje</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for ingredient in ingredients %}
-                    <tr class="transition">
-                        <td class="p-4 font-bold text-gray-800">{{ ingredient.name }}</td>
-                        <td class="p-4 text-gray-600">{{ ingredient.description|default:"-" }}</td>
-                        <td class="p-4 text-center">
-                            <div class="flex justify-center items-center gap-2">
-                                <a href="{% url 'edit_ingredient' ingredient.id %}" class="inline-flex items-center px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold transition">Edytuj</a>
-                                <form method="post" action="{% url 'delete_ingredient' ingredient.id %}" class="inline" onsubmit="return confirm('Czy na pewno usunąć ten składnik?');">
+                    <tr>
+                        <td><strong>{{ ingredient.name }}</strong></td>
+                        <td>{{ ingredient.description|default:"-" }}</td>
+                        <td>
+                            {% if ingredient.is_in_bin %}
+                                <span class="status-pill status-blue">Silos</span>
+                            {% else %}
+                                <span class="status-pill">Worek</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-right">
+                            <div class="row-actions">
+                                <a href="{% url 'edit_ingredient' ingredient.id %}" class="table-link">Edytuj</a>
+                                <form method="post" action="{% url 'delete_ingredient' ingredient.id %}" onsubmit="return confirm('Czy na pewno usunąć ten składnik?');">
                                     {% csrf_token %}
-                                    <button type="submit" class="inline-flex items-center px-3 py-1.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 font-bold transition">Usuń</button>
+                                    <button type="submit" class="link-button-danger">Usuń</button>
                                 </form>
                             </div>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="3" class="p-8 text-center text-gray-500 italic">Brak zdefiniowanych składników.</td>
+                        <td colspan="4" class="empty-table">Brak zdefiniowanych składników.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-    </div>
-</div>
+    </section>
+</main>
 {% endblock %}

@@ -6,13 +6,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Manager Gospodarstwa{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="{% static 'sow/css/app.css' %}">
-    <script src="{% static 'sow/js/table_manager.js' %}"></script>
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+    <script src="{% static 'js/table_manager.js' %}" defer></script>
+    <script src="{% static 'js/app.js' %}" defer></script>
     {% block extra_head %}{% endblock %}
-
 </head>
-<body class="bg-gray-100 font-sans leading-normal tracking-normal min-h-screen">
-    {% block content %}{% endblock %}
+<body>
+    <div class="site-shell">
+        {% if user.is_authenticated %}
+            {% include 'components/topbar.html' %}
+        {% endif %}
+
+        {% include 'components/messages.html' %}
+        {% block content %}{% endblock %}
+    </div>
 
     {% block scripts %}{% endblock %}
 </body>

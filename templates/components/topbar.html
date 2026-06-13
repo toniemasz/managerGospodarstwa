@@ -1,0 +1,23 @@
+{% with active=request.resolver_match.url_name %}
+<header class="topbar">
+    <a href="{% url 'modules_home' %}" class="brand" aria-label="Przejdź do centrali">
+        <span class="brand-title">Manager Gospodarstwa</span>
+        <span class="brand-subtitle">{{ current_farm.name|default:"Gospodarstwo" }}</span>
+    </a>
+
+    <nav class="main-nav" aria-label="Główna nawigacja">
+        <a href="{% url 'modules_home' %}" class="main-nav-link {% if active == 'modules_home' %}is-active{% endif %}">Centrala</a>
+        <a href="{% url 'dashboard' %}" class="main-nav-link {% if active == 'dashboard' or active == 'sow_detail' or active == 'add_sow' or active == 'add_event' or active == 'bulk_sow_events' or active == 'bulk_pregnancy_check' or active == 'bulk_vaccinate' or active == 'general_statistics' or active == 'archived_sows' or active == 'add_vaccination_plan' %}is-active{% endif %}">Maciory</a>
+        <a href="{% url 'feed_inventory' %}" class="main-nav-link {% if active == 'ingredient_list' or active == 'feed_inventory' or active == 'feed_full_inventory' or active == 'feed_recipes' or active == 'recipe_detail' or active == 'add_recipe' or active == 'feed_productions' or active == 'add_production' or active == 'process_stage1' or active == 'process_stage2' or active == 'feed_calculator' %}is-active{% endif %}">Pasze</a>
+        <a href="{% url 'sales_list' %}" class="main-nav-link {% if active == 'sales_list' or active == 'add_sale' %}is-active{% endif %}">Sprzedaż</a>
+    </nav>
+
+    <div class="user-menu">
+        <span class="username">{{ user.get_username }}</span>
+        <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="button button-ghost-danger">Wyloguj</button>
+        </form>
+    </div>
+</header>
+{% endwith %}

@@ -1,4 +1,3 @@
-cat << 'EOF' > .gitignore
 # Środowisko wirtualne
 .venv/
 venv/
@@ -7,7 +6,7 @@ env/
 
 # Konfiguracja PyCharma / JetBrains
 .idea/
-static/
+staticfiles/
 
 # Pliki konfiguracyjne zawierające hasła i klucze (BARDZO WAŻNE)
 .env
@@ -29,4 +28,3 @@ __pycache__/
 
 # Logi i pliki tymczasowe
 *.log
-EOF

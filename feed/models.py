@@ -7,11 +7,23 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 
 
 class IngredientModel(models.Model):
-    name = models.CharField(max_length=100, unique=True, verbose_name="Nazwa składnika")
+    farm = models.ForeignKey(
+        'farms.FarmModel',
+        on_delete=models.CASCADE,
+        related_name='ingredients',
+        blank=True,
+        null=True,
+        verbose_name="Gospodarstwo",
+    )
+    name = models.CharField(max_length=100, verbose_name="Nazwa składnika")
     description = models.TextField(blank=True, null=True, verbose_name="Opis")
 
-    # NOWE POLE: Rozróżnienie, czy składnik sypiemy z binu (silosu), czy z worka ręcznie
     is_in_bin = models.BooleanField(default=False, verbose_name="Przechowywane w binie (silosie)")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['farm', 'name'], name='unique_ingredient_name_per_farm')
+        ]
 
     def __str__(self):
         storage_type = "BIN" if self.is_in_bin else "WOREK"
@@ -40,8 +52,21 @@ class IngredientPriceConfigModel(models.Model):
 
 
 class RecipeModel(models.Model):
-    name = models.CharField(max_length=150, unique=True, verbose_name="Nazwa receptury")
+    farm = models.ForeignKey(
+        'farms.FarmModel',
+        on_delete=models.CASCADE,
+        related_name='recipes',
+        blank=True,
+        null=True,
+        verbose_name="Gospodarstwo",
+    )
+    name = models.CharField(max_length=150, verbose_name="Nazwa receptury")
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['farm', 'name'], name='unique_recipe_name_per_farm')
+        ]
 
     def __str__(self):
         return self.name

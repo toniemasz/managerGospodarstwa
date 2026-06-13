@@ -1,0 +1,9 @@
+{% if messages %}
+<section class="message-stack" aria-live="polite">
+    {% for message in messages %}
+        <div class="alert {% if message.tags == 'error' %}alert-error{% else %}alert-success{% endif %}">
+            {{ message }}
+        </div>
+    {% endfor %}
+</section>
+{% endif %}

@@ -1,29 +1,19 @@
 {% with active=request.resolver_match.url_name %}
-<nav class="module-tabs" aria-label="Nawigacja modułu pasz">
-    <a href="{% url 'ingredient_list' %}" class="module-tab {% if active == 'ingredient_list' or active == 'add_ingredient' or active == 'edit_ingredient' %}is-active{% endif %}">
-        <span>🌾</span><span>Składniki</span>
+<nav class="subnav" aria-label="Nawigacja pasz">
+    <a href="{% url 'ingredient_list' %}" class="{% if active == 'ingredient_list' or active == 'add_ingredient' or active == 'edit_ingredient' %}is-active{% endif %}">
+        Składniki
     </a>
-    <a href="{% url 'feed_inventory' %}" class="module-tab {% if active == 'feed_inventory' or active == 'feed_full_inventory' or active == 'add_delivery' or active == 'edit_delivery' %}is-active{% endif %}">
-        <span>📦</span><span>Magazyn</span>
+    <a href="{% url 'feed_inventory' %}" class="{% if active == 'feed_inventory' or active == 'feed_full_inventory' or active == 'add_delivery' or active == 'edit_delivery' %}is-active{% endif %}">
+        Magazyn
     </a>
-    <a href="{% url 'feed_recipes' %}" class="module-tab {% if active == 'feed_recipes' or active == 'add_recipe' or active == 'edit_recipe' %}is-active{% endif %}">
-        <span>🧪</span><span>Receptury</span>
+    <a href="{% url 'feed_recipes' %}" class="{% if active == 'feed_recipes' or active == 'recipe_detail' or active == 'add_recipe' or active == 'edit_recipe' %}is-active{% endif %}">
+        Receptury
     </a>
-    <a href="{% url 'feed_productions' %}" class="module-tab {% if active == 'feed_productions' or active == 'add_production' or active == 'edit_production' or active == 'process_stage1' or active == 'process_stage2' %}is-active{% endif %}">
-        <span>⚙️</span><span>Śrutowanie</span>
+    <a href="{% url 'feed_productions' %}" class="{% if active == 'feed_productions' or active == 'add_production' or active == 'edit_production' or active == 'process_stage1' or active == 'process_stage2' %}is-active{% endif %}">
+        Śrutowanie
     </a>
-    <a href="{% url 'feed_calculator' %}" class="module-tab {% if active == 'feed_calculator' %}is-active{% endif %}">
-        <span>🧮</span><span>Kalkulator</span>
+    <a href="{% url 'feed_calculator' %}" class="{% if active == 'feed_calculator' %}is-active{% endif %}">
+        Kalkulator
     </a>
 </nav>
 {% endwith %}
-
-{% if messages %}
-<div class="mb-4 space-y-2">
-    {% for message in messages %}
-    <div class="app-message p-4 rounded-xl shadow-sm font-bold {% if message.tags == 'error' %}bg-red-50 text-red-800{% else %}bg-green-50 text-green-800{% endif %}">
-        {{ message }}
-    </div>
-    {% endfor %}
-</div>
-{% endif %}

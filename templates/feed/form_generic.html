@@ -1,71 +1,47 @@
 {% extends 'base.html' %}
 {% block title %}{{ title }}{% endblock %}
 
-{% block extra_head %}
-<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.default.min.css" rel="stylesheet">
-<style>
-    /* Integracja wyglądu Tom Select ze stylami Tailwind CSS */
-    .ts-wrapper .ts-control {
-        border-color: #d1d5db;
-        border-radius: 0.375rem;
-        padding: 0.5rem 0.75rem;
-        min-height: 42px;
-        font-size: 0.875rem;
-        background-color: #ffffff;
-    }
-    .has-error .ts-wrapper .ts-control {
-        border-color: #ef4444;
-    }
-    .ts-wrapper.focus .ts-control {
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
-    }
-    .has-error .ts-wrapper.focus .ts-control {
-        border-color: #ef4444;
-        box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.5);
-    }
-</style>
-{% endblock %}
+{% block extra_head %}{% endblock %}
 
 {% block content %}
-<div class="container mx-auto p-4 md:p-6 max-w-xl">
-    <header class="mb-6 flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-        <h1 class="text-lg font-bold text-gray-800">🚜 {{ title }}</h1>
-        <a href="{% url back_url %}" class="text-sm text-gray-500 hover:text-gray-700 font-semibold">← Anuluj</a>
+<div class="mx-auto w-full max-w-xl px-4 py-6 md:px-6">
+    <header class="mb-6 flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h1 class="text-lg font-bold text-slate-800">🚜 {{ title }}</h1>
+        <a href="{% url back_url %}" class="text-sm font-semibold text-slate-500 hover:text-slate-700">← Anuluj</a>
     </header>
 
-    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+    <div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <form method="post" class="space-y-5" id="generic-form">
             {% csrf_token %}
 
             {% if form.non_field_errors %}
-            <div class="p-3 bg-red-50 border border-red-200 text-red-700 rounded text-sm font-medium mb-4">
+            <div class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700">
                 {{ form.non_field_errors }}
             </div>
             {% endif %}
 
             {% for field in form %}
-            <div class="flex flex-col space-y-1">
-                <label for="{{ field.id_for_label }}" class="text-sm font-bold text-gray-700">
+            <div class="flex flex-col gap-1">
+                <label for="{{ field.id_for_label }}" class="text-sm font-bold text-slate-700">
                     {{ field.label }}
                 </label>
 
-                <div class="text-gray-900 generic-field-wrapper {% if field.errors %}has-error{% endif %}">
+                <div class="generic-field-wrapper text-slate-900 {% if field.errors %}has-error{% endif %}">
                     {{ field }}
                 </div>
 
                 {% if field.help_text %}
-                <p class="text-xs text-gray-400">{{ field.help_text }}</p>
+                <p class="text-xs text-slate-400">{{ field.help_text }}</p>
                 {% endif %}
                 {% if field.errors %}
-                <p class="text-xs text-red-600 font-semibold">{{ field.errors.as_text }}</p>
+                <p class="text-xs font-semibold text-red-600">{{ field.errors.as_text }}</p>
                 {% endif %}
             </div>
             {% endfor %}
 
-            <div class="pt-6 mt-4 border-t border-gray-100 flex justify-end gap-3">
-                <a href="{% url back_url %}" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded font-bold text-sm transition">Wróć</a>
-                <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-sm shadow transition">💾 Zapisz zmiany</button>
+            <div class="mt-4 flex justify-end gap-3 border-t border-slate-100 pt-6">
+                <a href="{% url back_url %}" class="rounded-lg bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-200">Wróć</a>
+                <button type="submit" class="rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white shadow transition hover:bg-blue-700">💾 Zapisz zmiany</button>
             </div>
         </form>
     </div>
@@ -73,97 +49,38 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
+        document.querySelectorAll('.generic-field-wrapper input:not([type="checkbox"]), .generic-field-wrapper textarea, .generic-field-wrapper select').forEach(function(el) {
+            el.classList.add(
+                'w-full',
+                'min-h-10',
+                'rounded-lg',
+                'border',
+                'bg-white',
+                'px-3',
+                'py-2',
+                'text-sm',
+                'text-slate-900',
+                'outline-none',
+                'transition'
+            );
 
-        // 1. Stylizacja standardowych inputów do wyglądu Tailwinda
-        document.querySelectorAll('.generic-field-wrapper input:not([type="checkbox"]), .generic-field-wrapper textarea').forEach(function(el) {
-            el.classList.add('w-full', 'px-3', 'py-2', 'border', 'rounded-md', 'focus:outline-none', 'focus:ring-2', 'text-sm');
             if (el.closest('.has-error')) {
-                el.classList.add('border-red-500', 'focus:ring-red-500');
+                el.classList.add(
+                    'border-red-400',
+                    'focus:border-red-500',
+                    'focus:ring-2',
+                    'focus:ring-red-100'
+                );
             } else {
-                el.classList.add('border-gray-300', 'focus:ring-blue-500');
+                el.classList.add(
+                    'border-slate-300',
+                    'focus:border-blue-500',
+                    'focus:ring-2',
+                    'focus:ring-blue-100'
+                );
             }
-        });
-
-        // 2. Włączenie wyszukiwarki dla wszystkich rozwijanych list (np. wybór składnika)
-        document.querySelectorAll('.generic-field-wrapper select').forEach(function(el) {
-            new TomSelect(el, {
-                create: false,
-                sortField: { field: "text", direction: "asc" },
-                placeholder: "🔍 Zacznij wpisywać, aby wyszukać..."
-            });
-        });
-
-        // 3. Moduł: Kalkulator Ceny (Tona <-> Kilogram) [Zielony]
-        document.querySelectorAll('input[name$="price_per_kg"]').forEach(function(kgInput) {
-            const parentDiv = kgInput.closest('.flex-col');
-
-            const tonWrapper = document.createElement('div');
-            tonWrapper.className = 'flex flex-col space-y-1 mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-md shadow-inner';
-            tonWrapper.innerHTML = `
-                <label class="text-sm font-bold text-emerald-800 flex items-center gap-1">
-                    🔄 Przelicznik: Cena za Tonę (PLN/t)
-                </label>
-                <input type="number" step="0.01" min="0" class="w-full px-3 py-2 border border-emerald-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm bg-white font-semibold text-emerald-900" placeholder="np. 1500.00">
-                <p class="text-xs text-emerald-600 mt-1">Wpisz cenę za tonę, a cena za kg zaktualizuje się automatycznie.</p>
-            `;
-
-            parentDiv.parentNode.insertBefore(tonWrapper, parentDiv.nextSibling);
-            const tonInput = tonWrapper.querySelector('input');
-
-            const syncKgToTon = () => {
-                const kgVal = parseFloat(kgInput.value.replace(',', '.'));
-                if (!isNaN(kgVal)) { tonInput.value = (kgVal * 1000).toFixed(2); }
-                else { tonInput.value = ''; }
-            };
-
-            const syncTonToKg = () => {
-                const tonVal = parseFloat(tonInput.value.replace(',', '.'));
-                if (!isNaN(tonVal)) { kgInput.value = (tonVal / 1000).toFixed(5); }
-                else { kgInput.value = ''; }
-            };
-
-            syncKgToTon();
-            kgInput.addEventListener('input', syncKgToTon);
-            tonInput.addEventListener('input', syncTonToKg);
-        });
-
-        // 4. Moduł: Kalkulator Ilości (Tona <-> Kilogram) [Niebieski]
-        document.querySelectorAll('input[name$="quantity_kg"]').forEach(function(kgInput) {
-            const parentDiv = kgInput.closest('.flex-col');
-
-            const tonWrapper = document.createElement('div');
-            tonWrapper.className = 'flex flex-col space-y-1 mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md shadow-inner';
-            tonWrapper.innerHTML = `
-                <label class="text-sm font-bold text-blue-800 flex items-center gap-1">
-                    ⚖️ Przelicznik: Ilość w Tonach (t)
-                </label>
-                <input type="number" step="0.001" min="0" class="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white font-semibold text-blue-900" placeholder="np. 2.5">
-                <p class="text-xs text-blue-600 mt-1">Wpisz ilość w tonach (z faktury), a wartość w kg zaktualizuje się automatycznie.</p>
-            `;
-
-            parentDiv.parentNode.insertBefore(tonWrapper, parentDiv.nextSibling);
-            const tonInput = tonWrapper.querySelector('input');
-
-            const syncKgToTon = () => {
-                const kgVal = parseFloat(kgInput.value.replace(',', '.'));
-                if (!isNaN(kgVal)) {
-                    tonInput.value = (kgVal / 1000).toFixed(3); // 3 miejsca po przecinku (np. 1.500 tony)
-                } else { tonInput.value = ''; }
-            };
-
-            const syncTonToKg = () => {
-                const tonVal = parseFloat(tonInput.value.replace(',', '.'));
-                if (!isNaN(tonVal)) {
-                    kgInput.value = (tonVal * 1000).toFixed(2);
-                } else { kgInput.value = ''; }
-            };
-
-            syncKgToTon();
-            kgInput.addEventListener('input', syncKgToTon);
-            tonInput.addEventListener('input', syncTonToKg);
         });
     });
 </script>
