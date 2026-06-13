@@ -49,15 +49,12 @@ class PaginationTable {
     }
 
     updateTable() {
-        // Ukryj wszystkie wiersze
         this.rows.forEach(row => row.style.display = 'none');
 
-        // Oblicz indeksy dla stron
         const start = (this.currentPage - 1) * this.limit;
         const end = start + this.limit;
         const rowsToShow = this.filteredRows.slice(start, end);
 
-        // Pokaż tylko te z bieżącej strony
         rowsToShow.forEach(row => row.style.display = '');
 
         this.renderPagination();
@@ -65,25 +62,59 @@ class PaginationTable {
 
     renderPagination() {
         if (!this.paginationContainer) return;
-        this.paginationContainer.innerHTML = '';
 
-        const totalPages = Math.ceil(this.filteredRows.length / this.limit);
+        this.paginationContainer.innerHTML = '';
+        this.paginationContainer.className = 'p-4 flex flex-col sm:flex-row justify-between items-center gap-3 border-t bg-slate-50';
+
+        const totalRows = this.filteredRows.length;
+        const totalPages = Math.ceil(totalRows / this.limit);
+        const start = totalRows === 0 ? 0 : (this.currentPage - 1) * this.limit + 1;
+        const end = Math.min(this.currentPage * this.limit, totalRows);
+
+        const summary = document.createElement('span');
+        summary.className = 'pagination-summary';
+        summary.innerText = `Pokazano ${start}-${end} z ${totalRows}`;
+        this.paginationContainer.appendChild(summary);
+
         if (totalPages <= 1) return;
 
-        for (let i = 1; i <= totalPages; i++) {
+        const buttons = document.createElement('div');
+        buttons.className = 'flex flex-wrap justify-center gap-1.5';
+
+        const createButton = (label, disabled, onClick, isActive = false) => {
             const btn = document.createElement('button');
-            btn.innerText = i;
-            btn.className = `px-3 py-1 border rounded mx-1 text-sm font-medium transition-colors ${
-                i === this.currentPage
-                    ? 'bg-indigo-600 text-white border-indigo-600 shadow'
-                    : 'bg-white text-gray-700 hover:bg-gray-100 border-gray-300'
+            btn.type = 'button';
+            btn.innerText = label;
+            btn.disabled = disabled;
+            btn.className = `min-w-9 px-3 py-1.5 rounded-lg border text-sm font-bold transition ${
+                isActive
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                    : disabled
+                        ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                        : 'bg-white text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 border-gray-300'
             }`;
-            btn.onclick = () => {
+            btn.onclick = onClick;
+            return btn;
+        };
+
+        buttons.appendChild(createButton('‹', this.currentPage === 1, () => {
+            this.currentPage -= 1;
+            this.updateTable();
+        }));
+
+        for (let i = 1; i <= totalPages; i++) {
+            buttons.appendChild(createButton(String(i), false, () => {
                 this.currentPage = i;
                 this.updateTable();
-            };
-            this.paginationContainer.appendChild(btn);
+            }, i === this.currentPage));
         }
+
+        buttons.appendChild(createButton('›', this.currentPage === totalPages, () => {
+            this.currentPage += 1;
+            this.updateTable();
+        }));
+
+        this.paginationContainer.appendChild(buttons);
     }
 }
 
