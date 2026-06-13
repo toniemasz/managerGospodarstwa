@@ -22,10 +22,8 @@ class PigSaleModel(models.Model):
         verbose_name="Gospodarstwo",
     )
     sale_date = models.DateField(default=date.today, blank=True, null=True, verbose_name="Data sprzedaży")
-    slaughter_date = models.DateField(blank=True, null=True, verbose_name="Data uboju")
     document_number = models.CharField(max_length=50, blank=True, verbose_name="Numer dokumentu")
     tattoo = models.CharField(max_length=50, blank=True, verbose_name="Tatuaż")
-    supplier_name = models.CharField(max_length=255, blank=True, verbose_name="Dostawca")
     no_settlement = models.BooleanField(default=False, verbose_name="Bez rozliczenia")
 
     quantity = models.PositiveIntegerField(default=0, verbose_name="Ilość sprzedanych sztuk")

@@ -21,7 +21,6 @@ class SaleRepository:
             total_weight=db_model.total_weight,
             meat_class=db_model.meat_class,
             price_per_kg=db_model.price_per_kg,
-            slaughter_date=db_model.slaughter_date,
             document_number=db_model.document_number,
             no_settlement=db_model.no_settlement,
             settlement_status=db_model.settlement_status,

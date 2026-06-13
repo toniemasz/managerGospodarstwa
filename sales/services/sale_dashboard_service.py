@@ -37,7 +37,7 @@ class SaleDashboardService:
 
         filtered = []
         for sale in sales:
-            sale_date = sale.sale_date or sale.slaughter_date
+            sale_date = sale.sale_date
             if sale_date is None:
                 continue
             if date_from and sale_date < date_from:
