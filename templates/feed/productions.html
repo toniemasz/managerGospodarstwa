@@ -38,7 +38,7 @@
                         {% endif %}
                     </td>
                     <td class="p-4 text-gray-800">
-                        <span class="font-bold">{{ prod.recipe.name }}</span>
+                        <a href="{% url 'recipe_detail' prod.recipe.id %}" class="font-bold text-blue-700 hover:text-blue-900 hover:underline">{{ prod.recipe.name }}</a>
                         {% if prod.custom_recipe_data %}
                             <br><span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">⚠️ Zmodyfikowana proporcja</span>
                         {% endif %}

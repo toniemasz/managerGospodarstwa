@@ -1,150 +1,112 @@
-<!DOCTYPE html>
-<html lang="pl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% if event %}Edytuj Zdarzenie{% else %}Nowe Zdarzenie{% endif %} - Maciora {{ sow.ear_tag }}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
-    <div class="bg-white p-6 md:p-8 rounded-lg shadow-md w-full max-w-xl">
+{% extends 'base.html' %}
+{% block title %}{% if event %}Edytuj Zdarzenie{% else %}Nowe Zdarzenie{% endif %}{% endblock %}
 
-        <header class="mb-6 border-b pb-4">
-            <h2 class="text-xl font-bold text-gray-800">
-                {% if event %}Edycja zdarzenia w rejestrze{% else %}Nowe zdarzenie w rejestrze{% endif %}
-            </h2>
-            <p class="text-sm text-gray-500 mt-1">Dla maciory o numerze kolczyka: <strong class="text-blue-600">{{ sow.ear_tag }}</strong></p>
-        </header>
+{% block content %}
+<main class="app-page app-page-narrow">
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Maciory</p>
+            <h1>{% if event %}Edytuj zdarzenie{% else %}Nowe zdarzenie{% endif %}</h1>
+            <p class="page-subtitle">Maciora {{ sow.ear_tag }}</p>
+        </div>
+        <a href="{% url 'sow_detail' sow.id %}" class="button button-secondary">Wróć</a>
+    </section>
 
-        <form method="post" class="space-y-4">
+    <section class="panel">
+        <form method="post" class="responsive-form">
             {% csrf_token %}
 
-            <div>
-                <label class="block text-gray-700 text-sm font-bold mb-2">{{ form.event_type.label }}</label>
-                <select name="event_type" id="id_event_type" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                    {% for value, text in form.fields.event_type.choices %}
-                        <option value="{{ value }}" {% if form.event_type.value == value %}selected{% endif %}>{{ text }}</option>
-                    {% endfor %}
-                </select>
-
-                {% if form.event_type.errors %}
-                    <p class="text-red-600 text-sm font-bold mt-2 bg-red-50 border-l-4 border-red-500 p-2 rounded">
-                        {{ form.event_type.errors.0 }}
-                    </p>
-                {% endif %}
+            <div class="form-grid three-columns">
+                <div class="form-field">
+                    <label for="{{ form.event_type.id_for_label }}">{{ form.event_type.label }}</label>
+                    {{ form.event_type }}
+                    {{ form.event_type.errors }}
+                </div>
+                <div class="form-field">
+                    <label for="{{ form.event_date.id_for_label }}">{{ form.event_date.label }}</label>
+                    {{ form.event_date }}
+                    {{ form.event_date.errors }}
+                </div>
             </div>
 
-            <div>
-               <label class="block text-gray-700 text-sm font-bold mb-2">{{ form.event_date.label }}</label>
-                <input type="date" name="event_date" value="{% if form.is_bound %}{{ form.event_date.value|default:'' }}{% else %}{{ form.event_date.value|date:'Y-m-d'|default:'' }}{% endif %}" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+            <div id="sec_insemination" class="form-section hidden">
+                <div class="form-field">
+                    <label for="{{ form.technician.id_for_label }}">{{ form.technician.label }}</label>
+                    {{ form.technician }}
+                </div>
             </div>
 
-            <div id="sec_insemination" class="p-4 bg-yellow-50 rounded-lg border border-yellow-200 hidden">
-                <label class="block text-gray-700 text-sm font-bold mb-2">{{ form.technician.label }}</label>
-                <input type="text" name="technician" value="{{ form.technician.value|default:'' }}" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-yellow-500">
+            <div id="sec_pregnancy_check" class="form-section hidden">
+                <div class="form-field">
+                    <label for="{{ form.pregnancy_result.id_for_label }}">{{ form.pregnancy_result.label }}</label>
+                    {{ form.pregnancy_result }}
+                    {{ form.pregnancy_result.errors }}
+                </div>
             </div>
 
-            <div id="sec_pregnancy_check" class="p-4 bg-green-50 rounded-lg border border-green-200 hidden/ space-y-3">
-                <label class="block text-gray-700 text-sm font-bold mb-2">{{ form.pregnancy_result.label }}</label>
-                <select name="pregnancy_result" id="id_pregnancy_result" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-green-500">
-                    {% for value, text in form.fields.pregnancy_result.choices %}
-                        <option value="{{ value }}" {% if form.pregnancy_result.value == value %}selected{% endif %}>{{ text }}</option>
-                    {% endfor %}
-                </select>
-                {% if form.pregnancy_result.errors %}
-                    <p class="text-red-600 text-sm font-bold mt-2 bg-red-50 border-l-4 border-red-500 p-2 rounded">
-                        {{ form.pregnancy_result.errors.0 }}
-                    </p>
-                {% endif %}
-            </div>
-
-            <div id="sec_farrowing" class="p-4 bg-purple-50 rounded-lg border border-purple-200 hidden space-y-3">
-                <h4 class="text-sm font-bold text-purple-800">Statystyka miotu</h4>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-gray-600 text-xs font-bold mb-1">{{ form.born_alive.label }}</label>
-                        <input type="number" name="born_alive" value="{{ form.born_alive.value|default:'0' }}" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-purple-500">
+            <div id="sec_farrowing" class="form-section hidden">
+                <div class="form-grid three-columns">
+                    <div class="form-field">
+                        <label for="{{ form.born_alive.id_for_label }}">{{ form.born_alive.label }}</label>
+                        {{ form.born_alive }}
                     </div>
-                    <div>
-                        <label class="block text-gray-600 text-xs font-bold mb-1">{{ form.born_dead.label }}</label>
-                        <input type="number" name="born_dead" value="{{ form.born_dead.value|default:'0' }}" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <div class="form-field">
+                        <label for="{{ form.born_dead.id_for_label }}">{{ form.born_dead.label }}</label>
+                        {{ form.born_dead }}
                     </div>
                 </div>
             </div>
 
-            <div id="sec_weaning" class="p-4 bg-blue-50 rounded-lg border border-blue-200 hidden">
-                <label class="block text-gray-700 text-sm font-bold mb-2">{{ form.count.label }}</label>
-                <input type="number" name="count" value="{{ form.count.value|default:'0' }}" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <div id="sec_weaning" class="form-section hidden">
+                <div class="form-field">
+                    <label for="{{ form.count.id_for_label }}">{{ form.count.label }}</label>
+                    {{ form.count }}
+                </div>
             </div>
 
-            <div id="sec_vaccination" class="p-4 bg-teal-50 rounded-lg border border-teal-200 hidden">
-                <label class="block text-gray-700 text-sm font-bold mb-2">{{ form.vaccine_name.label }}</label>
-                <select name="vaccine_name" id="id_vaccine_name" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-teal-500">
-                    {% for value, text in form.fields.vaccine_name.choices %}
-                        <option value="{{ value }}" {% if form.vaccine_name.value == value %}selected{% endif %}>{{ text }}</option>
-                    {% endfor %}
-                </select>
-                {% if form.vaccine_name.errors %}
-                    <p class="text-red-600 text-sm font-bold mt-2 bg-red-50 border-l-4 border-red-500 p-2 rounded">
-                        {{ form.vaccine_name.errors.0 }}
-                    </p>
-                {% endif %}
+            <div id="sec_vaccination" class="form-section hidden">
+                <div class="form-field">
+                    <label for="{{ form.vaccine_name.id_for_label }}">{{ form.vaccine_name.label }}</label>
+                    {{ form.vaccine_name }}
+                    {{ form.vaccine_name.errors }}
+                </div>
             </div>
 
-            <div class="flex justify-between items-center pt-4 border-t">
-                <a href="{% url 'sow_detail' sow.id %}" class="text-gray-500 hover:text-gray-800 text-sm font-bold">Anuluj</a>
-                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded focus:outline-none shadow transition">
-                    {% if event %}Zapisz zmiany{% else %}Zapisz w bazie{% endif %}
+            <div class="form-actions">
+                <a href="{% url 'sow_detail' sow.id %}" class="button button-secondary">Anuluj</a>
+                <button type="submit" class="button button-primary">
+                    {% if event %}Zapisz zmiany{% else %}Zapisz zdarzenie{% endif %}
                 </button>
             </div>
         </form>
-    </div>
+    </section>
+</main>
+{% endblock %}
 
-    <script>
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
     const typeSelect = document.getElementById('id_event_type');
-    const secInsemination = document.getElementById('sec_insemination');
-    const secPregnancyCheck = document.getElementById('sec_pregnancy_check');
-    const secFarrowing = document.getElementById('sec_farrowing');
-    const secWeaning = document.getElementById('sec_weaning');
-    const secVaccination = document.getElementById('sec_vaccination');
+    const sections = {
+        INSEMINATION: document.getElementById('sec_insemination'),
+        PREGNANCY_CHECK: document.getElementById('sec_pregnancy_check'),
+        FARROWING: document.getElementById('sec_farrowing'),
+        WEANING: document.getElementById('sec_weaning'),
+        VACCINATION: document.getElementById('sec_vaccination')
+    };
 
     function toggleFields() {
-        const val = typeSelect.value;
-
-        // Ukryj domyślnie wszystkie sekcje dodatkowe
-        secInsemination.classList.add('hidden');
-        secPregnancyCheck.classList.add('hidden');
-        secFarrowing.classList.add('hidden');
-        secWeaning.classList.add('hidden');
-        secVaccination.classList.add('hidden');
-
-        // Aktywuj sekcję powiązaną z wybranym typem zdarzenia
-        if (val === 'INSEMINATION') {
-            secInsemination.classList.remove('hidden');
-        } else if (val === 'PREGNANCY_CHECK') {
-            secPregnancyCheck.classList.remove('hidden');
-        } else if (val === 'FARROWING') {
-            secFarrowing.classList.remove('hidden');
-        } else if (val === 'WEANING') {
-            secWeaning.classList.remove('hidden');
-        } else if (val === 'VACCINATION') {
-            secVaccination.classList.remove('hidden');
-        }
+        Object.values(sections).forEach(function (section) {
+            if (section) section.classList.add('hidden');
+        });
+        const active = sections[typeSelect.value];
+        if (active) active.classList.remove('hidden');
     }
 
-    typeSelect.addEventListener('change', toggleFields);
-
-    window.addEventListener('DOMContentLoaded', () => {
-        const dateInput = document.querySelector('input[name="event_date"]');
-        if (dateInput && !dateInput.value) {
-            const today = new Date();
-            const yyyy = today.getFullYear();
-            const mm = String(today.getMonth() + 1).padStart(2, '0');
-            const dd = String(today.getDate()).padStart(2, '0');
-            dateInput.value = `${yyyy}-${mm}-${dd}`;
-        }
+    if (typeSelect) {
+        typeSelect.addEventListener('change', toggleFields);
         toggleFields();
-    });
-    </script>
-</body>
-</html>
+    }
+});
+</script>
+{% endblock %}

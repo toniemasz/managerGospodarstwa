@@ -1,7 +1,7 @@
 # sows/forms.py
 from django import forms
 
-from .infrastructure.repositories import VaccinationPlanRepository
+from .services.sow_repository import VaccinationPlanRepository
 from .models import SowModel, SowEventModel, VaccinationPlanModel
 from django.core.exceptions import ValidationError
 
@@ -19,6 +19,20 @@ class VaccinationPlanForm(forms.ModelForm):
             'interval_months': 'Interwał cykliczny (w miesiącach)',
             'reminder_days_ahead': 'Wyprzedzenie przypomnienia (dni)'
         }
+
+    def __init__(self, *args, farm=None, **kwargs):
+        self.farm = farm
+        super().__init__(*args, **kwargs)
+        if self.farm is not None:
+            self.instance.farm = self.farm
+
+    def clean_name(self):
+        name = self.cleaned_data['name']
+        if self.farm is not None:
+            exists = VaccinationPlanModel.objects.filter(farm=self.farm, name__iexact=name).exclude(pk=self.instance.pk).exists()
+            if exists:
+                raise ValidationError("Taki plan szczepienia istnieje już w tym gospodarstwie.")
+        return name
 
     def clean(self):
         cleaned_data = super().clean()
@@ -87,10 +101,11 @@ class SowEventForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         self.sow_status = kwargs.pop('sow_status', None)
+        self.farm = kwargs.pop('farm', None)
         super().__init__(*args, **kwargs)
 
 
-        repo = VaccinationPlanRepository()
+        repo = VaccinationPlanRepository(farm=self.farm)
         self.fields['vaccine_name'].choices = repo.get_plan_choices()
 
     def clean(self):

@@ -70,6 +70,85 @@ class PaginationTable {
         const totalPages = Math.ceil(this.filteredRows.length / this.limit);
         if (totalPages <= 1) return;
 
+        const wrapper = document.createElement('div');
+        wrapper.className = 'pagination-strip';
+
+        const prevBtn = this.createPaginationButton('‹', Math.max(1, this.currentPage - 1), {
+            isDisabled: this.currentPage === 1,
+            ariaLabel: 'Poprzednia strona'
+        });
+        wrapper.appendChild(prevBtn);
+
+        this.getVisiblePages(totalPages).forEach(page => {
+            if (page === 'ellipsis') {
+                const gap = document.createElement('span');
+                gap.innerText = '...';
+                gap.className = 'pagination-ellipsis';
+                wrapper.appendChild(gap);
+                return;
+            }
+
+            wrapper.appendChild(this.createPaginationButton(page, page, {
+                isCurrent: page === this.currentPage,
+                ariaLabel: `Strona ${page}`
+            }));
+        });
+
+        const nextBtn = this.createPaginationButton('›', Math.min(totalPages, this.currentPage + 1), {
+            isDisabled: this.currentPage === totalPages,
+            ariaLabel: 'Następna strona'
+        });
+        wrapper.appendChild(nextBtn);
+        this.paginationContainer.appendChild(wrapper);
+    }
+
+    getVisiblePages(totalPages) {
+        if (totalPages <= 6) {
+            return Array.from({ length: totalPages }, (_, index) => index + 1);
+        }
+
+        if (this.currentPage <= 3) {
+            return [1, 2, 3, 'ellipsis', totalPages];
+        }
+
+        if (this.currentPage >= totalPages - 2) {
+            return [1, 'ellipsis', totalPages - 2, totalPages - 1, totalPages];
+        }
+
+        return [
+            1,
+            'ellipsis',
+            this.currentPage - 1,
+            this.currentPage,
+            this.currentPage + 1,
+            'ellipsis',
+            totalPages
+        ];
+    }
+
+    createPaginationButton(label, page, options = {}) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.innerText = label;
+        btn.disabled = options.isDisabled || false;
+        btn.setAttribute('aria-label', options.ariaLabel || `Strona ${label}`);
+        if (options.isCurrent) {
+            btn.setAttribute('aria-current', 'page');
+        }
+        btn.className = [
+            'pagination-button',
+            options.isCurrent ? 'is-current' : '',
+            options.isDisabled ? 'is-disabled' : ''
+        ].filter(Boolean).join(' ');
+        btn.onclick = () => {
+            if (options.isDisabled) return;
+            this.currentPage = page;
+            this.updateTable();
+        };
+        return btn;
+    }
+
+    renderLegacyPagination(totalPages) {
         for (let i = 1; i <= totalPages; i++) {
             const btn = document.createElement('button');
             btn.innerText = i;

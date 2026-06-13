@@ -1,148 +1,167 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Manager Gospodarstwa - Maciory{% endblock %}
+{% block title %}Maciory{% endblock %}
 
 {% block content %}
-<div class="container mx-auto p-4 md:p-6">
-    <header class="mb-6 flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
-        <h1 class="text-xl md:text-2xl font-bold text-gray-800">🐖 Manager Gospodarstwa</h1>
+<main class="app-page">
+    <section class="page-header">
         <div>
-            <a href="{% url 'modules_home' %}" class="text-sm text-gray-600 hover:text-blue-600 mr-4">Wróć do Centrali</a>
-            <span class="text-sm bg-green-100 text-green-800 font-medium px-2.5 py-0.5 rounded">Moduł: Maciory</span>
+            <p class="eyebrow">Maciory</p>
+            <h1>Przegląd stada</h1>
+            <p class="page-subtitle">Lista, statusy, szczepienia i archiwum bieżącego gospodarstwa.</p>
         </div>
-    </header>
-
-    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
-        <div class="p-4 border-b border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4">
-            <h2 class="text-lg font-bold text-gray-700 whitespace-nowrap">Przegląd Stada</h2>
-
-            <div class="flex flex-col md:flex-row gap-2 w-full justify-end items-center">
-                <select id="limitSelect" class="shadow-sm border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500">
-                    <option value="10">10 na stronę</option>
-                    <option value="25">25 na stronę</option>
-                    <option value="50">50 na stronę</option>
-                </select>
-
-                <input type="text" id="searchInput" placeholder="Wyszukaj nr kolczyka..." class="shadow-sm border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500">
-                <select id="statusFilter" class="shadow-sm border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500">
-                    <option value="ALL">Wszystkie statusy</option>
-                    <option value="IDLE">Jałowa</option>
-                    <option value="INSEMINATED">Po inseminacji</option>
-                    <option value="TO_CHECK">Do badania (USG)</option>
-                    <option value="PREGNANT">Prośna (Potwierdzona)</option>
-                    <option value="TO_RECHECK">Do rebadania (?)</option>
-                    <option value="LACTATING">Karmiąca</option>
-                </select>
-                <div class="flex flex-col md:flex-row gap-2 w-full justify-end items-center">
-                    <div class="flex gap-2">
-                        <a href="{% url 'general_statistics' %}" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2 px-4 rounded-lg shadow transition">
-                            📊 Statystyki Ogólne
-                        </a>
-                    </div>
-                    <a href="{% url 'add_vaccination_plan' %}" class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-center text-sm font-bold py-1.5 px-3 rounded shadow whitespace-nowrap transition hidden md:block" title="Konfiguruj cykliczne szczepienia">
-                        ⚙️ Konfiguruj szczepienia
-                    </a>
-                    <a href="{% url 'archived_sows' %}" class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-center text-sm font-bold py-1.5 px-4 rounded shadow whitespace-nowrap transition">
-                        🗄️ Archiwum
-                    </a>
-                    <a href="{% url 'add_sow' %}" class="bg-blue-600 hover:bg-blue-700 text-white text-center text-sm font-bold py-1.5 px-4 rounded shadow whitespace-nowrap transition">
-                        + Dodaj Maciorę
-                    </a>
-                </div>
-            </div>
+        <div class="header-actions">
+            <a href="{% url 'general_statistics' %}" class="button button-secondary">Statystyki</a>
+            <a href="{% url 'add_vaccination_plan' %}" class="button button-secondary">Szczepienia</a>
+            <a href="{% url 'archived_sows' %}" class="button button-secondary">Archiwum</a>
+            <a href="{% url 'add_sow' %}" class="button button-primary">Dodaj maciorę</a>
         </div>
-        {% if sows_to_check_usg %}
-<div class="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-lg shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-    <div>
-        <h3 class="text-red-800 font-bold mb-2">⚠️ Wymagane badanie USG (Minęło 30 dni od inseminacji)</h3>
-        <p class="text-sm text-red-700">Liczba macior oczekujących na wynik: <strong>{{ sows_to_check_usg|length }}</strong></p>
-    </div>
-    <a href="{% url 'bulk_pregnancy_check' %}" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded shadow font-bold transition whitespace-nowrap">
-        Przejdź do panelu badań
-    </a>
-</div>
-{% endif %}
+    </section>
 
-{% if vaccination_groups %}
-<div class="mb-6 bg-white p-4 rounded-lg shadow-sm border-t-4 border-blue-500">
-    <h3 class="text-gray-800 font-bold mb-4">💉 Planowane szczepienia grupowe</h3>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {% for group_name, sows_list in vaccination_groups.items %}
-        <form method="post" action="{% url 'bulk_vaccinate' %}" class="bg-blue-50 p-4 rounded border border-blue-100 flex flex-col justify-between">
-            {% csrf_token %}
-            <input type="hidden" name="vaccine_name" value="{{ sows_list.0.vaccine_name }}">
-            <input type="hidden" name="cycle_id" value="{{ sows_list.0.cycle_id }}">
+    <section class="stats-grid">
+        <div class="stat-tile">
+            <span>W stadzie</span>
+            <strong>{{ total_sows }}</strong>
+        </div>
+        <div class="stat-tile">
+            <span>Prośne</span>
+            <strong>{{ pregnant_count }}</strong>
+        </div>
+        <div class="stat-tile">
+            <span>Po inseminacji</span>
+            <strong>{{ inseminated_count }}</strong>
+        </div>
+        <div class="stat-tile">
+            <span>Do badania</span>
+            <strong>{{ sows_to_check_usg|length }}</strong>
+        </div>
+    </section>
 
+    {% if sows_to_check_usg %}
+    <section class="notice notice-danger">
+        <div>
+            <h2>Wymagane badanie USG</h2>
+            <p>Liczba macior oczekujących na wynik: <strong>{{ sows_to_check_usg|length }}</strong></p>
+        </div>
+        <a href="{% url 'bulk_pregnancy_check' %}" class="button button-danger">Panel badań</a>
+    </section>
+    {% endif %}
+
+    {% if vaccination_groups %}
+    <section class="panel compact-panel">
+        <div class="section-heading">
             <div>
-                <h4 class="font-bold text-blue-800 mb-2">{{ group_name }}</h4>
-                <p class="text-sm text-gray-600 mb-4">Liczba zwierząt w grupie: <strong>{{ sows_list|length }}</strong></p>
-                <div class="hidden">
-                    <!-- Ukrywamy checkboxy na dashboardzie, użytkownik potwierdzi je na nowym ekranie -->
-                    {% for s in sows_list %}
-                        <input type="checkbox" name="sow_ids" value="{{ s.sow_id }}" checked>
-                    {% endfor %}
-                </div>
+                <h2>Planowane szczepienia grupowe</h2>
+                <p>Grupy utworzone według skonfigurowanych terminów szczepień.</p>
             </div>
+        </div>
+        <div class="group-grid">
+            {% for group_name, sows_list in vaccination_groups.items %}
+            <form method="post" action="{% url 'bulk_vaccinate' %}" class="group-item">
+                {% csrf_token %}
+                <input type="hidden" name="vaccine_name" value="{{ sows_list.0.vaccine_name }}">
+                <input type="hidden" name="cycle_id" value="{{ sows_list.0.cycle_id }}">
+                {% for s in sows_list %}
+                    <input type="hidden" name="sow_ids" value="{{ s.sow_id }}">
+                {% endfor %}
 
-            <button type="submit" class="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm transition">
-                Przejdź do zatwierdzenia &rarr;
-            </button>
-        </form>
-        {% endfor %}
-    </div>
-</div>
-{% endif %}
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200 text-left text-sm text-gray-600" id="sowsTable">
-                <thead class="bg-gray-50 text-xs uppercase text-gray-500 font-bold">
+                <div>
+                    <h3>{{ group_name }}</h3>
+                    <p>{{ sows_list|length }} szt. w grupie</p>
+                </div>
+                <button type="submit" class="button button-secondary">Zatwierdź</button>
+            </form>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="panel table-panel">
+        <div class="section-heading">
+            <div>
+                <h2>Lista macior</h2>
+                <p>Kliknij w wiersz, aby przejść do karty maciory.</p>
+            </div>
+        </div>
+
+        <div class="table-scroll">
+            <table class="data-table" id="sowsTable">
+                <thead>
                     <tr>
-                        <th class="p-4">Nr Kolczyka</th>
-                        <th class="p-4">Status</th>
-                        <th class="p-4">W stadzie od</th>
-                        <th class="p-4">Przewidywany Poród</th>
-                        <th class="p-4 text-right">Urodzone żywe (Suma)</th>
+                        <th>Nr kolczyka</th>
+                        <th>Status</th>
+                        <th>W stadzie od</th>
+                        <th>Przewidywany poród</th>
+                        <th class="text-right">Urodzone żywe</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200">
+                <tbody>
                     {% for sow in all_sows %}
-                    <tr class="hover:bg-blue-50 cursor-pointer transition sow-row" 
-                        data-search="{{ sow.ear_tag }}" 
-                        data-filter="{{ sow.status }}" 
+                    <tr class="sow-row clickable-row"
+                        data-search="{{ sow.ear_tag }}"
+                        data-filter="{{ sow.status }}"
                         onclick="window.location.href='{% url 'sow_detail' sow.id %}'">
-                        <td class="p-4 font-semibold text-gray-900">{{ sow.ear_tag }}</td>
-                        <td class="p-4">
+                        <td><strong>{{ sow.ear_tag }}</strong></td>
+                        <td>
                             {% if sow.status == "INSEMINATED" %}
-                                <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-bold">{{ sow.dynamic_status_display }}</span>
+                                <span class="status-pill status-blue">{{ sow.dynamic_status_display }}</span>
                             {% elif sow.status == "TO_CHECK" %}
-                                <span class="bg-red-100 text-red-800 px-2 py-0.5 rounded text-xs font-bold animate-pulse">{{ sow.dynamic_status_display }}</span>
+                                <span class="status-pill status-red">{{ sow.dynamic_status_display }}</span>
                             {% elif sow.status == "PREGNANT" %}
-                                <span class="bg-green-100 text-green-800 px-2 py-0.5 rounded text-xs font-bold">{{ sow.dynamic_status_display }}</span>
+                                <span class="status-pill status-green">{{ sow.dynamic_status_display }}</span>
                             {% elif sow.status == "TO_RECHECK" %}
-                                <span class="bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-xs font-bold">{{ sow.dynamic_status_display }}</span>
+                                <span class="status-pill status-amber">{{ sow.dynamic_status_display }}</span>
                             {% elif sow.status == "LACTATING" %}
-                                <span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-xs font-bold">{{ sow.dynamic_status_display }}</span>
+                                <span class="status-pill status-violet">{{ sow.dynamic_status_display }}</span>
                             {% else %}
-                                <span class="bg-gray-100 text-gray-800 px-2 py-0.5 rounded text-xs font-bold">{{ sow.dynamic_status_display }}</span>
+                                <span class="status-pill">{{ sow.dynamic_status_display }}</span>
                             {% endif %}
                         </td>
-                        <td class="p-4 text-gray-500">{{ sow.entry_date|date:"d.m.Y" }}</td>
-                        <td class="p-4 text-gray-500">{{ sow.expected_farrowing_date|date:"d.m.Y"|default:"--" }}</td>
-                        <td class="p-4 text-right font-medium text-gray-800">{{ sow.total_born_alive }} szt.</td>
+                        <td>{{ sow.entry_date|date:"d.m.Y" }}</td>
+                        <td>{{ sow.expected_farrowing_date|date:"d.m.Y"|default:"--" }}</td>
+                        <td class="text-right"><strong>{{ sow.total_born_alive }}</strong> szt.</td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="p-4 text-center text-gray-400">Brak macior w bazie danych.</td>
+                        <td colspan="5" class="empty-table">Brak macior w bazie danych.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-        
-        <div id="paginationControls" class="p-4 flex justify-center border-t bg-gray-50"></div>
-    </div>
-</div>
+
+        <div class="table-footer-controls">
+            <div class="table-control">
+                <label for="searchInput">Szukaj po numerze</label>
+                <input type="text" id="searchInput" placeholder="Numer kolczyka">
+            </div>
+            <div class="table-control">
+                <label for="statusFilter">Status</label>
+                <select id="statusFilter">
+                    <option value="ALL">Wszystkie statusy</option>
+                    <option value="IDLE">Jałowa</option>
+                    <option value="INSEMINATED">Po inseminacji</option>
+                    <option value="TO_CHECK">Do badania USG</option>
+                    <option value="PREGNANT">Prośna</option>
+                    <option value="TO_RECHECK">Do rebadania</option>
+                    <option value="LACTATING">Karmiąca</option>
+                </select>
+            </div>
+            <div class="table-control">
+                <label for="limitSelect">Na stronę</label>
+                <select id="limitSelect">
+                    <option value="10">10 macior</option>
+                    <option value="25">25 macior</option>
+                    <option value="50">50 macior</option>
+                </select>
+            </div>
+        </div>
+        <div id="paginationControls" class="pagination-controls"></div>
+    </section>
+</main>
 {% endblock %}
+
 {% block scripts %}
 <script>
     document.addEventListener("DOMContentLoaded", () => {

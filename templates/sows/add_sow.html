@@ -1,29 +1,32 @@
-<!DOCTYPE html>
-<html lang="pl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dodaj Maciorę</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100 flex items-center justify-center h-screen">
-    <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-lg">
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">Dodaj nową maciorę do stada</h2>
+{% extends 'base.html' %}
+{% block title %}Dodaj Maciorę{% endblock %}
 
-        <form method="post" class="space-y-4">
+{% block content %}
+<main class="app-page app-page-narrow">
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Maciory</p>
+            <h1>Dodaj maciorę</h1>
+            <p class="page-subtitle">Nowy rekord zostanie przypisany do bieżącego gospodarstwa.</p>
+        </div>
+        <a href="{% url 'dashboard' %}" class="button button-secondary">Wróć</a>
+    </section>
+
+    <section class="panel">
+        <form method="post" class="responsive-form">
             {% csrf_token %}
             {% for field in form %}
-            <div>
-                <label class="block text-gray-700 text-sm font-bold mb-2">{{ field.label }}</label>
+            <div class="form-field">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
                 {{ field.errors }}
-                <input type="{{ field.field.widget.input_type }}" name="{{ field.name }}" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" {% if field.value %}value="{{ field.value }}"{% endif %} required>
             </div>
             {% endfor %}
-            <div class="flex justify-between items-center pt-4">
-                <a href="{% url 'dashboard' %}" class="text-gray-500 hover:text-gray-800 text-sm font-bold">Anuluj</a>
-                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded focus:outline-none shadow">Zapisz</button>
+            <div class="form-actions">
+                <a href="{% url 'dashboard' %}" class="button button-secondary">Anuluj</a>
+                <button type="submit" class="button button-primary">Zapisz</button>
             </div>
         </form>
-    </div>
-</body>
-</html>
+    </section>
+</main>
+{% endblock %}

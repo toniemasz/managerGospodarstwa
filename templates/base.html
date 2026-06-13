@@ -6,12 +6,37 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Manager Gospodarstwa{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{% static 'sow/css/app.css' %}">
     <script src="{% static 'sow/js/table_manager.js' %}"></script>
     {% block extra_head %}{% endblock %}
 
 </head>
-<body class="bg-gray-100 font-sans leading-normal tracking-normal">
-    {% block content %}{% endblock %}
+<body class="font-sans leading-normal tracking-normal">
+    <div class="app-shell">
+        {% if user.is_authenticated %}
+        <header class="app-topbar">
+            <a href="{% url 'modules_home' %}" class="brand-lockup" aria-label="Przejdź do centrali">
+                <span class="brand-title">Manager Gospodarstwa</span>
+                <span class="brand-farm">{{ current_farm.name|default:"Gospodarstwo" }}</span>
+            </a>
+            <nav class="app-nav" aria-label="Główna nawigacja">
+                <a href="{% url 'modules_home' %}">Centrala</a>
+                <a href="{% url 'dashboard' %}">Maciory</a>
+                <a href="{% url 'feed_inventory' %}">Pasze</a>
+                <a href="{% url 'sales_list' %}">Sprzedaż</a>
+            </nav>
+            <div class="user-area">
+                <span class="user-name">{{ user.get_username }}</span>
+                <form method="post" action="{% url 'logout' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="logout-button">Wyloguj</button>
+                </form>
+            </div>
+        </header>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </div>
 
     {% block scripts %}{% endblock %}
 </body>

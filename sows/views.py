@@ -1,16 +1,26 @@
-# sows/views.py
 import logging
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
 from datetime import date
 
-from .application.services import SowDashboardService
-from .infrastructure.repositories import SowRepository
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.http import HttpResponse
+from django.utils import timezone
+
+from .services.sow_dashboard_service import SowDashboardService
+from .services.sow_repository import SowRepository
 from .forms import SowForm, SowEventForm, VaccinationPlanForm
 from .models import SowModel, SowEventModel
-from django.http import HttpResponse
-import traceback
-from django.utils import timezone
+from farms.services.farm_service import get_or_create_user_farm
+
+logger = logging.getLogger(__name__)
+
+
+def _current_farm(request):
+    farm = getattr(request, 'farm', None)
+    if farm is None and request.user.is_authenticated:
+        farm = get_or_create_user_farm(request.user)
+        request.farm = farm
+    return farm
 
 
 @login_required
@@ -21,20 +31,23 @@ def modules_home_view(request):
 @login_required
 def dashboard_view(request):
     try:
-        service = SowDashboardService()
+        service = SowDashboardService(farm=_current_farm(request))
         context = service.get_dashboard_summary()
         return render(request, 'sows/dashboard.html', context)
-    except Exception as e:
-        error_html = f"<h2>Wystąpił błąd w danych!</h2><br><b>Powód:</b> {str(e)}<br><br><b>Dokładne miejsce w kodzie:</b><br><pre>{traceback.format_exc()}</pre>"
-        return HttpResponse(error_html, status=500)
+    except Exception:
+        logger.exception("Błąd w panelu macior")
+        return HttpResponse("Wystąpił błąd w danych. Szczegóły zapisano w logach aplikacji.", status=500)
 
 
 @login_required
 def add_sow_view(request):
+    farm = _current_farm(request)
     if request.method == 'POST':
         form = SowForm(request.POST)
         if form.is_valid():
-            form.save()
+            sow = form.save(commit=False)
+            sow.farm = farm
+            sow.save()
             return redirect('dashboard')
     else:
         form = SowForm()
@@ -44,18 +57,24 @@ def add_sow_view(request):
 @login_required
 def add_vaccination_plan_view(request):
     """Widok odpowiedzialny za konfigurację nowych szczepień cyklicznych."""
+    farm = _current_farm(request)
     if request.method == 'POST':
-        form = VaccinationPlanForm(request.POST)
+        form = VaccinationPlanForm(request.POST, farm=farm)
         if form.is_valid():
-            form.save()
+            plan = form.save(commit=False)
+            plan.farm = farm
+            plan.save()
             return redirect('dashboard')
     else:
-        form = VaccinationPlanForm()
+        form = VaccinationPlanForm(farm=farm)
 
     return render(request, 'sows/add_vaccination_plan.html', {'form': form})
+
+
 @login_required
 def sow_detail_view(request, sow_id):
-    db_sow = get_object_or_404(SowModel, id=sow_id)
+    farm = _current_farm(request)
+    db_sow = get_object_or_404(SowModel, id=sow_id, farm=farm)
 
     if request.method == 'POST' and 'edit_sow' in request.POST:
         form = SowForm(request.POST, instance=db_sow)
@@ -65,7 +84,7 @@ def sow_detail_view(request, sow_id):
     else:
         form = SowForm(instance=db_sow)
 
-    repo = SowRepository()
+    repo = SowRepository(farm=farm)
     sow = repo.get_sow_by_id(sow_id)
 
     return render(request, 'sows/sow_detail.html', {'sow': sow, 'form': form})
@@ -73,21 +92,22 @@ def sow_detail_view(request, sow_id):
 
 @login_required
 def add_event_view(request, sow_id):
-    db_sow = get_object_or_404(SowModel, id=sow_id)
+    farm = _current_farm(request)
+    db_sow = get_object_or_404(SowModel, id=sow_id, farm=farm)
 
-    repo = SowRepository()
-    domain_sow = repo.get_sow_by_id(sow_id)
-    domain_sow.update_state_for_date(date.today())
-    
+    repo = SowRepository(farm=farm)
+    sow = repo.get_sow_by_id(sow_id)
+    sow.update_state_for_date(date.today())
+
     if request.method == 'POST':
-        form = SowEventForm(request.POST, sow_status=domain_sow.status)
+        form = SowEventForm(request.POST, sow_status=sow.status, farm=farm)
         if form.is_valid():
             event = form.save(commit=False)
             event.sow = db_sow
             event.save()
             return redirect('sow_detail', sow_id=sow_id)
     else:
-        form = SowEventForm(sow_status=domain_sow.status)
+        form = SowEventForm(sow_status=sow.status, farm=farm, initial={'event_date': date.today()})
 
     return render(request, 'sows/add_event.html', {'form': form, 'sow': db_sow})
 
@@ -95,7 +115,8 @@ def add_event_view(request, sow_id):
 @login_required
 def bulk_pregnancy_check_view(request):
     """Zwraca ekran do masowego wprowadzania wyników badań USG i zapisuje je."""
-    service = SowDashboardService()
+    farm = _current_farm(request)
+    service = SowDashboardService(farm=farm)
     context = service.get_dashboard_summary()
     sows_to_check = context['sows_to_check_usg']
 
@@ -104,7 +125,7 @@ def bulk_pregnancy_check_view(request):
             result = request.POST.get(f'result_{sow.id}')
 
             if result in ['TAK', 'NIE', '?']:
-                db_sow = get_object_or_404(SowModel, id=sow.id)
+                db_sow = get_object_or_404(SowModel, id=sow.id, farm=farm)
                 SowEventModel.objects.create(
                     sow=db_sow,
                     event_type='PREGNANCY_CHECK',
@@ -119,16 +140,17 @@ def bulk_pregnancy_check_view(request):
 @login_required
 def bulk_vaccinate_view(request):
     """Odbiera żądanie z dashboardu, wyświetla ekran potwierdzenia i zapisuje zdarzenia."""
+    farm = _current_farm(request)
     if request.method == 'POST':
         sow_ids = request.POST.getlist('sow_ids')
         vaccine_name = request.POST.get('vaccine_name')
         cycle_id = request.POST.get('cycle_id')
 
         if request.POST.get('confirm') == 'yes':
-            _create_vaccination_events(sow_ids, vaccine_name, cycle_id)
+            _create_vaccination_events(sow_ids, vaccine_name, cycle_id, farm)
             return redirect('dashboard')
         else:
-            sows = SowModel.objects.filter(id__in=sow_ids)
+            sows = SowModel.objects.filter(id__in=sow_ids, farm=farm)
             return render(request, 'sows/bulk_vaccinate.html', {
                 'sows': sows,
                 'vaccine_name': vaccine_name,
@@ -140,17 +162,18 @@ def bulk_vaccinate_view(request):
 
 @login_required
 def edit_event_view(request, event_id):
-    db_event = get_object_or_404(SowEventModel, id=event_id)
+    farm = _current_farm(request)
+    db_event = get_object_or_404(SowEventModel, id=event_id, sow__farm=farm)
     sow_id = db_event.sow.id
 
     if request.method == 'POST':
-        form = SowEventForm(request.POST, instance=db_event)
+        form = SowEventForm(request.POST, instance=db_event, farm=farm)
         if form.is_valid():
             form.save()
             return redirect('sow_detail', sow_id=sow_id)
     else:
         initial_data = _get_event_initial_data(db_event)
-        form = SowEventForm(instance=db_event, initial=initial_data)
+        form = SowEventForm(instance=db_event, initial=initial_data, farm=farm)
 
     return render(request, 'sows/add_event.html', {
         'form': form,
@@ -161,8 +184,9 @@ def edit_event_view(request, event_id):
 
 @login_required
 def delete_sow_view(request, sow_id):
+    farm = _current_farm(request)
     if request.method == 'POST':
-        db_sow = get_object_or_404(SowModel, id=sow_id)
+        db_sow = get_object_or_404(SowModel, id=sow_id, farm=farm)
 
         if request.POST.get('archive') == 'on':
             db_sow.is_archived = True
@@ -177,14 +201,12 @@ def delete_sow_view(request, sow_id):
 @login_required
 def archived_sows_view(request):
     try:
-        service = SowDashboardService()
+        service = SowDashboardService(farm=_current_farm(request))
         archived_sows = service.get_archived_sows_list()
         return render(request, 'sows/archived_sows.html', {'archived_sows': archived_sows})
-    except Exception as e:
-        import traceback
-        error_html = f"<h2>Wystąpił błąd!</h2><br><b>Powód:</b> {str(e)}<br><pre>{traceback.format_exc()}</pre>"
-        return HttpResponse(error_html, status=500)
-
+    except Exception:
+        logger.exception("Błąd w archiwum macior")
+        return HttpResponse("Wystąpił błąd w archiwum. Szczegóły zapisano w logach aplikacji.", status=500)
 
 
 @login_required
@@ -198,30 +220,29 @@ def general_statistics_view(request):
         except ValueError:
             months = 6
 
-        service = SowDashboardService()
+        service = SowDashboardService(farm=_current_farm(request))
         context = service.get_general_statistics(metric_key=metric_key, months_limit=months, order=order)
         return render(request, 'sows/analytics.html', context)
-    except Exception as e:
-        import traceback
-        error_html = f"<h2>Błąd podczas generowania statystyk</h2><pre>{traceback.format_exc()}</pre>"
-        return HttpResponse(error_html, status=500)
+    except Exception:
+        logger.exception("Błąd podczas generowania statystyk")
+        return HttpResponse("Błąd podczas generowania statystyk. Szczegóły zapisano w logach aplikacji.", status=500)
 
 
 @login_required
 def delete_event_view(request, event_id):
     if request.method == 'POST':
-        db_event = get_object_or_404(SowEventModel, id=event_id)
+        farm = _current_farm(request)
+        db_event = get_object_or_404(SowEventModel, id=event_id, sow__farm=farm)
         sow_id = db_event.sow.id
         db_event.delete()
         return redirect('sow_detail', sow_id=sow_id)
     return redirect('dashboard')
 
 
-# Helper functions
-def _create_vaccination_events(sow_ids: list, vaccine_name: str, cycle_id: str) -> None:
+def _create_vaccination_events(sow_ids: list, vaccine_name: str, cycle_id: str, farm) -> None:
     """Tworzy zdarzenia szczepienia dla wskazanych macior."""
     for s_id in sow_ids:
-        db_sow = get_object_or_404(SowModel, id=s_id)
+        db_sow = get_object_or_404(SowModel, id=s_id, farm=farm)
         SowEventModel.objects.create(
             sow=db_sow,
             event_type='VACCINATION',

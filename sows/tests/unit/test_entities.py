@@ -1,6 +1,6 @@
 import pytest
 from datetime import date, timedelta
-from sows.domain.entities import Sow, SowEvent
+from sows.services.sow_lifecycle import Sow, SowEvent
 
 
 class TestSowEntity:
@@ -66,3 +66,102 @@ class TestSowEntity:
         ]
         empty_sow.load_history(events)
         assert empty_sow.avg_loss_before_weaning == 2.0
+
+    def test_load_history_handles_negative_and_recheck_pregnancy_results(self, empty_sow):
+        empty_sow.load_history([
+            SowEvent(event_type="INSEMINATION", event_date=date(2023, 1, 1), details={}),
+            SowEvent(event_type="PREGNANCY_CHECK", event_date=date(2023, 2, 1), details={"result": "?"}),
+        ])
+        assert empty_sow.status == "TO_RECHECK"
+
+        empty_sow.load_history([
+            SowEvent(event_type="INSEMINATION", event_date=date(2023, 3, 1), details={}),
+            SowEvent(event_type="PREGNANCY_CHECK", event_date=date(2023, 4, 1), details={"result": "NIE"}),
+        ])
+        assert empty_sow.status == "IDLE"
+        assert empty_sow.expected_farrowing_date is None
+
+    def test_weaning_updates_average_and_status(self, empty_sow):
+        empty_sow.load_history([
+            SowEvent(event_type="FARROWING", event_date=date(2023, 1, 1), details={"born_alive": 11}),
+            SowEvent(event_type="WEANING", event_date=date(2023, 2, 1), details={"count": 9}),
+        ])
+
+        assert empty_sow.status == "IDLE"
+        assert empty_sow.total_weaned == 9
+        assert empty_sow.avg_weaned == 9.0
+
+    def test_vaccination_status_before_farrowing(self, empty_sow):
+        empty_sow.load_history([
+            SowEvent(event_type="INSEMINATION", event_date=date(2023, 1, 1), details={}),
+        ])
+        plan = {
+            'name': 'Parwowiroza',
+            'days_before_farrowing': 21,
+            'days_after_event': None,
+            'event_source': None,
+            'interval_months': None,
+            'reminder_days_ahead': 7,
+        }
+
+        status = empty_sow.get_vaccination_status(plan, current_date=date(2023, 4, 4))
+
+        assert status['target_date'] == date(2023, 4, 4)
+        assert status['is_eligible'] is True
+        assert status['should_display'] is True
+
+    def test_vaccination_status_after_event_and_done_detection(self, empty_sow):
+        empty_sow.load_history([
+            SowEvent(event_type="FARROWING", event_date=date(2023, 5, 1), details={}),
+            SowEvent(
+                event_type="VACCINATION",
+                event_date=date(2023, 5, 15),
+                details={"vaccine_name": "Coli", "cycle_id": "after_farrowing_2023-05-01"},
+            ),
+        ])
+        plan = {
+            'name': 'Coli',
+            'days_before_farrowing': None,
+            'days_after_event': 14,
+            'event_source': 'FARROWING',
+            'interval_months': None,
+            'reminder_days_ahead': 7,
+        }
+
+        status = empty_sow.get_vaccination_status(plan, current_date=date(2023, 5, 15))
+
+        assert status['is_done'] is True
+        assert status['should_display'] is False
+
+    def test_cyclic_vaccination_uses_last_vaccination_as_base(self, empty_sow):
+        empty_sow.load_history([
+            SowEvent(event_type="VACCINATION", event_date=date(2023, 2, 1), details={"vaccine_name": "Okresowa"}),
+        ])
+        plan = {
+            'name': 'Okresowa',
+            'days_before_farrowing': None,
+            'days_after_event': None,
+            'event_source': None,
+            'interval_months': 4,
+            'reminder_days_ahead': 10,
+        }
+
+        status = empty_sow.get_vaccination_status(plan, current_date=date(2023, 6, 1))
+
+        assert status['target_date'] == date(2023, 6, 1)
+        assert status['cycle_id'] == 'cyclic_2023-06-01'
+        assert status['is_eligible'] is True
+
+    def test_dynamic_status_display_for_all_statuses(self, empty_sow):
+        expected = {
+            "INSEMINATED": "Po inseminacji",
+            "TO_CHECK": "Do badania (USG)",
+            "PREGNANT": "Prośna (Potwierdzona)",
+            "TO_RECHECK": "Do rebadania (?)",
+            "LACTATING": "Karmiąca",
+            "IDLE": "Jałowa",
+        }
+
+        for status, label in expected.items():
+            empty_sow.status = status
+            assert empty_sow.dynamic_status_display == label

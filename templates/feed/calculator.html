@@ -1,40 +1,89 @@
 {% extends 'base.html' %}
+{% block title %}Kalkulator paszy{% endblock %}
+
 {% block content %}
-<div class="container mx-auto p-4 md:p-6">
-    <header class="mb-6 flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
-        <h1 class="text-xl md:text-2xl font-bold text-gray-800">🚜 Zarządzanie Produkcją Paszy</h1>
+<main class="app-page">
+    <section class="page-header">
         <div>
-            <a href="{% url 'modules_home' %}" class="text-sm text-gray-600 hover:text-blue-600 mr-4">Wróć do Centrali</a>
-            <span class="text-sm bg-yellow-100 text-yellow-800 font-medium px-2.5 py-0.5 rounded">Moduł: Pasze</span>
+            <p class="eyebrow">Pasze</p>
+            <h1>Kalkulator kosztów</h1>
+            <p class="page-subtitle">Symulacja przyszłego kosztu paszy na podstawie cen składników.</p>
         </div>
-    </header>
+        <a href="{% url 'feed_recipes' %}" class="button button-secondary">Receptury</a>
+    </section>
+
     {% include 'feed/_feed_nav.html' %}
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="bg-white p-6 rounded shadow-sm">
-            <h2 class="text-lg font-bold mb-4">🧮 Koszty Paszy wg Receptur</h2>
-            <ul class="space-y-3">
-                {% for cost in costs %}
-                <li class="p-3 bg-gray-50 rounded border">
-                    <span class="font-bold text-gray-800">{{ cost.recipe_name }}</span>
-                    <div class="mt-1 text-sm text-gray-600">
-                        Koszt za 1 kg: <strong class="text-blue-600">{{ cost.cost_per_kg|floatformat:4 }} PLN</strong><br>
-                        Koszt za 1 Tonę: <strong class="text-green-600">{{ cost.cost_per_ton|floatformat:2 }} PLN</strong>
-                    </div>
-                </li>
-                {% endfor %}
-            </ul>
-        </div>
+    <form method="post" class="calculator-layout">
+        {% csrf_token %}
+        <section class="panel table-panel">
+            <div class="section-heading">
+                <div>
+                    <h2>Koszt według receptur</h2>
+                    <p>Wartości liczone tylko dla tej symulacji.</p>
+                </div>
+                <button type="submit" class="button button-primary">Przelicz</button>
+            </div>
+            <div class="table-scroll">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Receptura</th>
+                            <th class="text-right">Koszt 1 kg</th>
+                            <th class="text-right">Koszt 1 tony</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cost in costs %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'recipe_detail' cost.recipe_id %}" class="table-link">{{ cost.recipe_name }}</a>
+                            </td>
+                            <td class="text-right"><strong>{{ cost.cost_per_kg|floatformat:4 }}</strong> PLN</td>
+                            <td class="text-right"><strong>{{ cost.cost_per_ton|floatformat:2 }}</strong> PLN</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3" class="empty-table">Brak receptur do przeliczenia.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
 
-        <div class="bg-white p-6 rounded shadow-sm">
-            <h2 class="text-lg font-bold mb-4">⚙️ Konfiguracja cen składników</h2>
-            <form method="post" class="space-y-4">
-                {% csrf_token %}
-                {{ form.as_p }}
-                <button type="submit" class="bg-gray-800 text-white px-4 py-2 rounded shadow font-bold w-full">Zaktualizuj Cenę</button>
-            </form>
-            <p class="text-xs text-gray-500 mt-4">Wskazówka: Ceny podane w dostawach są tylko informacyjne. System używa cen ustawionych tutaj do symulacji kosztów śrutowania.</p>
-        </div>
-    </div>
-</div>
+        <aside class="panel calculator-price-panel">
+            <div class="section-heading">
+                <div>
+                    <h2>Ceny składników</h2>
+                    <p>Domyślnie z ostatniej dostawy, bez zapisu do innych zakładek.</p>
+                </div>
+            </div>
+            <div class="price-input-list">
+                {% for row in ingredient_prices %}
+                <label class="price-input-row" for="price_{{ row.ingredient.id }}">
+                    <span>
+                        <strong>{{ row.ingredient.name }}</strong>
+                        {% if row.has_delivery %}
+                            <small>Ostatni zakup: {{ row.source_date|date:"d.m.Y" }}</small>
+                        {% else %}
+                            <small>Brak zakupu, cena 0</small>
+                        {% endif %}
+                    </span>
+                    <input
+                        type="number"
+                        id="price_{{ row.ingredient.id }}"
+                        name="price_{{ row.ingredient.id }}"
+                        value="{{ row.price_per_kg|stringformat:'.5f' }}"
+                        min="0"
+                        step="0.00001"
+                    >
+                </label>
+                {% empty %}
+                <p class="empty-table">Brak składników w magazynie.</p>
+                {% endfor %}
+            </div>
+        </aside>
+    </form>
+</main>
 {% endblock %}

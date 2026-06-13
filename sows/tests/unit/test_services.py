@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 from datetime import date
-from sows.application.services import SowDashboardService
-from sows.domain.entities import Sow
+from sows.services.sow_dashboard_service import SowDashboardService
+from sows.services.sow_lifecycle import Sow, SowEvent
 
 class TestSowDashboardService:
     @pytest.fixture
@@ -15,7 +15,7 @@ class TestSowDashboardService:
         repo.get_all_sows.return_value = [sow1, sow2]
         return repo
 
-    @patch('sows.application.services.VaccinationPlanModel.objects.all')
+    @patch('sows.services.sow_dashboard_service.VaccinationPlanModel.objects.all')
     def test_get_dashboard_summary(self, mock_db_plans, mock_repo):
         # Arrange
         mock_db_plans.return_value = []
@@ -54,3 +54,27 @@ class TestSowDashboardService:
 
         assert len(result) == 1
         assert result[0] == mock_sow
+
+    def test_get_general_statistics_uses_metric_and_ordering(self):
+        sow1 = Sow(id=1, ear_tag="A", entry_date=date(2023, 1, 1), created_at=date(2023, 1, 1))
+        sow1.status = "IDLE"
+        sow1.load_history([
+            SowEvent(event_type="FARROWING", event_date=date.today(), details={"born_alive": 12})
+        ])
+        sow2 = Sow(id=2, ear_tag="B", entry_date=date(2023, 1, 1), created_at=date(2023, 1, 1))
+        sow2.status = "IDLE"
+        sow2.load_history([
+            SowEvent(event_type="FARROWING", event_date=date.today(), details={"born_alive": 8})
+        ])
+        mock_repo = Mock()
+        mock_repo.get_all_sows.return_value = [sow1, sow2]
+
+        result = SowDashboardService(repository=mock_repo).get_general_statistics(
+            metric_key="unknown",
+            months_limit=0,
+            order="asc",
+        )
+
+        assert result['current_metric'].key == "born_alive"
+        assert [item['ear_tag'] for item in result['top_sows']] == ["B", "A"]
+        assert result['chart_values'] == [20]

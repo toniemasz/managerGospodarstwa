@@ -1,33 +1,33 @@
-<!DOCTYPE html>
-<html lang="pl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zaloguj się</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100 flex items-center justify-center h-screen">
-    <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
-        <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">🐖 Manager Gospodarstwa</h2>
+{% extends 'base.html' %}
+{% block title %}Logowanie{% endblock %}
+
+{% block content %}
+<main class="auth-page">
+    <section class="panel auth-card">
+        <div class="page-header">
+            <div>
+                <p class="eyebrow">Manager Gospodarstwa</p>
+                <h1>Zaloguj się</h1>
+                <p class="page-subtitle">Po zalogowaniu system automatycznie przypisze Ci Twoje gospodarstwo.</p>
+            </div>
+        </div>
 
         {% if form.errors %}
-            <p class="text-sm text-red-600 bg-red-50 p-2 rounded mb-4 text-center">Błędny login lub hasło!</p>
+        <div class="alert alert-error">Błędny login lub hasło.</div>
         {% endif %}
 
-        <form method="post">
+        <form method="post" class="responsive-form">
             {% csrf_token %}
-            <div class="mb-4">
-                <label class="block text-gray-700 text-sm font-bold mb-2" {{ form.username.id_for_label }}>Użytkownik</label>
-                <input type="text" name="username" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            <div class="form-field">
+                <label for="{{ form.username.id_for_label }}">Użytkownik</label>
+                {{ form.username }}
             </div>
-            <div class="mb-6">
-                <label class="block text-gray-700 text-sm font-bold mb-2" {{ form.password.id_for_label }}>Hasło</label>
-                <input type="password" name="password" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            <div class="form-field">
+                <label for="{{ form.password.id_for_label }}">Hasło</label>
+                {{ form.password }}
             </div>
-            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-full focus:outline-none focus:shadow-outline shadow">
-                Zaloguj się
-            </button>
+            <button type="submit" class="button button-primary">Zaloguj</button>
         </form>
-    </div>
-</body>
-</html>
+    </section>
+</main>
+{% endblock %}

@@ -1,8 +1,8 @@
 from decimal import Decimal
 from datetime import date
 from unittest.mock import Mock
-from sales.domain.entities import PigSaleEntity
-from sales.application.services import SaleDashboardService
+from sales.services.sale_dashboard_service import SaleDashboardService
+from sales.services.sale_entities import PigSaleEntity
 
 
 def test_dashboard_service_calculates_stats_correctly():
@@ -26,3 +26,16 @@ def test_dashboard_service_calculates_stats_correctly():
     assert stats['total_weight'] == Decimal('1500.00')
     assert stats['total_revenue'] == Decimal('11500.00')  # (1000*8) + (500*7)
     assert stats['avg_price_per_kg'] == round(Decimal('11500.00') / Decimal('1500.00'), 2)
+
+
+def test_dashboard_service_handles_empty_sales():
+    mock_repo = Mock()
+    mock_repo.get_all_sales.return_value = []
+
+    result = SaleDashboardService(repository=mock_repo).get_dashboard_summary()
+
+    assert result['sales'] == []
+    assert result['stats']['total_pigs'] == 0
+    assert result['stats']['total_weight'] == 0
+    assert result['stats']['total_revenue'] == 0
+    assert result['stats']['avg_price_per_kg'] == Decimal('0.00')

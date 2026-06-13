@@ -1,76 +1,67 @@
-<!DOCTYPE html>
-<html lang="pl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Konfiguracja Szczepienia Cyklicznego</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
-    <div class="bg-white p-6 md:p-8 rounded-lg shadow-md w-full max-w-xl">
-        <header class="mb-6 border-b pb-4">
-            <h2 class="text-2xl font-bold text-gray-800">⚙️ Dodaj regułę szczepienia cyklicznego</h2>
-            <p class="text-sm text-gray-500 mt-1">Zdefiniuj, kiedy system ma automatycznie przypominać o tym szczepieniu. Wypełnij TYLKO jedną z sekcji wyzwalacza (A, B lub C).</p>
-        </header>
+{% extends 'base.html' %}
+{% block title %}Konfiguracja Szczepienia{% endblock %}
 
+{% block content %}
+<main class="app-page app-page-narrow">
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Maciory</p>
+            <h1>Reguła szczepienia</h1>
+            <p class="page-subtitle">Wybierz jedną metodę wyzwalania przypomnienia.</p>
+        </div>
+        <a href="{% url 'dashboard' %}" class="button button-secondary">Wróć</a>
+    </section>
+
+    <section class="panel">
         {% if form.non_field_errors %}
-            <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
-                {% for error in form.non_field_errors %}
-                    <p class="font-bold">{{ error }}</p>
-                {% endfor %}
-            </div>
+        <div class="alert alert-error">{{ form.non_field_errors }}</div>
         {% endif %}
 
-        <form method="post" class="space-y-4">
+        <form method="post" class="responsive-form">
             {% csrf_token %}
-
-            <div class="mb-4">
-                <label class="block text-gray-700 text-sm font-bold mb-2">{{ form.name.label }}</label>
+            <div class="form-field">
+                <label for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
+                {{ form.name }}
                 {{ form.name.errors }}
-                <input type="text" name="name" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="np. Parwowiroza i Różyca" required>
             </div>
 
-            <div class="p-4 bg-purple-50 rounded-lg border border-purple-200">
-                <h3 class="text-sm font-bold text-purple-800 mb-2">Opcja A: Na podstawie porodu</h3>
-                <label class="block text-gray-700 text-xs font-bold mb-1">{{ form.days_before_farrowing.label }}</label>
-                <input type="number" name="days_before_farrowing" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700" placeholder="np. 21 (czyli 3 tyg. przed)">
-            </div>
-
-            <div class="p-4 bg-green-50 rounded-lg border border-green-200">
-                <h3 class="text-sm font-bold text-green-800 mb-2">Opcja B: Po wybranym zdarzeniu</h3>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-gray-700 text-xs font-bold mb-1">{{ form.days_after_event.label }}</label>
-                        <input type="number" name="days_after_event" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700" placeholder="np. 14">
-                    </div>
-                    <div>
-                        <label class="block text-gray-700 text-xs font-bold mb-1">{{ form.event_source.label }}</label>
-                        <select name="event_source" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 bg-white">
-                            <option value="">-- Wybierz --</option>
-                            {% for value, text in form.fields.event_source.choices %}
-                                {% if value %}<option value="{{ value }}">{{ text }}</option>{% endif %}
-                            {% endfor %}
-                        </select>
-                    </div>
+            <div class="form-grid three-columns">
+                <div class="form-field">
+                    <label for="{{ form.days_before_farrowing.id_for_label }}">{{ form.days_before_farrowing.label }}</label>
+                    {{ form.days_before_farrowing }}
+                    {{ form.days_before_farrowing.errors }}
+                    <p class="field-hint">Np. 21 dni przed oproszeniem.</p>
+                </div>
+                <div class="form-field">
+                    <label for="{{ form.days_after_event.id_for_label }}">{{ form.days_after_event.label }}</label>
+                    {{ form.days_after_event }}
+                    {{ form.days_after_event.errors }}
+                </div>
+                <div class="form-field">
+                    <label for="{{ form.event_source.id_for_label }}">{{ form.event_source.label }}</label>
+                    {{ form.event_source }}
+                    {{ form.event_source.errors }}
                 </div>
             </div>
 
-            <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <h3 class="text-sm font-bold text-blue-800 mb-2">Opcja C: Interwał stały (dla całego stada)</h3>
-                <label class="block text-gray-700 text-xs font-bold mb-1">{{ form.interval_months.label }}</label>
-                <input type="number" name="interval_months" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700" placeholder="np. 4 (co 4 miesiące)">
+            <div class="form-grid three-columns">
+                <div class="form-field">
+                    <label for="{{ form.interval_months.id_for_label }}">{{ form.interval_months.label }}</label>
+                    {{ form.interval_months }}
+                    {{ form.interval_months.errors }}
+                </div>
+                <div class="form-field">
+                    <label for="{{ form.reminder_days_ahead.id_for_label }}">{{ form.reminder_days_ahead.label }}</label>
+                    {{ form.reminder_days_ahead }}
+                    {{ form.reminder_days_ahead.errors }}
+                </div>
             </div>
 
-            <div class="mt-4 border-t pt-4">
-                <label class="block text-gray-700 text-sm font-bold mb-2">{{ form.reminder_days_ahead.label }}</label>
-                <input type="number" name="reminder_days_ahead" value="7" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 w-1/3" required>
-            </div>
-
-            <div class="flex justify-between items-center pt-6">
-                <a href="{% url 'dashboard' %}" class="text-gray-500 hover:text-gray-800 text-sm font-bold">Anuluj</a>
-                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded focus:outline-none shadow">Zapisz Regułę</button>
+            <div class="form-actions">
+                <a href="{% url 'dashboard' %}" class="button button-secondary">Anuluj</a>
+                <button type="submit" class="button button-primary">Zapisz regułę</button>
             </div>
         </form>
-    </div>
-</body>
-</html>
+    </section>
+</main>
+{% endblock %}
