@@ -17,7 +17,7 @@
     <section class="stats-grid">
         <a href="{% url 'feed_full_inventory' %}" class="stat-tile stat-link">
             <span>Łączny stan magazynu</span>
-            <strong>{{ total_inventory_kg|floatformat:0 }} kg</strong>
+            <strong>{{ total_inventory_t|floatformat:2 }} t</strong>
         </a>
         <div class="stat-tile">
             <span>Niskie stany</span>

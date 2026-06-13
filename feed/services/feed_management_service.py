@@ -64,7 +64,8 @@ class FeedManagementService:
         return {
             'inventory': inventory_state,
             'low_stock_alerts': low_stock,
-            'total_inventory_kg': total_inventory_kg
+            'total_inventory_kg': total_inventory_kg,
+            'total_inventory_t': total_inventory_kg / Decimal('1000.00'),
         }
 
     def validate_production_capacity(self, production_id: int) -> tuple[bool, list[str]]:
