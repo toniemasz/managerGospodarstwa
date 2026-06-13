@@ -87,6 +87,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const typeSelect = document.getElementById('id_event_type');
+
     const sections = {
         INSEMINATION: document.getElementById('sec_insemination'),
         PREGNANCY_CHECK: document.getElementById('sec_pregnancy_check'),
@@ -95,17 +96,73 @@ document.addEventListener('DOMContentLoaded', function () {
         VACCINATION: document.getElementById('sec_vaccination')
     };
 
-    function toggleFields() {
-        Object.values(sections).forEach(function (section) {
-            if (section) section.classList.add('hidden');
+    const fieldsByType = {
+        INSEMINATION: ['id_technician'],
+        PREGNANCY_CHECK: ['id_pregnancy_result'],
+        FARROWING: ['id_born_alive', 'id_born_dead'],
+        WEANING: ['id_count'],
+        VACCINATION: ['id_vaccine_name']
+    };
+
+    const allDynamicFieldIds = [
+        'id_technician',
+        'id_pregnancy_result',
+        'id_born_alive',
+        'id_born_dead',
+        'id_count',
+        'id_vaccine_name'
+    ];
+
+    function setFieldState(field, enabled, shouldClear) {
+        if (!field) return;
+
+        field.disabled = !enabled;
+        field.closest('.form-field')?.classList.toggle('is-muted', !enabled);
+
+        if (!enabled) {
+            field.classList.add('opacity-60', 'cursor-not-allowed');
+            field.setAttribute('aria-disabled', 'true');
+
+            if (shouldClear) {
+                if (field.tagName === 'SELECT') {
+                    field.selectedIndex = 0;
+                } else {
+                    field.value = '';
+                }
+            }
+        } else {
+            field.classList.remove('opacity-60', 'cursor-not-allowed');
+            field.removeAttribute('aria-disabled');
+        }
+    }
+
+    function toggleFields(shouldClear = false) {
+        if (!typeSelect) return;
+
+        const eventType = typeSelect.value;
+        const activeFieldIds = fieldsByType[eventType] || [];
+
+        Object.entries(sections).forEach(function ([type, section]) {
+            if (!section) return;
+
+            const isActive = type === eventType;
+            section.classList.toggle('hidden', !isActive);
+            section.classList.toggle('opacity-60', !isActive);
         });
-        const active = sections[typeSelect.value];
-        if (active) active.classList.remove('hidden');
+
+        allDynamicFieldIds.forEach(function (fieldId) {
+            const field = document.getElementById(fieldId);
+            const isEnabled = activeFieldIds.includes(fieldId);
+            setFieldState(field, isEnabled, shouldClear);
+        });
     }
 
     if (typeSelect) {
-        typeSelect.addEventListener('change', toggleFields);
-        toggleFields();
+        typeSelect.addEventListener('change', function () {
+            toggleFields(true);
+        });
+
+        toggleFields(false);
     }
 });
 </script>

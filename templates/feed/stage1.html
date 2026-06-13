@@ -2,76 +2,76 @@
 {% block title %}Etap 1 śrutowania{% endblock %}
 
 {% block content %}
-<main class="app-page">
-    <section class="page-header">
+<main class="mx-auto w-full max-w-7xl px-4 py-6 md:px-6">
+    <section class="mb-5 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:flex-row md:items-center md:justify-between">
         <div>
-            <p class="eyebrow">Śrutowanie</p>
-            <h1>Etap 1: silosy i biny</h1>
-            <p class="page-subtitle">{{ production.recipe.name }} · {{ production.quantity_kg|floatformat:0 }} kg</p>
+            <p class="mb-1 text-xs font-black uppercase tracking-widest text-emerald-700">Śrutowanie</p>
+            <h1 class="text-3xl font-black tracking-tight text-slate-900 md:text-4xl">Etap 1: silosy i biny</h1>
+            <p class="mt-2 text-base font-semibold text-slate-500">{{ production.recipe.name }} · {{ production.quantity_kg|floatformat:0 }} kg</p>
         </div>
-        <a href="{% url 'feed_productions' %}" class="button button-secondary">Wróć</a>
+        <a href="{% url 'feed_productions' %}" class="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 font-black text-slate-700 transition hover:bg-slate-50 hover:text-blue-600">Wróć</a>
     </section>
 
-    <section class="stats-grid">
-        <div class="stat-tile">
-            <span>Ilość produkcji</span>
-            <strong>{{ production.quantity_kg|floatformat:0 }} kg</strong>
+    <section class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <span class="text-xs font-black uppercase tracking-wider text-slate-500">Ilość produkcji</span>
+            <strong class="mt-2 block text-2xl font-black text-slate-900">{{ production.quantity_kg|floatformat:0 }} kg</strong>
         </div>
-        <div class="stat-tile">
-            <span>Łączny koszt paszy</span>
-            <strong>{{ production_cost.total_cost|floatformat:2 }}</strong>
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <span class="text-xs font-black uppercase tracking-wider text-slate-500">Łączny koszt paszy</span>
+            <strong class="mt-2 block text-2xl font-black text-slate-900">{{ production_cost.total_cost|floatformat:2 }}</strong>
         </div>
-        <div class="stat-tile">
-            <span>Koszt 1 kg</span>
-            <strong>{{ production_cost.cost_per_kg|floatformat:4 }}</strong>
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <span class="text-xs font-black uppercase tracking-wider text-slate-500">Koszt 1 kg</span>
+            <strong class="mt-2 block text-2xl font-black text-slate-900">{{ production_cost.cost_per_kg|floatformat:4 }}</strong>
         </div>
-        <div class="stat-tile">
-            <span>Koszt tony</span>
-            <strong>{{ production_cost.cost_per_ton|floatformat:2 }}</strong>
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <span class="text-xs font-black uppercase tracking-wider text-slate-500">Koszt tony</span>
+            <strong class="mt-2 block text-2xl font-black text-slate-900">{{ production_cost.cost_per_ton|floatformat:2 }}</strong>
         </div>
     </section>
 
     {% if production.custom_recipe_data %}
-    <section class="notice notice-warning">
+    <section class="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
         <div>
-            <h2>Zmienione proporcje</h2>
-            <p>To śrutowanie korzysta z jednorazowo zmodyfikowanej receptury.</p>
+            <h2 class="text-base font-black text-amber-900">Zmienione proporcje</h2>
+            <p class="mt-1 text-sm font-medium text-amber-800">To śrutowanie korzysta z jednorazowo zmodyfikowanej receptury.</p>
         </div>
     </section>
     {% endif %}
 
-    <section class="panel table-panel">
-        <div class="section-heading">
+    <section class="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="border-b border-slate-200 bg-slate-50 p-5">
             <div>
-                <h2>Składniki z silosów</h2>
-                <p>Odhacz surowce pobrane do śrutowania.</p>
+                <h2 class="text-xl font-black text-slate-900">Składniki z silosów</h2>
+                <p class="mt-1 text-sm font-medium text-slate-500">Odhacz surowce pobrane do śrutowania.</p>
             </div>
         </div>
-        <div class="table-scroll">
-            <table class="data-table production-stage-table">
-                <thead>
+        <div class="w-full overflow-x-auto">
+            <table class="min-w-[760px] w-full border-separate border-spacing-0 text-sm text-slate-700">
+                <thead class="bg-slate-100">
                     <tr>
-                        <th>Gotowe</th>
-                        <th>Składnik</th>
-                        <th class="text-right">Udział</th>
-                        <th class="text-right">Ilość</th>
-                        <th class="text-right">Cena/kg</th>
-                        <th class="text-right">Koszt</th>
+                        <th class="whitespace-nowrap border-b border-slate-200 px-4 py-3 text-left text-xs font-black uppercase tracking-wider text-slate-500">Gotowe</th>
+                        <th class="whitespace-nowrap border-b border-slate-200 px-4 py-3 text-left text-xs font-black uppercase tracking-wider text-slate-500">Składnik</th>
+                        <th class="whitespace-nowrap border-b border-slate-200 px-4 py-3 text-right text-xs font-black uppercase tracking-wider text-slate-500">Udział</th>
+                        <th class="whitespace-nowrap border-b border-slate-200 px-4 py-3 text-right text-xs font-black uppercase tracking-wider text-slate-500">Ilość</th>
+                        <th class="whitespace-nowrap border-b border-slate-200 px-4 py-3 text-right text-xs font-black uppercase tracking-wider text-slate-500">Cena/kg</th>
+                        <th class="whitespace-nowrap border-b border-slate-200 px-4 py-3 text-right text-xs font-black uppercase tracking-wider text-slate-500">Koszt</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for item in stage1_items %}
-                    <tr class="ingredient-row">
-                        <td><input type="checkbox" class="ingredient-checkbox" data-id="{{ item.id }}"></td>
-                        <td><strong class="row-name">{{ item.name }}</strong></td>
-                        <td class="text-right">{{ item.percentage|floatformat:2 }}%</td>
-                        <td class="text-right"><strong>{{ item.weight_kg|floatformat:2 }}</strong> kg</td>
-                        <td class="text-right">{{ item.price_per_kg|floatformat:5 }} PLN</td>
-                        <td class="text-right">{{ item.cost|floatformat:2 }} PLN</td>
+                    <tr class="ingredient-row transition hover:bg-blue-50">
+                        <td class="border-b border-slate-100 px-4 py-4"><input type="checkbox" class="ingredient-checkbox h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" data-id="{{ item.id }}"></td>
+                        <td class="border-b border-slate-100 px-4 py-4"><strong class="row-name font-black text-slate-900">{{ item.name }}</strong></td>
+                        <td class="border-b border-slate-100 px-4 py-4 text-right">{{ item.percentage|floatformat:2 }}%</td>
+                        <td class="border-b border-slate-100 px-4 py-4 text-right"><strong class="font-black text-slate-900">{{ item.weight_kg|floatformat:2 }}</strong> kg</td>
+                        <td class="border-b border-slate-100 px-4 py-4 text-right">{{ item.price_per_kg|floatformat:5 }} PLN</td>
+                        <td class="border-b border-slate-100 px-4 py-4 text-right">{{ item.cost|floatformat:2 }} PLN</td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="empty-table">Brak składników przypisanych do silosów.</td>
+                        <td colspan="6" class="px-4 py-8 text-center font-bold italic text-slate-400">Brak składników przypisanych do silosów.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -79,10 +79,10 @@
         </div>
     </section>
 
-    <form method="post" id="stageForm" class="form-actions stage-actions">
+    <form method="post" id="stageForm" class="flex justify-end gap-3">
         {% csrf_token %}
-        <a href="{% url 'feed_productions' %}" class="button button-secondary">Anuluj</a>
-        <button type="submit" class="button button-primary">Zatwierdź etap 1</button>
+        <a href="{% url 'feed_productions' %}" class="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 font-black text-slate-700 transition hover:bg-slate-50 hover:text-blue-600">Anuluj</a>
+        <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-xl bg-blue-600 px-4 py-2 font-black text-white shadow-sm transition hover:bg-blue-700">Zatwierdź etap 1</button>
     </form>
 </main>
 {% endblock %}
@@ -97,8 +97,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function toggleRowStyle(checkbox) {
         const row = checkbox.closest('.ingredient-row');
         const nameText = row.querySelector('.row-name');
-        row.classList.toggle('is-complete', checkbox.checked);
-        if (nameText) nameText.classList.toggle('line-through', checkbox.checked);
+
+        row.classList.toggle('bg-emerald-50', checkbox.checked);
+        row.classList.toggle('opacity-75', checkbox.checked);
+
+        if (nameText) {
+            nameText.classList.toggle('line-through', checkbox.checked);
+            nameText.classList.toggle('text-emerald-700', checkbox.checked);
+        }
     }
 
     document.querySelectorAll('.ingredient-checkbox').forEach(cb => {
