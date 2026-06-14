@@ -58,7 +58,15 @@ def edit_ingredient_view(request, pk):
     else:
         form = IngredientForm(instance=ingredient, farm=farm)
     return render(request, 'feed/form_generic.html',
-                  {'form': form, 'title': f'Edytuj Składnik: {ingredient.name}', 'back_url': 'ingredient_list'})
+                  {
+                      'form': form,
+                      'title': f'Edytuj Składnik: {ingredient.name}',
+                      'back_url': 'ingredient_list',
+                      'delete_url': 'delete_ingredient',
+                      'delete_id': ingredient.id,
+                      'delete_label': 'Usuń składnik',
+                      'delete_confirm': f"Czy na pewno usunąć składnik: {ingredient.name}?",
+                  })
 
 
 @login_required
@@ -115,7 +123,18 @@ def edit_delivery_view(request, pk):
     else:
         form = DeliveryForm(instance=delivery, farm=farm)
     return render(request, 'feed/form_generic.html',
-                  {'form': form, 'title': 'Edytuj Dostawę', 'back_url': 'feed_inventory'})
+                  {
+                      'form': form,
+                      'title': 'Edytuj Dostawę',
+                      'back_url': 'feed_inventory',
+                      'delete_url': 'delete_delivery',
+                      'delete_id': delivery.id,
+                      'delete_label': 'Usuń dostawę',
+                      'delete_confirm': (
+                          f"Usunięcie tej dostawy zmniejszy stan magazynowy składnika "
+                          f"{delivery.ingredient.name} o {delivery.quantity_kg} kg. Kontynuować?"
+                      ),
+                  })
 
 
 @login_required
@@ -188,7 +207,7 @@ def edit_recipe_view(request, pk):
     else:
         form = RecipeForm(instance=recipe, farm=farm)
         formset = RecipeItemFormSet(instance=recipe, form_kwargs={'farm': farm})
-    return render(request, 'feed/add_recipe.html', {'form': form, 'formset': formset, 'is_edit': True})
+    return render(request, 'feed/add_recipe.html', {'form': form, 'formset': formset, 'is_edit': True, 'recipe': recipe})
 
 
 @login_required
@@ -263,7 +282,12 @@ def edit_production_view(request, pk):
         form = ProductionForm(instance=production, farm=farm)
 
     recipes = RecipeModel.objects.filter(farm=farm).prefetch_related('items__ingredient').order_by('name')
-    return render(request, 'feed/production_form.html', {'form': form, 'recipes': recipes, 'is_edit': True})
+    return render(request, 'feed/production_form.html', {
+        'form': form,
+        'recipes': recipes,
+        'is_edit': True,
+        'production': production,
+    })
 
 
 @login_required
@@ -271,13 +295,8 @@ def delete_production_view(request, pk):
     farm = _current_farm(request)
     production = get_object_or_404(ProductionModel, pk=pk, recipe__farm=farm)
     if request.method == 'POST':
-        # Zabezpieczenie integralności magazynu
-        if production.status == ProductionModel.Statuses.COMPLETED:
-            messages.error(request,
-                           "Zakończone śrutowanie odjęło już towar z magazynu. Operacja usunięcia zablokowana.")
-        else:
-            production.delete()
-            messages.success(request, "Usunięto planowane śrutowanie.")
+        production.delete()
+        messages.success(request, "Usunięto śrutowanie.")
     return redirect('feed_productions')
 
 

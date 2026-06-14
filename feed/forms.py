@@ -107,7 +107,7 @@ class DeliveryForm(forms.ModelForm):
         model = DeliveryModel
         fields = ['date', 'ingredient', 'quantity_kg', 'price_per_kg']
         widgets = {
-            'date': forms.DateInput(attrs={'type': 'date'}),
+            'date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
             'price_per_kg': forms.NumberInput(attrs={'step': '0.00001'})
         }
 
@@ -124,8 +124,8 @@ class ProductionForm(forms.ModelForm):
         model = ProductionModel
         fields = ['date', 'time', 'recipe', 'quantity_kg']
         widgets = {
-            'date': forms.DateInput(attrs={'type': 'date'}),
-            'time': forms.TimeInput(attrs={'type': 'time'})
+            'date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
+            'time': forms.TimeInput(format='%H:%M', attrs={'type': 'time'})
         }
 
     def __init__(self, *args, farm=None, **kwargs):

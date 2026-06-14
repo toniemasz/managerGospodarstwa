@@ -64,10 +64,6 @@
                         <td class="text-right">
                             <div class="row-actions">
                                 <a href="{% url 'edit_vaccination_plan' plan.id %}" class="table-link">Edytuj</a>
-                                <form method="post" action="{% url 'delete_vaccination_plan' plan.id %}" onsubmit="return confirm('Czy na pewno usunąć regułę szczepienia: {{ plan.name|escapejs }}?');">
-                                    {% csrf_token %}
-                                    <button type="submit" class="link-button-danger">Usuń</button>
-                                </form>
                             </div>
                         </td>
                     </tr>

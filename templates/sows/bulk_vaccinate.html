@@ -1,18 +1,52 @@
 {% extends 'base.html' %}
-{% block title %}Szczepienie Grupowe{% endblock %}
+{% block title %}Panel Szczepień{% endblock %}
 
 {% block content %}
 <main class="app-page app-page-narrow">
     <section class="page-header">
         <div>
             <p class="eyebrow">Maciory</p>
-            <h1>Szczepienie grupowe</h1>
+            <h1>Panel szczepień</h1>
             <p class="page-subtitle">Potwierdź zwierzęta, którym zapisujemy zdarzenie szczepienia.</p>
         </div>
         <a href="{% url 'dashboard' %}" class="button button-secondary">Wróć</a>
     </section>
 
-    <section class="panel">
+    {% if vaccination_groups %}
+        {% for group_name, sows_list in vaccination_groups.items %}
+        <section class="panel compact-panel">
+            <form method="post" action="{% url 'bulk_vaccinate' %}" class="responsive-form">
+                {% csrf_token %}
+                <input type="hidden" name="vaccine_name" value="{{ sows_list.0.vaccine_name }}">
+                <input type="hidden" name="cycle_id" value="{{ sows_list.0.cycle_id }}">
+                <input type="hidden" name="confirm" value="yes">
+
+                <div class="section-heading">
+                    <div>
+                        <h2>{{ group_name }}</h2>
+                        <p>{{ sows_list|length }} szczepień do potwierdzenia.</p>
+                    </div>
+                </div>
+
+                <div class="responsive-form">
+                    {% for item in sows_list %}
+                    <label class="checkbox-row form-section">
+                        <input type="checkbox" name="sow_ids" value="{{ item.sow_id }}" checked>
+                        <span>Maciora {{ item.ear_tag }}{% if item.status_display %} · {{ item.status_display }}{% endif %}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="button button-primary" onclick="return confirm('Potwierdzić zapis szczepienia dla zaznaczonych macior?');">
+                        Potwierdź szczepienie
+                    </button>
+                </div>
+            </form>
+        </section>
+        {% endfor %}
+    {% elif sows %}
+    <section class="panel compact-panel">
         <form method="post" action="{% url 'bulk_vaccinate' %}" class="responsive-form">
             {% csrf_token %}
             <input type="hidden" name="vaccine_name" value="{{ vaccine_name }}">
@@ -37,9 +71,14 @@
 
             <div class="form-actions">
                 <a href="{% url 'dashboard' %}" class="button button-secondary">Anuluj</a>
-                <button type="submit" class="button button-primary">Zatwierdź</button>
+                <button type="submit" class="button button-primary" onclick="return confirm('Potwierdzić zapis szczepienia dla zaznaczonych macior?');">Zatwierdź</button>
             </div>
         </form>
     </section>
+    {% else %}
+    <section class="panel compact-panel empty-state">
+        Brak szczepień oczekujących na potwierdzenie.
+    </section>
+    {% endif %}
 </main>
 {% endblock %}

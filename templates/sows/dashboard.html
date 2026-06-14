@@ -50,32 +50,13 @@
     </section>
     {% endif %}
 
-    {% if vaccination_groups %}
-    <section class="panel compact-panel">
-        <div class="section-heading">
-            <div>
-                <h2>Planowane szczepienia grupowe</h2>
-                <p>Grupy utworzone według skonfigurowanych terminów szczepień.</p>
-            </div>
+    {% if vaccinations_due_count %}
+    <section class="notice notice-warning">
+        <div>
+            <h2>Oczekujące szczepienia</h2>
+            <p>Liczba szczepień do potwierdzenia: <strong>{{ vaccinations_due_count }}</strong></p>
         </div>
-        <div class="group-grid">
-            {% for group_name, sows_list in vaccination_groups.items %}
-            <form method="post" action="{% url 'bulk_vaccinate' %}" class="group-item">
-                {% csrf_token %}
-                <input type="hidden" name="vaccine_name" value="{{ sows_list.0.vaccine_name }}">
-                <input type="hidden" name="cycle_id" value="{{ sows_list.0.cycle_id }}">
-                {% for s in sows_list %}
-                    <input type="hidden" name="sow_ids" value="{{ s.sow_id }}">
-                {% endfor %}
-
-                <div>
-                    <h3>{{ group_name }}</h3>
-                    <p>{{ sows_list|length }} szt. w grupie</p>
-                </div>
-                <button type="submit" class="button button-secondary">Zatwierdź</button>
-            </form>
-            {% endfor %}
-        </div>
+        <a href="{% url 'bulk_vaccinate' %}" class="button button-secondary">Panel szczepień</a>
     </section>
     {% endif %}
 
@@ -125,7 +106,6 @@
                         <td class="text-right"><strong>{{ sow.total_born_alive }}</strong> szt.</td>
                         <td class="text-right">
                             <div class="row-actions">
-                                <a href="{% url 'sow_detail' sow.id %}" class="table-link">Szczegóły</a>
                                 <a href="{% url 'edit_sow' sow.id %}" class="table-link">Edytuj</a>
                             </div>
                         </td>

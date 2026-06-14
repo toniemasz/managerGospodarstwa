@@ -114,25 +114,40 @@ class TestSowViews:
         ).exists()
 
     def test_bulk_vaccinate_confirmation_and_save(self, setup_client):
-        sow = SowModel.objects.create(ear_tag="VAC-1", farm=setup_client.farm)
+        sow = SowModel.objects.create(
+            ear_tag="VAC-1",
+            farm=setup_client.farm,
+            entry_date=date.today() - timedelta(days=30),
+        )
+        VaccinationPlanModel.objects.create(
+            name='Parwo',
+            interval_months=1,
+            reminder_days_ahead=7,
+            farm=setup_client.farm,
+        )
 
-        confirm_page = setup_client.post(reverse('bulk_vaccinate'), {
-            'sow_ids': [str(sow.id)],
-            'vaccine_name': 'Parwo',
-            'cycle_id': 'cycle-1',
-        })
+        dashboard = setup_client.get(reverse('dashboard'))
+        dashboard_content = dashboard.content.decode()
+        assert dashboard.status_code == 200
+        assert "Oczekujące szczepienia" in dashboard_content
+        assert "Liczba szczepień do potwierdzenia" in dashboard_content
+
+        confirm_page = setup_client.get(reverse('bulk_vaccinate'))
         assert confirm_page.status_code == 200
+        content = confirm_page.content.decode()
+        assert "Panel szczepień" in content
+        assert "Maciora VAC-1" in content
 
         save_response = setup_client.post(reverse('bulk_vaccinate'), {
             'confirm': 'yes',
             'sow_ids': [str(sow.id)],
             'vaccine_name': 'Parwo',
-            'cycle_id': 'cycle-1',
+            'cycle_id': f"cyclic_{date.today().strftime('%Y-%m-%d')}",
         })
 
         assert save_response.status_code == 302
         event = SowEventModel.objects.get(sow=sow, event_type='VACCINATION')
-        assert event.details == {'vaccine_name': 'Parwo', 'cycle_id': 'cycle-1'}
+        assert event.details == {'vaccine_name': 'Parwo', 'cycle_id': f"cyclic_{date.today().strftime('%Y-%m-%d')}"}
 
     def test_archive_and_archived_sows_views(self, setup_client):
         sow = SowModel.objects.create(ear_tag="ARCHIVE-ME", farm=setup_client.farm)

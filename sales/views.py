@@ -54,6 +54,16 @@ def edit_sale_view(request, pk):
     return _sale_form_view(request, sale=sale, template_context={'is_edit': True})
 
 
+@login_required
+def delete_sale_view(request, pk):
+    farm = _current_farm(request)
+    sale = get_object_or_404(PigSaleModel, pk=pk, farm=farm)
+    if request.method == 'POST':
+        sale.delete()
+        messages.success(request, "Sprzedaż została usunięta.")
+    return redirect('sales_list')
+
+
 def _sale_form_view(request, sale: PigSaleModel, template_context: dict):
     if request.method == 'POST' and 'import_pdf' in request.POST:
         return _handle_pdf_import(request, sale, template_context)

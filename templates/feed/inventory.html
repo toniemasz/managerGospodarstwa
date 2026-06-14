@@ -71,10 +71,6 @@
                         <td class="text-right">
                             <div class="row-actions">
                                 <a href="{% url 'edit_delivery' delivery.id %}" class="table-link">Edytuj</a>
-                                <form method="post" action="{% url 'delete_delivery' delivery.id %}" onsubmit="return confirm('Usunięcie tej dostawy zmniejszy stan magazynowy składnika {{ delivery.ingredient.name }} o {{ delivery.quantity_kg }} kg. Kontynuować?');">
-                                    {% csrf_token %}
-                                    <button type="submit" class="link-button-danger">Usuń</button>
-                                </form>
                             </div>
                         </td>
                     </tr>

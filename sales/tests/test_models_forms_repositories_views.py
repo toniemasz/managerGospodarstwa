@@ -73,6 +73,23 @@ def test_sales_views_require_login_and_handle_create(auth_client, client):
 
 
 @pytest.mark.django_db
+def test_delete_sale_view_removes_sale(auth_client):
+    sale = PigSaleModel.objects.create(
+        farm=auth_client.farm,
+        sale_date=date(2026, 6, 4),
+        quantity=3,
+        total_weight=Decimal('300.00'),
+        meat_class='E',
+        price_per_kg=Decimal('8.00'),
+    )
+
+    response = auth_client.post(reverse('delete_sale', args=[sale.id]))
+
+    assert response.status_code == 302
+    assert not PigSaleModel.objects.filter(id=sale.id).exists()
+
+
+@pytest.mark.django_db
 def test_sale_repository_filters_data_by_farm():
     user = User.objects.create_user(username='sale-owner')
     other_user = User.objects.create_user(username='sale-other')

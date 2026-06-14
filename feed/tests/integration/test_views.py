@@ -172,6 +172,10 @@ def test_feed_production_post_actions(auth_client, feed_objects):
     production.refresh_from_db()
     assert production.status == ProductionModel.Statuses.COMPLETED
 
+    delete_completed = auth_client.post(reverse('delete_production', args=[production.id]))
+    assert delete_completed.status_code == 302
+    assert not ProductionModel.objects.filter(id=production.id).exists()
+
     queued = feed_objects['production']
     delete = auth_client.post(reverse('delete_production', args=[queued.id]))
     assert delete.status_code == 302

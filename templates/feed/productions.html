@@ -59,10 +59,6 @@
                             <div class="row-actions">
                                 {% if prod.status == 'QUEUED' %}
                                     <a href="{% url 'process_stage1' prod.id %}" class="table-link">Etap 1</a>
-                                    <form method="post" action="{% url 'delete_production' prod.id %}" onsubmit="return confirm('Usunąć to zlecenie z kolejki?');">
-                                        {% csrf_token %}
-                                        <button type="submit" class="link-button-danger">Usuń</button>
-                                    </form>
                                 {% elif prod.status == 'STAGE_1_DONE' %}
                                     <a href="{% url 'process_stage2' prod.id %}" class="table-link">Etap 2</a>
                                 {% else %}
