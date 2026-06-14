@@ -89,6 +89,7 @@
             </div>
             {% endif %}
 
+            {% if not is_edit %}
             <div class="option-box">
                 <label class="checkbox-row">
                     <input type="checkbox" name="instant_complete">
@@ -101,6 +102,7 @@
                     <span>Wymuś śrutowanie mimo braków na magazynie</span>
                 </label>
             </div>
+            {% endif %}
 
             <div class="form-actions">
                 <a href="{% url 'feed_productions' %}" class="button button-secondary">Anuluj</a>

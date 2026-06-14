@@ -67,7 +67,7 @@
         <div class="section-heading">
             <div>
                 <h2>Rejestr sprzedaży</h2>
-                <p>Kliknij dokument, aby edytować dane lub zaimportować rozliczenie.</p>
+                <p>Rekordy sprzedaży z rozliczeniami i importem PDF.</p>
             </div>
         </div>
         <div class="table-scroll">
@@ -81,16 +81,18 @@
                         <th class="text-right">Ilość</th>
                         <th class="text-right">Waga</th>
                         <th class="text-right">Brutto</th>
+                        <th class="text-right">Akcje</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for sale in sales %}
-                    <tr class="sale-row clickable-row"
+                    <tr class="sale-row"
                         data-search="{{ sale.document_number }} {{ sale.tattoo }} {{ sale.sale_date|date:'d.m.Y' }}"
-                        data-filter="{% if sale.no_settlement %}PENDING{% else %}READY{% endif %}"
-                        onclick="window.location.href='{% url 'edit_sale' sale.id %}'">
+                        data-filter="{% if sale.no_settlement %}PENDING{% else %}READY{% endif %}">
                         <td><strong>{{ sale.sale_date|date:"d.m.Y"|default:"--" }}</strong></td>
-                        <td>{{ sale.document_number|default:"--" }}</td>
+                        <td>
+                            <a href="{% url 'edit_sale' sale.id %}" class="table-link">{{ sale.document_number|default:"--" }}</a>
+                        </td>
                         <td>{{ sale.tattoo|default:"--" }}</td>
                         <td>
                             {% if sale.no_settlement %}
@@ -102,10 +104,13 @@
                         <td class="text-right">{{ sale.quantity }}</td>
                         <td class="text-right">{{ sale.total_weight|floatformat:2 }} kg</td>
                         <td class="text-right"><strong>{{ sale.total_price|floatformat:2 }}</strong> PLN</td>
+                        <td class="text-right">
+                            <a href="{% url 'edit_sale' sale.id %}" class="table-link">Edytuj</a>
+                        </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="empty-table">Brak danych o sprzedaży.</td>
+                        <td colspan="8" class="empty-table">Brak danych o sprzedaży.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

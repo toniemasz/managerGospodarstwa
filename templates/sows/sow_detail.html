@@ -7,50 +7,39 @@
 <div class="container mx-auto max-w-5xl p-4 md:p-6">
 {% if sow.is_archived %}
 <div class="mb-6 p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded text-yellow-800 font-bold">
-    🗄️ Ta maciora jest zarchiwizowana. Tryb tylko do odczytu.
+    Ta maciora jest zarchiwizowana. Historia i dane pozostają dostępne do korekty.
 </div>
 {% endif %}
-    <form method="post" id="sowForm" class="mb-6 bg-white p-6 rounded-lg shadow-sm border-l-4 border-blue-600 transition-all duration-300">
-        {% csrf_token %}
+    <section class="mb-6 bg-white p-6 rounded-lg shadow-sm border-l-4 border-blue-600">
         <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full lg:max-w-xl">
-
                 <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Numer Kolczyka</label>
-                    <input type="text" name="ear_tag" id="ear_tag_input" value="{{ form.ear_tag.value }}"
-                           class="w-full border rounded px-3 py-1.5 text-gray-800 font-semibold focus:ring-2 focus:ring-blue-500 bg-gray-100 cursor-not-allowed transition" readonly>
+                    <p class="block text-xs font-bold text-gray-500 uppercase mb-1">Numer Kolczyka</p>
+                    <p class="w-full border rounded px-3 py-1.5 text-gray-800 font-semibold bg-gray-50">{{ sow.ear_tag }}</p>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Data wprowadzenia do stada</label>
-                    <input type="date" name="entry_date" id="entry_date_input" value="{{ form.entry_date.value|date:'Y-m-d' }}"
-                           class="w-full border rounded px-3 py-1.5 text-gray-800 focus:ring-2 focus:ring-blue-500 bg-gray-100 cursor-not-allowed transition" readonly>
+                    <p class="block text-xs font-bold text-gray-500 uppercase mb-1">Data wprowadzenia do stada</p>
+                    <p class="w-full border rounded px-3 py-1.5 text-gray-800 bg-gray-50">{{ sow.entry_date|date:"d.m.Y" }}</p>
                 </div>
             </div>
 
             <div class="flex flex-wrap gap-2 w-full lg:w-auto justify-end items-center">
                 <a href="{% url 'add_event' sow.id %}" id="btnAddEvent" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-extrabold py-2.5 px-5 rounded-lg shadow-md hover:shadow-lg transition transform hover:-translate-y-0.5">
-                    🚀 + Dodaj zdarzenie
+                    Dodaj zdarzenie
                 </a>
-                <button type="button" id="btnEditData" onclick="toggleEditMode()" class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 text-sm font-medium py-2 px-4 rounded-lg shadow-sm transition">
-                    ✏️ Edytuj dane
+                <a href="{% url 'edit_sow' sow.id %}" class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 text-sm font-medium py-2 px-4 rounded-lg shadow-sm transition">
+                    Edytuj maciorę
+                </a>
+                <button type="button" id="btnDeleteSow" onclick="openDeleteModal()" class="bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 px-4 rounded-lg shadow transition">
+                    Usuń
                 </button>
                 <a href="{% url 'dashboard' %}" id="btnGoBack" class="bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm font-bold py-2 px-4 rounded-lg shadow transition">
                     Wróć
                 </a>
-
-                <button type="button" id="btnDeleteSow" onclick="openDeleteModal()" class="hidden bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 px-4 rounded-lg shadow transition">
-                    🗑️ Usuń
-                </button>
-                <button type="button" id="btnCancelEdit" onclick="cancelEditMode()" class="hidden bg-gray-400 hover:bg-gray-500 text-white text-sm font-bold py-2 px-4 rounded-lg shadow transition">
-                    Anuluj
-                </button>
-                <button type="submit" id="btnSaveEdit" name="edit_sow" class="hidden bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 px-4 rounded-lg shadow transition">
-                    💾 Zapisz zmiany
-                </button>
             </div>
         </div>
         <p class="text-xs text-gray-400 mt-3">ID systemu: {{ sow.id }} | Data utworzenia profilu: {{ sow.created_at|date:"d.m.Y H:i" }}</p>
-    </form>
+    </section>
 
     <h2 class="text-lg font-bold text-gray-700 mb-3">Statystyki produkcyjne (Średnie na cykl)</h2>
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -95,7 +84,7 @@
                         <th class="p-4">Data zdarzenia</th>
                         <th class="p-4">Typ</th>
                         <th class="p-4">Szczegóły</th>
-                        <th class="p-4 text-center action-col hidden transition">Akcje</th>
+                        <th class="p-4 text-center">Akcje</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200" id="eventsTableBody">
@@ -143,12 +132,12 @@
                                 Nazwa: <strong class="text-teal-700">{{ event.details.vaccine_name|default:"Brak nazwy" }}</strong>
                             {% endif %}
                         </td>
-                        <td class="p-4 action-col hidden transition">
+                        <td class="p-4">
                             <div class="flex justify-center items-center gap-4">
-                                <a href="{% url 'edit_event' event.id %}" class="text-indigo-500 hover:text-indigo-700 font-bold transition">✏️ Edytuj</a>
+                                <a href="{% url 'edit_event' event.id %}" class="text-indigo-500 hover:text-indigo-700 font-bold transition">Szczegóły / edytuj</a>
                                 <form method="post" action="{% url 'delete_event' event.id %}" class="inline" onsubmit="return confirm('Czy na pewno chcesz bezpowrotnie usunąć to zdarzenie z historii maciory?');">
                                     {% csrf_token %}
-                                    <button type="submit" class="text-red-500 hover:text-red-700 font-bold transition">🗑️ Usuń</button>
+                                    <button type="submit" class="text-red-500 hover:text-red-700 font-bold transition">Usuń</button>
                                 </form>
                             </div>
                         </td>
@@ -214,6 +203,37 @@
 {% block scripts %}
 
 <script>
+    function openDeleteModal() {
+        const modal = document.getElementById('deleteModal');
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        checkDeleteConfirmation('{{ sow.ear_tag }}');
+    }
+
+    function closeDeleteModal() {
+        const modal = document.getElementById('deleteModal');
+        if (!modal) return;
+        modal.classList.add('hidden');
+    }
+
+    function checkDeleteConfirmation(expectedEarTag) {
+        const input = document.getElementById('confirmEarTag');
+        const button = document.getElementById('deleteBtn');
+        const archiveCheckbox = document.querySelector('#deleteModal input[name="archive"]');
+
+        if (!input || !button) return;
+
+        const confirmed = input.value.trim() === expectedEarTag;
+        const isArchive = archiveCheckbox ? archiveCheckbox.checked : false;
+
+        button.disabled = !confirmed;
+        button.textContent = isArchive ? 'Zarchiwizuj' : 'Usuń bezpowrotnie';
+        button.classList.toggle('bg-red-600', confirmed);
+        button.classList.toggle('hover:bg-red-700', confirmed);
+        button.classList.toggle('bg-gray-400', !confirmed);
+        button.classList.toggle('cursor-not-allowed', !confirmed);
+    }
+
     document.addEventListener("DOMContentLoaded", () => {
         new PaginationTable({
             tableId: 'eventsTable',

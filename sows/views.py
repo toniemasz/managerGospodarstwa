@@ -17,7 +17,7 @@ from .forms import (
     VaccinationPlanForm,
     empty_bulk_event_initials,
 )
-from .models import SowModel, SowEventModel
+from .models import SowModel, SowEventModel, VaccinationPlanModel
 from farms.services.farm_service import get_or_create_user_farm
 from farms.services.date_range import PERIOD_OPTIONS, parse_date_range
 
@@ -64,6 +64,34 @@ def add_sow_view(request):
 
 
 @login_required
+def edit_sow_view(request, sow_id):
+    farm = _current_farm(request)
+    db_sow = get_object_or_404(SowModel, id=sow_id, farm=farm)
+
+    if request.method == 'POST':
+        form = SowForm(request.POST, instance=db_sow)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Dane maciory zostały zaktualizowane.")
+            return redirect('sow_detail', sow_id=db_sow.id)
+    else:
+        form = SowForm(instance=db_sow)
+
+    return render(request, 'sows/add_sow.html', {
+        'form': form,
+        'sow': db_sow,
+        'is_edit': True,
+    })
+
+
+@login_required
+def vaccination_plans_view(request):
+    farm = _current_farm(request)
+    plans = VaccinationPlanModel.objects.filter(farm=farm).order_by('name')
+    return render(request, 'sows/vaccination_plans.html', {'plans': plans})
+
+
+@login_required
 def add_vaccination_plan_view(request):
     """Widok odpowiedzialny za konfigurację nowych szczepień cyklicznych."""
     farm = _current_farm(request)
@@ -73,11 +101,43 @@ def add_vaccination_plan_view(request):
             plan = form.save(commit=False)
             plan.farm = farm
             plan.save()
-            return redirect('dashboard')
+            messages.success(request, "Reguła szczepienia została dodana.")
+            return redirect('vaccination_plans')
     else:
         form = VaccinationPlanForm(farm=farm)
 
-    return render(request, 'sows/add_vaccination_plan.html', {'form': form})
+    return render(request, 'sows/add_vaccination_plan.html', {'form': form, 'is_edit': False})
+
+
+@login_required
+def edit_vaccination_plan_view(request, plan_id):
+    farm = _current_farm(request)
+    plan = get_object_or_404(VaccinationPlanModel, id=plan_id, farm=farm)
+
+    if request.method == 'POST':
+        form = VaccinationPlanForm(request.POST, instance=plan, farm=farm)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Reguła szczepienia została zaktualizowana.")
+            return redirect('vaccination_plans')
+    else:
+        form = VaccinationPlanForm(instance=plan, farm=farm)
+
+    return render(request, 'sows/add_vaccination_plan.html', {
+        'form': form,
+        'plan': plan,
+        'is_edit': True,
+    })
+
+
+@login_required
+def delete_vaccination_plan_view(request, plan_id):
+    farm = _current_farm(request)
+    plan = get_object_or_404(VaccinationPlanModel, id=plan_id, farm=farm)
+    if request.method == 'POST':
+        plan.delete()
+        messages.success(request, "Reguła szczepienia została usunięta.")
+    return redirect('vaccination_plans')
 
 
 @login_required

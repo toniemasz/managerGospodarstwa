@@ -1,15 +1,15 @@
 {% extends 'base.html' %}
-{% block title %}Konfiguracja Szczepienia{% endblock %}
+{% block title %}{% if is_edit %}Edycja Szczepienia{% else %}Konfiguracja Szczepienia{% endif %}{% endblock %}
 
 {% block content %}
 <main class="app-page app-page-narrow">
     <section class="page-header">
         <div>
             <p class="eyebrow">Maciory</p>
-            <h1>Reguła szczepienia</h1>
+            <h1>{% if is_edit %}Edytuj regułę szczepienia{% else %}Reguła szczepienia{% endif %}</h1>
             <p class="page-subtitle">Wybierz jedną metodę wyzwalania przypomnienia.</p>
         </div>
-        <a href="{% url 'dashboard' %}" class="button button-secondary">Wróć</a>
+        <a href="{% url 'vaccination_plans' %}" class="button button-secondary">Wróć</a>
     </section>
 
     <section class="panel">
@@ -58,8 +58,10 @@
             </div>
 
             <div class="form-actions">
-                <a href="{% url 'dashboard' %}" class="button button-secondary">Anuluj</a>
-                <button type="submit" class="button button-primary">Zapisz regułę</button>
+                <a href="{% url 'vaccination_plans' %}" class="button button-secondary">Anuluj</a>
+                <button type="submit" class="button button-primary">
+                    {% if is_edit %}Zapisz zmiany{% else %}Zapisz regułę{% endif %}
+                </button>
             </div>
         </form>
     </section>

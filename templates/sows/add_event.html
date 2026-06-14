@@ -1,12 +1,12 @@
 {% extends 'base.html' %}
-{% block title %}{% if event %}Edytuj Zdarzenie{% else %}Nowe Zdarzenie{% endif %}{% endblock %}
+{% block title %}{% if event %}Szczegóły Zdarzenia{% else %}Nowe Zdarzenie{% endif %}{% endblock %}
 
 {% block content %}
 <main class="app-page app-page-narrow">
     <section class="page-header">
         <div>
             <p class="eyebrow">Maciory</p>
-            <h1>{% if event %}Edytuj zdarzenie{% else %}Nowe zdarzenie{% endif %}</h1>
+            <h1>{% if event %}Szczegóły zdarzenia{% else %}Nowe zdarzenie{% endif %}</h1>
             <p class="page-subtitle">Maciora {{ sow.ear_tag }}</p>
         </div>
         <a href="{% url 'sow_detail' sow.id %}" class="button button-secondary">Wróć</a>

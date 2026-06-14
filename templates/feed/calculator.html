@@ -31,6 +31,7 @@
                             <th>Receptura</th>
                             <th class="text-right">Koszt 1 kg</th>
                             <th class="text-right">Koszt 1 tony</th>
+                            <th class="text-right">Akcje</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -41,10 +42,13 @@
                             </td>
                             <td class="text-right"><strong>{{ cost.cost_per_kg|floatformat:4 }}</strong> PLN</td>
                             <td class="text-right"><strong>{{ cost.cost_per_ton|floatformat:2 }}</strong> PLN</td>
+                            <td class="text-right">
+                                <a href="{% url 'edit_recipe' cost.recipe_id %}" class="table-link">Edytuj</a>
+                            </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="3" class="empty-table">Brak receptur do przeliczenia.</td>
+                            <td colspan="4" class="empty-table">Brak receptur do przeliczenia.</td>
                         </tr>
                         {% endfor %}
                     </tbody>

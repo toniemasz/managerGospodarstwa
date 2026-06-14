@@ -246,17 +246,12 @@ def add_production_view(request):
         form = ProductionForm(farm=farm, initial=initial)
 
     recipes = RecipeModel.objects.filter(farm=farm).prefetch_related('items__ingredient').order_by('name')
-    return render(request, 'feed/production_form.html', {'form': form, 'recipes': recipes})
+    return render(request, 'feed/production_form.html', {'form': form, 'recipes': recipes, 'is_edit': False})
 
 @login_required
 def edit_production_view(request, pk):
     farm = _current_farm(request)
     production = get_object_or_404(ProductionModel, pk=pk, recipe__farm=farm)
-
-    # Zabezpieczenie: Nie edytujemy śrutowania, które już zmieniło stan magazynu
-    if production.status == ProductionModel.Statuses.COMPLETED:
-        messages.error(request, "Nie można edytować zakończonego śrutowania.")
-        return redirect('feed_productions')
 
     if request.method == 'POST':
         form = ProductionForm(request.POST, instance=production, farm=farm)

@@ -15,7 +15,7 @@
             <a href="{% url 'bulk_sow_events' %}?rows=1" class="button button-secondary">Dodaj zdarzenie</a>
             <a href="{% url 'bulk_sow_events' %}" class="button button-secondary">Masowe zdarzenia</a>
             <a href="{% url 'general_statistics' %}" class="button button-secondary">Statystyki</a>
-            <a href="{% url 'add_vaccination_plan' %}" class="button button-secondary">Szczepienia</a>
+            <a href="{% url 'vaccination_plans' %}" class="button button-secondary">Szczepienia</a>
             <a href="{% url 'archived_sows' %}" class="button button-secondary">Archiwum</a>
             <a href="{% url 'add_sow' %}" class="button button-primary">Dodaj maciorę</a>
         </div>
@@ -83,7 +83,7 @@
         <div class="section-heading">
             <div>
                 <h2>Lista macior</h2>
-                <p>Kliknij w wiersz, aby przejść do karty maciory.</p>
+                <p>Lista aktywnych macior bieżącego gospodarstwa.</p>
             </div>
         </div>
 
@@ -96,15 +96,15 @@
                         <th>W stadzie od</th>
                         <th>Przewidywany poród</th>
                         <th class="text-right">Urodzone żywe</th>
+                        <th class="text-right">Akcje</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for sow in all_sows %}
-                    <tr class="sow-row clickable-row"
+                    <tr class="sow-row"
                         data-search="{{ sow.ear_tag }}"
-                        data-filter="{{ sow.status }}"
-                        onclick="window.location.href='{% url 'sow_detail' sow.id %}'">
-                        <td><strong>{{ sow.ear_tag }}</strong></td>
+                        data-filter="{{ sow.status }}">
+                        <td><a href="{% url 'sow_detail' sow.id %}" class="table-link"><strong>{{ sow.ear_tag }}</strong></a></td>
                         <td>
                             {% if sow.status == "INSEMINATED" %}
                                 <span class="status-pill status-blue">{{ sow.dynamic_status_display }}</span>
@@ -123,10 +123,16 @@
                         <td>{{ sow.entry_date|date:"d.m.Y" }}</td>
                         <td>{{ sow.expected_farrowing_date|date:"d.m.Y"|default:"--" }}</td>
                         <td class="text-right"><strong>{{ sow.total_born_alive }}</strong> szt.</td>
+                        <td class="text-right">
+                            <div class="row-actions">
+                                <a href="{% url 'sow_detail' sow.id %}" class="table-link">Szczegóły</a>
+                                <a href="{% url 'edit_sow' sow.id %}" class="table-link">Edytuj</a>
+                            </div>
+                        </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="empty-table">Brak macior w bazie danych.</td>
+                        <td colspan="6" class="empty-table">Brak macior w bazie danych.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
