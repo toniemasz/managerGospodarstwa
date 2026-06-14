@@ -89,7 +89,7 @@
         </div>
 
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200 text-left text-sm text-gray-600">
+            <table class="min-w-full divide-y divide-gray-200 text-left text-sm text-gray-600" id="eventsTable">
                 <thead class="bg-gray-100 text-xs uppercase text-gray-500 font-bold">
                     <tr>
                         <th class="p-4">Data zdarzenia</th>
@@ -216,7 +216,8 @@
 <script>
     document.addEventListener("DOMContentLoaded", () => {
         new PaginationTable({
-            rowSelector: '.event-row',
+            tableId: 'eventsTable',
+            rowSelector: '#eventsTable .event-row',
             filterSelectId: 'eventFilter',
             limitSelectId: 'eventLimitSelect',
             paginationContainerId: 'eventPaginationControls'

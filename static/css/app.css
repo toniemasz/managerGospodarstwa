@@ -198,29 +198,37 @@ input[type="checkbox"] { width: 1rem; height: 1rem; accent-color: var(--primary)
     }
 }
 /* Tabela rozliczenia - inputy dopasowane do zawartości */
-.settlement-table {
+.settlement-table,
+.bulk-event-table {
     table-layout: auto;
     width: max-content;
     min-width: 100%;
 }
 
 .settlement-table th,
-.settlement-table td {
+.settlement-table td,
+.bulk-event-table th,
+.bulk-event-table td {
     white-space: nowrap;
     vertical-align: middle;
 }
 
 .settlement-table input,
-.settlement-table select {
+.settlement-table select,
+.bulk-event-table input,
+.bulk-event-table select,
+.bulk-event-table textarea {
     width: auto;
     min-width: 8ch;
     max-width: none;
     box-sizing: content-box;
 }
 
-.settlement-table input[type="checkbox"] {
+.settlement-table input[type="checkbox"],
+.bulk-event-table input[type="checkbox"] {
     width: auto;
     min-width: auto;
+    box-sizing: border-box;
 }
 
 .settlement-table input[name$="-line_no"] {
@@ -239,6 +247,60 @@ input[type="checkbox"] { width: 1rem; height: 1rem; accent-color: var(--primary)
 .settlement-table input[name$="-vat_value"],
 .settlement-table input[name$="-gross_value"] {
     min-width: 10ch;
+}
+
+.bulk-event-table input[name$="-sow_ear_tag"] {
+    min-width: 12ch;
+}
+
+.bulk-event-table input[type="date"] {
+    min-width: 13ch;
+}
+
+.bulk-event-table select[name$="-event_type"],
+.bulk-event-table select[name$="-vaccine_name"] {
+    min-width: 18ch;
+}
+
+.bulk-cell-with-action {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+}
+
+.mini-button {
+    display: inline-flex;
+    width: 2.1rem;
+    min-width: 2.1rem;
+    height: 2.1rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-strong);
+    border-radius: .65rem;
+    background: #ffffff;
+    color: #475569;
+    font-weight: 950;
+    cursor: pointer;
+    transition: .18s ease;
+}
+
+.mini-button:hover {
+    border-color: #bfdbfe;
+    background: #eff6ff;
+    color: var(--primary);
+}
+
+.auto-resize-field {
+    width: auto;
+    max-width: 100%;
+}
+
+.form-field .auto-resize-field {
+    min-width: min(100%, 12ch);
+}
+
+.chronology-note {
+    margin-bottom: 1rem;
 }
 
 .table-scroll {

@@ -126,11 +126,17 @@ def bulk_sow_events_view(request):
     farm = _current_farm(request)
     service = BulkSowEventService(farm=farm)
     sows = SowModel.objects.filter(farm=farm, is_archived=False).order_by('ear_tag')
+    is_single = request.GET.get('rows') == '1'
 
     try:
-        initial_count = max(1, min(20, int(request.GET.get('rows', '8'))))
+        requested_rows = int(request.GET.get('rows', '1' if is_single else '8'))
     except ValueError:
-        initial_count = 8
+        requested_rows = 1 if is_single else 8
+
+    if is_single:
+        initial_count = 1
+    else:
+        initial_count = max(2, min(20, requested_rows))
 
     if request.method == 'POST':
         formset = BulkSowEventFormSet(request.POST, prefix='events', form_kwargs={'farm': farm})
@@ -160,7 +166,7 @@ def bulk_sow_events_view(request):
     return render(request, 'sows/bulk_events.html', {
         'formset': formset,
         'sows': sows,
-        'is_single': initial_count == 1,
+        'is_single': is_single,
     })
 
 

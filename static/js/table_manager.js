@@ -2,9 +2,16 @@ class PaginationTable {
     constructor(config = {}) {
         this.config = config;
 
+        this.table = this.resolveTable(config);
         this.rows = this.resolveRows(config);
-        this.table = this.rows.length ? this.rows[0].closest('table') : null;
+        if (!this.table && this.rows.length) {
+            this.table = this.rows[0].closest('table');
+        }
         this.scope = this.resolveScope(config);
+
+        if (this.table) {
+            this.table.dataset.paginationInitialized = 'true';
+        }
 
         this.searchInput = this.resolveElement(config.searchInputId, [
             'input[type="search"]',
@@ -39,20 +46,52 @@ class PaginationTable {
         this.filteredRows = [...this.rows];
 
         this.prepareControlsLayout();
+
+        if (!this.rows.length) {
+            return;
+        }
+
         this.prepareRows();
         this.initEvents();
         this.filterData();
     }
 
+    resolveTable(config) {
+        if (config.tableId) {
+            const table = document.getElementById(config.tableId);
+            if (table) return table;
+        }
+
+        if (config.tableSelector) {
+            const table = document.querySelector(config.tableSelector);
+            if (table) return table;
+        }
+
+        if (config.rowSelector) {
+            const row = document.querySelector(config.rowSelector);
+            if (row) return row.closest('table');
+        }
+
+        return null;
+    }
+
+    filterDataRows(rows) {
+        return rows.filter((row) => {
+            if (row.dataset.paginationEmpty === 'true') return false;
+            if (row.querySelector('.empty-table')) return false;
+            return row.querySelectorAll('td').length > 0;
+        });
+    }
+
     resolveRows(config) {
         if (config.rowSelector) {
-            const rows = Array.from(document.querySelectorAll(config.rowSelector));
+            const rows = this.filterDataRows(Array.from(document.querySelectorAll(config.rowSelector)));
             if (rows.length) return rows;
         }
 
-        if (config.tableId) {
-            const table = document.getElementById(config.tableId);
-            if (table) return Array.from(table.querySelectorAll('tbody tr'));
+        const table = this.table || (config.tableId ? document.getElementById(config.tableId) : null);
+        if (table) {
+            return this.filterDataRows(Array.from(table.querySelectorAll('tbody tr')));
         }
 
         return [];
@@ -425,22 +464,27 @@ function enhanceDataTables() {
 
 // ... existing code ...
 
+function hasEditableTableFields(table) {
+    return Boolean(table.querySelector(
+        'input:not([type="hidden"]):not([type="submit"]):not([type="button"]), select, textarea'
+    ));
+}
+
 function autoInitPaginationTables() {
     document.querySelectorAll('table').forEach((table, index) => {
         if (table.dataset.paginationInitialized === 'true') return;
         if (table.closest('[data-no-pagination="true"]')) return;
         if (table.dataset.noPagination === 'true') return;
+        if (hasEditableTableFields(table)) return;
 
         const tbody = table.querySelector('tbody');
         if (!tbody) return;
 
         const tbodyRows = Array.from(
             tbody.querySelectorAll('tr:not([data-pagination-empty="true"])')
-        ).filter((row) => row.querySelectorAll('td').length > 0);
+        ).filter((row) => row.querySelectorAll('td').length > 0 && !row.querySelector('.empty-table'));
 
         if (!tbodyRows.length) return;
-
-        table.dataset.paginationInitialized = 'true';
 
         if (!table.id) {
             table.id = `auto-table-${index + 1}`;
@@ -519,11 +563,68 @@ function ensureTableControls(table) {
     }
 }
 
+function getResizeText(field) {
+    if (field.tagName === 'SELECT') {
+        const option = field.options[field.selectedIndex];
+        return option ? option.text : '';
+    }
+
+    return field.value || field.placeholder || field.getAttribute('aria-label') || '';
+}
+
+function resizeAutoField(field) {
+    if (!field || field.type === 'checkbox' || field.type === 'radio' || field.type === 'hidden') {
+        return;
+    }
+
+    const isTableField = Boolean(field.closest('table'));
+    const text = getResizeText(field);
+    const min = parseInt(field.dataset.autoResizeMin || '', 10) || (field.tagName === 'SELECT' ? 10 : 6);
+    const max = parseInt(field.dataset.autoResizeMax || '', 10) || (isTableField ? 44 : 72);
+    const width = Math.min(max, Math.max(min, text.length + 2));
+
+    field.style.width = `${width}ch`;
+    field.style.maxWidth = '100%';
+
+    if (field.tagName === 'TEXTAREA') {
+        field.style.height = 'auto';
+        field.style.height = `${Math.max(field.scrollHeight, 44)}px`;
+    }
+}
+
+function bindAutoResizeField(field) {
+    if (!field || field.dataset.autoResizeBound === 'true') return;
+
+    field.dataset.autoResizeBound = 'true';
+    field.classList.add('auto-resize-field');
+    resizeAutoField(field);
+
+    field.addEventListener('input', () => resizeAutoField(field));
+    field.addEventListener('change', () => resizeAutoField(field));
+}
+
+function enhanceAutoResizeFields(root = document) {
+    const selector = [
+        'table input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"])',
+        'table select',
+        'table textarea',
+        '.bulk-event-input',
+        '.settlement-input',
+        '.form-field input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"])',
+        '.form-field select',
+        '.form-field textarea'
+    ].join(', ');
+
+    root.querySelectorAll(selector).forEach(bindAutoResizeField);
+}
+
 
 document.addEventListener('DOMContentLoaded', () => {
     enhanceDataTables();
     autoInitPaginationTables();
+    enhanceAutoResizeFields();
 });
 
 window.PaginationTable = PaginationTable;
 window.enhanceDataTables = enhanceDataTables;
+window.enhanceAutoResizeFields = enhanceAutoResizeFields;

@@ -174,6 +174,25 @@ class TestSowViews:
         assert "OWN-1" in response.content.decode()
         assert "OTHER-1" not in response.content.decode()
 
+    def test_dashboard_renders_more_than_first_page_of_sows(self, setup_client):
+        for index in range(15):
+            SowModel.objects.create(ear_tag=f"PAGE-{index:02d}", farm=setup_client.farm)
+
+        response = setup_client.get(reverse('dashboard'))
+        content = response.content.decode()
+
+        assert response.status_code == 200
+        assert "PAGE-00" in content
+        assert "PAGE-14" in content
+
+    def test_single_bulk_event_mode_has_only_one_row_without_add_button(self, setup_client):
+        response = setup_client.get(f"{reverse('bulk_sow_events')}?rows=1")
+        content = response.content.decode()
+
+        assert response.status_code == 200
+        assert 'id="add-bulk-event-row"' not in content
+        assert 'name="events-TOTAL_FORMS" value="1"' in content
+
     def test_bulk_sow_events_view_creates_valid_events(self, setup_client):
         sow = SowModel.objects.create(ear_tag="BULK-1", farm=setup_client.farm)
 
@@ -212,3 +231,25 @@ class TestSowViews:
 
         assert response.status_code == 200
         assert not SowEventModel.objects.filter(sow=sow, event_type='FARROWING').exists()
+
+    def test_bulk_sow_events_view_blocks_out_of_order_rows_for_same_sow(self, setup_client):
+        sow = SowModel.objects.create(ear_tag="BULK-ORDER", farm=setup_client.farm)
+
+        response = setup_client.post(reverse('bulk_sow_events'), {
+            'events-TOTAL_FORMS': '2',
+            'events-INITIAL_FORMS': '0',
+            'events-MIN_NUM_FORMS': '0',
+            'events-MAX_NUM_FORMS': '1000',
+            'events-0-sow_ear_tag': sow.ear_tag,
+            'events-0-event_type': 'INSEMINATION',
+            'events-0-event_date': '2026-06-20',
+            'events-0-technician': 'Jan',
+            'events-1-sow_ear_tag': sow.ear_tag,
+            'events-1-event_type': 'INSEMINATION',
+            'events-1-event_date': '2026-06-19',
+            'events-1-technician': 'Jan',
+        })
+
+        assert response.status_code == 200
+        assert "chronologicznie od góry do dołu" in response.content.decode()
+        assert not SowEventModel.objects.filter(sow=sow).exists()

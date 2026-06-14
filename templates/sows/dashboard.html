@@ -168,7 +168,8 @@
 <script>
     document.addEventListener("DOMContentLoaded", () => {
         new PaginationTable({
-            rowSelector: '.sow-row',
+            tableId: 'sowsTable',
+            rowSelector: '#sowsTable .sow-row',
             searchInputId: 'searchInput',
             filterSelectId: 'statusFilter',
             limitSelectId: 'limitSelect',
