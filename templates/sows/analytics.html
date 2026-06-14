@@ -78,19 +78,26 @@
                         <th>Numer kolczyka</th>
                         <th>Status</th>
                         <th class="text-right">Wynik</th>
+                        <th class="text-right">Akcje</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for item in top_sows %}
-                    <tr class="clickable-row" onclick="window.location.href='{% url 'sow_detail' item.id %}'">
+                    <tr>
                         <td>{{ forloop.counter }}</td>
-                        <td><strong>{{ item.ear_tag }}</strong></td>
+                        <td><a href="{% url 'sow_detail' item.id %}" class="table-link"><strong>{{ item.ear_tag }}</strong></a></td>
                         <td><span class="status-pill">{{ item.status }}</span></td>
                         <td class="text-right"><strong>{{ item.total_value }}</strong> {{ current_metric.unit }}</td>
+                        <td class="text-right">
+                            <div class="row-actions">
+                                <a href="{% url 'sow_detail' item.id %}" class="table-link">Szczegóły</a>
+                                <a href="{% url 'edit_sow' item.id %}" class="table-link">Edytuj</a>
+                            </div>
+                        </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="empty-table">Brak danych w wybranym okresie.</td>
+                        <td colspan="5" class="empty-table">Brak danych w wybranym okresie.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

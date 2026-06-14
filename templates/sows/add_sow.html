@@ -1,15 +1,25 @@
 {% extends 'base.html' %}
-{% block title %}Dodaj Maciorę{% endblock %}
+{% block title %}{% if is_edit %}Edytuj Maciorę{% else %}Dodaj Maciorę{% endif %}{% endblock %}
 
 {% block content %}
 <main class="app-page app-page-narrow">
     <section class="page-header">
         <div>
             <p class="eyebrow">Maciory</p>
-            <h1>Dodaj maciorę</h1>
-            <p class="page-subtitle">Nowy rekord zostanie przypisany do bieżącego gospodarstwa.</p>
+            <h1>{% if is_edit %}Edytuj maciorę{% else %}Dodaj maciorę{% endif %}</h1>
+            <p class="page-subtitle">
+                {% if is_edit %}
+                    Aktualizacja danych podstawowych maciory {{ sow.ear_tag }}.
+                {% else %}
+                    Nowy rekord zostanie przypisany do bieżącego gospodarstwa.
+                {% endif %}
+            </p>
         </div>
-        <a href="{% url 'dashboard' %}" class="button button-secondary">Wróć</a>
+        {% if is_edit %}
+            <a href="{% url 'sow_detail' sow.id %}" class="button button-secondary">Wróć</a>
+        {% else %}
+            <a href="{% url 'dashboard' %}" class="button button-secondary">Wróć</a>
+        {% endif %}
     </section>
 
     <section class="panel">
@@ -23,8 +33,13 @@
             </div>
             {% endfor %}
             <div class="form-actions">
-                <a href="{% url 'dashboard' %}" class="button button-secondary">Anuluj</a>
-                <button type="submit" class="button button-primary">Zapisz</button>
+                {% if is_edit %}
+                    <a href="{% url 'sow_detail' sow.id %}" class="button button-secondary">Anuluj</a>
+                    <button type="submit" class="button button-primary">Zapisz zmiany</button>
+                {% else %}
+                    <a href="{% url 'dashboard' %}" class="button button-secondary">Anuluj</a>
+                    <button type="submit" class="button button-primary">Zapisz</button>
+                {% endif %}
             </div>
         </form>
     </section>

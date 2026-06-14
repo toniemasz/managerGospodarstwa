@@ -75,6 +75,10 @@ tbody tr:last-child td { border-bottom: 0; }
 .text-right { text-align: right; }
 .table-link { display: inline-flex; align-items: center; justify-content: center; border-radius: .7rem; background: #eef2ff; padding: .45rem .65rem; color: #3730a3; font-size: .8rem; font-weight: 900; }
 .table-link:hover { background: #e0e7ff; }
+.row-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .45rem; }
+.link-button-danger { display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: .7rem; background: #fef2f2; padding: .45rem .65rem; color: var(--danger); font-size: .8rem; font-weight: 900; cursor: pointer; }
+.link-button-danger:hover { background: #fee2e2; }
+.muted-small { color: var(--muted); font-size: .8rem; font-weight: 750; }
 .empty-table, .empty-state { padding: 2rem; text-align: center; color: #94a3b8; font-weight: 800; }
 .table-footer-controls, .filter-bar { display: flex; flex-direction: column; gap: .9rem; padding: 1rem 1.25rem; border: 1px solid var(--border); border-radius: 1rem; background: white; box-shadow: var(--shadow); }
 .table-panel .table-footer-controls { border-width: 0 0 1px; border-radius: 0; box-shadow: none; background: #f8fafc; }

@@ -9,7 +9,10 @@
             <h1>Etap 2: dodatki ręczne</h1>
             <p class="page-subtitle">{{ production.recipe.name }} · {{ production.quantity_kg|floatformat:0 }} kg</p>
         </div>
-        <a href="{% url 'feed_productions' %}" class="button button-secondary">Wróć</a>
+        <div class="header-actions">
+            <a href="{% url 'edit_production' production.id %}" class="button button-secondary">Edytuj śrutowanie</a>
+            <a href="{% url 'feed_productions' %}" class="button button-secondary">Wróć</a>
+        </div>
     </section>
 
     <section class="stats-grid">

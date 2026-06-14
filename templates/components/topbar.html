@@ -7,9 +7,9 @@
 
     <nav class="main-nav" aria-label="Główna nawigacja">
         <a href="{% url 'modules_home' %}" class="main-nav-link {% if active == 'modules_home' %}is-active{% endif %}">Centrala</a>
-        <a href="{% url 'dashboard' %}" class="main-nav-link {% if active == 'dashboard' or active == 'sow_detail' or active == 'add_sow' or active == 'add_event' or active == 'bulk_sow_events' or active == 'bulk_pregnancy_check' or active == 'bulk_vaccinate' or active == 'general_statistics' or active == 'archived_sows' or active == 'add_vaccination_plan' %}is-active{% endif %}">Maciory</a>
-        <a href="{% url 'feed_inventory' %}" class="main-nav-link {% if active == 'ingredient_list' or active == 'feed_inventory' or active == 'feed_full_inventory' or active == 'feed_recipes' or active == 'recipe_detail' or active == 'add_recipe' or active == 'feed_productions' or active == 'add_production' or active == 'process_stage1' or active == 'process_stage2' or active == 'feed_calculator' %}is-active{% endif %}">Pasze</a>
-        <a href="{% url 'sales_list' %}" class="main-nav-link {% if active == 'sales_list' or active == 'add_sale' %}is-active{% endif %}">Sprzedaż</a>
+        <a href="{% url 'dashboard' %}" class="main-nav-link {% if active == 'dashboard' or active == 'sow_detail' or active == 'add_sow' or active == 'edit_sow' or active == 'add_event' or active == 'edit_event' or active == 'bulk_sow_events' or active == 'bulk_pregnancy_check' or active == 'bulk_vaccinate' or active == 'general_statistics' or active == 'archived_sows' or active == 'vaccination_plans' or active == 'add_vaccination_plan' or active == 'edit_vaccination_plan' %}is-active{% endif %}">Maciory</a>
+        <a href="{% url 'feed_inventory' %}" class="main-nav-link {% if active == 'ingredient_list' or active == 'add_ingredient' or active == 'edit_ingredient' or active == 'feed_inventory' or active == 'add_delivery' or active == 'edit_delivery' or active == 'feed_full_inventory' or active == 'feed_recipes' or active == 'recipe_detail' or active == 'add_recipe' or active == 'edit_recipe' or active == 'feed_productions' or active == 'add_production' or active == 'edit_production' or active == 'process_stage1' or active == 'process_stage2' or active == 'feed_calculator' %}is-active{% endif %}">Pasze</a>
+        <a href="{% url 'sales_list' %}" class="main-nav-link {% if active == 'sales_list' or active == 'add_sale' or active == 'edit_sale' %}is-active{% endif %}">Sprzedaż</a>
     </nav>
 
     <div class="user-menu">
