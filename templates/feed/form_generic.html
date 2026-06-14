@@ -45,6 +45,17 @@
             </div>
         </form>
     </div>
+
+    {% if delete_url and delete_id %}
+    <div class="mt-4 rounded-xl border border-red-200 bg-white p-6 shadow-sm">
+        <h2 class="text-base font-black text-red-700">Usuwanie rekordu</h2>
+        <p class="mt-1 text-sm font-semibold text-slate-500">Ta operacja wymaga potwierdzenia.</p>
+        <form method="post" action="{% url delete_url delete_id %}" class="mt-4 flex justify-end" onsubmit="return confirm('{{ delete_confirm|escapejs }}');">
+            {% csrf_token %}
+            <button type="submit" class="button button-danger">{{ delete_label|default:"Usuń" }}</button>
+        </form>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
 

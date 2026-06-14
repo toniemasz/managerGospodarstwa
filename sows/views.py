@@ -266,6 +266,7 @@ def bulk_vaccinate_view(request):
 
         if request.POST.get('confirm') == 'yes':
             _create_vaccination_events(sow_ids, vaccine_name, cycle_id, farm)
+            messages.success(request, f"Zapisano szczepienie dla {len(sow_ids)} macior.")
             return redirect('dashboard')
         else:
             sows = SowModel.objects.filter(id__in=sow_ids, farm=farm)
@@ -275,7 +276,12 @@ def bulk_vaccinate_view(request):
                 'cycle_id': cycle_id
             })
 
-    return redirect('dashboard')
+    service = SowDashboardService(farm=farm)
+    context = service.get_dashboard_summary()
+    return render(request, 'sows/bulk_vaccinate.html', {
+        'vaccination_groups': context['vaccination_groups'],
+        'vaccinations_due_count': context['vaccinations_due_count'],
+    })
 
 
 @login_required

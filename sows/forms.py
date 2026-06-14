@@ -66,7 +66,7 @@ class SowForm(forms.ModelForm):
             'entry_date': 'Data wprowadzenia do stada',
         }
         widgets = {
-            'entry_date': forms.DateInput(attrs={'type': 'date'}),
+            'entry_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
         }
 
 
@@ -97,7 +97,7 @@ class SowEventForm(forms.ModelForm):
             'event_date': 'Data zdarzenia',
         }
         widgets = {
-            'event_date': forms.DateInput(attrs={'type': 'date'}),
+            'event_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -193,7 +193,7 @@ class SowEventForm(forms.ModelForm):
 class BulkSowEventRowForm(forms.Form):
     sow_ear_tag = forms.CharField(label="Maciora", required=False, max_length=50)
     event_type = forms.ChoiceField(label="Typ zdarzenia", choices=[('', '---')] + SowEventModel.EVENT_TYPES, required=False)
-    event_date = forms.DateField(label="Data", required=False, widget=forms.DateInput(attrs={'type': 'date'}))
+    event_date = forms.DateField(label="Data", required=False, widget=forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}))
     technician = forms.CharField(label="Inseminator", required=False)
     pregnancy_result = forms.ChoiceField(
         label="Wynik USG",

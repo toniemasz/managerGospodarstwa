@@ -47,10 +47,6 @@
 
             <div class="recipe-card-actions">
                 <a href="{% url 'edit_recipe' card.recipe.id %}" class="button button-secondary">Edytuj</a>
-                <form method="post" action="{% url 'delete_recipe' card.recipe.id %}" onsubmit="return confirm('Czy na pewno usunąć recepturę: {{ card.recipe.name }}?');">
-                    {% csrf_token %}
-                    <button type="submit" class="button button-danger">Usuń</button>
-                </form>
             </div>
         </article>
         {% empty %}

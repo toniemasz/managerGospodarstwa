@@ -30,9 +30,6 @@
                 <a href="{% url 'edit_sow' sow.id %}" class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 text-sm font-medium py-2 px-4 rounded-lg shadow-sm transition">
                     Edytuj maciorę
                 </a>
-                <button type="button" id="btnDeleteSow" onclick="openDeleteModal()" class="bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 px-4 rounded-lg shadow transition">
-                    Usuń
-                </button>
                 <a href="{% url 'dashboard' %}" id="btnGoBack" class="bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm font-bold py-2 px-4 rounded-lg shadow transition">
                     Wróć
                 </a>
@@ -134,11 +131,7 @@
                         </td>
                         <td class="p-4">
                             <div class="flex justify-center items-center gap-4">
-                                <a href="{% url 'edit_event' event.id %}" class="text-indigo-500 hover:text-indigo-700 font-bold transition">Szczegóły / edytuj</a>
-                                <form method="post" action="{% url 'delete_event' event.id %}" class="inline" onsubmit="return confirm('Czy na pewno chcesz bezpowrotnie usunąć to zdarzenie z historii maciory?');">
-                                    {% csrf_token %}
-                                    <button type="submit" class="text-red-500 hover:text-red-700 font-bold transition">Usuń</button>
-                                </form>
+                                <a href="{% url 'edit_event' event.id %}" class="text-indigo-500 hover:text-indigo-700 font-bold transition">Edytuj</a>
                             </div>
                         </td>
                     </tr>
@@ -165,75 +158,11 @@
         </div>
 
     </div>
-<div id="deleteModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex justify-center items-center">
-    <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md relative">
-        <h3 class="text-xl font-bold text-red-600 mb-4">⚠️ Usuwanie maciory</h3>
-        <p class="text-gray-700 mb-4">
-            Czy na pewno chcesz usunąć maciorę o numerze <strong>{{ sow.ear_tag }}</strong>? Ta operacja jest nieodwracalna i usunie również historię jej zdarzeń!
-        </p>
-        <form method="post" action="{% url 'delete_sow' sow.id %}">
-            {% csrf_token %}
-
-            <div class="mb-4 text-left">
-                <label class="flex items-center cursor-pointer">
-                    <input type="checkbox" name="archive" checked class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500" onchange="checkDeleteConfirmation('{{ sow.ear_tag }}')">
-                    <span class="ml-2 text-gray-800 font-medium">Zarchiwizuj (statystyki i zdarzenia zostaną)</span>
-                </label>
-            </div>
-
-            <p class="text-sm text-gray-500 mb-2">Aby potwierdzić, przepisz poniżej jej numer kolczyka:</p>
-
-            <input type="text" id="confirmEarTag" placeholder="{{ sow.ear_tag }}"
-                   class="w-full border rounded px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-red-500 mb-4"
-                   oninput="checkDeleteConfirmation('{{ sow.ear_tag }}')">
-
-            <div class="flex justify-end gap-3">
-                <button type="button" onclick="closeDeleteModal()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded transition">
-                    Anuluj
-                </button>
-                <button type="submit" id="deleteBtn" disabled class="bg-gray-400 text-white font-bold py-2 px-4 rounded cursor-not-allowed transition">
-                    Usuń bezpowrotnie
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
 {% endblock %}
 
 {% block scripts %}
 
 <script>
-    function openDeleteModal() {
-        const modal = document.getElementById('deleteModal');
-        if (!modal) return;
-        modal.classList.remove('hidden');
-        checkDeleteConfirmation('{{ sow.ear_tag }}');
-    }
-
-    function closeDeleteModal() {
-        const modal = document.getElementById('deleteModal');
-        if (!modal) return;
-        modal.classList.add('hidden');
-    }
-
-    function checkDeleteConfirmation(expectedEarTag) {
-        const input = document.getElementById('confirmEarTag');
-        const button = document.getElementById('deleteBtn');
-        const archiveCheckbox = document.querySelector('#deleteModal input[name="archive"]');
-
-        if (!input || !button) return;
-
-        const confirmed = input.value.trim() === expectedEarTag;
-        const isArchive = archiveCheckbox ? archiveCheckbox.checked : false;
-
-        button.disabled = !confirmed;
-        button.textContent = isArchive ? 'Zarchiwizuj' : 'Usuń bezpowrotnie';
-        button.classList.toggle('bg-red-600', confirmed);
-        button.classList.toggle('hover:bg-red-700', confirmed);
-        button.classList.toggle('bg-gray-400', !confirmed);
-        button.classList.toggle('cursor-not-allowed', !confirmed);
-    }
-
     document.addEventListener("DOMContentLoaded", () => {
         new PaginationTable({
             tableId: 'eventsTable',

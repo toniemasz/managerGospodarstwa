@@ -80,6 +80,23 @@
             </div>
         </form>
     </section>
+
+    {% if event %}
+    <section class="panel compact-panel">
+        <div class="section-heading">
+            <div>
+                <h2>Usuwanie zdarzenia</h2>
+                <p>Usunięcie zmieni historię i przeliczenia tej maciory.</p>
+            </div>
+        </div>
+        <form method="post" action="{% url 'delete_event' event.id %}" class="responsive-form" onsubmit="return confirm('Czy na pewno usunąć to zdarzenie z historii maciory?');">
+            {% csrf_token %}
+            <div class="form-actions">
+                <button type="submit" class="button button-danger">Usuń zdarzenie</button>
+            </div>
+        </form>
+    </section>
+    {% endif %}
 </main>
 {% endblock %}
 

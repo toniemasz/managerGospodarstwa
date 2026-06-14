@@ -104,6 +104,17 @@
                 <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold shadow transition">💾 Zapisz Recepturę</button>
             </div>
         </form>
+
+        {% if is_edit %}
+        <div class="mt-6 border-t border-red-100 pt-6">
+            <h2 class="text-base font-black text-red-700">Usuwanie receptury</h2>
+            <p class="mt-1 text-sm font-semibold text-gray-500">Usunięcie receptury wymaga potwierdzenia.</p>
+            <form method="post" action="{% url 'delete_recipe' recipe.id %}" class="mt-4 flex justify-end" onsubmit="return confirm('Czy na pewno usunąć recepturę: {{ recipe.name|escapejs }}?');">
+                {% csrf_token %}
+                <button type="submit" class="button button-danger">Usuń recepturę</button>
+            </form>
+        </div>
+        {% endif %}
     </div>
 </div>
 

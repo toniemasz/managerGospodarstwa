@@ -46,10 +46,6 @@
                         <td class="text-right">
                             <div class="row-actions">
                                 <a href="{% url 'edit_ingredient' ingredient.id %}" class="table-link">Edytuj</a>
-                                <form method="post" action="{% url 'delete_ingredient' ingredient.id %}" onsubmit="return confirm('Czy na pewno usunąć ten składnik?');">
-                                    {% csrf_token %}
-                                    <button type="submit" class="link-button-danger">Usuń</button>
-                                </form>
                             </div>
                         </td>
                     </tr>

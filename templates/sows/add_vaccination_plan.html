@@ -65,5 +65,22 @@
             </div>
         </form>
     </section>
+
+    {% if is_edit %}
+    <section class="panel compact-panel">
+        <div class="section-heading">
+            <div>
+                <h2>Usuwanie reguły</h2>
+                <p>Usunięcie reguły zatrzyma przyszłe przypomnienia dla tego szczepienia.</p>
+            </div>
+        </div>
+        <form method="post" action="{% url 'delete_vaccination_plan' plan.id %}" class="responsive-form" onsubmit="return confirm('Czy na pewno usunąć regułę szczepienia: {{ plan.name|escapejs }}?');">
+            {% csrf_token %}
+            <div class="form-actions">
+                <button type="submit" class="button button-danger">Usuń regułę</button>
+            </div>
+        </form>
+    </section>
+    {% endif %}
 </main>
 {% endblock %}

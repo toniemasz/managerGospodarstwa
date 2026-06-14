@@ -171,6 +171,23 @@
             <button type="submit" name="save_sale" value="1" class="button button-primary">Zapisz sprzedaż</button>
         </div>
     </form>
+
+    {% if is_edit %}
+    <section class="panel compact-panel">
+        <div class="section-heading">
+            <div>
+                <h2>Usuwanie dokumentu</h2>
+                <p>Usunięcie sprzedaży usunie też wiersze rozliczenia klas.</p>
+            </div>
+        </div>
+        <form method="post" action="{% url 'delete_sale' sale.id %}" class="responsive-form" onsubmit="return confirm('Czy na pewno usunąć ten dokument sprzedaży?');">
+            {% csrf_token %}
+            <div class="form-actions">
+                <button type="submit" class="button button-danger">Usuń sprzedaż</button>
+            </div>
+        </form>
+    </section>
+    {% endif %}
 </main>
 {% endblock %}
 

@@ -60,6 +60,7 @@ class SowDashboardService:
             'to_recheck_count': status_counts['to_recheck_count'],
             'sows_to_check_usg': sows_to_check_usg,
             'vaccination_groups': dict(vaccination_groups),
+            'vaccinations_due_count': sum(len(items) for items in vaccination_groups.values()),
             'all_sows': sows,
         }
 
