@@ -113,7 +113,7 @@
 
             {{ row_formset.management_form }}
             <div class="table-scroll">
-                <table class="data-table settlement-table">
+                <table class="data-table settlement-table" data-no-pagination="true">
                     <thead>
                         <tr>
                             <th>Lp</th>
@@ -205,6 +205,7 @@
         }
 
         resizeSettlementInputs();
+        window.enhanceAutoResizeFields?.(document.querySelector('.settlement-table'));
 
         if (!addButton || !rows || !template || !totalForms) return;
 
@@ -223,6 +224,7 @@
             }
 
             resizeSettlementInputs(newRow);
+            window.enhanceAutoResizeFields?.(newRow);
         });
     });
 </script>

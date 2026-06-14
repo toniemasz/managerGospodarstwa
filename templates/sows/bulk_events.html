@@ -34,18 +34,28 @@
 
     <form method="post" class="responsive-form">
         {% csrf_token %}
+        {% if not is_single %}
+        <section class="notice notice-warning chronology-note">
+            <div>
+                <h2>Kolejność zdarzeń</h2>
+                <p>Jeśli wpisujesz kilka zdarzeń dla tej samej maciory, dodawaj je chronologicznie od góry do dołu: od najstarszego do najnowszego.</p>
+            </div>
+        </section>
+        {% endif %}
         <section class="panel table-panel">
             <div class="section-heading">
                 <div>
                     <h2>Tabela zdarzeń</h2>
                     <p>Zapis nastąpi dopiero wtedy, gdy wszystkie wypełnione wiersze przejdą walidację cyklu maciory.</p>
                 </div>
+                {% if not is_single %}
                 <button type="button" id="add-bulk-event-row" class="button button-secondary">Dodaj wiersz</button>
+                {% endif %}
             </div>
 
             {{ formset.management_form }}
             <div class="table-scroll">
-                <table class="data-table bulk-event-table">
+                <table class="data-table bulk-event-table" data-no-pagination="true">
                     <thead>
                         <tr>
                             <th>Maciora</th>
@@ -66,7 +76,9 @@
                             <td>
                                 <div class="bulk-cell-with-action">
                                     {{ form.sow_ear_tag }}
+                                    {% if not is_single %}
                                     <button type="button" class="mini-button copy-sow" title="Skopiuj maciorę z wiersza wyżej">↥</button>
+                                    {% endif %}
                                 </div>
                                 {{ form.sow_ear_tag.errors }}
                                 {{ form.non_field_errors }}
@@ -228,15 +240,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    addButton.addEventListener('click', () => {
-        const index = parseInt(totalForms.value, 10);
-        const html = template.innerHTML.replaceAll('__prefix__', index);
+    if (addButton) {
+        addButton.addEventListener('click', () => {
+            const index = parseInt(totalForms.value, 10);
+            const html = template.innerHTML.replaceAll('__prefix__', index);
 
-        rows.insertAdjacentHTML('beforeend', html);
-        totalForms.value = index + 1;
+            rows.insertAdjacentHTML('beforeend', html);
+            totalForms.value = index + 1;
 
-        prepareRow(rows.lastElementChild);
-    });
+            prepareRow(rows.lastElementChild);
+            window.enhanceAutoResizeFields?.(rows.lastElementChild);
+        });
+    }
 
     const form = rows.closest('form');
     if (form) {

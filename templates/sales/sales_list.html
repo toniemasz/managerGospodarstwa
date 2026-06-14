@@ -71,12 +71,12 @@
             </div>
         </div>
         <div class="table-scroll">
-            <table class="data-table">
+            <table class="data-table" id="salesTable">
                 <thead>
                     <tr>
                         <th>Data sprzedaży</th>
-                        <th>Data uboju</th>
                         <th>Dokument</th>
+                        <th>Tatuaż</th>
                         <th>Status</th>
                         <th class="text-right">Ilość</th>
                         <th class="text-right">Waga</th>
@@ -86,11 +86,12 @@
                 <tbody>
                     {% for sale in sales %}
                     <tr class="sale-row clickable-row"
-                        data-search="{{ sale.document_number }} {{ sale.sale_date|date:'d.m.Y' }}"
+                        data-search="{{ sale.document_number }} {{ sale.tattoo }} {{ sale.sale_date|date:'d.m.Y' }}"
                         data-filter="{% if sale.no_settlement %}PENDING{% else %}READY{% endif %}"
                         onclick="window.location.href='{% url 'edit_sale' sale.id %}'">
                         <td><strong>{{ sale.sale_date|date:"d.m.Y"|default:"--" }}</strong></td>
                         <td>{{ sale.document_number|default:"--" }}</td>
+                        <td>{{ sale.tattoo|default:"--" }}</td>
                         <td>
                             {% if sale.no_settlement %}
                                 <span class="status-pill status-amber">{{ sale.settlement_status }}</span>
@@ -141,7 +142,8 @@
 <script>
     document.addEventListener("DOMContentLoaded", () => {
         new PaginationTable({
-            rowSelector: '.sale-row',
+            tableId: 'salesTable',
+            rowSelector: '#salesTable .sale-row',
             searchInputId: 'searchInput',
             filterSelectId: 'statusFilter',
             limitSelectId: 'limitSelect',

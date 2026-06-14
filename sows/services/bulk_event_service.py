@@ -84,7 +84,11 @@ class BulkSowEventService:
             grouped_rows[row.sow.id].append(row)
 
         for sow_id, sow_rows in grouped_rows.items():
-            sow_rows.sort(key=lambda row: (row.event_date, row.form_index))
+            self._validate_input_order(sow_rows, result)
+            if any(row.form_index in result.errors for row in sow_rows):
+                continue
+
+            sow_rows.sort(key=lambda row: row.form_index)
             sow = self.repository.get_sow_by_id(sow_id)
             pending_events = []
 
@@ -133,6 +137,17 @@ class BulkSowEventService:
         ]
         SowEventModel.objects.bulk_create(events)
         return len(events)
+
+    @staticmethod
+    def _validate_input_order(rows: list[BulkEventRow], result: BulkEventResult) -> None:
+        previous_row = None
+        for row in sorted(rows, key=lambda item: item.form_index):
+            if previous_row and row.event_date < previous_row.event_date:
+                result.add_error(
+                    row.form_index,
+                    "Zdarzenia dla tej samej maciory wpisz chronologicznie od góry do dołu: od najstarszego do najnowszego.",
+                )
+            previous_row = row
 
     @staticmethod
     def _is_event_allowed(status: str, event_type: str) -> bool:
