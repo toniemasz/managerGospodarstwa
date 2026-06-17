@@ -72,12 +72,33 @@
                 </div>
             </div>
 
+            {% if requires_farrowing_confirmation %}
+            <div class="notice notice-warning">
+                <div>
+                    <h2>Potwierdź oproszenie</h2>
+                    <p>{{ farrowing_confirmation_message }}</p>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" name="farrowing_decision" value="without_check" class="button button-primary">
+                    Dodaj oproszenie bez badania
+                </button>
+                <button type="submit" name="farrowing_decision" value="auto_check" class="button button-secondary">
+                    Dodaj automatyczne badanie TAK i oproszenie
+                </button>
+                <button type="submit" name="farrowing_decision" value="cancel" class="button button-secondary">
+                    Anuluj
+                </button>
+            </div>
+            {% else %}
+
             <div class="form-actions">
                 <a href="{% url 'sow_detail' sow.id %}" class="button button-secondary">Anuluj</a>
                 <button type="submit" class="button button-primary">
                     {% if event %}Zapisz zmiany{% else %}Zapisz zdarzenie{% endif %}
                 </button>
             </div>
+            {% endif %}
         </form>
     </section>
 
@@ -89,7 +110,7 @@
                 <p>Usunięcie zmieni historię i przeliczenia tej maciory.</p>
             </div>
         </div>
-        <form method="post" action="{% url 'delete_event' event.id %}" class="responsive-form" onsubmit="return confirm('Czy na pewno usunąć to zdarzenie z historii maciory?');">
+        <form method="post" action="{% url 'delete_event' event.id %}" class="responsive-form" data-confirm="Czy na pewno usunąć to zdarzenie z historii maciory?">
             {% csrf_token %}
             <div class="form-actions">
                 <button type="submit" class="button button-danger">Usuń zdarzenie</button>
@@ -98,89 +119,4 @@
     </section>
     {% endif %}
 </main>
-{% endblock %}
-
-{% block scripts %}
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const typeSelect = document.getElementById('id_event_type');
-
-    const sections = {
-        INSEMINATION: document.getElementById('sec_insemination'),
-        PREGNANCY_CHECK: document.getElementById('sec_pregnancy_check'),
-        FARROWING: document.getElementById('sec_farrowing'),
-        WEANING: document.getElementById('sec_weaning'),
-        VACCINATION: document.getElementById('sec_vaccination')
-    };
-
-    const fieldsByType = {
-        INSEMINATION: ['id_technician'],
-        PREGNANCY_CHECK: ['id_pregnancy_result'],
-        FARROWING: ['id_born_alive', 'id_born_dead'],
-        WEANING: ['id_count'],
-        VACCINATION: ['id_vaccine_name']
-    };
-
-    const allDynamicFieldIds = [
-        'id_technician',
-        'id_pregnancy_result',
-        'id_born_alive',
-        'id_born_dead',
-        'id_count',
-        'id_vaccine_name'
-    ];
-
-    function setFieldState(field, enabled, shouldClear) {
-        if (!field) return;
-
-        field.disabled = !enabled;
-        field.closest('.form-field')?.classList.toggle('is-muted', !enabled);
-
-        if (!enabled) {
-            field.classList.add('opacity-60', 'cursor-not-allowed');
-            field.setAttribute('aria-disabled', 'true');
-
-            if (shouldClear) {
-                if (field.tagName === 'SELECT') {
-                    field.selectedIndex = 0;
-                } else {
-                    field.value = '';
-                }
-            }
-        } else {
-            field.classList.remove('opacity-60', 'cursor-not-allowed');
-            field.removeAttribute('aria-disabled');
-        }
-    }
-
-    function toggleFields(shouldClear = false) {
-        if (!typeSelect) return;
-
-        const eventType = typeSelect.value;
-        const activeFieldIds = fieldsByType[eventType] || [];
-
-        Object.entries(sections).forEach(function ([type, section]) {
-            if (!section) return;
-
-            const isActive = type === eventType;
-            section.classList.toggle('hidden', !isActive);
-            section.classList.toggle('opacity-60', !isActive);
-        });
-
-        allDynamicFieldIds.forEach(function (fieldId) {
-            const field = document.getElementById(fieldId);
-            const isEnabled = activeFieldIds.includes(fieldId);
-            setFieldState(field, isEnabled, shouldClear);
-        });
-    }
-
-    if (typeSelect) {
-        typeSelect.addEventListener('change', function () {
-            toggleFields(true);
-        });
-
-        toggleFields(false);
-    }
-});
-</script>
 {% endblock %}

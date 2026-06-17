@@ -6,36 +6,9 @@ from dataclasses import dataclass, field
 from django.db import transaction
 
 from sows.models import SowEventModel
+from sows.domain.sow_state_machine import SowStateMachine
 from sows.services.sow_lifecycle import SowEvent
 from sows.services.sow_repository import SowRepository
-
-
-STATE_RULES = {
-    'LACTATING': {
-        'allowed': {'WEANING'},
-        'message': "Maciora jest karmiąca. Następnym zdarzeniem powinno być odsadzenie.",
-    },
-    'IDLE': {
-        'allowed': {'INSEMINATION'},
-        'message': "Maciora jest jałowa. Rozpocznij cykl od inseminacji.",
-    },
-    'INSEMINATED': {
-        'allowed': {'PREGNANCY_CHECK', 'INSEMINATION'},
-        'message': "Po inseminacji można dodać badanie USG albo ponowną inseminację.",
-    },
-    'TO_CHECK': {
-        'allowed': {'PREGNANCY_CHECK', 'INSEMINATION'},
-        'message': "Maciora oczekuje na badanie USG. Dodaj badanie albo ponowną inseminację.",
-    },
-    'TO_RECHECK': {
-        'allowed': {'PREGNANCY_CHECK', 'INSEMINATION'},
-        'message': "Maciora jest do rebadania. Dodaj badanie USG albo nową inseminację.",
-    },
-    'PREGNANT': {
-        'allowed': {'FARROWING', 'INSEMINATION'},
-        'message': "Maciora jest prośna. Następnym naturalnym zdarzeniem jest oproszenie.",
-    },
-}
 
 
 @dataclass
@@ -109,11 +82,7 @@ class BulkSowEventService:
                 simulated_sow.update_state_for_date(row.event_date)
 
                 if not self._is_event_allowed(simulated_sow.status, row.event_type):
-                    message = STATE_RULES.get(simulated_sow.status, {}).get(
-                        'message',
-                        "To zdarzenie nie pasuje do aktualnego statusu maciory.",
-                    )
-                    result.add_error(row.form_index, message)
+                    result.add_error(row.form_index, SowStateMachine.get_error_message(simulated_sow.status))
                     continue
 
                 pending_events.append(SowEvent(
@@ -135,7 +104,7 @@ class BulkSowEventService:
             )
             for row in rows
         ]
-        SowEventModel.objects.bulk_create(events)
+        self.repository.bulk_create_events(events)
         return len(events)
 
     @staticmethod
@@ -151,12 +120,9 @@ class BulkSowEventService:
 
     @staticmethod
     def _is_event_allowed(status: str, event_type: str) -> bool:
-        if event_type == 'VACCINATION':
-            return True
-        rule = STATE_RULES.get(status)
-        if not rule:
-            return True
-        return event_type in rule['allowed']
+        if SowStateMachine.requires_confirmation(status, event_type):
+            return False
+        return SowStateMachine.can_add_event(status, event_type)
 
     @staticmethod
     def _would_insert_before_existing_production_event(sow, row: BulkEventRow) -> bool:

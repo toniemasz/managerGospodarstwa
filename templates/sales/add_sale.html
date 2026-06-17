@@ -12,16 +12,6 @@
         <a href="{% url 'sales_list' %}" class="button button-secondary">Wróć</a>
     </section>
 
-    {% if messages %}
-    <section class="message-stack">
-        {% for message in messages %}
-        <div class="alert {% if message.tags == 'error' %}alert-error{% else %}alert-success{% endif %}">
-            {{ message }}
-        </div>
-        {% endfor %}
-    </section>
-    {% endif %}
-
     <form method="post" enctype="multipart/form-data" class="responsive-form" id="sale-form">
         {% csrf_token %}
 
@@ -180,7 +170,7 @@
                 <p>Usunięcie sprzedaży usunie też wiersze rozliczenia klas.</p>
             </div>
         </div>
-        <form method="post" action="{% url 'delete_sale' sale.id %}" class="responsive-form" onsubmit="return confirm('Czy na pewno usunąć ten dokument sprzedaży?');">
+        <form method="post" action="{% url 'delete_sale' sale.id %}" class="responsive-form" data-confirm="Czy na pewno usunąć ten dokument sprzedaży?">
             {% csrf_token %}
             <div class="form-actions">
                 <button type="submit" class="button button-danger">Usuń sprzedaż</button>
@@ -189,60 +179,4 @@
     </section>
     {% endif %}
 </main>
-{% endblock %}
-
-{% block scripts %}
-<script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const addButton = document.getElementById('add-settlement-row');
-        const rows = document.getElementById('settlement-rows');
-        const template = document.getElementById('settlement-row-template');
-        const totalForms = document.getElementById('id_rows-TOTAL_FORMS');
-
-        function resizeInput(input) {
-            if (!input || input.type === 'checkbox' || input.tagName === 'SELECT') return;
-
-            const valueLength = input.value ? input.value.length : 0;
-            const placeholderLength = input.placeholder ? input.placeholder.length : 0;
-            const minLength = 6;
-
-            const finalLength = Math.max(valueLength, placeholderLength, minLength);
-
-            input.style.width = `${finalLength + 2}ch`;
-        }
-
-        function resizeSettlementInputs(container = document) {
-            container.querySelectorAll('.settlement-table input').forEach(input => {
-                resizeInput(input);
-
-                input.addEventListener('input', () => {
-                    resizeInput(input);
-                });
-            });
-        }
-
-        resizeSettlementInputs();
-        window.enhanceAutoResizeFields?.(document.querySelector('.settlement-table'));
-
-        if (!addButton || !rows || !template || !totalForms) return;
-
-        addButton.addEventListener('click', () => {
-            const index = parseInt(totalForms.value, 10);
-            const html = template.innerHTML.replaceAll('__prefix__', index);
-
-            rows.insertAdjacentHTML('beforeend', html);
-            totalForms.value = index + 1;
-
-            const newRow = rows.lastElementChild;
-
-            const lineInput = newRow.querySelector('input[name$="-line_no"]');
-            if (lineInput && !lineInput.value) {
-                lineInput.value = index + 1;
-            }
-
-            resizeSettlementInputs(newRow);
-            window.enhanceAutoResizeFields?.(newRow);
-        });
-    });
-</script>
 {% endblock %}

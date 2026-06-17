@@ -1,48 +1,45 @@
 {% extends 'base.html' %}
-{% block title %}Pełny Stan Magazynu{% endblock %}
+{% block title %}Pełny stan magazynu{% endblock %}
 
 {% block content %}
-<div class="container mx-auto p-4 md:p-6 max-w-5xl">
-    <header class="mb-6 flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
-        <h1 class="text-xl md:text-2xl font-bold text-gray-800">📦 Pełny Stan Magazynu</h1>
-        <a href="{% url 'feed_inventory' %}" class="bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm font-bold py-2 px-4 rounded transition">← Wróć do Magazynu</a>
-    </header>
+<main class="app-page">
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Pasze</p>
+            <h1>Pełny stan magazynu</h1>
+            <p class="page-subtitle">Bieżąca ilość każdego składnika z podziałem na silosy i składniki workowane.</p>
+        </div>
+        <a href="{% url 'feed_inventory' %}" class="button button-secondary">Wróć do magazynu</a>
+    </section>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <section class="inventory-grid">
         {% for item in inventory %}
-        <div class="bg-white p-5 rounded-lg shadow-sm border border-gray-200 flex justify-between items-center gap-4 transition hover:shadow-md">
+        <article class="inventory-card">
             <div>
-                <h3 class="font-bold text-gray-800 text-lg">{{ item.name }}</h3>
-                <span class="text-xs font-bold px-2 py-0.5 rounded mt-1 inline-block {% if item.is_in_bin %}bg-blue-100 text-blue-800 border border-blue-200{% else %}bg-orange-100 text-orange-800 border border-orange-200{% endif %}">
-                    {% if item.is_in_bin %}Silos (BIN){% else %}Worek (Ręcznie){% endif %}
-                </span>
-                <div class="mt-3">
-                    <a href="{% url 'edit_ingredient' item.ingredient_id %}" class="table-link">Edytuj składnik</a>
-                </div>
+                <h3>{{ item.name }}</h3>
+                {% if item.is_in_bin %}
+                    <span class="status-pill status-blue">Silos</span>
+                {% else %}
+                    <span class="status-pill status-amber">Worek</span>
+                {% endif %}
+                <p><a href="{% url 'edit_ingredient' item.ingredient_id %}" class="table-link">Edytuj składnik</a></p>
             </div>
-            <div class="text-right">
-                <span class="text-2xl font-black {% if item.current_stock < 500 %}text-red-600{% else %}text-blue-600{% endif %}">
+            <div class="inventory-stock {% if item.current_stock < low_stock_threshold_kg %}is-low{% endif %}">
+                <strong>
                     {% if item.current_stock > 1000 %}
                         {{ item.current_stock_in_t|floatformat:2 }}
                     {% else %}
                         {{ item.current_stock|floatformat:2 }}
                     {% endif %}
-                </span>
-
-                <span class="text-sm font-bold text-gray-500 block">
-                    {% if item.current_stock > 1000 %}
-                        t
-                    {% else %}
-                        kg
-                    {% endif %}
-                </span>
+                </strong>
+                <span>{% if item.current_stock > 1000 %}t{% else %}kg{% endif %}</span>
             </div>
-        </div>
+        </article>
         {% empty %}
-        <div class="col-span-full bg-white p-6 text-center text-gray-400 italic rounded-lg border">
+        <section class="panel empty-state">
             Brak zdefiniowanych składników. Dodaj je w module "Składniki".
-        </div>
+        </section>
         {% endfor %}
-    </div>
-</div>
+    </section>
+</main>
 {% endblock %}

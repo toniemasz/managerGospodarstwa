@@ -59,7 +59,13 @@
             </div>
         </div>
         <div class="chart-box">
-            <canvas id="trendChart"></canvas>
+            <canvas
+                id="trendChart"
+                data-chart-type="line"
+                data-chart-label="{{ current_metric.display_name }}"
+                data-chart-labels='{{ chart_labels|safe }}'
+                data-chart-values='{{ chart_values|safe }}'
+            ></canvas>
         </div>
     </section>
 
@@ -108,45 +114,4 @@
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-    const periodSelect = document.getElementById('period');
-    const dateInputs = [document.getElementById('date_from'), document.getElementById('date_to')];
-
-    function syncDateInputs() {
-        const isCustom = periodSelect.value === 'custom';
-        dateInputs.forEach(input => {
-            input.disabled = !isCustom;
-            input.closest('.table-control').classList.toggle('is-muted', !isCustom);
-        });
-    }
-    periodSelect.addEventListener('change', syncDateInputs);
-    syncDateInputs();
-
-    const ctx = document.getElementById('trendChart').getContext('2d');
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: {{ chart_labels|safe }},
-            datasets: [{
-                label: '{{ current_metric.display_name }}',
-                data: {{ chart_values|safe }},
-                borderColor: '#2364aa',
-                backgroundColor: 'rgba(35, 100, 170, 0.12)',
-                borderWidth: 3,
-                tension: 0.25,
-                fill: true,
-                pointRadius: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: { beginAtZero: true }
-            }
-        }
-    });
-});
-</script>
 {% endblock %}

@@ -1,5 +1,6 @@
 from datetime import date
 from decimal import Decimal
+from unittest.mock import patch
 
 import pytest
 from django.contrib import admin
@@ -7,8 +8,9 @@ from django.contrib.auth.models import User
 from django.test import Client
 from django.urls import reverse
 
-from sales.forms import PigSaleForm
-from sales.models import PigSaleModel
+from sales.forms import PigSaleForm, SaleClassRowFormSet
+from sales.models import PigSaleModel, SaleClassRowModel
+from sales.services.sale_form_service import SaleFormService
 from sales.services.sale_repository import SaleRepository
 from farms.services.farm_service import get_or_create_user_farm
 
@@ -116,3 +118,81 @@ def test_sale_repository_filters_data_by_farm():
     sales = SaleRepository(farm=farm).get_all_sales()
 
     assert [sale.id for sale in sales] == [own_sale.id]
+
+
+@pytest.mark.django_db
+def test_sale_repository_filters_sales_between_dates():
+    user = User.objects.create_user(username='sale-date-owner')
+    farm = get_or_create_user_farm(user)
+    in_range = PigSaleModel.objects.create(
+        farm=farm,
+        sale_date=date(2026, 6, 10),
+        quantity=10,
+        total_weight=Decimal('900.00'),
+        meat_class='E',
+        price_per_kg=Decimal('8.00'),
+    )
+    PigSaleModel.objects.create(
+        farm=farm,
+        sale_date=date(2026, 5, 10),
+        quantity=5,
+        total_weight=Decimal('450.00'),
+        meat_class='U',
+        price_per_kg=Decimal('7.00'),
+    )
+
+    sales = SaleRepository(farm=farm).get_sales_between(
+        date_from=date(2026, 6, 1),
+        date_to=date(2026, 6, 30),
+    )
+
+    assert [sale.id for sale in sales] == [in_range.id]
+
+
+@pytest.mark.django_db
+def test_sale_form_service_rolls_back_rows_when_new_rows_fail(auth_client):
+    sale = PigSaleModel.objects.create(
+        farm=auth_client.farm,
+        sale_date=date(2026, 6, 4),
+        quantity=3,
+        total_weight=Decimal('300.00'),
+        meat_class='E',
+        price_per_kg=Decimal('8.00'),
+    )
+    old_row = SaleClassRowModel.objects.create(
+        sale=sale,
+        line_no=1,
+        meat_class='E',
+        quantity=3,
+        weight=Decimal('300.00'),
+        price_per_kg=Decimal('8.00'),
+        gross_value=Decimal('2400.00'),
+    )
+    form = PigSaleForm(data={
+        'sale_date': '2026-06-05',
+        'document_number': 'FV/1',
+        'tattoo': 'ABC',
+    }, instance=sale)
+    formset = SaleClassRowFormSet(data={
+        'rows-TOTAL_FORMS': '1',
+        'rows-INITIAL_FORMS': '0',
+        'rows-MIN_NUM_FORMS': '0',
+        'rows-MAX_NUM_FORMS': '1000',
+        'rows-0-line_no': '1',
+        'rows-0-meat_class': 'U',
+        'rows-0-quantity': '4',
+        'rows-0-weight': '400.00',
+        'rows-0-price_per_kg': '7.50',
+        'rows-0-gross_value': '3000.00',
+    }, prefix='rows')
+
+    assert form.is_valid() is True
+    assert formset.is_valid() is True
+
+    with patch('sales.services.sale_form_service.SaleClassRowModel.objects.bulk_create', side_effect=RuntimeError):
+        with pytest.raises(RuntimeError):
+            SaleFormService(farm=auth_client.farm).save_sale(form, formset, sale)
+
+    assert SaleClassRowModel.objects.filter(id=old_row.id, sale=sale).exists()
+    sale.refresh_from_db()
+    assert sale.sale_date == date(2026, 6, 4)

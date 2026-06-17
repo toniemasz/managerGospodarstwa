@@ -6,10 +6,15 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.utils import timezone
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 
 from .services.sow_dashboard_service import SowDashboardService
-from .services.sow_repository import SowRepository
+from .services.sow_repository import SowRepository, VaccinationPlanRepository
 from .services.bulk_event_service import BulkSowEventService
+from .services.sow_event_service import (
+    FARROWING_DECISION_CANCEL,
+    SowEventService,
+)
 from .forms import (
     BulkSowEventFormSet,
     SowForm,
@@ -17,20 +22,11 @@ from .forms import (
     VaccinationPlanForm,
     empty_bulk_event_initials,
 )
-from .models import SowModel, SowEventModel, VaccinationPlanModel
-from farms.services.farm_service import get_or_create_user_farm
+from .models import SowModel, SowEventModel
+from farms.services.current_farm import get_current_farm
 from farms.services.date_range import PERIOD_OPTIONS, parse_date_range
 
 logger = logging.getLogger(__name__)
-
-
-def _current_farm(request):
-    farm = getattr(request, 'farm', None)
-    if farm is None and request.user.is_authenticated:
-        farm = get_or_create_user_farm(request.user)
-        request.farm = farm
-    return farm
-
 
 @login_required
 def modules_home_view(request):
@@ -40,7 +36,7 @@ def modules_home_view(request):
 @login_required
 def dashboard_view(request):
     try:
-        service = SowDashboardService(farm=_current_farm(request))
+        service = SowDashboardService(farm=get_current_farm(request))
         context = service.get_dashboard_summary()
         return render(request, 'sows/dashboard.html', context)
     except Exception:
@@ -50,7 +46,7 @@ def dashboard_view(request):
 
 @login_required
 def add_sow_view(request):
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     if request.method == 'POST':
         form = SowForm(request.POST)
         if form.is_valid():
@@ -65,7 +61,7 @@ def add_sow_view(request):
 
 @login_required
 def edit_sow_view(request, sow_id):
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     db_sow = get_object_or_404(SowModel, id=sow_id, farm=farm)
 
     if request.method == 'POST':
@@ -86,15 +82,15 @@ def edit_sow_view(request, sow_id):
 
 @login_required
 def vaccination_plans_view(request):
-    farm = _current_farm(request)
-    plans = VaccinationPlanModel.objects.filter(farm=farm).order_by('name')
+    farm = get_current_farm(request)
+    plans = VaccinationPlanRepository(farm=farm).get_all_plans()
     return render(request, 'sows/vaccination_plans.html', {'plans': plans})
 
 
 @login_required
 def add_vaccination_plan_view(request):
     """Widok odpowiedzialny za konfigurację nowych szczepień cyklicznych."""
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     if request.method == 'POST':
         form = VaccinationPlanForm(request.POST, farm=farm)
         if form.is_valid():
@@ -111,8 +107,8 @@ def add_vaccination_plan_view(request):
 
 @login_required
 def edit_vaccination_plan_view(request, plan_id):
-    farm = _current_farm(request)
-    plan = get_object_or_404(VaccinationPlanModel, id=plan_id, farm=farm)
+    farm = get_current_farm(request)
+    plan = VaccinationPlanRepository(farm=farm).get_plan_model_by_id(plan_id)
 
     if request.method == 'POST':
         form = VaccinationPlanForm(request.POST, instance=plan, farm=farm)
@@ -132,8 +128,8 @@ def edit_vaccination_plan_view(request, plan_id):
 
 @login_required
 def delete_vaccination_plan_view(request, plan_id):
-    farm = _current_farm(request)
-    plan = get_object_or_404(VaccinationPlanModel, id=plan_id, farm=farm)
+    farm = get_current_farm(request)
+    plan = VaccinationPlanRepository(farm=farm).get_plan_model_by_id(plan_id)
     if request.method == 'POST':
         plan.delete()
         messages.success(request, "Reguła szczepienia została usunięta.")
@@ -142,7 +138,7 @@ def delete_vaccination_plan_view(request, plan_id):
 
 @login_required
 def sow_detail_view(request, sow_id):
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     db_sow = get_object_or_404(SowModel, id=sow_id, farm=farm)
 
     if request.method == 'POST' and 'edit_sow' in request.POST:
@@ -161,19 +157,38 @@ def sow_detail_view(request, sow_id):
 
 @login_required
 def add_event_view(request, sow_id):
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     db_sow = get_object_or_404(SowModel, id=sow_id, farm=farm)
 
     repo = SowRepository(farm=farm)
     sow = repo.get_sow_by_id(sow_id)
     sow.update_state_for_date(date.today())
+    service = SowEventService(farm=farm, repository=repo)
 
     if request.method == 'POST':
         form = SowEventForm(request.POST, sow_status=sow.status, farm=farm)
         if form.is_valid():
-            event = form.save(commit=False)
-            event.sow = db_sow
-            event.save()
+            decision = request.POST.get('farrowing_decision')
+            try:
+                result = service.create_event(
+                    sow=db_sow,
+                    sow_status=sow.status,
+                    data=form.cleaned_data,
+                    farrowing_decision=decision,
+                )
+            except ValidationError as error:
+                form.add_error('event_type', error.messages[0])
+                return render(request, 'sows/add_event.html', {'form': form, 'sow': db_sow})
+            if result.confirmation_required:
+                return render(request, 'sows/add_event.html', {
+                    'form': form,
+                    'sow': db_sow,
+                    'requires_farrowing_confirmation': True,
+                    'farrowing_confirmation_message': result.message,
+                })
+            if result.cancelled or decision == FARROWING_DECISION_CANCEL:
+                messages.info(request, "Dodawanie oproszenia zostało anulowane.")
+                return redirect('sow_detail', sow_id=sow_id)
             return redirect('sow_detail', sow_id=sow_id)
     else:
         form = SowEventForm(sow_status=sow.status, farm=farm, initial={'event_date': date.today()})
@@ -183,7 +198,7 @@ def add_event_view(request, sow_id):
 
 @login_required
 def bulk_sow_events_view(request):
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     service = BulkSowEventService(farm=farm)
     sows = SowModel.objects.filter(farm=farm, is_archived=False).order_by('ear_tag')
     is_single = request.GET.get('rows') == '1'
@@ -233,7 +248,7 @@ def bulk_sow_events_view(request):
 @login_required
 def bulk_pregnancy_check_view(request):
     """Zwraca ekran do masowego wprowadzania wyników badań USG i zapisuje je."""
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     service = SowDashboardService(farm=farm)
     context = service.get_dashboard_summary()
     sows_to_check = context['sows_to_check_usg']
@@ -258,7 +273,7 @@ def bulk_pregnancy_check_view(request):
 @login_required
 def bulk_vaccinate_view(request):
     """Odbiera żądanie z dashboardu, wyświetla ekran potwierdzenia i zapisuje zdarzenia."""
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     if request.method == 'POST':
         sow_ids = request.POST.getlist('sow_ids')
         vaccine_name = request.POST.get('vaccine_name')
@@ -286,7 +301,7 @@ def bulk_vaccinate_view(request):
 
 @login_required
 def edit_event_view(request, event_id):
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     db_event = get_object_or_404(SowEventModel, id=event_id, sow__farm=farm)
     sow_id = db_event.sow.id
 
@@ -308,7 +323,7 @@ def edit_event_view(request, event_id):
 
 @login_required
 def delete_sow_view(request, sow_id):
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     if request.method == 'POST':
         db_sow = get_object_or_404(SowModel, id=sow_id, farm=farm)
 
@@ -325,7 +340,7 @@ def delete_sow_view(request, sow_id):
 @login_required
 def archived_sows_view(request):
     try:
-        service = SowDashboardService(farm=_current_farm(request))
+        service = SowDashboardService(farm=get_current_farm(request))
         archived_sows = service.get_archived_sows_list()
         return render(request, 'sows/archived_sows.html', {'archived_sows': archived_sows})
     except Exception:
@@ -343,7 +358,7 @@ def general_statistics_view(request):
         months_by_period = {'3m': 3, '6m': 6, '12m': 12, 'all': 0}
         months = months_by_period.get(date_range.period, 6)
 
-        service = SowDashboardService(farm=_current_farm(request))
+        service = SowDashboardService(farm=get_current_farm(request))
         context = service.get_general_statistics(
             metric_key=metric_key,
             months_limit=months,
@@ -362,7 +377,7 @@ def general_statistics_view(request):
 @login_required
 def delete_event_view(request, event_id):
     if request.method == 'POST':
-        farm = _current_farm(request)
+        farm = get_current_farm(request)
         db_event = get_object_or_404(SowEventModel, id=event_id, sow__farm=farm)
         sow_id = db_event.sow.id
         db_event.delete()

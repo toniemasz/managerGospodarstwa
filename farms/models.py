@@ -1,6 +1,13 @@
 from django.conf import settings
 from django.db import models
 
+from feed.domain.rules import DEFAULT_PRODUCTION_QUANTITY_KG, LOW_STOCK_THRESHOLD_KG
+from sows.domain.rules import (
+    FARROWING_ALERT_DAYS_AHEAD,
+    GESTATION_DAYS,
+    PREGNANCY_CHECK_AFTER_DAYS,
+)
+
 
 class FarmModel(models.Model):
     owner = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='farm')
@@ -13,3 +20,38 @@ class FarmModel(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class FarmSettingsModel(models.Model):
+    farm = models.OneToOneField(
+        "farms.FarmModel",
+        on_delete=models.CASCADE,
+        related_name="settings",
+    )
+    pregnancy_check_after_days = models.PositiveIntegerField(default=PREGNANCY_CHECK_AFTER_DAYS)
+    gestation_days = models.PositiveIntegerField(default=GESTATION_DAYS)
+    farrowing_alert_days_ahead = models.PositiveIntegerField(default=FARROWING_ALERT_DAYS_AHEAD)
+    vaccination_alert_days_ahead = models.PositiveIntegerField(default=7)
+    allow_farrowing_without_pregnancy_check = models.BooleanField(default=True)
+    ask_before_auto_pregnancy_check = models.BooleanField(default=True)
+    low_stock_threshold_kg = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=LOW_STOCK_THRESHOLD_KG,
+    )
+    default_production_quantity_kg = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=DEFAULT_PRODUCTION_QUANTITY_KG,
+    )
+    default_dashboard_period = models.CharField(max_length=20, default="6m")
+    date_format = models.CharField(max_length=20, default="YYYY-MM-DD")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Ustawienia gospodarstwa"
+        verbose_name_plural = "Ustawienia gospodarstw"
+
+    def __str__(self):
+        return f"Ustawienia: {self.farm.name}"

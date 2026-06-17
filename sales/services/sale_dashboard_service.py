@@ -8,8 +8,10 @@ class SaleDashboardService:
         self.repository = repository or SaleRepository(farm=farm)
 
     def get_dashboard_summary(self, date_from=None, date_to=None) -> Dict[str, Any]:
-        sales = self.repository.get_all_sales()
-        sales = self._filter_sales_by_date(sales, date_from=date_from, date_to=date_to)
+        if date_from is not None or date_to is not None:
+            sales = self.repository.get_sales_between(date_from=date_from, date_to=date_to)
+        else:
+            sales = self.repository.get_all_sales()
 
         total_pigs = sum(sale.quantity for sale in sales)
         total_weight = sum(sale.total_weight for sale in sales)
@@ -29,20 +31,3 @@ class SaleDashboardService:
                 'avg_weight_per_pig': round(avg_weight_per_pig, 2),
             }
         }
-
-    @staticmethod
-    def _filter_sales_by_date(sales, date_from=None, date_to=None):
-        if date_from is None and date_to is None:
-            return sales
-
-        filtered = []
-        for sale in sales:
-            sale_date = sale.sale_date
-            if sale_date is None:
-                continue
-            if date_from and sale_date < date_from:
-                continue
-            if date_to and sale_date > date_to:
-                continue
-            filtered.append(sale)
-        return filtered

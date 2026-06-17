@@ -119,7 +119,7 @@
                 <p>Usunięcie rekordu przeliczy historię i stan magazynowy na podstawie pozostałych danych.</p>
             </div>
         </div>
-        <form method="post" action="{% url 'delete_production' production.id %}" class="responsive-form" onsubmit="return confirm('Czy na pewno usunąć to śrutowanie?');">
+        <form method="post" action="{% url 'delete_production' production.id %}" class="responsive-form" data-confirm="Czy na pewno usunąć to śrutowanie?">
             {% csrf_token %}
             <div class="form-actions">
                 <button type="submit" class="button button-danger">Usuń śrutowanie</button>

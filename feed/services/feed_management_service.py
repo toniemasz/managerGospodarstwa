@@ -3,6 +3,8 @@ from django.utils import timezone
 from django.db import transaction
 from django.db.models import Count, Sum
 
+from farms.services.settings_service import get_farm_settings
+from feed.domain.rules import DEFAULT_PRODUCTION_QUANTITY_KG, LOW_STOCK_THRESHOLD_KG
 from feed.services.feed_calculators import InventoryItem, ProductionCalculator, RecipeCostCalculator
 from feed.services.feed_repository import FeedRepository
 from feed.models import ProductionModel
@@ -12,6 +14,7 @@ class FeedManagementService:
     def __init__(self, farm=None, repository: FeedRepository = None):
         self.farm = farm
         self.repository = repository or FeedRepository(farm=farm)
+        self.settings = get_farm_settings(farm) if farm is not None else None
 
     @staticmethod
     def _recipe_items_from_production(production) -> list[dict]:
@@ -58,15 +61,23 @@ class FeedManagementService:
                 total_used=total_consumed
             ))
 
-        low_stock = [item for item in inventory_state if item.current_stock < 500]
+        low_stock_threshold = self.get_low_stock_threshold()
+        low_stock = [item for item in inventory_state if item.current_stock < low_stock_threshold]
         total_inventory_kg = sum((item.current_stock for item in inventory_state), Decimal('0.00'))
 
         return {
             'inventory': inventory_state,
             'low_stock_alerts': low_stock,
+            'low_stock_threshold_kg': low_stock_threshold,
             'total_inventory_kg': total_inventory_kg,
             'total_inventory_t': total_inventory_kg / Decimal('1000.00'),
         }
+
+    def get_low_stock_threshold(self) -> Decimal:
+        return self.settings.low_stock_threshold_kg if self.settings else LOW_STOCK_THRESHOLD_KG
+
+    def get_default_production_quantity(self) -> Decimal:
+        return self.settings.default_production_quantity_kg if self.settings else DEFAULT_PRODUCTION_QUANTITY_KG
 
     def validate_production_capacity(self, production_id: int) -> tuple[bool, list[str]]:
         production = self.repository.get_production_for_processing(production_id)

@@ -34,6 +34,15 @@ class SaleRepository:
         db_sales = PigSaleModel.objects.prefetch_related('rows').filter(**self._filter_for_farm())
         return [self._map_to_entity(sale) for sale in db_sales]
 
+    def get_sales_between(self, date_from=None, date_to=None) -> List[PigSaleEntity]:
+        filters = self._filter_for_farm()
+        if date_from is not None:
+            filters['sale_date__gte'] = date_from
+        if date_to is not None:
+            filters['sale_date__lte'] = date_to
+        db_sales = PigSaleModel.objects.prefetch_related('rows').filter(**filters)
+        return [self._map_to_entity(sale) for sale in db_sales]
+
     def get_sale_by_id(self, sale_id: int) -> PigSaleEntity:
         db_sale = get_object_or_404(PigSaleModel.objects.prefetch_related('rows'), **self._filter_for_farm(id=sale_id))
         return self._map_to_entity(db_sale)

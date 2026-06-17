@@ -59,13 +59,17 @@ def test_dashboard_service_filters_sales_by_date_range():
         price_per_kg=Decimal('7.00'),
     )
     mock_repo = Mock()
-    mock_repo.get_all_sales.return_value = [sale_in_range, sale_outside_range]
+    mock_repo.get_sales_between.return_value = [sale_in_range]
 
     result = SaleDashboardService(repository=mock_repo).get_dashboard_summary(
         date_from=date(2026, 6, 1),
         date_to=date(2026, 6, 30),
     )
 
+    mock_repo.get_sales_between.assert_called_once_with(
+        date_from=date(2026, 6, 1),
+        date_to=date(2026, 6, 30),
+    )
     assert result['sales'] == [sale_in_range]
     assert result['stats']['sale_count'] == 1
     assert result['stats']['total_pigs'] == 10

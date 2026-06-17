@@ -8,29 +8,22 @@ from decimal import Decimal, InvalidOperation
 from .models import RecipeModel, ProductionModel, IngredientModel, DeliveryModel
 from .forms import IngredientForm, RecipeForm, RecipeItemFormSet, DeliveryForm, ProductionForm
 from .services.feed_management_service import FeedManagementService
-from farms.services.farm_service import get_or_create_user_farm
+from .services.feed_repository import FeedRepository
+from farms.services.current_farm import get_current_farm
 from farms.services.date_range import PERIOD_OPTIONS, parse_date_range
-
-
-def _current_farm(request):
-    farm = getattr(request, 'farm', None)
-    if farm is None and request.user.is_authenticated:
-        farm = get_or_create_user_farm(request.user)
-        request.farm = farm
-    return farm
 
 
 # --- SKŁADNIKI ---
 @login_required
 def ingredient_list_view(request):
-    farm = _current_farm(request)
-    ingredients = IngredientModel.objects.filter(farm=farm).order_by('name')
+    farm = get_current_farm(request)
+    ingredients = FeedRepository(farm=farm).get_all_ingredients()
     return render(request, 'feed/ingredients.html', {'ingredients': ingredients})
 
 
 @login_required
 def add_ingredient_view(request):
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     if request.method == 'POST':
         form = IngredientForm(request.POST, farm=farm)
         if form.is_valid():
@@ -47,7 +40,7 @@ def add_ingredient_view(request):
 
 @login_required
 def edit_ingredient_view(request, pk):
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     ingredient = get_object_or_404(IngredientModel, pk=pk, farm=farm)
     if request.method == 'POST':
         form = IngredientForm(request.POST, instance=ingredient, farm=farm)
@@ -71,7 +64,7 @@ def edit_ingredient_view(request, pk):
 
 @login_required
 def delete_ingredient_view(request, pk):
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     ingredient = get_object_or_404(IngredientModel, pk=pk, farm=farm)
     if request.method == 'POST':
         try:
@@ -86,18 +79,18 @@ def delete_ingredient_view(request, pk):
 # --- MAGAZYN / DOSTAWY ---
 @login_required
 def feed_inventory_view(request):
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     service = FeedManagementService(farm=farm)
     # Pobiera zaktualizowany słownik z serwisu (uwzględniający tylko zakończone produkcje)
     context = service.get_inventory_dashboard()
     # Dodajemy historię dostaw do widoku
-    context['deliveries'] = DeliveryModel.objects.select_related('ingredient').filter(ingredient__farm=farm).order_by('-date', '-id')
+    context['deliveries'] = service.repository.get_deliveries()
     return render(request, 'feed/inventory.html', context)
 
 
 @login_required
 def add_delivery_view(request):
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     if request.method == 'POST':
         form = DeliveryForm(request.POST, farm=farm)
         if form.is_valid():
@@ -112,7 +105,7 @@ def add_delivery_view(request):
 
 @login_required
 def edit_delivery_view(request, pk):
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     delivery = get_object_or_404(DeliveryModel, pk=pk, ingredient__farm=farm)
     if request.method == 'POST':
         form = DeliveryForm(request.POST, instance=delivery, farm=farm)
@@ -139,7 +132,7 @@ def edit_delivery_view(request, pk):
 
 @login_required
 def delete_delivery_view(request, pk):
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     delivery = get_object_or_404(DeliveryModel, pk=pk, ingredient__farm=farm)
     if request.method == 'POST':
         delivery.delete()
@@ -150,9 +143,9 @@ def delete_delivery_view(request, pk):
 # --- RECEPTURY ---
 @login_required
 def feed_recipes_view(request):
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     service = FeedManagementService(farm=farm)
-    recipes = RecipeModel.objects.filter(farm=farm).prefetch_related('items__ingredient').order_by('name')
+    recipes = service.repository.get_recipes_with_items()
     costs = {cost.recipe_id: cost for cost in service.get_recipe_costs()}
     recipe_cards = [{'recipe': recipe, 'cost': costs.get(recipe.id)} for recipe in recipes]
     return render(request, 'feed/recipes.html', {'recipe_cards': recipe_cards})
@@ -160,7 +153,7 @@ def feed_recipes_view(request):
 
 @login_required
 def recipe_detail_view(request, pk):
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     date_range = parse_date_range(request.GET, default_period='6m')
     service = FeedManagementService(farm=farm)
     context = service.get_recipe_detail(pk, date_from=date_range.date_from, date_to=date_range.date_to)
@@ -171,7 +164,7 @@ def recipe_detail_view(request, pk):
 
 @login_required
 def add_recipe_view(request):
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     recipe = RecipeModel(farm=farm)
     if request.method == 'POST':
         form = RecipeForm(request.POST, instance=recipe, farm=farm)
@@ -194,7 +187,7 @@ def add_recipe_view(request):
 
 @login_required
 def edit_recipe_view(request, pk):
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     recipe = get_object_or_404(RecipeModel, pk=pk, farm=farm)
     if request.method == 'POST':
         form = RecipeForm(request.POST, instance=recipe, farm=farm)
@@ -212,7 +205,7 @@ def edit_recipe_view(request, pk):
 
 @login_required
 def delete_recipe_view(request, pk):
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     recipe = get_object_or_404(RecipeModel, pk=pk, farm=farm)
     if request.method == 'POST':
         try:
@@ -225,16 +218,17 @@ def delete_recipe_view(request, pk):
 
 @login_required
 def feed_production_view(request):
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     # Sortujemy najpierw po dacie malejąco, a potem po godzinie malejąco
-    productions = ProductionModel.objects.select_related('recipe').filter(recipe__farm=farm).order_by('-date', '-time', '-id')
+    productions = FeedRepository(farm=farm).get_productions()
     return render(request, 'feed/productions.html', {'productions': productions})
 
 
 # 2. Zaktualizuj wartości początkowe w formularzu dodawania:
 @login_required
 def add_production_view(request):
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
+    service = FeedManagementService(farm=farm)
     if request.method == 'POST':
         form = ProductionForm(request.POST, farm=farm)
         if form.is_valid():
@@ -242,7 +236,6 @@ def add_production_view(request):
             if request.POST.get('instant_complete') == 'on':
                 force_inventory = request.POST.get('force_inventory') == 'on'
 
-                service = FeedManagementService(farm=farm)
                 success, message = service.complete_production(production.id, skip_stages=True,
                                                                force_inventory=force_inventory)
                 if success:
@@ -255,21 +248,21 @@ def add_production_view(request):
     else:
         now = timezone.now()
         initial = {
-            'quantity_kg': 2000,
+            'quantity_kg': service.get_default_production_quantity(),
             'date': now.date(),
             'time': now.strftime('%H:%M')
         }
         selected_recipe = request.GET.get('recipe')
-        if selected_recipe and RecipeModel.objects.filter(pk=selected_recipe, farm=farm).exists():
+        if selected_recipe and service.repository.recipe_exists(selected_recipe):
             initial['recipe'] = selected_recipe
         form = ProductionForm(farm=farm, initial=initial)
 
-    recipes = RecipeModel.objects.filter(farm=farm).prefetch_related('items__ingredient').order_by('name')
+    recipes = service.repository.get_recipes_with_items()
     return render(request, 'feed/production_form.html', {'form': form, 'recipes': recipes, 'is_edit': False})
 
 @login_required
 def edit_production_view(request, pk):
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     production = get_object_or_404(ProductionModel, pk=pk, recipe__farm=farm)
 
     if request.method == 'POST':
@@ -281,7 +274,7 @@ def edit_production_view(request, pk):
     else:
         form = ProductionForm(instance=production, farm=farm)
 
-    recipes = RecipeModel.objects.filter(farm=farm).prefetch_related('items__ingredient').order_by('name')
+    recipes = FeedRepository(farm=farm).get_recipes_with_items()
     return render(request, 'feed/production_form.html', {
         'form': form,
         'recipes': recipes,
@@ -292,7 +285,7 @@ def edit_production_view(request, pk):
 
 @login_required
 def delete_production_view(request, pk):
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     production = get_object_or_404(ProductionModel, pk=pk, recipe__farm=farm)
     if request.method == 'POST':
         production.delete()
@@ -302,7 +295,7 @@ def delete_production_view(request, pk):
 
 @login_required
 def process_stage1_view(request, pk):
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     get_object_or_404(ProductionModel, pk=pk, recipe__farm=farm)
     if request.method == 'POST':
         service = FeedManagementService(farm=farm)
@@ -320,7 +313,7 @@ def process_stage1_view(request, pk):
 
 @login_required
 def process_stage2_view(request, pk):
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     get_object_or_404(ProductionModel, pk=pk, recipe__farm=farm)
     if request.method == 'POST':
         service = FeedManagementService(farm=farm)
@@ -341,7 +334,7 @@ def process_stage2_view(request, pk):
 
 @login_required
 def feed_calculator_view(request):
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     service = FeedManagementService(farm=farm)
 
     overrides = {}
@@ -361,7 +354,7 @@ def feed_calculator_view(request):
 @login_required
 def feed_full_inventory_view(request):
     """Widok wyświetlający pełny stan każdego surowca na magazynie."""
-    farm = _current_farm(request)
+    farm = get_current_farm(request)
     service = FeedManagementService(farm=farm)
     context = service.get_inventory_dashboard()
     return render(request, 'feed/full_inventory.html', context)

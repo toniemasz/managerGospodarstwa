@@ -6,7 +6,7 @@ from .models import IngredientModel, RecipeModel, RecipeItemModel, DeliveryModel
     IngredientPriceConfigModel
 
 
-FORM_FIELD_CLASS = 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white'
+FORM_FIELD_CLASS = 'form-control'
 
 
 def _apply_widget_class(field):

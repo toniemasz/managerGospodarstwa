@@ -2,9 +2,11 @@ import logging
 from datetime import date, timedelta
 from collections import defaultdict
 
+from farms.services.settings_service import get_farm_settings
+from sows.domain.rules import FARROWING_ALERT_DAYS_AHEAD, PREGNANCY_CHECK_AFTER_DAYS
 from sows.services.sow_metrics import METRICS_REGISTRY, MetricDescriptor
 from sows.services.sow_repository import SowRepository
-from sows.models import VaccinationPlanModel
+from sows.services.sow_notification_service import SowNotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +17,7 @@ class SowDashboardService:
     def __init__(self, farm=None, repository: SowRepository = None):
         self.farm = farm
         self.repository = repository or SowRepository(farm=farm)
+        self.settings = get_farm_settings(farm) if farm is not None else None
 
     @staticmethod
     def _empty_status_counts() -> dict:
@@ -31,25 +34,21 @@ class SowDashboardService:
         today = date.today()
         sows = self.repository.get_all_sows()
 
-        # Pobranie słownika planów szczepień z bazy danych
-        db_plans = VaccinationPlanModel.objects.all()
-        if self.farm is not None:
-            db_plans = db_plans.filter(farm=self.farm)
-        plans = self._build_vaccination_plans(db_plans)
-
-        sows_to_check_usg = []
-        vaccination_groups = defaultdict(list)
-
         status_counts = self._empty_status_counts()
+        pregnancy_check_after_days = self._pregnancy_check_after_days()
 
         for sow in sows:
             try:
-                sow.update_state_for_date(today)
+                sow.update_state_for_date(today, pregnancy_check_after_days=pregnancy_check_after_days)
                 self._classify_sow_status(sow, status_counts)
-                self._check_pregnancy_requirements(sow, sows_to_check_usg)
-                self._group_vaccinations(sow, plans, vaccination_groups, today)
             except Exception as e:
                 logger.exception("Błąd przetwarzania maciory %s (ID: %s): %s", sow.ear_tag, sow.id, e)
+
+        notifications = SowNotificationService(
+            farm=self.farm,
+            pregnancy_check_after_days=pregnancy_check_after_days,
+            farrowing_alert_days_ahead=self._farrowing_alert_days_ahead(),
+        ).build_notifications(sows, today)
 
         return {
             'total_sows': len(sows),
@@ -58,9 +57,11 @@ class SowDashboardService:
             'lactating_count': status_counts['lactating_count'],
             'idle_count': status_counts['idle_count'],
             'to_recheck_count': status_counts['to_recheck_count'],
-            'sows_to_check_usg': sows_to_check_usg,
-            'vaccination_groups': dict(vaccination_groups),
-            'vaccinations_due_count': sum(len(items) for items in vaccination_groups.values()),
+            'sows_to_check_usg': notifications['sows_to_check_usg'],
+            'farrowing_due_sows': notifications['farrowing_due_sows'],
+            'farrowing_due_count': notifications['farrowing_due_count'],
+            'vaccination_groups': notifications['vaccination_groups'],
+            'vaccinations_due_count': notifications['vaccinations_due_count'],
             'all_sows': sows,
         }
 
@@ -69,26 +70,13 @@ class SowDashboardService:
         sows = self.repository.get_archived_sows()
         for sow in sows:
             try:
-                sow.update_state_for_date(date.today())
+                sow.update_state_for_date(
+                    date.today(),
+                    pregnancy_check_after_days=self._pregnancy_check_after_days(),
+                )
             except Exception as e:
                 logger.exception("Błąd przetwarzania zarchiwizowanej maciory %s: %s", sow.ear_tag, e)
         return sows
-
-    @staticmethod
-    def _build_vaccination_plans(db_plans) -> list:
-        """Konwertuje modele planów szczepień na słowniki z wartościami domyślnymi."""
-        plans = []
-        for plan in db_plans:
-            plans.append({
-                'id': plan.id,
-                'name': plan.name,
-                'days_before_farrowing': plan.days_before_farrowing,
-                'days_after_event': getattr(plan, 'days_after_event', None),
-                'event_source': getattr(plan, 'event_source', None),
-                'interval_months': plan.interval_months,
-                'reminder_days_ahead': getattr(plan, 'reminder_days_ahead', 7)
-            })
-        return plans
 
     @staticmethod
     def _classify_sow_status(sow, status_counts: dict) -> None:
@@ -105,27 +93,11 @@ class SowDashboardService:
         if sow.status in status_mapping:
             status_counts[status_mapping[sow.status]] += 1
 
-    @staticmethod
-    def _check_pregnancy_requirements(sow, sows_to_check_usg: list) -> None:
-        """Sprawdza czy maciora wymaga badania USG."""
-        if sow.status == "TO_CHECK":
-            sows_to_check_usg.append(sow)
+    def _pregnancy_check_after_days(self) -> int:
+        return self.settings.pregnancy_check_after_days if self.settings else PREGNANCY_CHECK_AFTER_DAYS
 
-    @staticmethod
-    def _group_vaccinations(sow, plans: list, vaccination_groups: dict, current_date: date) -> None:
-        """Grupuje szczepienia dla maciory na podstawie planów."""
-        for plan_dict in plans:
-            vacc_status = sow.get_vaccination_status(plan_dict, current_date=current_date)
-            if vacc_status['should_display']:
-                group_key = f"{plan_dict['name']} (Termin: {vacc_status['target_date'].strftime('%d.%m.%Y')})"
-                vaccination_groups[group_key].append({
-                    'sow_id': sow.id,
-                    'ear_tag': sow.ear_tag,
-                    'status_display': sow.dynamic_status_display,
-                    'cycle_id': vacc_status['cycle_id'],
-                    'vaccine_name': plan_dict['name'],
-                    'is_eligible': vacc_status['is_eligible']
-                })
+    def _farrowing_alert_days_ahead(self) -> int:
+        return self.settings.farrowing_alert_days_ahead if self.settings else FARROWING_ALERT_DAYS_AHEAD
 
     def get_general_statistics(
         self,

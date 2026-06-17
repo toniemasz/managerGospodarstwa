@@ -5,6 +5,7 @@ from django.forms import formset_factory
 from .services.sow_repository import VaccinationPlanRepository
 from .models import SowModel, SowEventModel, VaccinationPlanModel
 from django.core.exceptions import ValidationError
+from sows.domain.sow_state_machine import SowStateMachine
 
 
 class VaccinationPlanForm(forms.ModelForm):
@@ -125,43 +126,9 @@ class SowEventForm(forms.ModelForm):
 
         # 2. Walidacja maszyny stanów cyklu produkcyjnego maciory
         if not self.instance.pk and self.sow_status and event_type:
-
-            # Szczepienia ochronne są dozwolone w każdym momencie cyklu
-            if event_type == 'VACCINATION':
-                return cleaned_data
-
-            # Mapowanie stanów i dozwolonych typów zdarzeń
-            state_validation = {
-                'LACTATING': {
-                    'allowed': ['WEANING'],
-                    'message': "Błąd: Maciora jest w okresie laktacji (karmiąca). Następnym krokiem w cyklu musi być 'Odsadzenie'!"
-                },
-                'IDLE': {
-                    'allowed': ['INSEMINATION'],
-                    'message': "Błąd: Maciora jest jałowa. Rozpocznij nowy cykl produkcyjny wybierając 'Inseminacja'."
-                },
-                'INSEMINATED': {
-                    'allowed': ['PREGNANCY_CHECK', 'INSEMINATION'],
-                    'message': "Błąd: Maciora jest po inseminacji. Następnym krokiem powinno być 'Badanie USG' (potwierdzenie ciąży) lub ponowna 'Inseminacja'."
-                },
-                'TO_CHECK': {
-                    'allowed': ['PREGNANCY_CHECK', 'INSEMINATION'],
-                    'message': "Błąd: Maciora oczekuje na badanie USG. Wybierz 'Badanie USG' lub ponowną 'Inseminację'."
-                },
-                'TO_RECHECK': {
-                    'allowed': ['PREGNANCY_CHECK', 'INSEMINATION'],
-                    'message': "Błąd: Status maciory to 'Do rebadania (?)'. Wybierz ponowne 'Badanie USG' lub nową 'Inseminację'."
-                },
-                'PREGNANT': {
-                    'allowed': ['FARROWING', 'INSEMINATION'],
-                    'message': "Błąd: Maciora ma potwierdzoną ciążę (Prośna). Naturalnym następnym krokiem jest 'Oproszenie'."
-                },
-            }
-
-            if self.sow_status in state_validation:
-                validation_rule = state_validation[self.sow_status]
-                if event_type not in validation_rule['allowed']:
-                    self.add_error('event_type', validation_rule['message'])
+            needs_confirmation = SowStateMachine.requires_confirmation(self.sow_status, event_type)
+            if not needs_confirmation and not SowStateMachine.can_add_event(self.sow_status, event_type):
+                self.add_error('event_type', SowStateMachine.get_error_message(self.sow_status))
 
         return cleaned_data
 

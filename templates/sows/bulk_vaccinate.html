@@ -15,7 +15,7 @@
     {% if vaccination_groups %}
         {% for group_name, sows_list in vaccination_groups.items %}
         <section class="panel compact-panel">
-            <form method="post" action="{% url 'bulk_vaccinate' %}" class="responsive-form">
+            <form method="post" action="{% url 'bulk_vaccinate' %}" class="responsive-form" data-confirm="Potwierdzić zapis szczepienia dla zaznaczonych macior?">
                 {% csrf_token %}
                 <input type="hidden" name="vaccine_name" value="{{ sows_list.0.vaccine_name }}">
                 <input type="hidden" name="cycle_id" value="{{ sows_list.0.cycle_id }}">
@@ -38,7 +38,7 @@
                 </div>
 
                 <div class="form-actions">
-                    <button type="submit" class="button button-primary" onclick="return confirm('Potwierdzić zapis szczepienia dla zaznaczonych macior?');">
+                    <button type="submit" class="button button-primary">
                         Potwierdź szczepienie
                     </button>
                 </div>
@@ -47,7 +47,7 @@
         {% endfor %}
     {% elif sows %}
     <section class="panel compact-panel">
-        <form method="post" action="{% url 'bulk_vaccinate' %}" class="responsive-form">
+        <form method="post" action="{% url 'bulk_vaccinate' %}" class="responsive-form" data-confirm="Potwierdzić zapis szczepienia dla zaznaczonych macior?">
             {% csrf_token %}
             <input type="hidden" name="vaccine_name" value="{{ vaccine_name }}">
             <input type="hidden" name="cycle_id" value="{{ cycle_id }}">
@@ -71,7 +71,7 @@
 
             <div class="form-actions">
                 <a href="{% url 'dashboard' %}" class="button button-secondary">Anuluj</a>
-                <button type="submit" class="button button-primary" onclick="return confirm('Potwierdzić zapis szczepienia dla zaznaczonych macior?');">Zatwierdź</button>
+                <button type="submit" class="button button-primary">Zatwierdź</button>
             </div>
         </form>
     </section>

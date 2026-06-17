@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+
+{% block title %}Ustawienia{% endblock %}
+
+{% block content %}
+<main class="app-page app-page-narrow">
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Gospodarstwo</p>
+            <h1>Ustawienia</h1>
+            <p class="page-subtitle">Domyślne reguły alertów, cyklu maciory i pasz.</p>
+        </div>
+    </section>
+
+    <section class="panel">
+        <form method="post" class="responsive-form">
+            {% csrf_token %}
+            {{ form.non_field_errors }}
+
+            <div class="form-section">
+                <div class="section-heading">
+                    <div>
+                        <h2>Dane gospodarstwa</h2>
+                    </div>
+                </div>
+                <div class="form-field">
+                    <label for="{{ form.farm_name.id_for_label }}">{{ form.farm_name.label }}</label>
+                    {{ form.farm_name }}
+                    {{ form.farm_name.errors }}
+                </div>
+            </div>
+
+            <div class="form-section">
+                <div class="section-heading">
+                    <div>
+                        <h2>Maciory i alerty</h2>
+                    </div>
+                </div>
+                <div class="form-grid two-columns">
+                    <div class="form-field">
+                        <label for="{{ form.pregnancy_check_after_days.id_for_label }}">{{ form.pregnancy_check_after_days.label }}</label>
+                        {{ form.pregnancy_check_after_days }}
+                        {{ form.pregnancy_check_after_days.errors }}
+                    </div>
+                    <div class="form-field">
+                        <label for="{{ form.gestation_days.id_for_label }}">{{ form.gestation_days.label }}</label>
+                        {{ form.gestation_days }}
+                        {{ form.gestation_days.errors }}
+                    </div>
+                    <div class="form-field">
+                        <label for="{{ form.farrowing_alert_days_ahead.id_for_label }}">{{ form.farrowing_alert_days_ahead.label }}</label>
+                        {{ form.farrowing_alert_days_ahead }}
+                        {{ form.farrowing_alert_days_ahead.errors }}
+                    </div>
+                    <div class="form-field">
+                        <label for="{{ form.vaccination_alert_days_ahead.id_for_label }}">{{ form.vaccination_alert_days_ahead.label }}</label>
+                        {{ form.vaccination_alert_days_ahead }}
+                        {{ form.vaccination_alert_days_ahead.errors }}
+                    </div>
+                </div>
+                <label class="checkbox-row">
+                    {{ form.allow_farrowing_without_pregnancy_check }}
+                    <span>{{ form.allow_farrowing_without_pregnancy_check.label }}</span>
+                </label>
+                <label class="checkbox-row">
+                    {{ form.ask_before_auto_pregnancy_check }}
+                    <span>{{ form.ask_before_auto_pregnancy_check.label }}</span>
+                </label>
+            </div>
+
+            <div class="form-section">
+                <div class="section-heading">
+                    <div>
+                        <h2>Pasze</h2>
+                    </div>
+                </div>
+                <div class="form-grid two-columns">
+                    <div class="form-field">
+                        <label for="{{ form.low_stock_threshold_kg.id_for_label }}">{{ form.low_stock_threshold_kg.label }}</label>
+                        {{ form.low_stock_threshold_kg }}
+                        {{ form.low_stock_threshold_kg.errors }}
+                    </div>
+                    <div class="form-field">
+                        <label for="{{ form.default_production_quantity_kg.id_for_label }}">{{ form.default_production_quantity_kg.label }}</label>
+                        {{ form.default_production_quantity_kg }}
+                        {{ form.default_production_quantity_kg.errors }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="button button-primary">Zapisz ustawienia</button>
+            </div>
+        </form>
+    </section>
+</main>
+{% endblock %}
