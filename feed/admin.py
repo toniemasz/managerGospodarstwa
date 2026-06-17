@@ -11,7 +11,7 @@ from .models import (
 
 @admin.register(IngredientModel)
 class IngredientAdmin(admin.ModelAdmin):
-    list_display = ('name', 'farm', 'is_in_bin')
+    list_display = ('name', 'farm', 'is_in_bin', 'low_stock_threshold_kg')
     list_filter = ('farm', 'is_in_bin')
     search_fields = ('name', 'farm__name', 'farm__owner__username')
 
