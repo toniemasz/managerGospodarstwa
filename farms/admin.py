@@ -16,6 +16,6 @@ class FarmSettingsAdmin(admin.ModelAdmin):
         'pregnancy_check_after_days',
         'gestation_days',
         'farrowing_alert_days_ahead',
-        'low_stock_threshold_kg',
+        'default_production_quantity_kg',
     )
     search_fields = ('farm__name', 'farm__owner__username', 'farm__owner__email')
