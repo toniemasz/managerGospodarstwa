@@ -1,6 +1,7 @@
 import pytest
 from django.urls import reverse
 from django.contrib.auth.models import User
+from django.test import override_settings
 from datetime import date, timedelta
 
 from sows.models import SowEventModel, SowModel, VaccinationPlanModel
@@ -15,6 +16,13 @@ class TestSowViews:
         client.farm = get_or_create_user_farm(user)
         client.login(username='testuser', password='password')
         return client
+
+    @override_settings(DEBUG=False, TESTING=False, ALLOWED_HOSTS=['testserver'])
+    def test_login_view_redirects_to_https_in_production(self, client):
+        response = client.get(reverse('login'))
+
+        assert response.status_code == 302
+        assert response['Location'].startswith('https://testserver/login/')
 
     def test_dashboard_view_access(self, setup_client):
         url = reverse('dashboard')
