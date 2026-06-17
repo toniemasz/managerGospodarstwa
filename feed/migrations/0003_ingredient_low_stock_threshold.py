@@ -11,10 +11,19 @@ def copy_farm_thresholds_to_ingredients(apps, schema_editor):
     IngredientModel = apps.get_model('feed', 'IngredientModel')
     FarmSettingsModel = apps.get_model('farms', 'FarmSettingsModel')
 
-    thresholds_by_farm_id = {
-        settings.farm_id: settings.low_stock_threshold_kg
-        for settings in FarmSettingsModel.objects.all()
-    }
+    table_name = FarmSettingsModel._meta.db_table
+    with schema_editor.connection.cursor() as cursor:
+        columns = {
+            column.name
+            for column in schema_editor.connection.introspection.get_table_description(cursor, table_name)
+        }
+
+    if 'low_stock_threshold_kg' in columns:
+        thresholds_by_farm_id = dict(
+            FarmSettingsModel.objects.values_list('farm_id', 'low_stock_threshold_kg')
+        )
+    else:
+        thresholds_by_farm_id = {}
 
     for ingredient in IngredientModel.objects.all():
         threshold = thresholds_by_farm_id.get(ingredient.farm_id, DEFAULT_LOW_STOCK_THRESHOLD_KG)
