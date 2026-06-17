@@ -59,13 +59,18 @@
             </div>
         </div>
         <div class="chart-box">
+            {{ chart_labels|json_script:"trend-chart-labels" }}
+            {{ chart_values|json_script:"trend-chart-values" }}
             <canvas
                 id="trendChart"
                 data-chart-type="line"
                 data-chart-label="{{ current_metric.display_name }}"
-                data-chart-labels='{{ chart_labels|safe }}'
-                data-chart-values='{{ chart_values|safe }}'
+                data-chart-labels-id="trend-chart-labels"
+                data-chart-values-id="trend-chart-values"
+                role="img"
+                aria-label="Wykres trendu: {{ current_metric.display_name }}"
             ></canvas>
+            <p class="chart-empty" data-chart-message hidden></p>
         </div>
     </section>
 

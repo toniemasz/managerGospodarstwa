@@ -8,6 +8,12 @@
         }
     }
 
+    function parseJsonScript(elementId, fallback) {
+        if (!elementId) return fallback;
+        const element = document.getElementById(elementId);
+        return parseJson(element?.textContent, fallback);
+    }
+
     function setFieldState(field, enabled, shouldClear) {
         if (!field) return;
 
@@ -56,14 +62,31 @@
     }
 
     function initTrendCharts(root = document) {
-        if (!window.Chart) return;
-
         root.querySelectorAll('canvas[data-chart-type="line"]').forEach((canvas) => {
             if (canvas.dataset.chartInitialized === 'true') return;
 
-            const labels = parseJson(canvas.dataset.chartLabels, []);
-            const values = parseJson(canvas.dataset.chartValues, []);
+            const labels = parseJsonScript(canvas.dataset.chartLabelsId, []);
+            const values = parseJsonScript(canvas.dataset.chartValuesId, []);
             const label = canvas.dataset.chartLabel || 'Wynik';
+            const message = canvas.parentElement?.querySelector('[data-chart-message]');
+
+            const showMessage = (text) => {
+                canvas.hidden = true;
+                if (message) {
+                    message.textContent = text;
+                    message.hidden = false;
+                }
+            };
+
+            if (!labels.length || !values.length) {
+                showMessage('Brak danych dla wybranej metryki i zakresu dat.');
+                return;
+            }
+
+            if (!window.Chart) {
+                showMessage('Nie udało się załadować wykresu. Odśwież stronę i spróbuj ponownie.');
+                return;
+            }
 
             canvas.dataset.chartInitialized = 'true';
 
