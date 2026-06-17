@@ -119,11 +119,13 @@ def test_feed_post_create_and_delete_views(auth_client, feed_objects):
     add_ingredient = auth_client.post(reverse('add_ingredient'), {
         'name': 'Soja',
         'description': '',
+        'low_stock_threshold_kg': '250.00',
         'is_in_bin': '',
     })
     assert add_ingredient.status_code == 302
     soja = IngredientModel.objects.get(name='Soja')
     assert soja.farm == auth_client.farm
+    assert soja.low_stock_threshold_kg == Decimal('250.00')
 
     add_delivery = auth_client.post(reverse('add_delivery'), {
         'date': timezone.now().date(),
