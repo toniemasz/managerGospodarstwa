@@ -1,0 +1,14 @@
+{% extends "admin/index.html" %}
+
+{% block content %}
+{% if request.user.is_superuser %}
+<div class="module" style="margin-bottom: 20px;">
+    <h2>Kopia zapasowa bazy danych</h2>
+    <p> Pobierz aktualną kopię danych aplikacji z bazy, do której jest podłączone środowisko.</p>
+    <p>
+        <a href="{% url 'admin_database_backup' %}" class="button">Pobierz kopię zapasową</a>
+    </p>
+</div>
+{% endif %}
+{{ block.super }}
+{% endblock %}
