@@ -101,5 +101,35 @@
             <a href="{% url 'export_user_data' %}" class="button button-secondary">Eksportuj moje dane</a>
         </div>
     </section>
+
+    <section class="panel compact-panel">
+        <div class="section-heading">
+            <div>
+                <h2>Awaryjne przywracanie danych</h2>
+                <p>Import jest dostępny wyłącznie dla gospodarstwa bez macior, pasz, receptur, produkcji i sprzedaży.</p>
+            </div>
+        </div>
+        <div class="notice-warning" role="note">
+            Jeżeli system wykryje istniejące dane lub duplikaty w pliku, cały import zostanie przerwany bez zapisywania zmian.
+        </div>
+        <form method="post" enctype="multipart/form-data" class="responsive-form">
+            {% csrf_token %}
+            {{ import_form.non_field_errors }}
+            <div class="form-field">
+                <label for="{{ import_form.backup_file.id_for_label }}">{{ import_form.backup_file.label }}</label>
+                {{ import_form.backup_file }}
+                {% if import_form.backup_file.help_text %}<p class="help-text">{{ import_form.backup_file.help_text }}</p>{% endif %}
+                {{ import_form.backup_file.errors }}
+            </div>
+            <label class="checkbox-row">
+                {{ import_form.confirm_empty_import }}
+                <span>{{ import_form.confirm_empty_import.label }}</span>
+            </label>
+            {{ import_form.confirm_empty_import.errors }}
+            <div class="form-actions">
+                <button type="submit" name="import_backup" value="1" class="button button-secondary">Przywróć moje dane</button>
+            </div>
+        </form>
+    </section>
 </main>
 {% endblock %}

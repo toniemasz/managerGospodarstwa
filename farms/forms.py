@@ -52,3 +52,19 @@ class FarmSettingsForm(forms.ModelForm):
         if commit:
             settings.save()
         return settings
+
+
+class UserBackupImportForm(forms.Form):
+    backup_file = forms.FileField(
+        label='Plik kopii danych',
+        help_text='Wybierz plik ZIP lub JSON utworzony przez eksport danych gospodarstwa.',
+        widget=forms.FileInput(attrs={'accept': '.zip,.json'}),
+    )
+    confirm_empty_import = forms.BooleanField(
+        label='Rozumiem, że import zadziała tylko wtedy, gdy gospodarstwo nie ma danych.',
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['backup_file'].widget.attrs['class'] = 'form-control'
+        self.fields['confirm_empty_import'].widget.attrs['class'] = 'checkbox-input'

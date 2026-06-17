@@ -15,9 +15,9 @@ class SaleDashboardService:
 
         total_pigs = sum(sale.quantity for sale in sales)
         total_weight = sum(sale.total_weight for sale in sales)
-        total_revenue = sum(sale.total_price for sale in sales)
+        total_net_revenue = sum(sale.net_price for sale in sales)
 
-        avg_price_per_kg = (total_revenue / total_weight) if total_weight > 0 else Decimal('0.00')
+        avg_price_per_kg = (total_net_revenue / total_weight) if total_weight > 0 else Decimal('0.00')
         avg_weight_per_pig = (total_weight / total_pigs) if total_pigs > 0 else Decimal('0.00')
 
         return {
@@ -26,7 +26,7 @@ class SaleDashboardService:
                 'sale_count': len(sales),
                 'total_pigs': total_pigs,
                 'total_weight': total_weight,
-                'total_revenue': total_revenue,
+                'total_net_revenue': total_net_revenue,
                 'avg_price_per_kg': round(avg_price_per_kg, 2),
                 'avg_weight_per_pig': round(avg_weight_per_pig, 2),
             }

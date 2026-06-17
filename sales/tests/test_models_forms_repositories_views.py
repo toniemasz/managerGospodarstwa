@@ -75,6 +75,28 @@ def test_sales_views_require_login_and_handle_create(auth_client, client):
 
 
 @pytest.mark.django_db
+def test_sales_list_displays_net_values(auth_client):
+    PigSaleModel.objects.create(
+        farm=auth_client.farm,
+        sale_date=date.today(),
+        quantity=10,
+        total_weight=Decimal('1000.00'),
+        price_per_kg=Decimal('8.00'),
+        net_value=Decimal('8000.00'),
+        gross_value=Decimal('8640.00'),
+    )
+
+    response = auth_client.get(reverse('sales_list'), {'period': 'all'})
+    content = response.content.decode()
+
+    assert response.status_code == 200
+    assert 'Przychód netto' in content
+    assert '>Netto<' in content
+    assert '8000,00' in content
+    assert '8640,00' not in content
+
+
+@pytest.mark.django_db
 def test_delete_sale_view_removes_sale(auth_client):
     sale = PigSaleModel.objects.create(
         farm=auth_client.farm,
