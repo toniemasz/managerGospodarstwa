@@ -50,8 +50,8 @@
             <strong>{{ stats.total_weight|floatformat:0 }} kg</strong>
         </div>
         <div class="stat-tile">
-            <span>Przychód brutto</span>
-            <strong>{{ stats.total_revenue|floatformat:2 }}</strong>
+            <span>Przychód netto</span>
+            <strong>{{ stats.total_net_revenue|floatformat:2 }} PLN</strong>
         </div>
         <div class="stat-tile">
             <span>Średnia cena/kg</span>
@@ -80,7 +80,7 @@
                         <th>Status</th>
                         <th class="text-right">Ilość</th>
                         <th class="text-right">Waga</th>
-                        <th class="text-right">Brutto</th>
+                        <th class="text-right">Netto</th>
                         <th class="text-right">Akcje</th>
                     </tr>
                 </thead>
@@ -103,7 +103,7 @@
                         </td>
                         <td class="text-right">{{ sale.quantity }}</td>
                         <td class="text-right">{{ sale.total_weight|floatformat:2 }} kg</td>
-                        <td class="text-right"><strong>{{ sale.total_price|floatformat:2 }}</strong> PLN</td>
+                        <td class="text-right"><strong>{{ sale.net_price|floatformat:2 }}</strong> PLN</td>
                         <td class="text-right">
                             <a href="{% url 'edit_sale' sale.id %}" class="table-link">Edytuj</a>
                         </td>

@@ -16,7 +16,14 @@ class PigSaleEntity:
     avg_meatiness_seurop: Decimal | None = None
     live_weight: Decimal | None = None
     dressing_percentage: Decimal | None = None
+    net_value: Decimal = Decimal('0.00')
     gross_value: Decimal = Decimal('0.00')
+
+    @property
+    def net_price(self) -> Decimal:
+        if self.net_value:
+            return self.net_value
+        return self.total_weight * self.price_per_kg
 
     @property
     def total_price(self) -> Decimal:

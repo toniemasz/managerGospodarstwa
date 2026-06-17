@@ -4,10 +4,25 @@
 {% if request.user.is_superuser %}
 <div class="module" style="margin-bottom: 20px;">
     <h2>Kopia zapasowa bazy danych</h2>
-    <p> Pobierz aktualną kopię danych aplikacji z bazy, do której jest podłączone środowisko.</p>
+    <p>Pobierz aktualną kopię danych aplikacji z bazy, do której jest podłączone środowisko.</p>
     <p>
         <a href="{% url 'admin_database_backup' %}" class="button">Pobierz kopię zapasową</a>
     </p>
+</div>
+<div class="module" style="margin-bottom: 20px;">
+    <h2>Awaryjne przywracanie bazy</h2>
+    <p>Przywracanie zadziała tylko wtedy, gdy baza nie zawiera danych biznesowych. Wykrycie danych lub konfliktu użytkownika przerwie całą operację.</p>
+    <form method="post" enctype="multipart/form-data" action="{% url 'admin_database_restore' %}">
+        {% csrf_token %}
+        <p><input type="file" name="backup_file" accept=".zip,.json" required></p>
+        <p>
+            <label>
+                <input type="checkbox" name="confirm_empty_restore" required>
+                Rozumiem, że jest to import awaryjny przeznaczony wyłącznie dla pustej bazy.
+            </label>
+        </p>
+        <p><button type="submit" class="button">Przywróć kopię</button></p>
+    </form>
 </div>
 {% endif %}
 {{ block.super }}

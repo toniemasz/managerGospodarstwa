@@ -1,11 +1,18 @@
-from io import StringIO, BytesIO
-from zipfile import ZIP_DEFLATED, ZipFile
+import logging
 
+from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
-from django.core.management import call_command
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
-from django.utils import timezone
+from django.shortcuts import redirect
+
+from farms.services.data_backup import (
+    BackupImportError,
+    build_database_backup,
+    restore_database_backup,
+)
+
+logger = logging.getLogger(__name__)
 
 
 @staff_member_required
@@ -13,29 +20,32 @@ def admin_database_backup_view(request):
     if not request.user.is_superuser:
         raise PermissionDenied("Tylko superadministrator może pobrać kopię zapasową bazy danych.")
 
-    timestamp = timezone.now().strftime("%Y-%m-%d_%H-%M-%S")
-    json_filename = f"database_backup_{timestamp}.json"
-    zip_filename = f"database_backup_{timestamp}.zip"
-
-    json_buffer = StringIO()
-    call_command(
-        "dumpdata",
-        stdout=json_buffer,
-        indent=2,
-        natural_foreign=True,
-        natural_primary=True,
-        exclude=[
-            "contenttypes.ContentType",
-            "auth.Permission",
-            "admin.LogEntry",
-            "sessions.Session",
-        ],
-    )
-
-    zip_buffer = BytesIO()
-    with ZipFile(zip_buffer, "w", ZIP_DEFLATED) as backup_zip:
-        backup_zip.writestr(json_filename, json_buffer.getvalue())
-
-    response = HttpResponse(zip_buffer.getvalue(), content_type="application/zip")
+    archive, zip_filename = build_database_backup()
+    response = HttpResponse(archive, content_type="application/zip")
     response["Content-Disposition"] = f'attachment; filename="{zip_filename}"'
     return response
+
+
+@staff_member_required
+def admin_database_restore_view(request):
+    if not request.user.is_superuser:
+        raise PermissionDenied("Tylko superadministrator może przywrócić kopię zapasową bazy danych.")
+    if request.method != 'POST':
+        return redirect('admin:index')
+    if request.POST.get('confirm_empty_restore') != 'on':
+        messages.error(request, 'Potwierdź, że rozumiesz warunek przywracania do pustej bazy.')
+        return redirect('admin:index')
+    uploaded_file = request.FILES.get('backup_file')
+    if not uploaded_file:
+        messages.error(request, 'Wybierz plik kopii zapasowej ZIP lub JSON.')
+        return redirect('admin:index')
+    try:
+        restored_count = restore_database_backup(uploaded_file)
+    except BackupImportError as error:
+        messages.error(request, str(error))
+    except Exception:
+        logger.exception('Nie udało się przywrócić kopii bazy danych')
+        messages.error(request, 'Nie udało się przywrócić kopii. Nie zapisano żadnych danych.')
+    else:
+        messages.success(request, f'Przywrócono kopię bazy ({restored_count} rekordów).')
+    return redirect('admin:index')
