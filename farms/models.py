@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.db import models
 
-from feed.domain.rules import DEFAULT_PRODUCTION_QUANTITY_KG
+from feed.domain.rules import DEFAULT_PRODUCTION_QUANTITY_KG, LOW_STOCK_THRESHOLD_KG
 from sows.domain.rules import (
     FARROWING_ALERT_DAYS_AHEAD,
     GESTATION_DAYS,
@@ -34,6 +34,11 @@ class FarmSettingsModel(models.Model):
     vaccination_alert_days_ahead = models.PositiveIntegerField(default=7)
     allow_farrowing_without_pregnancy_check = models.BooleanField(default=True)
     ask_before_auto_pregnancy_check = models.BooleanField(default=True)
+    low_stock_threshold_kg = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=LOW_STOCK_THRESHOLD_KG,
+    )
     default_production_quantity_kg = models.DecimalField(
         max_digits=10,
         decimal_places=2,
