@@ -1,6 +1,7 @@
 # sows/urls.py
 from django.urls import path
 from django.contrib.auth import views as auth_views
+from .auth_views import SecureLoginView
 from .views import (
     modules_home_view,
     dashboard_view,
@@ -39,7 +40,7 @@ urlpatterns = [
     path('maciory/zdarzenia/masowo/', bulk_sow_events_view, name='bulk_sow_events'),
     path('maciory/<int:sow_id>/zdarzenie/dodaj/', add_event_view, name='add_event'),
     path('maciory/statystyki/', general_statistics_view, name='general_statistics'),
-    path('login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
+    path('login/', SecureLoginView.as_view(), name='login'),
     path('logout/', auth_views.LogoutView.as_view(next_page='login'), name='logout'),
     path('konfiguracja/szczepienia/', vaccination_plans_view, name='vaccination_plans'),
     path('konfiguracja/szczepienie/dodaj/', add_vaccination_plan_view, name='add_vaccination_plan'),
