@@ -72,14 +72,10 @@
                 <div class="section-heading">
                     <div>
                         <h2>Pasze</h2>
+                        <p>Próg niskiego stanu ustawisz osobno podczas dodawania lub edycji składnika.</p>
                     </div>
                 </div>
                 <div class="form-grid two-columns">
-                    <div class="form-field">
-                        <label for="{{ form.low_stock_threshold_kg.id_for_label }}">{{ form.low_stock_threshold_kg.label }}</label>
-                        {{ form.low_stock_threshold_kg }}
-                        {{ form.low_stock_threshold_kg.errors }}
-                    </div>
                     <div class="form-field">
                         <label for="{{ form.default_production_quantity_kg.id_for_label }}">{{ form.default_production_quantity_kg.label }}</label>
                         {{ form.default_production_quantity_kg }}
@@ -92,6 +88,18 @@
                 <button type="submit" class="button button-primary">Zapisz ustawienia</button>
             </div>
         </form>
+    </section>
+
+    <section class="panel compact-panel">
+        <div class="section-heading">
+            <div>
+                <h2>Eksport danych</h2>
+                <p>Pobierz plik ZIP z danymi przypisanymi do Twojego gospodarstwa.</p>
+            </div>
+        </div>
+        <div class="form-actions">
+            <a href="{% url 'export_user_data' %}" class="button button-secondary">Eksportuj moje dane</a>
+        </div>
     </section>
 </main>
 {% endblock %}

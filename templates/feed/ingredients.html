@@ -18,7 +18,7 @@
         <div class="section-heading">
             <div>
                 <h2>Lista składników</h2>
-                <p>Składniki są przypisane do bieżącego gospodarstwa.</p>
+                <p>Składniki są przypisane do bieżącego gospodarstwa. Każdy składnik ma własny próg niskiego stanu.</p>
             </div>
         </div>
         <div class="table-scroll">
@@ -28,6 +28,7 @@
                         <th>Nazwa</th>
                         <th>Opis</th>
                         <th>Przechowywanie</th>
+                        <th class="text-right">Próg niskiego stanu</th>
                         <th class="text-right">Akcje</th>
                     </tr>
                 </thead>
@@ -43,6 +44,7 @@
                                 <span class="status-pill">Worek</span>
                             {% endif %}
                         </td>
+                        <td class="text-right">{{ ingredient.low_stock_threshold_kg|floatformat:2 }} kg</td>
                         <td class="text-right">
                             <div class="row-actions">
                                 <a href="{% url 'edit_ingredient' ingredient.id %}" class="table-link">Edytuj</a>
@@ -51,7 +53,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="empty-table">Brak zdefiniowanych składników.</td>
+                        <td colspan="5" class="empty-table">Brak zdefiniowanych składników.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

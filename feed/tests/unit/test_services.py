@@ -210,17 +210,31 @@ class TestFeedManagementService:
         assert costs[0].recipe_name == "Standardowa"
         assert costs[0].cost_per_kg == Decimal('1.40')
 
-    def test_inventory_uses_low_stock_threshold_from_farm_settings(self):
+    def test_inventory_uses_low_stock_threshold_from_each_ingredient(self):
         user = User.objects.create_user(username='feed-settings-user')
         farm = get_or_create_user_farm(user)
         settings = get_farm_settings(farm)
-        settings.low_stock_threshold_kg = Decimal('750.00')
         settings.default_production_quantity_kg = Decimal('1800.00')
         settings.save()
 
-        ingredient = IngredientModel.objects.create(name="Pszenica", farm=farm)
+        low_threshold_ingredient = IngredientModel.objects.create(
+            name="Pszenica",
+            farm=farm,
+            low_stock_threshold_kg=Decimal('750.00'),
+        )
+        enough_stock_ingredient = IngredientModel.objects.create(
+            name="Jęczmień",
+            farm=farm,
+            low_stock_threshold_kg=Decimal('300.00'),
+        )
         DeliveryModel.objects.create(
-            ingredient=ingredient,
+            ingredient=low_threshold_ingredient,
+            date=timezone.now().date(),
+            quantity_kg=Decimal('600.00'),
+            price_per_kg=Decimal('1.00'),
+        )
+        DeliveryModel.objects.create(
+            ingredient=enough_stock_ingredient,
             date=timezone.now().date(),
             quantity_kg=Decimal('600.00'),
             price_per_kg=Decimal('1.00'),
@@ -229,6 +243,7 @@ class TestFeedManagementService:
         service = FeedManagementService(farm=farm)
         dashboard = service.get_inventory_dashboard()
 
-        assert dashboard['low_stock_threshold_kg'] == Decimal('750.00')
-        assert [item.ingredient_id for item in dashboard['low_stock_alerts']] == [ingredient.id]
+        alert_ids = [item.ingredient_id for item in dashboard['low_stock_alerts']]
+        assert alert_ids == [low_threshold_ingredient.id]
+        assert dashboard['low_stock_alerts'][0].low_stock_threshold_kg == Decimal('750.00')
         assert service.get_default_production_quantity() == Decimal('1800.00')

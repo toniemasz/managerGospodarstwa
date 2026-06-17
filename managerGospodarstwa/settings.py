@@ -23,7 +23,10 @@ env = environ.Env(
 
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
-TESTING = any(arg.endswith('pytest') or arg == 'test' for arg in sys.argv)
+TESTING = 'pytest' in sys.modules or any(
+    Path(arg).name.startswith('pytest') or arg == 'test'
+    for arg in sys.argv
+)
 DEBUG = env.bool('DEBUG', default=False)
 
 if DEBUG or TESTING:
@@ -76,7 +79,7 @@ STATICFILES_DIRS = [
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 
-if DEBUG:
+if DEBUG or TESTING:
 
     STORAGES = {
         "staticfiles": {
@@ -116,11 +119,11 @@ WSGI_APPLICATION = 'managerGospodarstwa.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-if DEBUG:
+if DEBUG or TESTING:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
+            'NAME': ':memory:' if TESTING else BASE_DIR / 'db.sqlite3',
         }
     }
 else:

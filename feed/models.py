@@ -5,6 +5,8 @@ from django.db import models
 from django.db.models import JSONField
 from django.core.validators import MinValueValidator, MaxValueValidator
 
+from feed.domain.rules import LOW_STOCK_THRESHOLD_KG
+
 
 class IngredientModel(models.Model):
     farm = models.ForeignKey(
@@ -17,6 +19,14 @@ class IngredientModel(models.Model):
     )
     name = models.CharField(max_length=100, verbose_name="Nazwa składnika")
     description = models.TextField(blank=True, null=True, verbose_name="Opis")
+    low_stock_threshold_kg = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=LOW_STOCK_THRESHOLD_KG,
+        validators=[MinValueValidator(Decimal('0.00'))],
+        verbose_name="Próg niskiego stanu (kg)",
+        help_text="Alert pojawi się, gdy stan tego składnika spadnie poniżej tej wartości.",
+    )
 
     is_in_bin = models.BooleanField(default=False, verbose_name="Przechowywane w binie (silosie)")
 
