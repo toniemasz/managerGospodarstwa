@@ -57,24 +57,23 @@ class FeedManagementService:
                 ingredient_id=ing.id,
                 name=ing.name,
                 is_in_bin=ing.is_in_bin,
+                low_stock_threshold_kg=ing.low_stock_threshold_kg,
                 total_delivered=total_delivered,
                 total_used=total_consumed
             ))
 
-        low_stock_threshold = self.get_low_stock_threshold()
-        low_stock = [item for item in inventory_state if item.current_stock < low_stock_threshold]
+        low_stock = [item for item in inventory_state if item.is_low_stock]
         total_inventory_kg = sum((item.current_stock for item in inventory_state), Decimal('0.00'))
 
         return {
             'inventory': inventory_state,
             'low_stock_alerts': low_stock,
-            'low_stock_threshold_kg': low_stock_threshold,
             'total_inventory_kg': total_inventory_kg,
             'total_inventory_t': total_inventory_kg / Decimal('1000.00'),
         }
 
     def get_low_stock_threshold(self) -> Decimal:
-        return self.settings.low_stock_threshold_kg if self.settings else LOW_STOCK_THRESHOLD_KG
+        return LOW_STOCK_THRESHOLD_KG
 
     def get_default_production_quantity(self) -> Decimal:
         return self.settings.default_production_quantity_kg if self.settings else DEFAULT_PRODUCTION_QUANTITY_KG
