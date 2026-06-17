@@ -11,14 +11,18 @@ class InventoryItem:
     total_delivered: Decimal
     total_used: Decimal
     is_in_bin: bool = False
+    low_stock_threshold_kg: Decimal = Decimal('500.00')
 
     @property
     def current_stock(self) -> Decimal:
         return self.total_delivered - self.total_used
 
+    @property
+    def is_low_stock(self) -> bool:
+        return self.current_stock < self.low_stock_threshold_kg
+
     def current_stock_in_t(self) -> Decimal:
         return self.current_stock/Decimal('1000.00')
-
 
 
 @dataclass
