@@ -35,7 +35,7 @@
             <h2>Niski stan surowców</h2>
             <p>
                 {% for alert in low_stock_alerts %}
-                    {{ alert.name }}: {{ alert.current_stock|floatformat:0 }} kg{% if not forloop.last %}, {% endif %}
+                    {{ alert.name }}: {{ alert.current_stock|floatformat:0 }} kg / próg {{ alert.low_stock_threshold_kg|floatformat:0 }} kg{% if not forloop.last %}, {% endif %}
                 {% endfor %}
             </p>
         </div>
