@@ -8,9 +8,4 @@ class Migration(migrations.Migration):
         ('feed', '0003_ingredient_low_stock_threshold'),
     ]
 
-    operations = [
-        migrations.RemoveField(
-            model_name='farmsettingsmodel',
-            name='low_stock_threshold_kg',
-        ),
-    ]
+    operations = []
