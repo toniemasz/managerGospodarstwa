@@ -19,6 +19,7 @@ class SecureLoginView(LoginView):
         return (
             not settings.DEBUG
             and not getattr(settings, 'TESTING', False)
+            and getattr(settings, 'SECURE_SSL_REDIRECT', False)
             and not request.is_secure()
         )
 
