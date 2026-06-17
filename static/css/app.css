@@ -1178,6 +1178,20 @@ input[type="file"] {
     height: 100%;
 }
 
+.chart-empty {
+    display: grid;
+    min-height: 100%;
+    margin: 0;
+    place-items: center;
+    color: var(--muted);
+    font-weight: 700;
+    text-align: center;
+}
+
+.chart-empty[hidden] {
+    display: none;
+}
+
 .ingredient-form-list,
 .ingredient-editor,
 .group-grid {

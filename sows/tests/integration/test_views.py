@@ -1,3 +1,6 @@
+import json
+import re
+
 import pytest
 from django.urls import reverse
 from django.contrib.auth.models import User
@@ -177,6 +180,32 @@ class TestSowViews:
         })
 
         assert response.status_code == 200
+
+    def test_general_statistics_chart_data_is_valid_json(self, setup_client):
+        sow = SowModel.objects.create(ear_tag='CHART-1', farm=setup_client.farm)
+        SowEventModel.objects.create(
+            sow=sow,
+            event_type='FARROWING',
+            event_date=date.today(),
+            details={'born_alive': 12},
+        )
+
+        response = setup_client.get(reverse('general_statistics'), {'period': 'all'})
+        html = response.content.decode()
+        labels_match = re.search(
+            r'<script id="trend-chart-labels" type="application/json">(.*?)</script>',
+            html,
+        )
+        values_match = re.search(
+            r'<script id="trend-chart-values" type="application/json">(.*?)</script>',
+            html,
+        )
+
+        assert response.status_code == 200
+        assert labels_match is not None
+        assert values_match is not None
+        assert json.loads(labels_match.group(1)) == [date.today().strftime('%Y-%m')]
+        assert json.loads(values_match.group(1)) == [12]
 
     def test_unauthenticated_user_redirected(self, client):
         # Bez logowania powinno wyrzucić 302 (do strony logowania)
