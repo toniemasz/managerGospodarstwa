@@ -1,6 +1,9 @@
 from decimal import Decimal
 import pytest
+from django.contrib.auth.models import User
 from django.utils import timezone
+from farms.services.farm_service import get_or_create_user_farm
+from farms.services.settings_service import get_farm_settings
 from feed.models import IngredientModel, DeliveryModel, RecipeModel, RecipeItemModel, ProductionModel
 from feed.services.feed_management_service import FeedManagementService
 
@@ -206,3 +209,26 @@ class TestFeedManagementService:
         assert len(costs) == 1
         assert costs[0].recipe_name == "Standardowa"
         assert costs[0].cost_per_kg == Decimal('1.40')
+
+    def test_inventory_uses_low_stock_threshold_from_farm_settings(self):
+        user = User.objects.create_user(username='feed-settings-user')
+        farm = get_or_create_user_farm(user)
+        settings = get_farm_settings(farm)
+        settings.low_stock_threshold_kg = Decimal('750.00')
+        settings.default_production_quantity_kg = Decimal('1800.00')
+        settings.save()
+
+        ingredient = IngredientModel.objects.create(name="Pszenica", farm=farm)
+        DeliveryModel.objects.create(
+            ingredient=ingredient,
+            date=timezone.now().date(),
+            quantity_kg=Decimal('600.00'),
+            price_per_kg=Decimal('1.00'),
+        )
+
+        service = FeedManagementService(farm=farm)
+        dashboard = service.get_inventory_dashboard()
+
+        assert dashboard['low_stock_threshold_kg'] == Decimal('750.00')
+        assert [item.ingredient_id for item in dashboard['low_stock_alerts']] == [ingredient.id]
+        assert service.get_default_production_quantity() == Decimal('1800.00')

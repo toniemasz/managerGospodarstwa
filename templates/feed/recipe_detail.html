@@ -177,21 +177,3 @@
     </section>
 </main>
 {% endblock %}
-
-{% block scripts %}
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-    const periodSelect = document.getElementById('period');
-    const dateInputs = [document.getElementById('date_from'), document.getElementById('date_to')];
-    function syncDateInputs() {
-        const isCustom = periodSelect.value === 'custom';
-        dateInputs.forEach(input => {
-            input.disabled = !isCustom;
-            input.closest('.table-control').classList.toggle('is-muted', !isCustom);
-        });
-    }
-    periodSelect.addEventListener('change', syncDateInputs);
-    syncDateInputs();
-});
-</script>
-{% endblock %}

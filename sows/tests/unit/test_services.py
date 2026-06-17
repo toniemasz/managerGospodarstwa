@@ -3,6 +3,7 @@ from unittest.mock import Mock, patch, MagicMock
 from datetime import date
 from sows.services.sow_dashboard_service import SowDashboardService
 from sows.services.sow_lifecycle import Sow, SowEvent
+from sows.services.sow_repository import VaccinationPlanRepository
 
 class TestSowDashboardService:
     @pytest.fixture
@@ -15,10 +16,9 @@ class TestSowDashboardService:
         repo.get_all_sows.return_value = [sow1, sow2]
         return repo
 
-    @patch('sows.services.sow_dashboard_service.VaccinationPlanModel.objects.all')
+    @patch.object(VaccinationPlanRepository, 'get_all_plans', return_value=[])
     def test_get_dashboard_summary(self, mock_db_plans, mock_repo):
         # Arrange
-        mock_db_plans.return_value = []
         service = SowDashboardService(repository=mock_repo)
 
         # Act
@@ -50,7 +50,7 @@ class TestSowDashboardService:
 
 
         mock_repo.get_archived_sows.assert_called_once()
-        mock_sow.update_state_for_date.assert_called_once_with(date.today())
+        mock_sow.update_state_for_date.assert_called_once_with(date.today(), pregnancy_check_after_days=30)
 
         assert len(result) == 1
         assert result[0] == mock_sow
@@ -78,3 +78,17 @@ class TestSowDashboardService:
         assert result['current_metric'].key == "born_alive"
         assert [item['ear_tag'] for item in result['top_sows']] == ["B", "A"]
         assert result['chart_values'] == [20]
+
+    @patch.object(VaccinationPlanRepository, 'get_all_plans', return_value=[])
+    def test_dashboard_summary_contains_farrowing_due_alerts(self, mock_plans):
+        sow = Sow(id=1, ear_tag="DUE-1", entry_date=date(2026, 1, 1), created_at=date(2026, 1, 1))
+        sow.status = "PREGNANT"
+        sow.expected_farrowing_date = date.today()
+
+        mock_repo = Mock()
+        mock_repo.get_all_sows.return_value = [sow]
+
+        result = SowDashboardService(repository=mock_repo).get_dashboard_summary()
+
+        assert result['farrowing_due_count'] == 1
+        assert result['farrowing_due_sows'][0]['ear_tag'] == "DUE-1"

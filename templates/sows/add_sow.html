@@ -52,7 +52,7 @@
                 <p>Domyślnie maciora zostanie przeniesiona do archiwum z zachowaniem historii.</p>
             </div>
         </div>
-        <form method="post" action="{% url 'delete_sow' sow.id %}" class="responsive-form" onsubmit="return confirm('Czy na pewno wykonać tę operację dla maciory {{ sow.ear_tag|escapejs }}?');">
+        <form method="post" action="{% url 'delete_sow' sow.id %}" class="responsive-form" data-confirm="Czy na pewno wykonać tę operację dla maciory {{ sow.ear_tag|escapejs }}?">
             {% csrf_token %}
             <label class="checkbox-row form-section">
                 <input type="checkbox" name="archive" checked>

@@ -32,6 +32,10 @@ class FeedRepository:
     def get_all_ingredients(self):
         return IngredientModel.objects.filter(**self._filter_for_farm()).order_by('name')
 
+    def get_deliveries(self):
+        filters = self._related_filter_for_farm('ingredient')
+        return DeliveryModel.objects.select_related('ingredient').filter(**filters).order_by('-date', '-id')
+
     def get_delivery_aggregates(self) -> dict:
         """Zwraca słownik {ingredient_id: sum_of_deliveries}"""
         filters = self._related_filter_for_farm('ingredient')
@@ -59,6 +63,14 @@ class FeedRepository:
     def get_recipes_with_items(self):
         """Tylko pobiera receptury z bazy z prefetch."""
         return RecipeModel.objects.filter(**self._filter_for_farm()).prefetch_related('items__ingredient').order_by('name')
+
+    def recipe_exists(self, recipe_id: int) -> bool:
+        return RecipeModel.objects.filter(**self._filter_for_farm(pk=recipe_id)).exists()
+
+    def get_productions(self):
+        return ProductionModel.objects.select_related('recipe').filter(
+            **self._related_filter_for_farm('recipe')
+        ).order_by('-date', '-time', '-id')
 
     def get_recipe_with_items(self, recipe_id: int):
         queryset = RecipeModel.objects.prefetch_related('items__ingredient')

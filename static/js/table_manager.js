@@ -3,6 +3,10 @@ class PaginationTable {
         this.config = config;
 
         this.table = this.resolveTable(config);
+        if (this.table && this.table.paginationTableInstance) {
+            return this.table.paginationTableInstance;
+        }
+
         this.rows = this.resolveRows(config);
         if (!this.table && this.rows.length) {
             this.table = this.rows[0].closest('table');
@@ -11,6 +15,7 @@ class PaginationTable {
 
         if (this.table) {
             this.table.dataset.paginationInitialized = 'true';
+            this.table.paginationTableInstance = this;
         }
 
         this.searchInput = this.resolveElement(config.searchInputId, [
@@ -107,7 +112,6 @@ class PaginationTable {
             return (
                 this.table.closest('.panel') ||
                 this.table.closest('.table-panel') ||
-                this.table.closest('.bg-white') ||
                 this.table.parentElement ||
                 document
             );
@@ -206,15 +210,18 @@ class PaginationTable {
     }
 
     initEvents() {
-        if (this.searchInput) {
+        if (this.searchInput && this.searchInput.dataset.tableManagerSearchBound !== 'true') {
+            this.searchInput.dataset.tableManagerSearchBound = 'true';
             this.searchInput.addEventListener('input', () => this.filterData());
         }
 
-        if (this.filterSelect) {
+        if (this.filterSelect && this.filterSelect.dataset.tableManagerFilterBound !== 'true') {
+            this.filterSelect.dataset.tableManagerFilterBound = 'true';
             this.filterSelect.addEventListener('change', () => this.filterData());
         }
 
-        if (this.limitSelect) {
+        if (this.limitSelect && this.limitSelect.dataset.tableManagerLimitBound !== 'true') {
+            this.limitSelect.dataset.tableManagerLimitBound = 'true';
             this.limitSelect.addEventListener('change', (event) => {
                 const value = parseInt(event.target.value, 10);
                 this.limit = Number.isNaN(value) || value <= 0 ? 10 : value;
@@ -402,6 +409,10 @@ class PaginationTable {
         button.type = 'button';
         button.innerText = label;
         button.disabled = disabled;
+        button.setAttribute('aria-label', this.getButtonLabel(label, isActive));
+        if (isActive) {
+            button.setAttribute('aria-current', 'page');
+        }
         button.className = [
             'pagination-button',
             isActive ? 'is-active' : '',
@@ -413,6 +424,12 @@ class PaginationTable {
         }
 
         return button;
+    }
+
+    getButtonLabel(label, isActive) {
+        if (label === '‹') return 'Poprzednia strona';
+        if (label === '›') return 'Następna strona';
+        return isActive ? `Strona ${label}, aktualna` : `Przejdź do strony ${label}`;
     }
 }
 
@@ -447,6 +464,16 @@ function enhanceDataTable(table) {
         header.textContent.trim()
     );
 
+    const isEditable = hasEditableTableFields(table);
+    const wantsMobileCards = table.dataset.mobileCards === 'true';
+    const blocksMobileCards = table.dataset.mobileCards === 'false';
+
+    if (isEditable || table.classList.contains('settlement-table') || table.classList.contains('bulk-event-table')) {
+        table.classList.add('wide-table');
+    } else if (!blocksMobileCards && (wantsMobileCards || headers.length <= 6)) {
+        table.classList.add('mobile-card-table');
+    }
+
     table.querySelectorAll('tbody tr').forEach((row) => {
         if (row.dataset.paginationEmpty === 'true') return;
 
@@ -462,8 +489,6 @@ function enhanceDataTables() {
     document.querySelectorAll('table').forEach(enhanceDataTable);
 }
 
-// ... existing code ...
-
 function hasEditableTableFields(table) {
     return Boolean(table.querySelector(
         'input:not([type="hidden"]):not([type="submit"]):not([type="button"]), select, textarea'
@@ -475,6 +500,7 @@ function autoInitPaginationTables() {
         if (table.dataset.paginationInitialized === 'true') return;
         if (table.closest('[data-no-pagination="true"]')) return;
         if (table.dataset.noPagination === 'true') return;
+        if (table.dataset.tablePagination === 'false') return;
         if (hasEditableTableFields(table)) return;
 
         const tbody = table.querySelector('tbody');
@@ -512,7 +538,11 @@ function autoInitPaginationTables() {
 
         new PaginationTable({
             rowSelector: `#${table.id} tbody tr.${rowClass}:not([data-pagination-empty="true"])`,
-            tableId: table.id
+            tableId: table.id,
+            searchInputId: table.dataset.searchInput || null,
+            filterSelectId: table.dataset.filterSelect || null,
+            limitSelectId: table.dataset.limitSelect || null,
+            paginationContainerId: table.dataset.paginationTarget || null
         });
     });
 }
@@ -521,7 +551,6 @@ function ensureTableControls(table) {
     const panel =
         table.closest('.panel') ||
         table.closest('.table-card') ||
-        table.closest('.bg-white') ||
         table.closest('section') ||
         table.parentElement;
 
@@ -535,14 +564,18 @@ function ensureTableControls(table) {
         controls.className = 'table-footer-controls';
         controls.dataset.autoCreated = 'true';
 
+        const searchLabel = table.dataset.searchLabel || 'Szukaj';
+        const searchPlaceholder = table.dataset.searchPlaceholder || 'Wpisz szukaną frazę...';
+        const limitLabel = table.dataset.limitLabel || 'Na stronę';
+
         controls.innerHTML = `
             <div class="table-control">
-                <label for="${table.id}-search">Szukaj</label>
-                <input type="text" id="${table.id}-search" class="table-search" placeholder="Wpisz szukaną frazę...">
+                <label for="${table.id}-search">${searchLabel}</label>
+                <input type="search" id="${table.id}-search" class="table-search" placeholder="${searchPlaceholder}" data-table-search>
             </div>
             <div class="table-control">
-                <label for="${table.id}-limit">Na stronę</label>
-                <select id="${table.id}-limit" class="table-limit">
+                <label for="${table.id}-limit">${limitLabel}</label>
+                <select id="${table.id}-limit" class="table-limit" data-table-limit>
                     <option value="10">10</option>
                     <option value="25">25</option>
                     <option value="50">50</option>

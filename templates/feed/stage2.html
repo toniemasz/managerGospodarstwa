@@ -56,7 +56,7 @@
                 <tbody>
                     {% for item in stage2_items %}
                     <tr class="ingredient-row">
-                        <td><input type="checkbox" class="ingredient-checkbox" data-id="{{ item.id }}"></td>
+                        <td><input type="checkbox" class="ingredient-checkbox" data-id="{{ item.id }}" aria-label="Oznacz {{ item.name }} jako gotowe"></td>
                         <td><strong class="row-name">{{ item.name }}</strong></td>
                         <td class="text-right">{{ item.percentage|floatformat:2 }}%</td>
                         <td class="text-right"><strong>{{ item.weight_kg|floatformat:2 }}</strong> kg</td>
@@ -73,7 +73,7 @@
         </div>
     </section>
 
-    <form method="post" id="stageForm" class="panel stage-confirm-panel">
+    <form method="post" id="stageForm" class="panel stage-confirm-panel" data-stage-storage-key="feed_prod_{{ production.id }}_stage2">
         {% csrf_token %}
         <label class="checkbox-row warning-option">
             <input type="checkbox" name="force_inventory" id="force_inventory">
@@ -85,36 +85,4 @@
         </div>
     </form>
 </main>
-{% endblock %}
-
-{% block scripts %}
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    const prodId = "{{ production.id }}";
-    const storageKey = `feed_prod_${prodId}_stage2`;
-    let checkedState = JSON.parse(localStorage.getItem(storageKey)) || {};
-
-    function toggleRowStyle(checkbox) {
-        const row = checkbox.closest('.ingredient-row');
-        const nameText = row.querySelector('.row-name');
-        row.classList.toggle('is-complete', checkbox.checked);
-        if (nameText) nameText.classList.toggle('line-through', checkbox.checked);
-    }
-
-    document.querySelectorAll('.ingredient-checkbox').forEach(cb => {
-        const itemId = cb.dataset.id;
-        cb.checked = Boolean(checkedState[itemId]);
-        toggleRowStyle(cb);
-        cb.addEventListener('change', function() {
-            checkedState[itemId] = this.checked;
-            localStorage.setItem(storageKey, JSON.stringify(checkedState));
-            toggleRowStyle(this);
-        });
-    });
-
-    document.getElementById('stageForm').addEventListener('submit', function() {
-        localStorage.removeItem(storageKey);
-    });
-});
-</script>
 {% endblock %}

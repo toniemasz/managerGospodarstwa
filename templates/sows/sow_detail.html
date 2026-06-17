@@ -1,177 +1,165 @@
 {% extends 'base.html' %}
-{% load static %}
 
-{% block title %}Karta Maciory - {{ sow.ear_tag }}{% endblock %}
+{% block title %}Karta maciory - {{ sow.ear_tag }}{% endblock %}
 
 {% block content %}
-<div class="container mx-auto max-w-5xl p-4 md:p-6">
-{% if sow.is_archived %}
-<div class="mb-6 p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded text-yellow-800 font-bold">
-    Ta maciora jest zarchiwizowana. Historia i dane pozostają dostępne do korekty.
-</div>
-{% endif %}
-    <section class="mb-6 bg-white p-6 rounded-lg shadow-sm border-l-4 border-blue-600">
-        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full lg:max-w-xl">
-                <div>
-                    <p class="block text-xs font-bold text-gray-500 uppercase mb-1">Numer Kolczyka</p>
-                    <p class="w-full border rounded px-3 py-1.5 text-gray-800 font-semibold bg-gray-50">{{ sow.ear_tag }}</p>
-                </div>
-                <div>
-                    <p class="block text-xs font-bold text-gray-500 uppercase mb-1">Data wprowadzenia do stada</p>
-                    <p class="w-full border rounded px-3 py-1.5 text-gray-800 bg-gray-50">{{ sow.entry_date|date:"d.m.Y" }}</p>
-                </div>
-            </div>
-
-            <div class="flex flex-wrap gap-2 w-full lg:w-auto justify-end items-center">
-                <a href="{% url 'add_event' sow.id %}" id="btnAddEvent" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-extrabold py-2.5 px-5 rounded-lg shadow-md hover:shadow-lg transition transform hover:-translate-y-0.5">
-                    Dodaj zdarzenie
-                </a>
-                <a href="{% url 'edit_sow' sow.id %}" class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 text-sm font-medium py-2 px-4 rounded-lg shadow-sm transition">
-                    Edytuj maciorę
-                </a>
-                <a href="{% url 'dashboard' %}" id="btnGoBack" class="bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm font-bold py-2 px-4 rounded-lg shadow transition">
-                    Wróć
-                </a>
-            </div>
+<main class="app-page">
+    {% if sow.is_archived %}
+    <section class="notice notice-warning">
+        <div>
+            <h2>Maciora zarchiwizowana</h2>
+            <p>Historia i dane pozostają dostępne do korekty.</p>
         </div>
-        <p class="text-xs text-gray-400 mt-3">ID systemu: {{ sow.id }} | Data utworzenia profilu: {{ sow.created_at|date:"d.m.Y H:i" }}</p>
+    </section>
+    {% endif %}
+
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Karta maciory</p>
+            <h1>Maciora {{ sow.ear_tag }}</h1>
+            <p class="page-subtitle">Historia zdarzeń, średnie produkcyjne i podstawowe dane rekordu.</p>
+        </div>
+        <div class="header-actions">
+            <a href="{% url 'add_event' sow.id %}" class="button button-primary">Dodaj zdarzenie</a>
+            <a href="{% url 'edit_sow' sow.id %}" class="button button-secondary">Edytuj maciorę</a>
+            <a href="{% url 'dashboard' %}" class="button button-secondary">Wróć</a>
+        </div>
     </section>
 
-    <h2 class="text-lg font-bold text-gray-700 mb-3">Statystyki produkcyjne (Średnie na cykl)</h2>
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-green-500">
-            <p class="text-xs uppercase text-gray-400 font-bold">Urodzone Żywe</p>
-            <p class="text-2xl font-bold text-gray-800">{{ sow.avg_born_alive }} <span class="text-sm font-normal text-gray-500">szt.</span></p>
+    <section class="panel compact-panel">
+        <div class="info-grid">
+            <div class="info-field">
+                <span class="field-label">Numer kolczyka</span>
+                <span class="info-value">{{ sow.ear_tag }}</span>
+            </div>
+            <div class="info-field">
+                <span class="field-label">Data wprowadzenia</span>
+                <span class="info-value">{{ sow.entry_date|date:"d.m.Y" }}</span>
+            </div>
         </div>
-        <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-red-500">
-            <p class="text-xs uppercase text-gray-400 font-bold">Urodzone Martwe</p>
-            <p class="text-2xl font-bold text-gray-800">{{ sow.avg_born_dead }} <span class="text-sm font-normal text-gray-500">szt.</span></p>
-        </div>
-        <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-blue-500">
-            <p class="text-xs uppercase text-gray-400 font-bold">Odsadzone</p>
-            <p class="text-2xl font-bold text-gray-800">{{ sow.avg_weaned }} <span class="text-sm font-normal text-gray-500">szt.</span></p>
-        </div>
-        <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-orange-500">
-            <p class="text-xs uppercase text-gray-400 font-bold">Upadki przed odsadzeniem</p>
-            <p class="text-2xl font-bold text-gray-800">{{ sow.avg_loss_before_weaning }} <span class="text-sm font-normal text-gray-500">szt.</span></p>
-        </div>
-    </div>
+        <p class="detail-meta">ID systemu: {{ sow.id }} | Data utworzenia profilu: {{ sow.created_at|date:"d.m.Y H:i" }}</p>
+    </section>
 
-    <div class="bg-white rounded-lg shadow-sm overflow-hidden border-t-4 border-indigo-500 mb-8">
+    <h2 class="section-title">Statystyki produkcyjne</h2>
+    <section class="stats-grid">
+        <div class="stat-tile">
+            <span>Urodzone żywe</span>
+            <strong>{{ sow.avg_born_alive }} szt.</strong>
+        </div>
+        <div class="stat-tile">
+            <span>Urodzone martwe</span>
+            <strong>{{ sow.avg_born_dead }} szt.</strong>
+        </div>
+        <div class="stat-tile">
+            <span>Odsadzone</span>
+            <strong>{{ sow.avg_weaned }} szt.</strong>
+        </div>
+        <div class="stat-tile">
+            <span>Upadki przed odsadzeniem</span>
+            <strong>{{ sow.avg_loss_before_weaning }} szt.</strong>
+        </div>
+    </section>
 
-        <div class="p-4 bg-gray-50 border-b border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4">
-            <h3 class="text-md font-bold text-gray-700 flex items-center">📅 Rejestr Zdarzeń (Chronologicznie)</h3>
-
-            <div class="flex items-center gap-2">
-                <label for="eventFilter" class="text-sm font-bold text-gray-500">Filtruj:</label>
-                <select id="eventFilter" class="shadow-sm border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
-                        <option value="ALL">Wszystkie zdarzenia</option>
-                        <option value="INSEMINATION">Tylko Inseminacje</option>
-                        <option value="PREGNANCY_CHECK">Tylko Badania USG</option> <option value="FARROWING">Tylko Oproszenia</option>
-                        <option value="WEANING">Tylko Odsadzenia</option>
-                        <option value="VACCINATION">Tylko Szczepienia</option> </select>
+    <section class="panel table-panel">
+        <div class="section-heading">
+            <div>
+                <h2>Rejestr zdarzeń</h2>
+                <p>Zdarzenia pokazane chronologicznie dla tej maciory.</p>
+            </div>
+            <div class="table-control">
+                <label for="eventFilter">Filtruj zdarzenia</label>
+                <select id="eventFilter" data-table-filter>
+                    <option value="ALL">Wszystkie zdarzenia</option>
+                    <option value="INSEMINATION">Inseminacje</option>
+                    <option value="PREGNANCY_CHECK">Badania USG</option>
+                    <option value="FARROWING">Oproszenia</option>
+                    <option value="WEANING">Odsadzenia</option>
+                    <option value="VACCINATION">Szczepienia</option>
+                </select>
             </div>
         </div>
 
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200 text-left text-sm text-gray-600" id="eventsTable">
-                <thead class="bg-gray-100 text-xs uppercase text-gray-500 font-bold">
+        <div class="table-scroll">
+            <table class="data-table" id="eventsTable">
+                <thead>
                     <tr>
-                        <th class="p-4">Data zdarzenia</th>
-                        <th class="p-4">Typ</th>
-                        <th class="p-4">Szczegóły</th>
-                        <th class="p-4 text-center">Akcje</th>
+                        <th>Data zdarzenia</th>
+                        <th>Typ</th>
+                        <th>Szczegóły</th>
+                        <th class="text-right">Akcje</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200" id="eventsTableBody">
+                <tbody>
                     {% for event in sow.all_events %}
-                    <tr class="hover:bg-gray-50 event-row" data-filter="{{ event.event_type }}" data-search="{{ event.event_date }}">
-                        <td class="p-4 font-semibold text-gray-800 whitespace-nowrap">{{ event.event_date }}</td>
-                        <td class="p-4 whitespace-nowrap">
+                    <tr class="event-row" data-filter="{{ event.event_type }}" data-search="{{ event.event_date }} {{ event.get_event_type_display }}">
+                        <td><strong>{{ event.event_date|date:"d.m.Y" }}</strong></td>
+                        <td>
                             {% if event.event_type == 'INSEMINATION' %}
-                                <span class="bg-yellow-100 text-yellow-800 px-2.5 py-1 rounded-full text-xs font-bold border border-yellow-200">🧬 Inseminacja</span>
+                                <span class="status-pill status-amber">Inseminacja</span>
                             {% elif event.event_type == 'PREGNANCY_CHECK' %}
-                                <span class="bg-green-100 text-green-800 px-2.5 py-1 rounded-full text-xs font-bold border border-green-200">🩺 Badanie USG</span>
+                                <span class="status-pill status-green">Badanie USG</span>
                             {% elif event.event_type == 'FARROWING' %}
-                                <span class="bg-purple-100 text-purple-800 px-2.5 py-1 rounded-full text-xs font-bold border border-purple-200">🍼 Oproszenie</span>
+                                <span class="status-pill status-violet">Oproszenie</span>
                             {% elif event.event_type == 'WEANING' %}
-                                <span class="bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full text-xs font-bold border border-blue-200">🐖 Odsadzenie</span>
+                                <span class="status-pill status-blue">Odsadzenie</span>
                             {% elif event.event_type == 'VACCINATION' %}
-                                <span class="bg-teal-100 text-teal-800 px-2.5 py-1 rounded-full text-xs font-bold border border-teal-200">💉 Szczepienie</span>
+                                <span class="status-pill status-green">Szczepienie</span>
+                            {% else %}
+                                <span class="status-pill">{{ event.get_event_type_display }}</span>
                             {% endif %}
                         </td>
-                        <td class="p-4 text-gray-700">
-                            {% if event.event_type == 'INSEMINATION' %}
-                                Inseminator/Technik: <strong class="text-gray-900">{{ event.details.technician|default:"Brak danych" }}</strong>
-
-                            {% elif event.event_type == 'PREGNANCY_CHECK' %}
-                                Wynik:
-                                {% if event.details.result == 'TAK' %}
-                                    <strong class="text-green-600">Prośna (TAK)</strong>
-                                {% elif event.details.result == 'NIE' %}
-                                    <strong class="text-red-600">Jałowa (NIE)</strong>
-                                {% elif event.details.result == '?' %}
-                                    <strong class="text-orange-500">Do rebadania (?)</strong>
-                                {% else %}
-                                    <strong class="text-gray-500">Brak danych</strong>
+                        <td>
+                            <div class="event-detail">
+                                {% if event.event_type == 'INSEMINATION' %}
+                                    <span>Inseminator/technik: <strong>{{ event.details.technician|default:"Brak danych" }}</strong></span>
+                                {% elif event.event_type == 'PREGNANCY_CHECK' %}
+                                    <span>Wynik:
+                                        {% if event.details.result == 'TAK' %}
+                                            <strong>Prośna (TAK)</strong>
+                                        {% elif event.details.result == 'NIE' %}
+                                            <strong>Jałowa (NIE)</strong>
+                                        {% elif event.details.result == '?' %}
+                                            <strong>Do rebadania (?)</strong>
+                                        {% else %}
+                                            <strong>Brak danych</strong>
+                                        {% endif %}
+                                    </span>
+                                {% elif event.event_type == 'FARROWING' %}
+                                    <span>Urodzone żywe: <strong>{{ event.details.born_alive|default:"0" }}</strong></span>
+                                    <span>Urodzone martwe: <strong>{{ event.details.born_dead|default:"0" }}</strong></span>
+                                {% elif event.event_type == 'WEANING' %}
+                                    <span>Odsadzone prosięta: <strong>{{ event.details.count|default:"0" }} szt.</strong></span>
+                                {% elif event.event_type == 'VACCINATION' %}
+                                    <span>Szczepionka: <strong>{{ event.details.vaccine_name|default:"Brak nazwy" }}</strong></span>
                                 {% endif %}
-
-                            {% elif event.event_type == 'FARROWING' %}
-                                Urodzone żywe: <strong class="text-green-600">{{ event.details.born_alive|default:"0" }}</strong>,
-                                Martwe: <strong class="text-red-500">{{ event.details.born_dead|default:"0" }}</strong>
-                                (Łącznie: <strong>{{ event.details.born_alive|default:"0"|add:event.details.born_dead|default:"0" }}</strong>)
-
-                            {% elif event.event_type == 'WEANING' %}
-                                Liczba odsadzonych prosiąt: <strong class="text-blue-600">{{ event.details.count|default:"0" }} szt.</strong>
-
-                            {% elif event.event_type == 'VACCINATION' %}
-                                Nazwa: <strong class="text-teal-700">{{ event.details.vaccine_name|default:"Brak nazwy" }}</strong>
-                            {% endif %}
+                            </div>
                         </td>
-                        <td class="p-4">
-                            <div class="flex justify-center items-center gap-4">
-                                <a href="{% url 'edit_event' event.id %}" class="text-indigo-500 hover:text-indigo-700 font-bold transition">Edytuj</a>
+                        <td class="text-right">
+                            <div class="row-actions">
+                                <a href="{% url 'edit_event' event.id %}" class="table-link">Edytuj</a>
                             </div>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="p-4 text-center text-gray-400 italic">Brak zarejestrowanych zdarzeń w historii.</td>
+                        <td colspan="4" class="empty-table">Brak zarejestrowanych zdarzeń w historii.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
 
-        <div class="p-4 flex flex-col sm:flex-row justify-between items-center border-t bg-gray-50 gap-4">
-            <div class="flex items-center gap-2">
-                <label for="eventLimitSelect" class="text-xs text-gray-500 font-bold uppercase tracking-wider">Wierszy na stronę:</label>
-                <select id="eventLimitSelect" class="shadow-sm border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-gray-700">
-                    <option value="10">10</option>
-                    <option value="25">25</option>
-                    <option value="50">50</option>
+        <div class="table-footer-controls">
+            <div class="table-control">
+                <label for="eventLimitSelect">Na stronę</label>
+                <select id="eventLimitSelect">
+                    <option value="10">10 zdarzeń</option>
+                    <option value="25">25 zdarzeń</option>
+                    <option value="50">50 zdarzeń</option>
                 </select>
             </div>
-
-            <div id="eventPaginationControls" class="flex gap-1"></div>
         </div>
-
-    </div>
-{% endblock %}
-
-{% block scripts %}
-
-<script>
-    document.addEventListener("DOMContentLoaded", () => {
-        new PaginationTable({
-            tableId: 'eventsTable',
-            rowSelector: '#eventsTable .event-row',
-            filterSelectId: 'eventFilter',
-            limitSelectId: 'eventLimitSelect',
-            paginationContainerId: 'eventPaginationControls'
-        });
-    });
-</script>
-
+        <div id="eventPaginationControls" class="pagination-controls"></div>
+    </section>
+</main>
 {% endblock %}

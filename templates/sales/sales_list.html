@@ -71,7 +71,7 @@
             </div>
         </div>
         <div class="table-scroll">
-            <table class="data-table" id="salesTable">
+            <table class="data-table" id="salesTable" data-mobile-cards="true">
                 <thead>
                     <tr>
                         <th>Data sprzedaży</th>
@@ -119,7 +119,7 @@
         <div class="table-footer-controls">
             <div class="table-control">
                 <label for="searchInput">Szukaj</label>
-                <input type="text" id="searchInput" placeholder="Numer dokumentu lub data">
+                <input type="search" id="searchInput" placeholder="Numer dokumentu, tatuaż lub data">
             </div>
             <div class="table-control">
                 <label for="statusFilter">Status</label>
@@ -141,34 +141,4 @@
         <div id="paginationControls" class="pagination-controls"></div>
     </section>
 </main>
-{% endblock %}
-
-{% block scripts %}
-<script>
-    document.addEventListener("DOMContentLoaded", () => {
-        new PaginationTable({
-            tableId: 'salesTable',
-            rowSelector: '#salesTable .sale-row',
-            searchInputId: 'searchInput',
-            filterSelectId: 'statusFilter',
-            limitSelectId: 'limitSelect',
-            paginationContainerId: 'paginationControls'
-        });
-    });
-</script>
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-    const periodSelect = document.getElementById('period');
-    const dateInputs = [document.getElementById('date_from'), document.getElementById('date_to')];
-    function syncDateInputs() {
-        const isCustom = periodSelect.value === 'custom';
-        dateInputs.forEach(input => {
-            input.disabled = !isCustom;
-            input.closest('.table-control').classList.toggle('is-muted', !isCustom);
-        });
-    }
-    periodSelect.addEventListener('change', syncDateInputs);
-    syncDateInputs();
-});
-</script>
 {% endblock %}

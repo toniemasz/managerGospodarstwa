@@ -1,6 +1,8 @@
 from datetime import date, timedelta
 from typing import List, Dict, Any, Optional
 
+from sows.domain.rules import GESTATION_DAYS, PREGNANCY_CHECK_AFTER_DAYS
+
 
 class SowEvent:
     def __init__(self, event_type: str, event_date: date, details: Dict[str, Any], id: int = None):
@@ -47,7 +49,7 @@ class Sow:
         # Pełna historia (chronologicznie od najnowszego)
         self.all_events: List[SowEvent] = []
 
-    def load_history(self, events: List[SowEvent]) -> None:
+    def load_history(self, events: List[SowEvent], gestation_days: int = GESTATION_DAYS) -> None:
         """
         Ładuje pełną historię zdarzeń maciory, odtwarzając chronologicznie jej
         bieżący status oraz agregując dane statystyczne.
@@ -72,7 +74,7 @@ class Sow:
             if event.event_type == "INSEMINATION":
                 self.status = "INSEMINATED"
                 self.last_insemination_date = event.event_date
-                self.expected_farrowing_date = event.event_date + timedelta(days=114)
+                self.expected_farrowing_date = event.event_date + timedelta(days=gestation_days)
                 self.inseminations.append(event)
 
             elif event.event_type == "PREGNANCY_CHECK":
@@ -108,14 +110,18 @@ class Sow:
             elif event.event_type == "VACCINATION":
                 self.vaccinations.append(event)
 
-    def is_due_for_pregnancy_check(self, current_date: date) -> bool:
+    def is_due_for_pregnancy_check(
+        self,
+        current_date: date,
+        pregnancy_check_after_days: int = PREGNANCY_CHECK_AFTER_DAYS,
+    ) -> bool:
         """
         Sprawdza na podstawie bieżącej daty, czy minęło 30 dni od inseminacji
         i czy maciora wymaga wykonania badania USG lub badania szczegółowego.
         """
-        if self.status in ["INSEMINATED", "TO_RECHECK"] and self.last_insemination_date:
+        if self.status in ["INSEMINATED", "TO_RECHECK", "TO_CHECK"] and self.last_insemination_date:
             days_since_insemination = (current_date - self.last_insemination_date).days
-            return days_since_insemination >= 30
+            return days_since_insemination >= pregnancy_check_after_days
         return False
 
     def get_vaccination_status(self, plan: Dict[str, Any], current_date: date) -> Dict[str, Any]:
@@ -191,10 +197,14 @@ class Sow:
             'days_to_target': days_to_target
         }
 
-    def update_state_for_date(self, current_date: date):
+    def update_state_for_date(
+        self,
+        current_date: date,
+        pregnancy_check_after_days: int = PREGNANCY_CHECK_AFTER_DAYS,
+    ):
         """Dynamicznie aktualizuje status w pamięci na podstawie upływu czasu (30 dni)."""
         if self.status == "INSEMINATED" and self.last_insemination_date:
-            if (current_date - self.last_insemination_date).days >= 30:
+            if (current_date - self.last_insemination_date).days >= pregnancy_check_after_days:
                 self.status = "TO_CHECK"
 
     @property

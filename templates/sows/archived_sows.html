@@ -1,41 +1,44 @@
 {% extends 'base.html' %}
-{% load static %}
 
-{% block title %}Archiwum Macior{% endblock %}
+{% block title %}Archiwum macior{% endblock %}
 
 {% block content %}
-<div class="container mx-auto p-4 md:p-6">
-    <header class="mb-6 flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
-        <h1 class="text-xl md:text-2xl font-bold text-gray-800">🗄️ Archiwum Macior</h1>
+<main class="app-page">
+    <section class="page-header">
         <div>
-            <a href="{% url 'dashboard' %}" class="bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm font-bold py-2 px-4 rounded transition">Wróć do stada</a>
+            <p class="eyebrow">Maciory</p>
+            <h1>Archiwum macior</h1>
+            <p class="page-subtitle">Zarchiwizowane rekordy z zachowaną historią zdarzeń.</p>
         </div>
-    </header>
+        <a href="{% url 'dashboard' %}" class="button button-secondary">Wróć do stada</a>
+    </section>
 
-    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200 text-left text-sm text-gray-600">
-                <thead class="bg-gray-50 text-xs uppercase text-gray-500 font-bold">
+    <section class="panel table-panel">
+        <div class="section-heading">
+            <div>
+                <h2>Lista archiwalna</h2>
+                <p>Pozycje można nadal otworzyć i skorygować.</p>
+            </div>
+        </div>
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead>
                     <tr>
-                        <th class="p-4">Nr Kolczyka</th>
-                        <th class="p-4">Ostatni Status</th>
-                        <th class="p-4">W stadzie od</th>
-                        <th class="p-4 text-right">Urodzone żywe (Suma)</th>
-                        <th class="p-4 text-right">Akcje</th>
+                        <th>Nr kolczyka</th>
+                        <th>Ostatni status</th>
+                        <th>W stadzie od</th>
+                        <th class="text-right">Urodzone żywe</th>
+                        <th class="text-right">Akcje</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200">
+                <tbody>
                     {% for sow in archived_sows %}
-                    <tr class="hover:bg-gray-50 transition">
-                        <td class="p-4 font-semibold text-gray-900">
-                            <a href="{% url 'sow_detail' sow.id %}" class="table-link">{{ sow.ear_tag }}</a>
-                        </td>
-                        <td class="p-4">
-                            <span class="bg-gray-200 text-gray-800 px-2 py-0.5 rounded text-xs font-bold">{{ sow.dynamic_status_display }}</span>
-                        </td>
-                        <td class="p-4 text-gray-500">{{ sow.entry_date|date:"d.m.Y" }}</td>
-                        <td class="p-4 text-right font-medium text-gray-800">{{ sow.total_born_alive }} szt.</td>
-                        <td class="p-4 text-right">
+                    <tr>
+                        <td><a href="{% url 'sow_detail' sow.id %}" class="table-link">{{ sow.ear_tag }}</a></td>
+                        <td><span class="status-pill">{{ sow.dynamic_status_display }}</span></td>
+                        <td>{{ sow.entry_date|date:"d.m.Y" }}</td>
+                        <td class="text-right"><strong>{{ sow.total_born_alive }}</strong> szt.</td>
+                        <td class="text-right">
                             <div class="row-actions">
                                 <a href="{% url 'edit_sow' sow.id %}" class="table-link">Edytuj</a>
                             </div>
@@ -43,12 +46,12 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="p-4 text-center text-gray-400">Archiwum jest puste.</td>
+                        <td colspan="5" class="empty-table">Archiwum jest puste.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-    </div>
-</div>
+    </section>
+</main>
 {% endblock %}

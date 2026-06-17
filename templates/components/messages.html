@@ -1,7 +1,7 @@
 {% if messages %}
-<section class="message-stack" aria-live="polite">
+<section class="message-stack" aria-live="polite" aria-label="Komunikaty systemowe">
     {% for message in messages %}
-        <div class="alert {% if message.tags == 'error' %}alert-error{% else %}alert-success{% endif %}">
+        <div class="alert {% if 'error' in message.tags %}alert-error{% elif 'warning' in message.tags %}alert-warning{% else %}alert-success{% endif %}" role="{% if 'error' in message.tags %}alert{% else %}status{% endif %}">
             {{ message }}
         </div>
     {% endfor %}
