@@ -17,7 +17,12 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
+from managerGospodarstwa.admin_backup import admin_database_backup_view
+
+admin.site.index_template = 'admin/custom_index.html'
+
 urlpatterns = [
+    path('admin/kopia-zapasowa-bazy/', admin_database_backup_view, name='admin_database_backup'),
     path('admin/', admin.site.urls),
     path('', include('sows.urls')),
     path('ustawienia/', include('farms.urls')),
