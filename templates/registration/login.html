@@ -18,6 +18,9 @@
 
         <form method="post" class="responsive-form">
             {% csrf_token %}
+            {% if redirect_field_value %}
+                <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
+            {% endif %}
             <div class="form-field">
                 <label for="{{ form.username.id_for_label }}">Użytkownik</label>
                 {{ form.username }}
