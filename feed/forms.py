@@ -17,14 +17,24 @@ def _apply_widget_class(field):
 class IngredientForm(forms.ModelForm):
     class Meta:
         model = IngredientModel
-        # Dodane pole is_in_bin, aby w panelu decydować czy to silos czy worek
-        fields = ['name', 'description', 'is_in_bin']
+        fields = ['name', 'description', 'low_stock_threshold_kg', 'is_in_bin']
+        labels = {
+            'low_stock_threshold_kg': 'Próg niskiego stanu (kg)',
+        }
+        widgets = {
+            'low_stock_threshold_kg': forms.NumberInput(attrs={'step': '0.01', 'min': '0'}),
+        }
+        help_texts = {
+            'low_stock_threshold_kg': 'Alert pojawi się, gdy stan tego składnika spadnie poniżej tej wartości.',
+        }
 
     def __init__(self, *args, farm=None, **kwargs):
         self.farm = farm
         super().__init__(*args, **kwargs)
         if self.farm is not None:
             self.instance.farm = self.farm
+        for field in self.fields.values():
+            _apply_widget_class(field)
 
     def clean_name(self):
         name = self.cleaned_data['name']
