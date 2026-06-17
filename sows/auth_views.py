@@ -19,9 +19,14 @@ class SecureLoginView(LoginView):
         return (
             not settings.DEBUG
             and not getattr(settings, 'TESTING', False)
-            and getattr(settings, 'SECURE_SSL_REDIRECT', False)
+            and not SecureLoginView._is_local_http_host(request)
             and not request.is_secure()
         )
+
+    @staticmethod
+    def _is_local_http_host(request) -> bool:
+        host = request.get_host().split(':', 1)[0]
+        return host in {'127.0.0.1', 'localhost', '0.0.0.0'}
 
     @staticmethod
     def _build_https_url(request) -> str:
