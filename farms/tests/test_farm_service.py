@@ -1,3 +1,7 @@
+import json
+from io import BytesIO
+from zipfile import ZipFile
+
 import pytest
 from django.contrib.auth.models import AnonymousUser, User
 from django.test import RequestFactory
@@ -9,6 +13,7 @@ from farms.models import FarmModel, FarmSettingsModel
 from farms.services.current_farm import get_current_farm
 from farms.services.farm_service import get_default_farm_name, get_first_user_farm, get_or_create_user_farm
 from farms.services.settings_service import get_farm_settings
+from feed.models import IngredientModel
 
 
 @pytest.mark.django_db
@@ -103,7 +108,6 @@ def test_farm_settings_view_updates_farm_and_rules(client):
         'gestation_days': '115',
         'farrowing_alert_days_ahead': '5',
         'vaccination_alert_days_ahead': '9',
-        'low_stock_threshold_kg': '750.00',
         'default_production_quantity_kg': '1800.00',
         'allow_farrowing_without_pregnancy_check': 'on',
         'ask_before_auto_pregnancy_check': 'on',
@@ -115,3 +119,29 @@ def test_farm_settings_view_updates_farm_and_rules(client):
     assert farm.name == 'Nowa nazwa gospodarstwa'
     assert settings.pregnancy_check_after_days == 28
     assert settings.farrowing_alert_days_ahead == 5
+
+
+@pytest.mark.django_db
+def test_user_data_export_contains_only_current_farm_data(client):
+    user = User.objects.create_user(username='export-user', password='password')
+    farm = get_or_create_user_farm(user)
+    other_user = User.objects.create_user(username='other-export-user')
+    other_farm = get_or_create_user_farm(other_user)
+
+    own_ingredient = IngredientModel.objects.create(name='Własna soja', farm=farm)
+    IngredientModel.objects.create(name='Cudza soja', farm=other_farm)
+
+    client.login(username='export-user', password='password')
+    response = client.get(reverse('export_user_data'))
+
+    assert response.status_code == 200
+    assert response['Content-Type'] == 'application/zip'
+
+    with ZipFile(BytesIO(response.content)) as export_zip:
+        exported_file = export_zip.namelist()[0]
+        payload = json.loads(export_zip.read(exported_file).decode('utf-8'))
+
+    exported_ingredients = payload['data']['feed.IngredientModel']
+    assert len(exported_ingredients) == 1
+    assert exported_ingredients[0]['pk'] == own_ingredient.id
+    assert exported_ingredients[0]['fields']['name'] == 'Własna soja'
