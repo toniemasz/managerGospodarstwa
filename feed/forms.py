@@ -4,6 +4,7 @@ from django.forms import inlineformset_factory
 from django.forms.formsets import DELETION_FIELD_NAME
 from .models import IngredientModel, RecipeModel, RecipeItemModel, DeliveryModel, ProductionModel, \
     IngredientPriceConfigModel
+from feed.domain.rules import LOW_STOCK_THRESHOLD_KG
 
 
 FORM_FIELD_CLASS = 'form-control'
@@ -25,12 +26,14 @@ class IngredientForm(forms.ModelForm):
             'low_stock_threshold_kg': forms.NumberInput(attrs={'step': '0.01', 'min': '0'}),
         }
         help_texts = {
-            'low_stock_threshold_kg': 'Alert pojawi się, gdy stan tego składnika spadnie poniżej tej wartości.',
+            'low_stock_threshold_kg': 'Alert pojawi się, gdy stan tego składnika spadnie poniżej tej wartości. Puste pole oznacza domyślnie 500 kg.',
         }
 
     def __init__(self, *args, farm=None, **kwargs):
         self.farm = farm
         super().__init__(*args, **kwargs)
+        self.fields['low_stock_threshold_kg'].required = False
+        self.fields['low_stock_threshold_kg'].initial = LOW_STOCK_THRESHOLD_KG
         if self.farm is not None:
             self.instance.farm = self.farm
         for field in self.fields.values():
@@ -43,6 +46,9 @@ class IngredientForm(forms.ModelForm):
             if exists:
                 raise forms.ValidationError("Taki składnik istnieje już w tym gospodarstwie.")
         return name
+
+    def clean_low_stock_threshold_kg(self):
+        return self.cleaned_data.get('low_stock_threshold_kg') or LOW_STOCK_THRESHOLD_KG
 
 
 class RecipeForm(forms.ModelForm):
