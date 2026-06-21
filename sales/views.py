@@ -2,6 +2,7 @@ import logging
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -11,6 +12,7 @@ from .services.sale_dashboard_service import SaleDashboardService
 from .services.sale_form_service import SaleFormService
 from farms.services.current_farm import get_current_farm
 from farms.services.date_range import PERIOD_OPTIONS, parse_date_range
+from farms.services.audit_log_service import log_action
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +53,10 @@ def delete_sale_view(request, pk):
     farm = get_current_farm(request)
     sale = get_object_or_404(PigSaleModel, pk=pk, farm=farm)
     if request.method == 'POST':
+        representation = str(sale)
+        object_id = sale.pk
         sale.delete()
+        log_action(farm=farm, user=request.user, action="DELETE", model_label="sales.PigSaleModel", object_id=object_id, object_repr=representation)
         messages.success(request, "Sprzedaż została usunięta.")
     return redirect('sales_list')
 
@@ -65,7 +70,13 @@ def _sale_form_view(request, sale: PigSaleModel, template_context: dict):
         form = PigSaleForm(request.POST, request.FILES, instance=sale)
         row_formset = service.row_formset_from_post(request.POST)
         if form.is_valid() and row_formset.is_valid():
-            service.save_sale(form, row_formset, sale)
+            saved_sale = service.save_sale(form, row_formset, sale)
+            log_action(
+                farm=saved_sale.farm,
+                user=request.user,
+                action="UPDATE" if template_context.get('is_edit') else "CREATE",
+                obj=saved_sale,
+            )
             messages.success(request, "Sprzedaż została zapisana.")
             return redirect('sales_list')
     else:
@@ -88,7 +99,22 @@ def _handle_pdf_import(request, sale: PigSaleModel, template_context: dict, serv
         form = PigSaleForm(request.POST, request.FILES, instance=sale)
         row_formset = service.row_formset_from_post(request.POST)
     else:
-        parsed = service.parse_pdf_import(uploaded_pdf, request.POST)
+        try:
+            PigSaleForm.validate_settlement_pdf(uploaded_pdf)
+            parsed = service.parse_pdf_import(uploaded_pdf, request.POST)
+        except ValidationError as error:
+            messages.error(request, error.messages[0])
+            form = PigSaleForm(request.POST, request.FILES, instance=sale)
+            row_formset = service.row_formset_from_post(request.POST)
+            context = {'form': form, 'row_formset': row_formset, 'sale': sale, **template_context}
+            return render(request, 'sales/add_sale.html', context)
+        except Exception:
+            logger.exception("Nie udało się odczytać rozliczenia PDF")
+            messages.error(request, "Nie udało się odczytać PDF. Sprawdź, czy plik ma obsługiwany format.")
+            form = PigSaleForm(request.POST, request.FILES, instance=sale)
+            row_formset = service.row_formset_from_post(request.POST)
+            context = {'form': form, 'row_formset': row_formset, 'sale': sale, **template_context}
+            return render(request, 'sales/add_sale.html', context)
         form = PigSaleForm(instance=sale, initial=parsed.form_initial)
         row_formset = SaleClassRowFormSet(prefix='rows', initial=parsed.row_initial)
 
@@ -96,6 +122,15 @@ def _handle_pdf_import(request, sale: PigSaleModel, template_context: dict, serv
             messages.success(request, "Zaimportowano rozliczenie z PDF. Sprawdź tabelę przed zapisem.")
         for warning in parsed.warnings:
             messages.warning(request, warning)
+        log_action(
+            farm=sale.farm,
+            user=request.user,
+            action="PDF_IMPORT_PREVIEW",
+            model_label="sales.PigSaleModel",
+            object_id=sale.pk,
+            object_repr=str(sale),
+            metadata={"filename": uploaded_pdf.name, "warnings": parsed.warnings},
+        )
 
     context = {
         'form': form,

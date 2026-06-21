@@ -15,6 +15,7 @@ urlpatterns = [
     path('magazyn/dostawa/<int:pk>/edytuj/', views.edit_delivery_view, name='edit_delivery'),
     path('magazyn/dostawa/<int:pk>/usun/', views.delete_delivery_view, name='delete_delivery'),
     path('magazyn/pelny/', views.feed_full_inventory_view, name='feed_full_inventory'),
+    path('magazyn/korekta/', views.inventory_adjustment_view, name='inventory_adjustment'),
     # Receptury
     path('receptury/', views.feed_recipes_view, name='feed_recipes'),
     path('receptury/dodaj/', views.add_recipe_view, name='add_recipe'),

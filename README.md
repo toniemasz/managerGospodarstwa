@@ -198,6 +198,33 @@ Testy można uruchomić komendą:
 pytest
 ```
 
+### Lokalna baza demonstracyjna
+
+Przy `DEBUG=True` można utworzyć kompletny zestaw demonstracyjny:
+
+```bash
+python manage.py seed_demo_data
+```
+
+Logowanie do danych demo: `testtest` / `testtest`. Polecenie jest idempotentne. Pełne wyczyszczenie lokalnej bazy i ponowne utworzenie danych wykonuje:
+
+```bash
+python manage.py seed_demo_data --reset
+```
+
+`--reset` działa wyłącznie lokalnie przy `DEBUG=True` i usuwa wszystkie dane z lokalnej bazy.
+
+### Bezpieczeństwo danych i nowe narzędzia
+
+- Centrum zadań zbiera badania USG, oproszenia, szczepienia, niskie stany, kolejkę śrutowań i sprzedaże bez rozliczenia.
+- Historia zmian zapisuje najważniejsze operacje i jest izolowana per gospodarstwo.
+- Stan magazynu wynika z ruchów magazynowych: dostaw, zużycia produkcyjnego i korekt plus/minus.
+- Korekta stanu jest dostępna w module magazynu i blokuje zejście poniżej zera.
+- Ustawienia gospodarstwa udostępniają eksport/import CSV w archiwum ZIP; import jest atomowy i domyślnie wymaga pustego gospodarstwa.
+- Analityka opłacalności pokazuje sprzedaż, produkcję i szacowany koszt paszy w wybranym okresie.
+- Backup/restore całej bazy w panelu administracyjnym jest dostępny wyłącznie dla superusera; restore wymaga żądania POST i potwierdzenia.
+- Istniejący eksport/import danych użytkownika w formacie ZIP/JSON pozostaje dostępny.
+
 ### 10. Najczęstsze problemy lokalne
 
 Jeżeli po zmianach w modelach baza danych nie jest aktualna, należy wykonać:

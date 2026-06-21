@@ -8,6 +8,7 @@ from feed.domain.rules import DEFAULT_PRODUCTION_QUANTITY_KG, LOW_STOCK_THRESHOL
 from feed.services.feed_calculators import InventoryItem, ProductionCalculator, RecipeCostCalculator
 from feed.services.feed_repository import FeedRepository
 from feed.models import ProductionModel
+from feed.services.inventory_service import InventoryMovementService
 
 
 class FeedManagementService:
@@ -38,20 +39,14 @@ class FeedManagementService:
     def get_inventory_dashboard(self) -> dict:
         """Orkiestruje wyliczanie stanu magazynu bez dotykania ORM."""
         ingredients = self.repository.get_all_ingredients()
-        delivery_map = self.repository.get_delivery_aggregates()
-        completed_productions = self.repository.get_completed_productions()
-
-        consumed_map = {ing.id: Decimal('0.00') for ing in ingredients}
-
-        for prod in completed_productions:
-            for req in self._calculator_for_production(prod).get_requirements():
-                if req.ingredient_id in consumed_map:
-                    consumed_map[req.ingredient_id] += req.required_kg
+        movement_totals = InventoryMovementService(self.farm).movement_totals()
 
         inventory_state = []
         for ing in ingredients:
-            total_delivered = delivery_map.get(ing.id, Decimal('0.00'))
-            total_consumed = consumed_map.get(ing.id, Decimal('0.00'))
+            total_delivered, total_consumed = movement_totals.get(
+                ing.id,
+                (Decimal('0.00'), Decimal('0.00')),
+            )
 
             inventory_state.append(InventoryItem(
                 ingredient_id=ing.id,
@@ -59,7 +54,7 @@ class FeedManagementService:
                 is_in_bin=ing.is_in_bin,
                 low_stock_threshold_kg=ing.low_stock_threshold_kg,
                 total_delivered=total_delivered,
-                total_used=total_consumed
+                total_used=total_consumed,
             ))
 
         low_stock = [item for item in inventory_state if item.is_low_stock]
@@ -143,7 +138,7 @@ class FeedManagementService:
         return True, "Zakończono pobieranie z binów. Gotowe do Etapu 2."
 
     @transaction.atomic
-    def complete_production(self, production_id: int, skip_stages: bool = False, force_inventory: bool = False) -> \
+    def complete_production(self, production_id: int, skip_stages: bool = False, force_inventory: bool = False, user=None) -> \
     tuple[bool, str]:
         production = self.repository.get_production_for_processing(production_id, lock_for_update=True)
 
@@ -161,6 +156,11 @@ class FeedManagementService:
         production.status = 'COMPLETED'
         production.completed_at = timezone.now()
         self.repository.save_production(production)
+        InventoryMovementService(self.farm).book_production(
+            production,
+            user=user,
+            forced=force_inventory,
+        )
         return True, "Śrutowanie zakończone pomyślnie. Zaktualizowano stany magazynowe."
 
     def get_calculator_data(self):

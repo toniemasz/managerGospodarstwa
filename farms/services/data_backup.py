@@ -167,6 +167,8 @@ def import_user_backup(uploaded_file, farm: FarmModel) -> dict[str, int]:
 
     with transaction.atomic():
         counts = _restore_user_records(payload, data, farm)
+        from feed.services.inventory_service import InventoryMovementService
+        InventoryMovementService(farm).rebuild()
     return counts
 
 

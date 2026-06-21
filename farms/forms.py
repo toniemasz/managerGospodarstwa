@@ -68,3 +68,14 @@ class UserBackupImportForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.fields['backup_file'].widget.attrs['class'] = 'form-control'
         self.fields['confirm_empty_import'].widget.attrs['class'] = 'checkbox-input'
+
+
+class CsvImportForm(forms.Form):
+    csv_archive = forms.FileField(
+        label="Archiwum CSV (ZIP)",
+        widget=forms.FileInput(attrs={"accept": ".zip", "class": "form-control"}),
+    )
+    confirm_empty_import = forms.BooleanField(
+        label="Potwierdzam import do pustego gospodarstwa.",
+        widget=forms.CheckboxInput(attrs={"class": "checkbox-input"}),
+    )

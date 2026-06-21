@@ -99,7 +99,21 @@
         </div>
         <div class="form-actions">
             <a href="{% url 'export_user_data' %}" class="button button-secondary">Eksportuj moje dane</a>
+            <a href="{% url 'export_csv' %}" class="button button-secondary">Eksportuj CSV</a>
+            <a href="{% url 'audit_log' %}" class="button button-secondary">Historia zmian</a>
         </div>
+    </section>
+
+    <section class="panel compact-panel">
+        <div class="section-heading"><div><h2>Import CSV</h2><p>Importuje komplet plików CSV z archiwum eksportu. Gospodarstwo musi być puste.</p></div></div>
+        <form method="post" enctype="multipart/form-data" class="responsive-form">
+            {% csrf_token %}
+            {{ csv_import_form.non_field_errors }}
+            <div class="form-field">{{ csv_import_form.csv_archive.label_tag }}{{ csv_import_form.csv_archive }}{{ csv_import_form.csv_archive.errors }}</div>
+            <label class="checkbox-row">{{ csv_import_form.confirm_empty_import }}<span>{{ csv_import_form.confirm_empty_import.label }}</span></label>
+            {{ csv_import_form.confirm_empty_import.errors }}
+            <div class="form-actions"><button type="submit" name="import_csv" value="1" class="button button-secondary">Importuj CSV</button></div>
+        </form>
     </section>
 
     <section class="panel compact-panel">

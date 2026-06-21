@@ -17,8 +17,6 @@ class PigSaleModel(models.Model):
         'farms.FarmModel',
         on_delete=models.CASCADE,
         related_name='pig_sales',
-        blank=True,
-        null=True,
         verbose_name="Gospodarstwo",
     )
     sale_date = models.DateField(default=date.today, blank=True, null=True, verbose_name="Data sprzedaży")
@@ -45,6 +43,12 @@ class PigSaleModel(models.Model):
         sale_date = self.sale_date or "bez daty"
         return f"Sprzedaż {self.quantity} szt. - {sale_date}"
 
+    def save(self, *args, **kwargs):
+        if self.farm_id is None:
+            from farms.services.farm_service import get_or_create_legacy_farm
+            self.farm = get_or_create_legacy_farm()
+        return super().save(*args, **kwargs)
+
     @property
     def settlement_status(self) -> str:
         if self.no_settlement:
@@ -62,6 +66,12 @@ class PigSaleModel(models.Model):
     def recalculate_from_rows(self) -> None:
         rows = list(self.rows.all())
         if not rows:
+            self.quantity = 0
+            self.total_weight = Decimal('0.00')
+            self.price_per_kg = Decimal('0.00')
+            self.net_value = Decimal('0.00')
+            self.vat_value = Decimal('0.00')
+            self.gross_value = Decimal('0.00')
             return
 
         self.quantity = sum((row.quantity or 0) for row in rows)

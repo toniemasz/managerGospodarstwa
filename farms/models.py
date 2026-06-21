@@ -50,3 +50,35 @@ class FarmSettingsModel(models.Model):
 
     def __str__(self):
         return f"Ustawienia: {self.farm.name}"
+
+
+class AuditLogModel(models.Model):
+    farm = models.ForeignKey(
+        FarmModel,
+        on_delete=models.CASCADE,
+        related_name="audit_logs",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="farm_audit_logs",
+        null=True,
+        blank=True,
+    )
+    action = models.CharField(max_length=50)
+    model_label = models.CharField(max_length=100)
+    object_id = models.CharField(max_length=100, blank=True)
+    object_repr = models.CharField(max_length=255, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        indexes = [
+            models.Index(fields=("farm", "-created_at"), name="audit_farm_created_idx"),
+        ]
+        verbose_name = "Wpis historii zmian"
+        verbose_name_plural = "Historia zmian"
+
+    def __str__(self):
+        return f"{self.action}: {self.object_repr or self.model_label}"

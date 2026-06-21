@@ -54,6 +54,27 @@ class PigSaleForm(forms.ModelForm):
             existing = field.widget.attrs.get('class', '')
             field.widget.attrs['class'] = f'{existing} {FORM_FIELD_CLASS}'.strip()
 
+    def clean_settlement_pdf(self):
+        uploaded = self.cleaned_data.get('settlement_pdf')
+        if uploaded is None:
+            return uploaded
+        return self.validate_settlement_pdf(uploaded)
+
+    @staticmethod
+    def validate_settlement_pdf(uploaded):
+        if uploaded.size > 10 * 1024 * 1024:
+            raise forms.ValidationError("Plik PDF może mieć maksymalnie 10 MB.")
+        if not uploaded.name.lower().endswith('.pdf'):
+            raise forms.ValidationError("Wybierz plik z rozszerzeniem .pdf.")
+        content_type = getattr(uploaded, 'content_type', '')
+        if content_type not in ('application/pdf', 'application/x-pdf'):
+            raise forms.ValidationError("Przesłany plik nie ma typu PDF.")
+        header = uploaded.read(5)
+        uploaded.seek(0)
+        if header != b'%PDF-':
+            raise forms.ValidationError("Plik nie jest prawidłowym dokumentem PDF.")
+        return uploaded
+
 
 class SaleClassRowForm(forms.Form):
     line_no = forms.IntegerField(label="Lp", min_value=1, required=False)

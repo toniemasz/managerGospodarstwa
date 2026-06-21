@@ -138,8 +138,41 @@ class DeliveryForm(forms.ModelForm):
 
     def __init__(self, *args, farm=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['quantity_kg'].min_value = Decimal('0.01')
         if farm is not None:
             self.fields['ingredient'].queryset = IngredientModel.objects.filter(farm=farm).order_by('name')
+
+
+class InventoryAdjustmentForm(forms.Form):
+    ingredient = forms.ModelChoiceField(queryset=IngredientModel.objects.none(), label="Składnik")
+    movement_date = forms.DateField(
+        label="Data korekty",
+        widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+    )
+    quantity_kg = forms.DecimalField(
+        label="Ilość (kg)", min_value=Decimal("0.01"), max_digits=12, decimal_places=2,
+        widget=forms.NumberInput(attrs={"step": "0.01", "min": "0.01"}),
+    )
+    direction = forms.ChoiceField(
+        label="Typ korekty",
+        choices=(("plus", "Zwiększenie stanu"), ("minus", "Zmniejszenie stanu")),
+    )
+    reason = forms.CharField(label="Powód", max_length=500, widget=forms.Textarea(attrs={"rows": 3}))
+
+    def __init__(self, *args, farm=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if farm is not None:
+            self.fields["ingredient"].queryset = IngredientModel.objects.filter(farm=farm).order_by("name")
+        for field in self.fields.values():
+            _apply_widget_class(field)
+
+    def clean_movement_date(self):
+        from django.utils import timezone
+
+        movement_date = self.cleaned_data["movement_date"]
+        if movement_date > timezone.localdate():
+            raise forms.ValidationError("Data korekty nie może być z przyszłości.")
+        return movement_date
 
 
 class ProductionForm(forms.ModelForm):

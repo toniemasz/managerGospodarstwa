@@ -37,6 +37,9 @@
     </section>
 
     <section class="module-grid">
+        <a href="{% url 'task_center' %}" class="module-card">
+            <span class="module-icon green">D</span><div><h2>Dzisiejsze zadania</h2><p>USG, oproszenia, szczepienia, magazyn, śrutowanie i nierozliczone sprzedaże.</p></div>
+        </a>
         <a href="{% url 'dashboard' %}" class="module-card">
             <span class="module-icon">M</span>
             <div>
@@ -59,6 +62,9 @@
                 <h2>Sprzedaż</h2>
                 <p>Rejestr sprzedaży, klasy mięsności, wagi i podsumowania finansowe.</p>
             </div>
+        </a>
+        <a href="{% url 'profitability' %}" class="module-card">
+            <span class="module-icon amber">A</span><div><h2>Opłacalność</h2><p>Sprzedaż, produkcja paszy, koszty receptur i porównanie w czasie.</p></div>
         </a>
     </section>
 </main>

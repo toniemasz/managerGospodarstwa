@@ -6,6 +6,7 @@ from .models import (
     ProductionModel,
     RecipeItemModel,
     RecipeModel,
+    InventoryMovementModel,
 )
 
 
@@ -49,3 +50,10 @@ class ProductionAdmin(admin.ModelAdmin):
     list_display = ('date', 'time', 'recipe', 'quantity_kg', 'status')
     list_filter = ('recipe__farm', 'status')
     search_fields = ('recipe__name', 'recipe__farm__name')
+
+
+@admin.register(InventoryMovementModel)
+class InventoryMovementAdmin(admin.ModelAdmin):
+    list_display = ('movement_date', 'farm', 'ingredient', 'movement_type', 'quantity_kg', 'source_model')
+    list_filter = ('farm', 'movement_type')
+    search_fields = ('ingredient__name', 'note', 'source_id')

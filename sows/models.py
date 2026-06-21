@@ -15,8 +15,6 @@ class VaccinationPlanModel(models.Model):
         'farms.FarmModel',
         on_delete=models.CASCADE,
         related_name='vaccination_plans',
-        blank=True,
-        null=True,
         verbose_name="Gospodarstwo",
     )
     name = models.CharField(max_length=100, verbose_name="Nazwa szczepienia")
@@ -34,13 +32,17 @@ class VaccinationPlanModel(models.Model):
     def __str__(self):
         return self.name
 
+    def save(self, *args, **kwargs):
+        if self.farm_id is None:
+            from farms.services.farm_service import get_or_create_legacy_farm
+            self.farm = get_or_create_legacy_farm()
+        return super().save(*args, **kwargs)
+
 class SowModel(models.Model):
     farm = models.ForeignKey(
         'farms.FarmModel',
         on_delete=models.CASCADE,
         related_name='sows',
-        blank=True,
-        null=True,
         verbose_name="Gospodarstwo",
     )
     ear_tag = models.CharField(max_length=50)
@@ -51,6 +53,12 @@ class SowModel(models.Model):
 
     def __str__(self):
         return f"Maciora {self.ear_tag}"
+
+    def save(self, *args, **kwargs):
+        if self.farm_id is None:
+            from farms.services.farm_service import get_or_create_legacy_farm
+            self.farm = get_or_create_legacy_farm()
+        return super().save(*args, **kwargs)
 
 class SowEventModel(models.Model):
     EVENT_TYPES = [
