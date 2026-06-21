@@ -38,11 +38,16 @@
                 <button type="button" id="add-ingredient-btn" class="button button-secondary">Dodaj składnik</button>
             </div>
 
+            <div id="recipe-percentage-summary" class="notice recipe-percentage-summary" role="status" aria-live="polite">
+                <span>Suma udziałów</span>
+                <strong><span id="recipe-percentage-total">0,00</span>% / 100%</strong>
+            </div>
+
             {{ formset.management_form }}
 
             <div id="ingredient-forms-container" class="ingredient-form-list">
                 {% for f in formset %}
-                <div class="ingredient-row-card">
+                <div class="ingredient-row-card{% if f.DELETE.value %} hidden{% endif %}">
                     {{ f.id }}
                     <div class="ingredient-row-fields">
                         <div class="form-field">

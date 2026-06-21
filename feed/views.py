@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import ProtectedError
+from django.db.models.deletion import ProtectedError, RestrictedError
 from django.utils import timezone
 from decimal import Decimal, InvalidOperation
 
@@ -70,7 +70,7 @@ def delete_ingredient_view(request, pk):
         try:
             ingredient.delete()
             messages.success(request, "Składnik usunięty.")
-        except ProtectedError:
+        except (ProtectedError, RestrictedError):
             messages.error(request,
                            "Nie można usunąć składnika, ponieważ przypisane są do niego dostawy lub występuje w recepturze.")
     return redirect('ingredient_list')
@@ -211,7 +211,7 @@ def delete_recipe_view(request, pk):
         try:
             recipe.delete()
             messages.success(request, "Receptura usunięta.")
-        except ProtectedError:
+        except (ProtectedError, RestrictedError):
             messages.error(request, "Nie można usunąć receptury, ponieważ zrealizowano z jej użyciem śrutowanie.")
     return redirect('feed_recipes')
 

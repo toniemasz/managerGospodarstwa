@@ -90,6 +90,7 @@ class BaseRecipeItemFormSet(forms.BaseInlineFormSet):
             return
 
         total_percentage = Decimal('0.00')
+        ingredient_ids = set()
 
         for form in self.forms:
             # Weryfikacja usunięcia oparta o stałą frameworka
@@ -102,6 +103,14 @@ class BaseRecipeItemFormSet(forms.BaseInlineFormSet):
             percentage = form.cleaned_data.get('percentage')
             if percentage:
                 total_percentage += percentage
+
+            ingredient = form.cleaned_data.get('ingredient')
+            if ingredient:
+                if ingredient.pk in ingredient_ids:
+                    raise forms.ValidationError(
+                        f"Składnik {ingredient.name} został dodany do receptury więcej niż raz."
+                    )
+                ingredient_ids.add(ingredient.pk)
 
         if total_percentage != Decimal('100.00'):
             raise forms.ValidationError(

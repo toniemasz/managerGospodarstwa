@@ -1204,6 +1204,17 @@ input[type="file"] {
     padding: 0;
 }
 
+.recipe-percentage-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.ingredient-row-card[hidden] {
+    display: none !important;
+}
+
 .ingredient-row-card,
 .ingredient-line {
     display: grid;

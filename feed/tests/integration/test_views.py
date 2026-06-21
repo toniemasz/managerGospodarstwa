@@ -115,6 +115,36 @@ def test_add_recipe_does_not_save_when_formset_invalid(auth_client, feed_objects
 
 
 @pytest.mark.django_db
+def test_edit_recipe_removes_selected_ingredient(auth_client):
+    farm = auth_client.farm
+    recipe = RecipeModel.objects.create(name='Receptura do zmiany', farm=farm)
+    wheat = IngredientModel.objects.create(name='Pszenica usuwana', farm=farm)
+    soy = IngredientModel.objects.create(name='Soja po zmianie', farm=farm)
+    wheat_item = RecipeItemModel.objects.create(recipe=recipe, ingredient=wheat, percentage=Decimal('60.00'))
+    soy_item = RecipeItemModel.objects.create(recipe=recipe, ingredient=soy, percentage=Decimal('40.00'))
+
+    response = auth_client.post(reverse('edit_recipe', args=[recipe.id]), {
+        'name': recipe.name,
+        'items-TOTAL_FORMS': '2',
+        'items-INITIAL_FORMS': '2',
+        'items-MIN_NUM_FORMS': '0',
+        'items-MAX_NUM_FORMS': '1000',
+        'items-0-id': wheat_item.id,
+        'items-0-ingredient': wheat.id,
+        'items-0-percentage': '60.00',
+        'items-0-DELETE': 'on',
+        'items-1-id': soy_item.id,
+        'items-1-ingredient': soy.id,
+        'items-1-percentage': '100.00',
+    })
+
+    assert response.status_code == 302
+    assert not RecipeItemModel.objects.filter(id=wheat_item.id).exists()
+    soy_item.refresh_from_db()
+    assert soy_item.percentage == Decimal('100.00')
+
+
+@pytest.mark.django_db
 def test_feed_post_create_and_delete_views(auth_client, feed_objects):
     add_ingredient = auth_client.post(reverse('add_ingredient'), {
         'name': 'Soja',
@@ -143,6 +173,32 @@ def test_feed_post_create_and_delete_views(auth_client, feed_objects):
     delete_ingredient = auth_client.post(reverse('delete_ingredient', args=[soja.id]))
     assert delete_ingredient.status_code == 302
     assert not IngredientModel.objects.filter(id=soja.id).exists()
+
+
+@pytest.mark.django_db
+def test_recipe_delete_view_deletes_unused_recipe_and_protects_used_recipe(auth_client, feed_objects):
+    unused_recipe = RecipeModel.objects.create(name='Receptura bez śrutowania', farm=auth_client.farm)
+
+    deleted = auth_client.post(reverse('delete_recipe', args=[unused_recipe.id]))
+
+    assert deleted.status_code == 302
+    assert not RecipeModel.objects.filter(id=unused_recipe.id).exists()
+
+    used_recipe = feed_objects['recipe']
+    protected = auth_client.post(reverse('delete_recipe', args=[used_recipe.id]))
+
+    assert protected.status_code == 302
+    assert RecipeModel.objects.filter(id=used_recipe.id).exists()
+
+
+@pytest.mark.django_db
+def test_ingredient_delete_view_protects_ingredient_used_in_recipe(auth_client, feed_objects):
+    ingredient = feed_objects['ingredient']
+
+    response = auth_client.post(reverse('delete_ingredient', args=[ingredient.id]))
+
+    assert response.status_code == 302
+    assert IngredientModel.objects.filter(id=ingredient.id).exists()
 
 
 @pytest.mark.django_db
