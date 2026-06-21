@@ -53,6 +53,56 @@ def test_recipe_item_formset_validation():
 
 
 @pytest.mark.django_db
+def test_recipe_item_formset_deletes_item_and_validates_remaining_total():
+    recipe = RecipeModel.objects.create(name="Edycja receptury")
+    wheat = IngredientModel.objects.create(name="Pszenica do usunięcia")
+    soy = IngredientModel.objects.create(name="Soja pozostająca")
+    wheat_item = RecipeItemModel.objects.create(recipe=recipe, ingredient=wheat, percentage=Decimal('60.00'))
+    soy_item = RecipeItemModel.objects.create(recipe=recipe, ingredient=soy, percentage=Decimal('40.00'))
+
+    data = {
+        'items-TOTAL_FORMS': '2',
+        'items-INITIAL_FORMS': '2',
+        'items-MIN_NUM_FORMS': '0',
+        'items-MAX_NUM_FORMS': '1000',
+        'items-0-id': wheat_item.id,
+        'items-0-ingredient': wheat.id,
+        'items-0-percentage': '60.00',
+        'items-0-DELETE': 'on',
+        'items-1-id': soy_item.id,
+        'items-1-ingredient': soy.id,
+        'items-1-percentage': '100.00',
+    }
+
+    formset = RecipeItemFormSet(data=data, instance=recipe)
+
+    assert formset.is_valid() is True
+    formset.save()
+    assert list(recipe.items.values_list('ingredient_id', 'percentage')) == [(soy.id, Decimal('100.00'))]
+
+
+@pytest.mark.django_db
+def test_recipe_item_formset_rejects_duplicate_ingredient():
+    recipe = RecipeModel.objects.create(name="Bez duplikatów")
+    ingredient = IngredientModel.objects.create(name="Jęczmień unikalny")
+    data = {
+        'items-TOTAL_FORMS': '2',
+        'items-INITIAL_FORMS': '0',
+        'items-MIN_NUM_FORMS': '0',
+        'items-MAX_NUM_FORMS': '1000',
+        'items-0-ingredient': ingredient.id,
+        'items-0-percentage': '50.00',
+        'items-1-ingredient': ingredient.id,
+        'items-1-percentage': '50.00',
+    }
+
+    formset = RecipeItemFormSet(data=data, instance=recipe)
+
+    assert formset.is_valid() is False
+    assert "więcej niż raz" in formset.non_form_errors()[0]
+
+
+@pytest.mark.django_db
 def test_production_form_custom_recipe_validation():
     recipe = RecipeModel.objects.create(name="Receptura Testowa")
     ing1 = IngredientModel.objects.create(name="Jęczmień")

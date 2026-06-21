@@ -309,6 +309,34 @@
 
         form.dataset.recipeRowsBound = 'true';
 
+        const totalElement = document.getElementById('recipe-percentage-total');
+        const summaryElement = document.getElementById('recipe-percentage-summary');
+
+        const updatePercentageSummary = () => {
+            let total = 0;
+
+            container.querySelectorAll('.ingredient-row-card').forEach((row) => {
+                const deleteCheckbox = row.querySelector('input[type="checkbox"][name$="-DELETE"]');
+                if (deleteCheckbox?.checked) return;
+
+                const percentageInput = row.querySelector('input[name$="-percentage"]');
+                const value = Number.parseFloat(String(percentageInput?.value || '').replace(',', '.'));
+                if (Number.isFinite(value)) total += value;
+            });
+
+            if (totalElement) {
+                totalElement.textContent = total.toLocaleString('pl-PL', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+            }
+            if (summaryElement) {
+                const isComplete = Math.abs(total - 100) < 0.005;
+                summaryElement.classList.toggle('notice-success', isComplete);
+                summaryElement.classList.toggle('notice-danger', !isComplete);
+            }
+        };
+
         addButton.addEventListener('click', (event) => {
             event.preventDefault();
             const currentFormCount = parseInt(totalFormsInput.value, 10);
@@ -321,6 +349,7 @@
             container.appendChild(newRow);
             totalFormsInput.value = currentFormCount + 1;
             window.enhanceAutoResizeFields?.(newRow);
+            updatePercentageSummary();
         });
 
         container.addEventListener('click', (event) => {
@@ -332,8 +361,18 @@
             const deleteCheckbox = row?.querySelector('input[type="checkbox"][name$="-DELETE"]');
 
             if (deleteCheckbox) deleteCheckbox.checked = true;
-            if (row) row.hidden = true;
+            if (row) {
+                row.hidden = true;
+                row.classList.add('hidden');
+            }
+            updatePercentageSummary();
         });
+
+        container.addEventListener('input', (event) => {
+            if (event.target.matches('input[name$="-percentage"]')) updatePercentageSummary();
+        });
+
+        updatePercentageSummary();
     }
 
     function initProductionStageChecklist(root = document) {
