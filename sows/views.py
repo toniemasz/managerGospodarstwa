@@ -197,7 +197,12 @@ def add_event_view(request, sow_id):
                 log_action(farm=farm, user=request.user, action="CREATE", obj=event)
             return redirect('sow_detail', sow_id=sow_id)
     else:
-        form = SowEventForm(sow_status=sow.status, farm=farm, initial={'event_date': date.today()})
+        requested_event_type = request.GET.get('event_type', '')
+        allowed_event_types = {value for value, _label in SowEventModel.EVENT_TYPES}
+        initial = {'event_date': date.today()}
+        if requested_event_type in allowed_event_types:
+            initial['event_type'] = requested_event_type
+        form = SowEventForm(sow_status=sow.status, farm=farm, initial=initial)
 
     return render(request, 'sows/add_event.html', {'form': form, 'sow': db_sow})
 
@@ -264,7 +269,7 @@ def bulk_pregnancy_check_view(request):
     """Zwraca ekran do masowego wprowadzania wyników badań USG i zapisuje je."""
     farm = get_current_farm(request)
     service = SowDashboardService(farm=farm)
-    context = service.get_dashboard_summary()
+    context = service.get_notifications()
     sows_to_check = context['sows_to_check_usg']
 
     if request.method == 'POST':
@@ -283,6 +288,15 @@ def bulk_pregnancy_check_view(request):
         return redirect('dashboard')
 
     return render(request, 'sows/bulk_pregnancy.html', {'sows': sows_to_check})
+
+
+@login_required
+def farrowing_panel_view(request):
+    farm = get_current_farm(request)
+    notifications = SowDashboardService(farm=farm).get_notifications()
+    return render(request, 'sows/farrowing_panel.html', {
+        'farrowings': notifications['farrowing_due_sows'],
+    })
 
 
 @login_required
@@ -309,7 +323,7 @@ def bulk_vaccinate_view(request):
             })
 
     service = SowDashboardService(farm=farm)
-    context = service.get_dashboard_summary()
+    context = service.get_notifications()
     return render(request, 'sows/bulk_vaccinate.html', {
         'vaccination_groups': context['vaccination_groups'],
         'vaccinations_due_count': context['vaccinations_due_count'],
@@ -390,6 +404,11 @@ def general_statistics_view(request):
         )
         context['date_filter'] = date_range
         context['period_options'] = PERIOD_OPTIONS
+        from farms.services.filter_ui import filter_ui_state
+        context.update(filter_ui_state(request.GET, {
+            'metric': 'Metryka', 'period': 'Okres', 'date_from': 'Od',
+            'date_to': 'Do', 'order': 'Ranking',
+        }))
         return render(request, 'sows/analytics.html', context)
     except Exception:
         logger.exception("Błąd podczas generowania statystyk")

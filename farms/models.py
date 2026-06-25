@@ -7,6 +7,7 @@ from sows.domain.rules import (
     GESTATION_DAYS,
     PREGNANCY_CHECK_AFTER_DAYS,
 )
+from farms.module_registry import default_nav_modules, default_visible_modules
 
 
 class FarmModel(models.Model):
@@ -41,6 +42,8 @@ class FarmSettingsModel(models.Model):
     )
     default_dashboard_period = models.CharField(max_length=20, default="6m")
     date_format = models.CharField(max_length=20, default="YYYY-MM-DD")
+    visible_modules = models.JSONField(default=default_visible_modules, blank=True)
+    nav_modules = models.JSONField(default=default_nav_modules, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

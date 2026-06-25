@@ -8,6 +8,7 @@ from django.contrib.auth import get_user_model
 from django.core.management import BaseCommand, CommandError, call_command
 from django.db import transaction
 
+from costs.models import CostCategoryModel, CostModel
 from farms.services.farm_service import get_or_create_user_farm
 from farms.services.settings_service import get_farm_settings
 from feed.models import DeliveryModel, IngredientModel, ProductionModel, RecipeItemModel, RecipeModel
@@ -32,6 +33,18 @@ RECIPES = {
     "Tuczniki grower": [(0, 35), (1, 30), (2, 15), (5, 15), (8, 5)],
     "Tuczniki finisher": [(0, 40), (1, 35), (3, 10), (5, 10), (8, 5)],
 }
+
+COST_CATEGORIES = [
+    "Weterynarz",
+    "Energia",
+    "Paliwo",
+    "Słoma",
+    "Remonty",
+    "Usługi",
+    "Leki",
+    "Transport",
+    "Inne",
+]
 
 
 class Command(BaseCommand):
@@ -119,12 +132,12 @@ class Command(BaseCommand):
                 defaults={"is_in_bin": in_bin, "low_stock_threshold_kg": Decimal("600") if in_bin else Decimal("150")},
             )
             ingredients.append(ingredient)
-            for delivery_index in range(2):
+            for delivery_index in range(4):
                 DeliveryModel.objects.update_or_create(
                     ingredient=ingredient,
                     date=today - timedelta(days=delivery_index * 75 + index),
                     defaults={
-                        "quantity_kg": Decimal("12000") if in_bin else Decimal("2500"),
+                        "quantity_kg": Decimal("12000") if in_bin else Decimal("5000"),
                         "price_per_kg": Decimal("0.85") + Decimal(index) / Decimal("20") + Decimal(delivery_index) / Decimal("10"),
                     },
                 )
@@ -164,6 +177,9 @@ class Command(BaseCommand):
                     "quantity": 0 if index % 3 == 0 else 80 + index,
                     "total_weight": Decimal("0") if index % 3 == 0 else Decimal(80 + index) * Decimal("95.5"),
                     "price_per_kg": Decimal("7.20") + Decimal(index) / Decimal("20"),
+                    "avg_meatiness_seurop": None if index % 3 == 0 else Decimal("58.20") + Decimal(index) / Decimal("10"),
+                    "live_weight": Decimal("0") if index % 3 == 0 else Decimal(80 + index) * Decimal("122.5"),
+                    "dressing_percentage": None if index % 3 == 0 else Decimal("77.96"),
                     "net_value": Decimal("0") if index % 3 == 0 else Decimal("52000") + Decimal(index) * Decimal("1250"),
                     "vat_value": Decimal("0") if index % 3 == 0 else Decimal("4160") + Decimal(index) * Decimal("100"),
                     "gross_value": Decimal("0") if index % 3 == 0 else Decimal("56160") + Decimal(index) * Decimal("1350"),
@@ -174,8 +190,34 @@ class Command(BaseCommand):
                     sale=sale, line_no=1,
                     defaults={"meat_class": "E", "quantity": sale.quantity, "weight": sale.total_weight, "price_per_kg": sale.price_per_kg, "net_value": sale.net_value, "vat_value": sale.vat_value, "gross_value": sale.gross_value},
                 )
+
+        categories = []
+        for name in COST_CATEGORIES:
+            category, _ = CostCategoryModel.objects.update_or_create(
+                farm=farm,
+                name=name,
+                defaults={"description": f"Koszty: {name.lower()}", "is_active": True},
+            )
+            categories.append(category)
+        for index in range(18):
+            month = (index % 12) + 1
+            cost_date = date(today.year, month, min(5 + index, 25))
+            category = categories[index % len(categories)]
+            CostModel.objects.update_or_create(
+                farm=farm,
+                category=category,
+                date=cost_date,
+                description=f"Wydatek demonstracyjny {index + 1:02d}",
+                defaults={
+                    "amount": Decimal("450.00") + Decimal(index) * Decimal("137.50"),
+                    "document_number": f"KOSZT/{today.year}/{index + 1:03d}",
+                    "supplier": f"Dostawca {index % 6 + 1}",
+                    "is_paid": index % 4 != 0,
+                    "created_by": user,
+                },
+            )
         InventoryMovementService(farm).rebuild()
-        return {"maciory": len(sows), "składniki": len(ingredients), "receptury": len(recipes), "produkcje": len(statuses), "sprzedaże": 12}
+        return {"maciory": len(sows), "składniki": len(ingredients), "receptury": len(recipes), "produkcje": len(statuses), "sprzedaże": 12, "kategorie kosztów": len(categories), "koszty": 18}
 
     @staticmethod
     def _event(sow, event_type, event_date, details):

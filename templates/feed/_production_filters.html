@@ -1,0 +1,3 @@
+<div class="filter-field"><label for="production-status">Status</label><select id="production-status" name="status"><option value="">Wszystkie</option>{% for value, label in production_statuses %}<option value="{{ value }}" {% if request.GET.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+<div class="filter-field"><label for="production-date-from">Od</label><input id="production-date-from" type="date" name="date_from" value="{{ request.GET.date_from }}"></div>
+<div class="filter-field"><label for="production-date-to">Do</label><input id="production-date-to" type="date" name="date_to" value="{{ request.GET.date_to }}"></div>

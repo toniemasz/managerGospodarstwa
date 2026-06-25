@@ -67,6 +67,7 @@
 
             const labels = parseJsonScript(canvas.dataset.chartLabelsId, []);
             const values = parseJsonScript(canvas.dataset.chartValuesId, []);
+            const configuredDatasets = parseJsonScript(canvas.dataset.chartDatasetsId, []);
             const label = canvas.dataset.chartLabel || 'Wynik';
             const message = canvas.parentElement?.querySelector('[data-chart-message]');
 
@@ -78,7 +79,7 @@
                 }
             };
 
-            if (!labels.length || !values.length) {
+            if (!labels.length || (!values.length && !configuredDatasets.length)) {
                 showMessage('Brak danych dla wybranej metryki i zakresu dat.');
                 return;
             }
@@ -90,20 +91,30 @@
 
             canvas.dataset.chartInitialized = 'true';
 
+            const datasets = configuredDatasets.length
+                ? configuredDatasets.map((dataset) => ({
+                    borderWidth: 3,
+                    tension: 0.25,
+                    fill: false,
+                    pointRadius: 3,
+                    ...dataset
+                }))
+                : [{
+                    label,
+                    data: values,
+                    borderColor: '#2364aa',
+                    backgroundColor: 'rgba(35, 100, 170, 0.12)',
+                    borderWidth: 3,
+                    tension: 0.25,
+                    fill: true,
+                    pointRadius: 4
+                }];
+
             new window.Chart(canvas.getContext('2d'), {
                 type: 'line',
                 data: {
                     labels,
-                    datasets: [{
-                        label,
-                        data: values,
-                        borderColor: '#2364aa',
-                        backgroundColor: 'rgba(35, 100, 170, 0.12)',
-                        borderWidth: 3,
-                        tension: 0.25,
-                        fill: true,
-                        pointRadius: 4
-                    }]
+                    datasets
                 },
                 options: {
                     responsive: true,
@@ -242,6 +253,13 @@
         rows.addEventListener('click', (event) => {
             const button = event.target.closest('.copy-sow');
             if (button) copyPreviousSow(button);
+            const removeButton = event.target.closest('.remove-bulk-event-row');
+            if (removeButton) {
+                const row = removeButton.closest('.bulk-event-row');
+                const checkbox = getField(row, 'DELETE');
+                if (checkbox) checkbox.checked = true;
+                if (row) row.hidden = true;
+            }
         });
 
         if (addButton && template && totalForms && addButton.dataset.bulkEventAddBound !== 'true') {
@@ -277,7 +295,22 @@
 
         if (!addButton || !rows || !template || !totalForms || addButton.dataset.saleRowsBound === 'true') return;
 
+        const emptyState = document.getElementById('settlement-rows-empty');
+        const updateEmptyState = () => {
+            const hasVisibleRows = Array.from(rows.querySelectorAll('.settlement-row')).some((row) => !row.hidden);
+            if (emptyState) emptyState.hidden = hasVisibleRows;
+        };
+
         addButton.dataset.saleRowsBound = 'true';
+        rows.addEventListener('click', (event) => {
+            const button = event.target.closest('.remove-settlement-row');
+            if (!button) return;
+            const row = button.closest('.settlement-row');
+            const checkbox = row?.querySelector('input[type="checkbox"][name$="-DELETE"]');
+            if (checkbox) checkbox.checked = true;
+            if (row) row.hidden = true;
+            updateEmptyState();
+        });
         addButton.addEventListener('click', () => {
             const index = parseInt(totalForms.value, 10);
             const html = template.innerHTML.replaceAll('__prefix__', index);
@@ -293,7 +326,9 @@
 
             window.enhanceAutoResizeFields?.(newRow);
             window.enhanceDataTables?.();
+            updateEmptyState();
         });
+        updateEmptyState();
     }
 
     function initRecipeFormset(root = document) {
@@ -311,6 +346,12 @@
 
         const totalElement = document.getElementById('recipe-percentage-total');
         const summaryElement = document.getElementById('recipe-percentage-summary');
+        const emptyState = document.getElementById('ingredient-forms-empty');
+
+        const updateEmptyState = () => {
+            const hasVisibleRows = Array.from(container.querySelectorAll('.ingredient-row-card')).some((row) => !row.hidden);
+            if (emptyState) emptyState.hidden = hasVisibleRows;
+        };
 
         const updatePercentageSummary = () => {
             let total = 0;
@@ -350,6 +391,7 @@
             totalFormsInput.value = currentFormCount + 1;
             window.enhanceAutoResizeFields?.(newRow);
             updatePercentageSummary();
+            updateEmptyState();
         });
 
         container.addEventListener('click', (event) => {
@@ -366,6 +408,7 @@
                 row.classList.add('hidden');
             }
             updatePercentageSummary();
+            updateEmptyState();
         });
 
         container.addEventListener('input', (event) => {
@@ -373,6 +416,7 @@
         });
 
         updatePercentageSummary();
+        updateEmptyState();
     }
 
     function initProductionStageChecklist(root = document) {

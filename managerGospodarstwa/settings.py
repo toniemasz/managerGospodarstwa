@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     'sows',
     'sales',
     'feed',
+    'costs',
 ]
 
 MIDDLEWARE = [
@@ -158,5 +159,10 @@ LANGUAGE_CODE = 'pl'
 TIME_ZONE = 'Europe/Warsaw'
 
 USE_I18N = True
+
+USE_THOUSAND_SEPARATOR = True
+THOUSAND_SEPARATOR = ' '
+DECIMAL_SEPARATOR = ','
+NUMBER_GROUPING = 3
 
 USE_TZ = True

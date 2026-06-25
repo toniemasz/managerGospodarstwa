@@ -78,7 +78,11 @@ def test_current_farm_context_processor_exposes_request_farm():
     request = RequestFactory().get('/')
     request.farm = farm
 
-    assert current_farm(request) == {'current_farm': farm}
+    assert current_farm(request) == {
+        'current_farm': farm,
+        'ui_modules': [],
+        'ui_visible_module_keys': [],
+    }
 
 
 @pytest.mark.django_db
@@ -102,6 +106,7 @@ def test_get_farm_settings_creates_default_settings():
     assert settings.farm == farm
     assert settings.pregnancy_check_after_days == 30
     assert settings.gestation_days == 114
+    assert settings.nav_modules == ["tasks", "sows", "feed", "sales"]
     assert FarmSettingsModel.objects.filter(farm=farm).count() == 1
 
 

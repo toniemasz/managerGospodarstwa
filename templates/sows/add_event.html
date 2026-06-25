@@ -15,6 +15,7 @@
     <section class="panel">
         <form method="post" class="responsive-form">
             {% csrf_token %}
+            {% include 'components/form_errors.html' with form=form %}
 
             <div class="form-grid three-columns">
                 <div class="form-field">
@@ -29,14 +30,16 @@
                 </div>
             </div>
 
-            <div id="sec_insemination" class="form-section hidden">
+            <div id="sec_insemination" class="form-section dynamic-form-section hidden">
+                <div class="form-section-heading"><h2>Dane inseminacji</h2><p>Pole pojawia się dla zdarzenia inseminacji.</p></div>
                 <div class="form-field">
                     <label for="{{ form.technician.id_for_label }}">{{ form.technician.label }}</label>
                     {{ form.technician }}
                 </div>
             </div>
 
-            <div id="sec_pregnancy_check" class="form-section hidden">
+            <div id="sec_pregnancy_check" class="form-section dynamic-form-section hidden">
+                <div class="form-section-heading"><h2>Wynik badania</h2><p>Wynik zmieni bieżący status maciory.</p></div>
                 <div class="form-field">
                     <label for="{{ form.pregnancy_result.id_for_label }}">{{ form.pregnancy_result.label }}</label>
                     {{ form.pregnancy_result }}
@@ -44,7 +47,8 @@
                 </div>
             </div>
 
-            <div id="sec_farrowing" class="form-section hidden">
+            <div id="sec_farrowing" class="form-section dynamic-form-section hidden">
+                <div class="form-section-heading"><h2>Wynik oproszenia</h2><p>Podaj liczbę prosiąt żywych i martwych.</p></div>
                 <div class="form-grid three-columns">
                     <div class="form-field">
                         <label for="{{ form.born_alive.id_for_label }}">{{ form.born_alive.label }}</label>
@@ -57,14 +61,16 @@
                 </div>
             </div>
 
-            <div id="sec_weaning" class="form-section hidden">
+            <div id="sec_weaning" class="form-section dynamic-form-section hidden">
+                <div class="form-section-heading"><h2>Dane odsadzenia</h2><p>Podaj liczbę odsadzonych prosiąt.</p></div>
                 <div class="form-field">
                     <label for="{{ form.count.id_for_label }}">{{ form.count.label }}</label>
                     {{ form.count }}
                 </div>
             </div>
 
-            <div id="sec_vaccination" class="form-section hidden">
+            <div id="sec_vaccination" class="form-section dynamic-form-section hidden">
+                <div class="form-section-heading"><h2>Dane szczepienia</h2><p>Wybierz preparat z planów gospodarstwa.</p></div>
                 <div class="form-field">
                     <label for="{{ form.vaccine_name.id_for_label }}">{{ form.vaccine_name.label }}</label>
                     {{ form.vaccine_name }}

@@ -2,14 +2,25 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import F, Sum
 
-from feed.models import DeliveryModel, IngredientModel, InventoryMovementModel, ProductionModel
-from feed.services.feed_calculators import ProductionCalculator
+from feed.models import (
+    DeliveryModel,
+    IngredientModel,
+    InventoryMovementModel,
+    ProductionIngredientUsageModel,
+    ProductionModel,
+)
+from feed.services.feed_calculators import IngredientRequirement, ProductionCalculator
+
+
+KG_QUANT = Decimal("0.01")
+MONEY_QUANT = Decimal("0.01")
+PRICE_QUANT = Decimal("0.00001")
 
 
 @dataclass(frozen=True)
@@ -49,6 +60,7 @@ class InventoryMovementService:
 
     @transaction.atomic
     def sync_delivery(self, delivery: DeliveryModel, *, user=None) -> InventoryMovementModel:
+        delivery = DeliveryModel.objects.select_for_update().select_related("ingredient").get(pk=delivery.pk)
         farm = self.farm or delivery.ingredient.farm
         if delivery.ingredient.farm_id != farm.id:
             raise ValidationError("Dostawa nie należy do tego gospodarstwa.")
@@ -66,16 +78,33 @@ class InventoryMovementService:
                 "note": "Dostawa magazynowa",
             },
         )
+        self.refresh_delivery_remaining(delivery)
         return movement
 
     @transaction.atomic
     def remove_delivery(self, delivery: DeliveryModel) -> None:
+        if ProductionIngredientUsageModel.objects.filter(delivery=delivery).exists():
+            raise ValidationError(
+                "Nie można usunąć dostawy, która została już rozliczona w produkcji paszy."
+            )
         InventoryMovementModel.objects.filter(
             farm=self.farm,
             movement_type=InventoryMovementModel.Types.DELIVERY,
             source_model=delivery._meta.label,
             source_id=str(delivery.pk),
         ).delete()
+
+    @staticmethod
+    def _quantize_kg(value: Decimal) -> Decimal:
+        return Decimal(value).quantize(KG_QUANT, rounding=ROUND_HALF_UP)
+
+    @staticmethod
+    def _quantize_money(value: Decimal) -> Decimal:
+        return Decimal(value).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+
+    @staticmethod
+    def _quantize_price(value: Decimal) -> Decimal:
+        return Decimal(value).quantize(PRICE_QUANT, rounding=ROUND_HALF_UP)
 
     @staticmethod
     def _production_requirements(production: ProductionModel):
@@ -94,39 +123,184 @@ class InventoryMovementService:
             custom_recipe_data=production.custom_recipe_data,
         ).get_requirements()
 
-    @transaction.atomic
-    def book_production(self, production: ProductionModel, *, user=None, forced=False) -> int:
-        farm = self.farm or production.recipe.farm
-        if production.recipe.farm_id != farm.id:
-            raise ValidationError("Produkcja nie należy do tego gospodarstwa.")
-        requirements = list(self._production_requirements(production))
-        ingredient_ids = [item.ingredient_id for item in requirements]
-        stale = InventoryMovementModel.objects.filter(
+    @staticmethod
+    def _movement_requirements(production: ProductionModel, farm):
+        movements = InventoryMovementModel.objects.filter(
             farm=farm,
             movement_type=InventoryMovementModel.Types.PRODUCTION_USAGE,
             source_model=production._meta.label,
             source_id=str(production.pk),
+        ).select_related("ingredient").order_by("ingredient__name", "id")
+        requirements = []
+        for movement in movements:
+            requirements.append(IngredientRequirement(
+                ingredient_id=movement.ingredient_id,
+                name=movement.ingredient.name,
+                is_in_bin=movement.ingredient.is_in_bin,
+                percentage=Decimal("0.00"),
+                required_kg=abs(movement.quantity_kg),
+            ))
+        return requirements
+
+    @transaction.atomic
+    def refresh_delivery_remaining(self, delivery: DeliveryModel) -> Decimal:
+        delivery = DeliveryModel.objects.select_for_update().get(pk=delivery.pk)
+        allocated = ProductionIngredientUsageModel.objects.filter(
+            delivery=delivery,
+        ).aggregate(total=Sum("quantity_kg"))["total"] or Decimal("0.00")
+        remaining = self._quantize_kg(delivery.quantity_kg - allocated)
+        if remaining < 0:
+            raise ValidationError("Dostawa ma rozliczone więcej składnika niż jej ilość.")
+        DeliveryModel.objects.filter(pk=delivery.pk).update(remaining_quantity_kg=remaining)
+        delivery.remaining_quantity_kg = remaining
+        return remaining
+
+    @transaction.atomic
+    def release_production(self, production: ProductionModel) -> None:
+        farm = self.farm or production.recipe.farm
+        usages = ProductionIngredientUsageModel.objects.select_for_update().filter(
+            farm=farm,
+            production=production,
+        ).select_related("delivery")
+        for usage in usages:
+            if usage.delivery_id:
+                DeliveryModel.objects.filter(pk=usage.delivery_id).update(
+                    remaining_quantity_kg=F("remaining_quantity_kg") + usage.quantity_kg,
+                )
+        usages.delete()
+        InventoryMovementModel.objects.filter(
+            farm=farm,
+            movement_type=InventoryMovementModel.Types.PRODUCTION_USAGE,
+            source_model=production._meta.label,
+            source_id=str(production.pk),
+        ).delete()
+        ProductionModel.objects.filter(pk=production.pk).update(
+            feed_cost_total=Decimal("0.00"),
+            feed_cost_per_kg=Decimal("0.00000"),
+            feed_cost_is_partial=False,
+            feed_cost_note="",
         )
-        if ingredient_ids:
-            stale = stale.exclude(ingredient_id__in=ingredient_ids)
-        stale.delete()
-        count = 0
+
+    @transaction.atomic
+    def book_production(
+        self,
+        production: ProductionModel,
+        *,
+        user=None,
+        forced=False,
+        prefer_existing_movements=False,
+    ) -> int:
+        production = (
+            ProductionModel.objects.select_for_update()
+            .select_related("recipe")
+            .prefetch_related("recipe__items__ingredient")
+            .get(pk=production.pk)
+        )
+        farm = self.farm or production.recipe.farm
+        if production.recipe.farm_id != farm.id:
+            raise ValidationError("Produkcja nie należy do tego gospodarstwa.")
+
+        if production.status != ProductionModel.Statuses.COMPLETED:
+            self.release_production(production)
+            return 0
+
+        requirements = []
+        if prefer_existing_movements:
+            requirements = self._movement_requirements(production, farm)
+        if not requirements:
+            requirements = list(self._production_requirements(production))
+
+        self.release_production(production)
+
+        usage_count = 0
+        total_cost = Decimal("0.00")
+        partial = False
+        missing_messages = []
         for requirement in requirements:
-            movement, created = InventoryMovementModel.objects.update_or_create(
+            required_kg = self._quantize_kg(abs(requirement.required_kg))
+            if required_kg <= 0:
+                continue
+
+            remaining_to_allocate = required_kg
+            ingredient_cost = Decimal("0.00")
+            deliveries = DeliveryModel.objects.select_for_update().filter(
+                ingredient_id=requirement.ingredient_id,
+                ingredient__farm=farm,
+                date__lte=production.date,
+                price_per_kg__isnull=False,
+                remaining_quantity_kg__gt=0,
+            ).order_by("date", "id")
+
+            for delivery in deliveries:
+                if remaining_to_allocate <= 0:
+                    break
+                available = self._quantize_kg(delivery.remaining_quantity_kg)
+                if available <= 0:
+                    continue
+                quantity = min(available, remaining_to_allocate)
+                quantity = self._quantize_kg(quantity)
+                unit_price = delivery.price_per_kg or Decimal("0.00000")
+                cost = self._quantize_money(quantity * unit_price)
+                ProductionIngredientUsageModel.objects.create(
+                    farm=farm,
+                    production=production,
+                    ingredient_id=requirement.ingredient_id,
+                    delivery=delivery,
+                    quantity_kg=quantity,
+                    unit_price=unit_price,
+                    cost=cost,
+                )
+                usage_count += 1
+                ingredient_cost += cost
+                remaining_to_allocate = self._quantize_kg(remaining_to_allocate - quantity)
+                delivery.remaining_quantity_kg = self._quantize_kg(delivery.remaining_quantity_kg - quantity)
+                delivery.save(update_fields=["remaining_quantity_kg"])
+
+            if remaining_to_allocate > 0:
+                partial = True
+                missing_messages.append(f"{requirement.name}: {remaining_to_allocate:.2f} kg")
+                if not forced:
+                    raise ValidationError(
+                        "Brakuje rozliczalnych dostaw FIFO dla produkcji: "
+                        + ", ".join(missing_messages)
+                    )
+
+            movement_unit_price = None
+            if ingredient_cost > 0 and required_kg > 0:
+                movement_unit_price = self._quantize_price(ingredient_cost / required_kg)
+            InventoryMovementModel.objects.create(
                 farm=farm,
                 ingredient_id=requirement.ingredient_id,
                 movement_type=InventoryMovementModel.Types.PRODUCTION_USAGE,
                 source_model=production._meta.label,
                 source_id=str(production.pk),
-                defaults={
-                    "quantity_kg": -abs(requirement.required_kg),
-                    "movement_date": production.date,
-                    "created_by": user if getattr(user, "is_authenticated", False) else None,
-                    "note": "Wymuszone zatwierdzenie produkcji" if forced else "Zużycie do produkcji",
-                },
+                quantity_kg=-required_kg,
+                unit_price=movement_unit_price,
+                movement_date=production.date,
+                created_by=user if getattr(user, "is_authenticated", False) else None,
+                note="Zużycie do produkcji FIFO"
+                if not forced
+                else "Wymuszone zatwierdzenie produkcji FIFO",
             )
-            count += int(created)
-        return count
+            total_cost += ingredient_cost
+
+        cost_per_kg = Decimal("0.00000")
+        if production.quantity_kg:
+            cost_per_kg = self._quantize_price(total_cost / production.quantity_kg)
+        note = ""
+        if partial:
+            note = "Częściowy koszt - brak rozliczalnych dostaw FIFO: " + ", ".join(missing_messages)
+        ProductionModel.objects.filter(pk=production.pk).update(
+            feed_cost_total=self._quantize_money(total_cost),
+            feed_cost_per_kg=cost_per_kg,
+            feed_cost_is_partial=partial,
+            feed_cost_note=note[:255],
+        )
+        production.feed_cost_total = self._quantize_money(total_cost)
+        production.feed_cost_per_kg = cost_per_kg
+        production.feed_cost_is_partial = partial
+        production.feed_cost_note = note[:255]
+        return usage_count
 
     @transaction.atomic
     def adjust(
@@ -166,12 +340,11 @@ class InventoryMovementService:
 
     @transaction.atomic
     def rebuild(self) -> dict[str, int]:
+        ProductionIngredientUsageModel.objects.filter(farm=self.farm).delete()
+        DeliveryModel.objects.filter(ingredient__farm=self.farm).update(remaining_quantity_kg=F("quantity_kg"))
         InventoryMovementModel.objects.filter(
             farm=self.farm,
-            movement_type__in=(
-                InventoryMovementModel.Types.DELIVERY,
-                InventoryMovementModel.Types.PRODUCTION_USAGE,
-            ),
+            movement_type=InventoryMovementModel.Types.DELIVERY,
         ).delete()
         delivery_count = 0
         for delivery in DeliveryModel.objects.filter(ingredient__farm=self.farm).select_related("ingredient"):
@@ -181,7 +354,15 @@ class InventoryMovementService:
         productions = ProductionModel.objects.filter(
             recipe__farm=self.farm,
             status=ProductionModel.Statuses.COMPLETED,
-        ).select_related("recipe").prefetch_related("recipe__items__ingredient")
+        ).select_related("recipe").prefetch_related("recipe__items__ingredient").order_by("date", "time", "id")
         for production in productions:
-            production_count += self.book_production(production)
+            production_count += self.book_production(
+                production,
+                forced=True,
+                prefer_existing_movements=True,
+            )
+        InventoryMovementModel.objects.filter(
+            farm=self.farm,
+            movement_type=InventoryMovementModel.Types.PRODUCTION_USAGE,
+        ).exclude(source_id__in=[str(pk) for pk in productions.values_list("pk", flat=True)]).delete()
         return {"deliveries": delivery_count, "production_movements": production_count}

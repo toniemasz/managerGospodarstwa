@@ -3,6 +3,7 @@
 {% block content %}
 <main class="app-page">
     <section class="page-header"><div><p class="eyebrow">Gospodarstwo</p><h1>Historia zmian</h1><p class="page-subtitle">Najważniejsze operacje wykonane w gospodarstwie.</p></div><a class="button button-secondary" href="{% url 'farm_settings' %}">Ustawienia</a></section>
+    {% url 'audit_log' as audit_filter_url %}{% include 'components/filter_panel.html' with filter_action=audit_filter_url filter_clear_url=audit_filter_url filter_fields_template='farms/_audit_filters.html' %}
     <section class="panel table-panel"><div class="table-scroll"><table class="data-table">
         <thead><tr><th>Data</th><th>Użytkownik</th><th>Akcja</th><th>Obiekt</th><th>Szczegóły</th></tr></thead>
         <tbody>{% for log in logs %}<tr><td>{{ log.created_at|date:"d.m.Y H:i" }}</td><td>{{ log.user.username|default:"system" }}</td><td>{{ log.action }}</td><td>{{ log.object_repr|default:log.model_label }}</td><td>{{ log.metadata|default:"-" }}</td></tr>{% empty %}<tr><td colspan="5" class="empty-table">Brak wpisów.</td></tr>{% endfor %}</tbody>

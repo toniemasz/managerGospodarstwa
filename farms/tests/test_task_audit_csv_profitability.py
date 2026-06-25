@@ -13,6 +13,7 @@ from farms.services.csv_transfer import build_csv_export, import_csv_archive
 from farms.services.farm_service import get_or_create_user_farm
 from farms.services.profitability import ProfitabilityAnalyticsService
 from farms.services.task_center import TaskCenterService
+from costs.models import CostCategoryModel, CostModel
 from feed.models import DeliveryModel, IngredientModel, ProductionModel, RecipeItemModel, RecipeModel
 from sales.models import PigSaleModel
 from sows.models import SowModel
@@ -40,10 +41,10 @@ def test_task_center_and_audit_log_are_isolated(client, two_farms):
     assert list(tasks["unsettled_sales"]) == [sale_a]
 
     client.force_login(user_a)
-    task_response = client.get(reverse("task_center"))
+    task_response = client.get(reverse("task_center"), {"tab": "feed"})
     assert task_response.status_code == 200
-    assert b">A<" in task_response.content
-    assert b">B<" not in task_response.content
+    assert b"Niski stan: A" in task_response.content
+    assert b"Niski stan: B" not in task_response.content
     response = client.get(reverse("audit_log"))
     assert response.status_code == 200
     assert b"SECRET" not in response.content
@@ -58,6 +59,15 @@ def test_csv_export_and_atomic_import_round_trip(two_farms):
     recipe = RecipeModel.objects.create(farm=source, name="CSV recipe")
     RecipeItemModel.objects.create(recipe=recipe, ingredient=ingredient, percentage=100)
     PigSaleModel.objects.create(farm=source, document_number="CSV/1", quantity=10)
+    category = CostCategoryModel.objects.create(farm=source, name="CSV koszt")
+    CostModel.objects.create(
+        farm=source,
+        category=category,
+        date=date.today(),
+        amount=Decimal("123.45"),
+        description="Koszt z CSV",
+        is_paid=True,
+    )
 
     payload, _ = build_csv_export(source)
     uploaded = SimpleUploadedFile("export.zip", payload, content_type="application/zip")
@@ -66,6 +76,7 @@ def test_csv_export_and_atomic_import_round_trip(two_farms):
     assert counts["maciory"] == 1
     assert SowModel.objects.filter(farm=target, ear_tag=sow.ear_tag).exists()
     assert IngredientModel.objects.filter(farm=target, name="Pszenica").exists()
+    assert CostModel.objects.filter(farm=target, description="Koszt z CSV", amount=Decimal("123.45")).exists()
     assert not SowModel.objects.filter(farm=source).exclude(pk=sow.pk).exists()
 
 
@@ -94,3 +105,48 @@ def test_profitability_calculations_are_farm_scoped(two_farms):
     assert result["sold_quantity"] == 10
     assert result["feed_quantity_kg"] == Decimal("1000")
     assert result["feed_cost"] == Decimal("1500")
+
+
+@pytest.mark.django_db
+def test_profitability_includes_manual_costs_and_monthly_result(two_farms):
+    _, farm, _, _other = two_farms
+    category = CostCategoryModel.objects.create(farm=farm, name="Energia")
+    CostModel.objects.create(
+        farm=farm,
+        category=category,
+        date=date(2026, 3, 5),
+        amount=Decimal("1200"),
+        description="Prąd",
+        is_paid=True,
+    )
+    PigSaleModel.objects.create(
+        farm=farm,
+        sale_date=date(2026, 3, 20),
+        quantity=10,
+        live_weight=Decimal("1200"),
+        net_value=Decimal("10000"),
+        gross_value=Decimal("10800"),
+    )
+    result = ProfitabilityAnalyticsService(farm).calculate(
+        date_from=date(2026, 1, 1),
+        date_to=date(2026, 12, 31),
+    )
+    assert result["additional_cost"] == Decimal("1200")
+    assert result["net_result"] == Decimal("8800")
+    assert result["total_cost_per_live_kg"] == Decimal("1")
+    assert result["timeline"][0]["result_net"] == Decimal("8800")
+
+
+@pytest.mark.django_db
+def test_csv_cost_export_is_filtered_by_accounting_year(two_farms):
+    _, source, _, _target = two_farms
+    category = CostCategoryModel.objects.create(farm=source, name="Eksport")
+    CostModel.objects.create(farm=source, category=category, date=date(2025, 1, 1), amount=10, description="Rok 2025")
+    CostModel.objects.create(farm=source, category=category, date=date(2026, 1, 1), amount=20, description="Rok 2026")
+
+    payload, _ = build_csv_export(source, year=2026)
+    from zipfile import ZipFile
+    with ZipFile(BytesIO(payload)) as archive:
+        exported = archive.read("costs.csv").decode("utf-8-sig")
+    assert "Rok 2026" in exported
+    assert "Rok 2025" not in exported

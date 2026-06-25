@@ -64,6 +64,12 @@ def test_repository_fetches_raw_data_for_calculator():
 @pytest.mark.django_db
 def test_repository_public_methods_for_production_flow():
     ing = IngredientModel.objects.create(name="Pszenica")
+    DeliveryModel.objects.create(
+        ingredient=ing,
+        date=timezone.now().date(),
+        quantity_kg=Decimal('500.00'),
+        price_per_kg=Decimal('1.00000'),
+    )
     recipe = RecipeModel.objects.create(name="Pełnoporcjowa")
     RecipeItemModel.objects.create(recipe=recipe, ingredient=ing, percentage=Decimal('100.00'))
     queued = ProductionModel.objects.create(

@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+{% load l10n %}
+{% block title %}Koszty{% endblock %}
+{% block content %}
+<main class="app-page">
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Finanse</p>
+            <h1>Koszty — {{ selected_year|unlocalize }}</h1>
+            <p class="page-subtitle">Koszty dodatkowe gospodarstwa, płatności i podział na kategorie.</p>
+        </div>
+        <div class="header-actions">
+            <a href="{% url 'cost_categories' %}" class="button button-secondary">Kategorie kosztów</a>
+            <a href="{% url 'add_cost' %}" class="button button-primary">Dodaj koszt</a>
+        </div>
+    </section>
+
+    {% url 'cost_list' as cost_filter_url %}
+    {% include 'components/filter_panel.html' with filter_action=cost_filter_url filter_clear_url=cost_filter_url filter_fields_template='costs/_filters.html' %}
+
+    <section class="stats-grid">
+        <div class="stat-tile"><span>Łączne koszty</span><strong>{{ summary.total|floatformat:2 }} zł</strong></div>
+        <div class="stat-tile"><span>Opłacone</span><strong>{{ summary.paid|floatformat:2 }} zł</strong></div>
+        <div class="stat-tile"><span>Nieopłacone</span><strong>{{ summary.unpaid|floatformat:2 }} zł</strong></div>
+        <div class="stat-tile"><span>Liczba wpisów</span><strong>{{ summary.count }}</strong></div>
+        <div class="stat-tile"><span>Największa kategoria</span><strong>{% if summary.largest_category %}{{ summary.largest_category.category__name|default:'Bez kategorii' }}{% else %}—{% endif %}</strong></div>
+    </section>
+
+    <section class="panel table-panel">
+        <div class="section-heading"><div><h2>Rejestr kosztów</h2><p>Dokumenty i płatności w wybranym okresie.</p></div></div>
+        {% if costs %}
+        <div class="table-scroll">
+            <table class="data-table mobile-card-table" data-mobile-cards="true">
+                <thead><tr><th>Data</th><th>Opis</th><th>Kategoria</th><th>Dokument</th><th>Dostawca</th><th>Status</th><th class="text-right">Kwota</th><th class="text-right">Akcje</th></tr></thead>
+                <tbody>
+                    {% for cost in costs %}
+                    <tr>
+                        <td data-label="Data">{{ cost.date|date:'d.m.Y' }}</td>
+                        <td data-label="Opis"><strong>{{ cost.description }}</strong></td>
+                        <td data-label="Kategoria">{{ cost.category.name|default:'Bez kategorii' }}</td>
+                        <td data-label="Dokument">{{ cost.document_number|default:'—' }}</td>
+                        <td data-label="Dostawca">{{ cost.supplier|default:'—' }}</td>
+                        <td data-label="Status"><span class="status-pill {% if cost.is_paid %}status-green{% else %}status-amber{% endif %}">{% if cost.is_paid %}Opłacony{% else %}Nieopłacony{% endif %}</span></td>
+                        <td data-label="Kwota" class="text-right"><strong>{{ cost.amount|floatformat:2 }} zł</strong></td>
+                        <td data-label="Akcje" class="text-right"><a href="{% url 'edit_cost' cost.id %}" class="table-link">Edytuj</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            {% url 'add_cost' as add_cost_url %}
+            {% include 'components/empty_state.html' with empty_title='Brak kosztów' empty_message='Nie zarejestrowano kosztów dla wybranych filtrów.' empty_action_url=add_cost_url empty_action_label='Dodaj pierwszy koszt' %}
+        {% endif %}
+    </section>
+</main>
+{% endblock %}

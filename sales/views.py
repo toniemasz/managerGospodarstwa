@@ -11,8 +11,9 @@ from .models import PigSaleModel
 from .services.sale_dashboard_service import SaleDashboardService
 from .services.sale_form_service import SaleFormService
 from farms.services.current_farm import get_current_farm
-from farms.services.date_range import PERIOD_OPTIONS, parse_date_range
+from farms.services.accounting_year import get_available_years, parse_accounting_year
 from farms.services.audit_log_service import log_action
+from farms.services.filter_ui import filter_ui_state
 
 logger = logging.getLogger(__name__)
 
@@ -20,14 +21,34 @@ logger = logging.getLogger(__name__)
 @login_required
 def sales_list_view(request):
     try:
-        date_range = parse_date_range(request.GET, default_period='6m')
-        service = SaleDashboardService(farm=get_current_farm(request))
+        farm = get_current_farm(request)
+        accounting_year = parse_accounting_year(request.GET)
+        date_from = accounting_year.date_from
+        date_to = accounting_year.date_to
+        from datetime import date
+        try:
+            if request.GET.get('date_from'):
+                date_from = date.fromisoformat(request.GET['date_from'])
+            if request.GET.get('date_to'):
+                date_to = date.fromisoformat(request.GET['date_to'])
+        except ValueError:
+            pass
+        if date_from > date_to:
+            date_from, date_to = date_to, date_from
+        service = SaleDashboardService(farm=farm)
         context = service.get_dashboard_summary(
-            date_from=date_range.date_from,
-            date_to=date_range.date_to,
+            date_from=date_from,
+            date_to=date_to,
         )
-        context['date_filter'] = date_range
-        context['period_options'] = PERIOD_OPTIONS
+        context.update({
+            'selected_year': accounting_year.year,
+            'available_years': get_available_years(farm),
+            'date_from': date_from,
+            'date_to': date_to,
+        })
+        context.update(filter_ui_state(request.GET, {
+            'year': 'Rok', 'date_from': 'Od', 'date_to': 'Do',
+        }))
         return render(request, 'sales/sales_list.html', context)
     except Exception:
         logger.exception("Error in sales dashboard")
@@ -67,7 +88,7 @@ def _sale_form_view(request, sale: PigSaleModel, template_context: dict):
         return _handle_pdf_import(request, sale, template_context, service)
 
     if request.method == 'POST':
-        form = PigSaleForm(request.POST, request.FILES, instance=sale)
+        form = PigSaleForm(request.POST, request.FILES, instance=sale, farm=sale.farm)
         row_formset = service.row_formset_from_post(request.POST)
         if form.is_valid() and row_formset.is_valid():
             saved_sale = service.save_sale(form, row_formset, sale)
@@ -80,7 +101,7 @@ def _sale_form_view(request, sale: PigSaleModel, template_context: dict):
             messages.success(request, "Sprzedaż została zapisana.")
             return redirect('sales_list')
     else:
-        form = PigSaleForm(instance=sale)
+        form = PigSaleForm(instance=sale, farm=sale.farm)
         row_formset = SaleClassRowFormSet(prefix='rows', initial=service.initial_rows_for_sale(sale))
 
     context = {
@@ -96,7 +117,7 @@ def _handle_pdf_import(request, sale: PigSaleModel, template_context: dict, serv
     uploaded_pdf = request.FILES.get('settlement_pdf')
     if not uploaded_pdf:
         messages.error(request, "Wybierz plik PDF do importu.")
-        form = PigSaleForm(request.POST, request.FILES, instance=sale)
+        form = PigSaleForm(request.POST, request.FILES, instance=sale, farm=sale.farm)
         row_formset = service.row_formset_from_post(request.POST)
     else:
         try:
@@ -104,18 +125,18 @@ def _handle_pdf_import(request, sale: PigSaleModel, template_context: dict, serv
             parsed = service.parse_pdf_import(uploaded_pdf, request.POST)
         except ValidationError as error:
             messages.error(request, error.messages[0])
-            form = PigSaleForm(request.POST, request.FILES, instance=sale)
+            form = PigSaleForm(request.POST, request.FILES, instance=sale, farm=sale.farm)
             row_formset = service.row_formset_from_post(request.POST)
             context = {'form': form, 'row_formset': row_formset, 'sale': sale, **template_context}
             return render(request, 'sales/add_sale.html', context)
         except Exception:
             logger.exception("Nie udało się odczytać rozliczenia PDF")
             messages.error(request, "Nie udało się odczytać PDF. Sprawdź, czy plik ma obsługiwany format.")
-            form = PigSaleForm(request.POST, request.FILES, instance=sale)
+            form = PigSaleForm(request.POST, request.FILES, instance=sale, farm=sale.farm)
             row_formset = service.row_formset_from_post(request.POST)
             context = {'form': form, 'row_formset': row_formset, 'sale': sale, **template_context}
             return render(request, 'sales/add_sale.html', context)
-        form = PigSaleForm(instance=sale, initial=parsed.form_initial)
+        form = PigSaleForm(instance=sale, initial=parsed.form_initial, farm=sale.farm)
         row_formset = SaleClassRowFormSet(prefix='rows', initial=parsed.row_initial)
 
         if parsed.has_rows:

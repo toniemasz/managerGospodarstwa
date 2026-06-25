@@ -8,7 +8,9 @@ from io import BytesIO, StringIO
 from zipfile import BadZipFile, ZIP_DEFLATED, ZipFile
 
 from django.db import transaction
+from django.utils import timezone
 
+from costs.models import CostCategoryModel, CostModel
 from farms.services.data_backup import BackupImportError, user_business_data_counts
 from feed.models import DeliveryModel, IngredientModel, ProductionModel, RecipeItemModel, RecipeModel
 from feed.services.inventory_service import InventoryMovementService
@@ -29,6 +31,8 @@ SCHEMAS = {
     "productions.csv": ("id", "recipe_id", "date", "time", "quantity_kg", "custom_recipe_data", "status", "completed_at"),
     "sales.csv": ("id", "sale_date", "document_number", "tattoo", "no_settlement", "quantity", "total_weight", "meat_class", "price_per_kg", "avg_meatiness_seurop", "live_weight", "dressing_percentage", "net_value", "vat_value", "gross_value"),
     "sale_rows.csv": ("id", "sale_id", "line_no", "meat_class", "quantity", "weight", "avg_weight", "avg_meatiness", "price_per_kg", "net_value", "vat_value", "gross_value"),
+    "cost_categories.csv": ("id", "name", "description", "is_active"),
+    "costs.csv": ("id", "category_id", "date", "amount", "description", "document_number", "supplier", "is_paid"),
 }
 
 
@@ -51,7 +55,8 @@ def _write_csv(columns, rows):
     return output.getvalue().encode("utf-8-sig")
 
 
-def build_csv_export(farm) -> tuple[bytes, str]:
+def build_csv_export(farm, *, year=None) -> tuple[bytes, str]:
+    selected_year = year or timezone.localdate().year
     datasets = {
         "sows.csv": [
             {"id": obj.pk, "ear_tag": obj.ear_tag, "entry_date": obj.entry_date, "is_archived": obj.is_archived, "archived_at": obj.archived_at}
@@ -75,13 +80,14 @@ def build_csv_export(farm) -> tuple[bytes, str]:
         "productions.csv": list(ProductionModel.objects.filter(recipe__farm=farm).order_by("id").values(*SCHEMAS["productions.csv"])),
         "sales.csv": list(PigSaleModel.objects.filter(farm=farm).order_by("id").values(*SCHEMAS["sales.csv"])),
         "sale_rows.csv": list(SaleClassRowModel.objects.filter(sale__farm=farm).order_by("id").values(*SCHEMAS["sale_rows.csv"])),
+        "cost_categories.csv": list(CostCategoryModel.objects.filter(farm=farm).order_by("id").values(*SCHEMAS["cost_categories.csv"])),
+        "costs.csv": list(CostModel.objects.filter(farm=farm, date__year=selected_year).order_by("id").values(*SCHEMAS["costs.csv"])),
     }
     buffer = BytesIO()
     with ZipFile(buffer, "w", ZIP_DEFLATED) as archive:
         for filename, columns in SCHEMAS.items():
             archive.writestr(filename, _write_csv(columns, datasets[filename]))
-    from django.utils import timezone
-    return buffer.getvalue(), f"eksport_csv_{timezone.now():%Y-%m-%d_%H-%M-%S}.zip"
+    return buffer.getvalue(), f"eksport_csv_{selected_year}_{timezone.now():%Y-%m-%d_%H-%M-%S}.zip"
 
 
 def _read_archive(uploaded_file):
@@ -192,6 +198,7 @@ def _validate_duplicates(rows):
         "recipes.csv": ("name",),
         "recipe_items.csv": ("recipe_id", "ingredient_id"),
         "sale_rows.csv": ("sale_id", "line_no"),
+        "cost_categories.csv": ("name",),
     }
     for filename, fields in unique_fields.items():
         seen = set()
@@ -208,6 +215,7 @@ def _validate_semantics(rows):
         "vaccination_plans.csv": "name",
         "ingredients.csv": "name",
         "recipes.csv": "name",
+        "cost_categories.csv": "name",
     }
     for filename, field in required_text.items():
         if any(not row[field].strip() for row in rows[filename]):
@@ -292,6 +300,28 @@ def import_csv_archive(uploaded_file, farm) -> dict[str, int]:
         sale_map[row["id"]] = PigSaleModel.objects.create(farm=farm, sale_date=_date(row["sale_date"], nullable=True), document_number=row["document_number"], tattoo=row["tattoo"], no_settlement=_bool(row["no_settlement"]), quantity=_int(row["quantity"] or 0), meat_class=row["meat_class"], **values)
     for row in rows["sale_rows.csv"]:
         SaleClassRowModel.objects.create(sale=_related(sale_map, row["sale_id"], "sprzedaże"), line_no=_int(row["line_no"]), meat_class=row["meat_class"], quantity=_int(row["quantity"], nullable=True), **{name: _decimal(row[name], nullable=True) for name in ("weight", "avg_weight", "avg_meatiness", "price_per_kg", "net_value", "vat_value", "gross_value")})
+    category_map = {}
+    for row in rows["cost_categories.csv"]:
+        category_map[row["id"]] = CostCategoryModel.objects.create(
+            farm=farm,
+            name=row["name"],
+            description=row["description"],
+            is_active=_bool(row["is_active"]),
+        )
+    for row in rows["costs.csv"]:
+        category = None
+        if row["category_id"]:
+            category = _related(category_map, row["category_id"], "kategorii kosztu")
+        CostModel.objects.create(
+            farm=farm,
+            category=category,
+            date=_date(row["date"]),
+            amount=_decimal(row["amount"]),
+            description=row["description"],
+            document_number=row["document_number"],
+            supplier=row["supplier"],
+            is_paid=_bool(row["is_paid"]),
+        )
     InventoryMovementService(farm).rebuild()
-    counts.update({"składniki": len(ingredient_map), "receptury": len(recipe_map), "dostawy": len(rows["deliveries.csv"]), "produkcje": len(rows["productions.csv"]), "sprzedaże": len(sale_map), "wiersze sprzedaży": len(rows["sale_rows.csv"])})
+    counts.update({"składniki": len(ingredient_map), "receptury": len(recipe_map), "dostawy": len(rows["deliveries.csv"]), "produkcje": len(rows["productions.csv"]), "sprzedaże": len(sale_map), "wiersze sprzedaży": len(rows["sale_rows.csv"]), "kategorie kosztów": len(category_map), "koszty": len(rows["costs.csv"])})
     return counts

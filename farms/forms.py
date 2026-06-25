@@ -1,6 +1,8 @@
 from django import forms
 
 from farms.models import FarmSettingsModel
+from farms.module_registry import MODULE_DEFINITIONS
+from farms.services.module_navigation import normalize_nav_modules, normalize_visible_modules
 
 
 class FarmSettingsForm(forms.ModelForm):
@@ -35,6 +37,26 @@ class FarmSettingsForm(forms.ModelForm):
             initial = {**initial, 'farm_name': farm.name}
         kwargs['initial'] = initial
         super().__init__(*args, **kwargs)
+        visible = normalize_visible_modules(getattr(self.instance, 'visible_modules', None))
+        nav_modules = normalize_nav_modules(
+            getattr(self.instance, 'nav_modules', None),
+            visible_keys=visible,
+        )
+        for module in MODULE_DEFINITIONS:
+            if module['key'] == 'settings':
+                continue
+            self.fields[f"show_{module['key']}"] = forms.BooleanField(
+                required=False,
+                label=module['title'],
+                initial=module['key'] in visible,
+                widget=forms.CheckboxInput(attrs={'class': 'checkbox-input'}),
+            )
+            self.fields[f"nav_{module['key']}"] = forms.BooleanField(
+                required=False,
+                label=f"{module['title']} na pasku",
+                initial=module['key'] in nav_modules,
+                widget=forms.CheckboxInput(attrs={'class': 'checkbox-input'}),
+            )
         for field in self.fields.values():
             existing = field.widget.attrs.get('class', '')
             if isinstance(field.widget, forms.CheckboxInput):
@@ -49,6 +71,20 @@ class FarmSettingsForm(forms.ModelForm):
             if commit:
                 self.farm.save(update_fields=['name'])
             settings.farm = self.farm
+        visible_modules = normalize_visible_modules([
+            module['key']
+            for module in MODULE_DEFINITIONS
+            if module['key'] == 'settings' or self.cleaned_data.get(f"show_{module['key']}")
+        ])
+        settings.visible_modules = visible_modules
+        settings.nav_modules = normalize_nav_modules(
+            [
+                module['key']
+                for module in MODULE_DEFINITIONS
+                if module['key'] != 'settings' and self.cleaned_data.get(f"nav_{module['key']}")
+            ],
+            visible_keys=visible_modules,
+        )
         if commit:
             settings.save()
         return settings

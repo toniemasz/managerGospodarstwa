@@ -21,15 +21,15 @@
             <strong>{{ production.quantity_kg|floatformat:0 }} kg</strong>
         </div>
         <div class="stat-tile">
-            <span>Łączny koszt paszy</span>
+            <span>Szac. koszt paszy</span>
             <strong>{{ production_cost.total_cost|floatformat:2 }}</strong>
         </div>
         <div class="stat-tile">
-            <span>Koszt 1 kg</span>
+            <span>Szac. koszt 1 kg</span>
             <strong>{{ production_cost.cost_per_kg|floatformat:4 }}</strong>
         </div>
         <div class="stat-tile">
-            <span>Koszt tony</span>
+            <span>Szac. koszt tony</span>
             <strong>{{ production_cost.cost_per_ton|floatformat:2 }}</strong>
         </div>
     </section>
@@ -38,7 +38,7 @@
         <div class="section-heading">
             <div>
                 <h2>Składniki ręczne</h2>
-                <p>Odważ składniki workowane i zatwierdź zakończenie śrutowania.</p>
+                <p>Odważ składniki workowane i zatwierdź zakończenie śrutowania. Finalny koszt zostanie zapisany z FIFO.</p>
             </div>
         </div>
         <div class="table-scroll">

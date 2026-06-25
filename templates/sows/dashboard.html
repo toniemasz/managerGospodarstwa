@@ -40,62 +40,13 @@
         </div>
     </section>
 
-    {% if sows_to_check_usg %}
-    <section class="notice notice-danger">
+    <section class="notice{% if sows_to_check_usg or vaccinations_due_count or farrowing_due_count %} notice-warning{% endif %}">
         <div>
-            <h2>Wymagane badanie USG</h2>
-            <p>Liczba macior oczekujących na wynik: <strong>{{ sows_to_check_usg|length }}</strong></p>
+            <h2>Oczekujące szczepienia i inne alerty są w panelu zadań</h2>
+            <p>USG: <strong>{{ sows_to_check_usg|length }}</strong>. Liczba szczepień do potwierdzenia: <strong>{{ vaccinations_due_count }}</strong>. Oproszenia: <strong>{{ farrowing_due_count }}</strong>.</p>
         </div>
-        <a href="{% url 'bulk_pregnancy_check' %}" class="button button-danger">Panel badań</a>
+        <a href="{% url 'task_center' %}?tab=production" class="button button-primary">Otwórz panel zadań</a>
     </section>
-    {% endif %}
-
-    {% if vaccinations_due_count %}
-    <section class="notice notice-warning">
-        <div>
-            <h2>Oczekujące szczepienia</h2>
-            <p>Liczba szczepień do potwierdzenia: <strong>{{ vaccinations_due_count }}</strong></p>
-        </div>
-        <a href="{% url 'bulk_vaccinate' %}" class="button button-secondary">Panel szczepień</a>
-    </section>
-    {% endif %}
-
-    {% if farrowing_due_count %}
-    <section class="panel table-panel">
-        <div class="section-heading">
-            <div>
-                <h2>Maciora zbliża się do oproszenia</h2>
-                <p>Liczba macior w oknie alertu: <strong>{{ farrowing_due_count }}</strong></p>
-            </div>
-        </div>
-        <div class="table-scroll">
-            <table class="data-table mobile-card-table" data-mobile-cards="true">
-                <thead>
-                    <tr>
-                        <th>Nr kolczyka</th>
-                        <th>Planowane oproszenie</th>
-                        <th>Dni do oproszenia</th>
-                        <th>Status</th>
-                        <th class="text-right">Akcje</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in farrowing_due_sows %}
-                    <tr>
-                        <td data-label="Nr kolczyka"><strong>{{ item.ear_tag }}</strong></td>
-                        <td data-label="Planowane oproszenie">{{ item.expected_farrowing_date|date:"d.m.Y" }}</td>
-                        <td data-label="Dni do oproszenia">{{ item.days_to_farrowing }}</td>
-                        <td data-label="Status">{{ item.status_display }}</td>
-                        <td data-label="Akcje" class="text-right">
-                            <a href="{% url 'sow_detail' item.id %}" class="table-link">Szczegóły</a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </section>
-    {% endif %}
 
     <section class="panel table-panel">
         <div class="section-heading">

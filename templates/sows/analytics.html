@@ -14,42 +14,8 @@
         <a href="{% url 'dashboard' %}" class="button button-secondary">Wróć</a>
     </section>
 
-    <section class="panel compact-panel">
-        <form method="get" action="{% url 'general_statistics' %}" class="filter-bar">
-            <div class="table-control">
-                <label for="metric">Metryka</label>
-                <select id="metric" name="metric">
-                    {% for m in available_metrics %}
-                        <option value="{{ m.key }}" {% if m.key == current_metric.key %}selected{% endif %}>{{ m.display_name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="table-control">
-                <label for="period">Okres</label>
-                <select id="period" name="period">
-                    {% for value, label in period_options %}
-                        <option value="{{ value }}" {% if date_filter.period == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="table-control">
-                <label for="date_from">Od</label>
-                <input id="date_from" type="date" name="date_from" value="{{ date_filter.date_from_value }}">
-            </div>
-            <div class="table-control">
-                <label for="date_to">Do</label>
-                <input id="date_to" type="date" name="date_to" value="{{ date_filter.date_to_value }}">
-            </div>
-            <div class="table-control">
-                <label for="order">Ranking</label>
-                <select id="order" name="order">
-                    <option value="desc" {% if current_order == 'desc' %}selected{% endif %}>Najlepsze</option>
-                    <option value="asc" {% if current_order == 'asc' %}selected{% endif %}>Najgorsze</option>
-                </select>
-            </div>
-            <button type="submit" class="button button-primary">Pokaż</button>
-        </form>
-    </section>
+    {% url 'general_statistics' as statistics_filter_url %}
+    {% include 'components/filter_panel.html' with filter_action=statistics_filter_url filter_clear_url=statistics_filter_url filter_fields_template='sows/_analytics_filters.html' %}
 
     <section class="panel">
         <div class="section-heading">

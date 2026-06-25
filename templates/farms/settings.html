@@ -3,19 +3,41 @@
 {% block title %}Ustawienia{% endblock %}
 
 {% block content %}
-<main class="app-page app-page-narrow">
+<main class="app-page settings-page">
     <section class="page-header">
         <div>
             <p class="eyebrow">Gospodarstwo</p>
             <h1>Ustawienia</h1>
-            <p class="page-subtitle">Domyślne reguły alertów, cyklu maciory i pasz.</p>
+            <p class="page-subtitle">Domyślne reguły alertów, widoczność modułów, pasze oraz eksport danych.</p>
+        </div>
+        <div class="header-actions">
+            <a href="{% url 'audit_log' %}" class="button button-secondary">Historia zmian</a>
+        </div>
+    </section>
+
+    <section class="settings-summary-grid">
+        <div class="stat-tile">
+            <span>Gospodarstwo</span>
+            <strong>{{ current_farm.name|default:"Brak nazwy" }}</strong>
+        </div>
+        <div class="stat-tile">
+            <span>Widoczne moduły</span>
+            <strong>{{ ui_visible_module_keys|length }}</strong>
+        </div>
+        <div class="stat-tile">
+            <span>Kontrola ciąży po</span>
+            <strong>{{ form.pregnancy_check_after_days.value|default:"-" }} dni</strong>
+        </div>
+        <div class="stat-tile">
+            <span>Domyślne śrutowanie</span>
+            <strong>{{ form.default_production_quantity_kg.value|floatformat:2 }} kg</strong>
         </div>
     </section>
 
     <section class="panel">
         <form method="post" class="responsive-form">
             {% csrf_token %}
-            {{ form.non_field_errors }}
+            {% include 'components/form_errors.html' with form=form %}
 
             <div class="form-section">
                 <div class="section-heading">
@@ -29,6 +51,8 @@
                     {{ form.farm_name.errors }}
                 </div>
             </div>
+
+            {% include 'farms/_module_visibility.html' %}
 
             <div class="form-section">
                 <div class="section-heading">
@@ -84,66 +108,67 @@
                 </div>
             </div>
 
-            <div class="form-actions">
+            <div class="form-actions settings-save-bar">
                 <button type="submit" class="button button-primary">Zapisz ustawienia</button>
             </div>
         </form>
     </section>
 
-    <section class="panel compact-panel">
-        <div class="section-heading">
-            <div>
-                <h2>Eksport danych</h2>
-                <p>Pobierz plik ZIP z danymi przypisanymi do Twojego gospodarstwa.</p>
+    <section class="settings-admin-grid">
+        <article class="panel compact-panel">
+            <div class="section-heading">
+                <div>
+                    <h2>Eksport danych</h2>
+                    <p>Pobierz archiwum lub pliki CSV przypisane do gospodarstwa.</p>
+                </div>
             </div>
-        </div>
-        <div class="form-actions">
-            <a href="{% url 'export_user_data' %}" class="button button-secondary">Eksportuj moje dane</a>
-            <a href="{% url 'export_csv' %}" class="button button-secondary">Eksportuj CSV</a>
-            <a href="{% url 'audit_log' %}" class="button button-secondary">Historia zmian</a>
-        </div>
-    </section>
+            <div class="settings-action-list">
+                <a href="{% url 'export_user_data' %}" class="button button-secondary">Eksport ZIP</a>
+                <a href="{% url 'export_csv' %}" class="button button-secondary">Eksport CSV</a>
+            </div>
+        </article>
 
-    <section class="panel compact-panel">
-        <div class="section-heading"><div><h2>Import CSV</h2><p>Importuje komplet plików CSV z archiwum eksportu. Gospodarstwo musi być puste.</p></div></div>
-        <form method="post" enctype="multipart/form-data" class="responsive-form">
-            {% csrf_token %}
-            {{ csv_import_form.non_field_errors }}
-            <div class="form-field">{{ csv_import_form.csv_archive.label_tag }}{{ csv_import_form.csv_archive }}{{ csv_import_form.csv_archive.errors }}</div>
-            <label class="checkbox-row">{{ csv_import_form.confirm_empty_import }}<span>{{ csv_import_form.confirm_empty_import.label }}</span></label>
-            {{ csv_import_form.confirm_empty_import.errors }}
-            <div class="form-actions"><button type="submit" name="import_csv" value="1" class="button button-secondary">Importuj CSV</button></div>
-        </form>
-    </section>
+        <article class="panel compact-panel">
+            <div class="section-heading"><div><h2>Import CSV</h2><p>Komplet plików CSV z archiwum eksportu. Gospodarstwo musi być puste.</p></div></div>
+            <form method="post" enctype="multipart/form-data" class="responsive-form">
+                {% csrf_token %}
+                {{ csv_import_form.non_field_errors }}
+                <div class="form-field">{{ csv_import_form.csv_archive.label_tag }}{{ csv_import_form.csv_archive }}{{ csv_import_form.csv_archive.errors }}</div>
+                <label class="checkbox-row">{{ csv_import_form.confirm_empty_import }}<span>{{ csv_import_form.confirm_empty_import.label }}</span></label>
+                {{ csv_import_form.confirm_empty_import.errors }}
+                <div class="form-actions"><button type="submit" name="import_csv" value="1" class="button button-secondary">Importuj CSV</button></div>
+            </form>
+        </article>
 
-    <section class="panel compact-panel">
-        <div class="section-heading">
-            <div>
-                <h2>Awaryjne przywracanie danych</h2>
-                <p>Import jest dostępny wyłącznie dla gospodarstwa bez macior, pasz, receptur, produkcji i sprzedaży.</p>
+        <article class="panel compact-panel settings-danger-panel">
+            <div class="section-heading">
+                <div>
+                    <h2>Awaryjne przywracanie danych</h2>
+                    <p>Import jest dostępny wyłącznie dla pustego gospodarstwa.</p>
+                </div>
             </div>
-        </div>
-        <div class="notice-warning" role="note">
-            Jeżeli system wykryje istniejące dane lub duplikaty w pliku, cały import zostanie przerwany bez zapisywania zmian.
-        </div>
-        <form method="post" enctype="multipart/form-data" class="responsive-form">
-            {% csrf_token %}
-            {{ import_form.non_field_errors }}
-            <div class="form-field">
-                <label for="{{ import_form.backup_file.id_for_label }}">{{ import_form.backup_file.label }}</label>
-                {{ import_form.backup_file }}
-                {% if import_form.backup_file.help_text %}<p class="help-text">{{ import_form.backup_file.help_text }}</p>{% endif %}
-                {{ import_form.backup_file.errors }}
+            <div class="notice-warning" role="note">
+                Jeżeli system wykryje istniejące dane lub duplikaty w pliku, cały import zostanie przerwany bez zapisywania zmian.
             </div>
-            <label class="checkbox-row">
-                {{ import_form.confirm_empty_import }}
-                <span>{{ import_form.confirm_empty_import.label }}</span>
-            </label>
-            {{ import_form.confirm_empty_import.errors }}
-            <div class="form-actions">
-                <button type="submit" name="import_backup" value="1" class="button button-secondary">Przywróć moje dane</button>
-            </div>
-        </form>
+            <form method="post" enctype="multipart/form-data" class="responsive-form">
+                {% csrf_token %}
+                {{ import_form.non_field_errors }}
+                <div class="form-field">
+                    <label for="{{ import_form.backup_file.id_for_label }}">{{ import_form.backup_file.label }}</label>
+                    {{ import_form.backup_file }}
+                    {% if import_form.backup_file.help_text %}<p class="help-text">{{ import_form.backup_file.help_text }}</p>{% endif %}
+                    {{ import_form.backup_file.errors }}
+                </div>
+                <label class="checkbox-row">
+                    {{ import_form.confirm_empty_import }}
+                    <span>{{ import_form.confirm_empty_import.label }}</span>
+                </label>
+                {{ import_form.confirm_empty_import.errors }}
+                <div class="form-actions">
+                    <button type="submit" name="import_backup" value="1" class="button button-secondary">Przywróć moje dane</button>
+                </div>
+            </form>
+        </article>
     </section>
 </main>
 {% endblock %}

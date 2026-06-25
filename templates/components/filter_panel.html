@@ -1,0 +1,18 @@
+<details class="filter-disclosure"{% if filters_active %} open{% endif %}>
+    <summary>
+        <span>Filtry</span>
+        {% if filters_active %}<span class="filter-active-badge">Aktywne: {{ filter_chips|length }}</span>{% else %}<small>Rozwiń, aby zawęzić dane</small>{% endif %}
+    </summary>
+    {% if filter_chips %}
+    <div class="filter-chips" aria-label="Aktywne filtry">
+        {% for chip in filter_chips %}<span class="filter-chip">{{ chip }}</span>{% endfor %}
+    </div>
+    {% endif %}
+    <form method="get" action="{{ filter_action }}" class="filter-bar filter-panel-form">
+        {% include filter_fields_template %}
+        <div class="filter-actions">
+            <button type="submit" class="button button-primary">Zastosuj</button>
+            <a href="{{ filter_clear_url|default:filter_action }}" class="button button-secondary">Wyczyść filtry</a>
+        </div>
+    </form>
+</details>

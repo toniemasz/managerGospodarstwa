@@ -1,4 +1,4 @@
-from django.db.models.signals import post_delete, post_save, pre_save
+from django.db.models.signals import post_delete, post_save, pre_delete, pre_save
 from django.dispatch import receiver
 
 from feed.models import DeliveryModel, InventoryMovementModel, ProductionModel
@@ -35,8 +35,18 @@ def delete_delivery_movement(sender, instance, **kwargs):
 
 @receiver(post_save, sender=ProductionModel)
 def sync_production_movement(sender, instance, **kwargs):
+    if getattr(instance, "_skip_inventory_sync", False):
+        return
+    service = InventoryMovementService(instance.recipe.farm)
     if instance.status == ProductionModel.Statuses.COMPLETED:
-        InventoryMovementService(instance.recipe.farm).book_production(instance)
+        service.book_production(instance)
+    else:
+        service.release_production(instance)
+
+
+@receiver(pre_delete, sender=ProductionModel)
+def release_production_inventory(sender, instance, **kwargs):
+    InventoryMovementService(instance.recipe.farm).release_production(instance)
 
 
 @receiver(post_delete, sender=ProductionModel)

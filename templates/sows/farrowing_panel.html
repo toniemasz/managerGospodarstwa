@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}Panel oproszeń{% endblock %}
+{% block content %}
+<main class="app-page">
+    <section class="page-header">
+        <div><p class="eyebrow">Produkcja</p><h1>Panel oproszeń</h1><p class="page-subtitle">Planowane oproszenia w oknie alertu gospodarstwa oraz po terminie.</p></div>
+        <a href="{% url 'task_center' %}?tab=production" class="button button-secondary">Wróć do zadań</a>
+    </section>
+    <section class="panel table-panel">
+        <div class="section-heading"><div><h2>Oproszenia do obsługi</h2><p>{{ farrowings|length }} aktywnych powiadomień.</p></div></div>
+        {% if farrowings %}
+        <div class="table-scroll"><table class="data-table mobile-card-table">
+            <thead><tr><th>Maciora</th><th>Planowany termin</th><th>Status</th><th class="text-right">Akcje</th></tr></thead>
+            <tbody>{% for item in farrowings %}<tr>
+                <td data-label="Maciora"><a href="{% url 'sow_detail' item.id %}" class="table-link">{{ item.ear_tag }}</a></td>
+                <td data-label="Planowany termin">{{ item.expected_farrowing_date|date:'d.m.Y' }}</td>
+                <td data-label="Status"><span class="status-pill {% if item.alert_status == 'overdue' %}status-red{% elif item.alert_status == 'today' %}status-amber{% else %}status-blue{% endif %}">{{ item.alert_status_label }} — {{ item.time_label }}</span></td>
+                <td data-label="Akcje" class="text-right"><a href="{% url 'add_event' item.id %}?event_type=FARROWING" class="button button-primary button-small">Dodaj oproszenie</a></td>
+            </tr>{% endfor %}</tbody>
+        </table></div>
+        {% else %}{% include 'components/empty_state.html' with empty_title='Brak oproszeń do obsługi' empty_message='Żadna maciora nie znajduje się teraz w oknie alertu.' %}{% endif %}
+    </section>
+</main>
+{% endblock %}

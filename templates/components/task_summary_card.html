@@ -1,0 +1,17 @@
+<article class="task-summary-card{% if section.urgent_count %} has-urgent{% endif %}">
+    <div class="task-summary-heading">
+        <div><h2>{{ section.title }}</h2><p>{{ section.count }} aktywnych{% if section.urgent_count %}, {{ section.urgent_count }} pilnych{% endif %}</p></div>
+        <span class="count-badge{% if section.urgent_count %} is-urgent{% endif %}">{{ section.count }}</span>
+    </div>
+    {% if section.preview_items %}
+    <ul class="task-preview-list">
+        {% for task in section.preview_items %}
+        <li><span>{{ task.title }}</span><small>{{ task.status_label }}</small></li>
+        {% endfor %}
+    </ul>
+    {% if section.more_count %}<p class="task-more-count">+ {{ section.more_count }} więcej</p>{% endif %}
+    {% else %}
+    <p class="task-card-empty">{{ section.empty_message }}</p>
+    {% endif %}
+    <a href="{{ section.panel_url }}" class="button button-secondary">{{ section.panel_label }}</a>
+</article>

@@ -44,11 +44,11 @@ class SowDashboardService:
             except Exception as e:
                 logger.exception("Błąd przetwarzania maciory %s (ID: %s): %s", sow.ear_tag, sow.id, e)
 
-        notifications = SowNotificationService(
-            farm=self.farm,
-            pregnancy_check_after_days=pregnancy_check_after_days,
-            farrowing_alert_days_ahead=self._farrowing_alert_days_ahead(),
-        ).build_notifications(sows, today)
+        notifications = self.get_notifications(
+            sows=sows,
+            current_date=today,
+            update_states=False,
+        )
 
         return {
             'total_sows': len(sows),
@@ -64,6 +64,39 @@ class SowDashboardService:
             'vaccinations_due_count': notifications['vaccinations_due_count'],
             'all_sows': sows,
         }
+
+    def get_notifications(
+        self,
+        *,
+        sows: list | None = None,
+        current_date: date | None = None,
+        update_states: bool = True,
+    ) -> dict:
+        """Zwraca wspólny zestaw alertów bez liczenia statystyk dashboardu."""
+        current_date = current_date or date.today()
+        sows = sows if sows is not None else self.repository.get_all_sows()
+        pregnancy_check_after_days = self._pregnancy_check_after_days()
+
+        if update_states:
+            for sow in sows:
+                try:
+                    sow.update_state_for_date(
+                        current_date,
+                        pregnancy_check_after_days=pregnancy_check_after_days,
+                    )
+                except Exception as error:
+                    logger.exception(
+                        "Błąd przetwarzania alertów maciory %s (ID: %s): %s",
+                        sow.ear_tag,
+                        sow.id,
+                        error,
+                    )
+
+        return SowNotificationService(
+            farm=self.farm,
+            pregnancy_check_after_days=pregnancy_check_after_days,
+            farrowing_alert_days_ahead=self._farrowing_alert_days_ahead(),
+        ).build_notifications(sows, current_date)
 
     def get_archived_sows_list(self) -> list:
         """Pobiera i aktualizuje statusy dla zarchiwizowanych macior."""

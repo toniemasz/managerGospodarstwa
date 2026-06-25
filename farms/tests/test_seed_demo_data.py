@@ -6,6 +6,7 @@ from django.test import override_settings
 from feed.models import IngredientModel, ProductionModel, RecipeModel
 from sales.models import PigSaleModel
 from sows.models import SowModel
+from costs.models import CostCategoryModel, CostModel
 
 
 @pytest.mark.django_db(transaction=True)
@@ -23,6 +24,11 @@ def test_seed_demo_data_creates_realistic_idempotent_dataset():
         PigSaleModel.objects.filter(farm=farm).count(),
     )
     assert counts == (40, 15, 6, 20, 12)
+    assert CostCategoryModel.objects.filter(farm=farm).count() == 9
+    assert CostModel.objects.filter(farm=farm).count() == 18
+    assert CostModel.objects.filter(farm=farm, is_paid=True).exists()
+    assert CostModel.objects.filter(farm=farm, is_paid=False).exists()
+    assert PigSaleModel.objects.filter(farm=farm, live_weight__gt=0).exists()
     call_command("seed_demo_data", verbosity=0)
     assert counts == (
         SowModel.objects.filter(farm=farm).count(),

@@ -1,0 +1,26 @@
+/* variables.css - wydzielone style aplikacji. */
+
+:root {
+    --bg: #f3f6f4;
+    --surface: #ffffff;
+    --surface-muted: #eef4f1;
+    --surface-soft: #f8fafc;
+    --border: #d7e0dc;
+    --border-strong: #aebdb7;
+    --text: #12211d;
+    --muted: #62736d;
+    --primary: #1f6f78;
+    --primary-dark: #15515a;
+    --primary-soft: #e4f2f4;
+    --danger: #c92a2a;
+    --danger-soft: #fff0f0;
+    --success: #0f766e;
+    --success-soft: #e5f5f1;
+    --warning: #a16207;
+    --warning-soft: #fff6db;
+    --violet: #5f4bb6;
+    --radius: .6rem;
+    --shadow: 0 1px 2px rgba(18, 33, 29, .06), 0 16px 36px rgba(18, 33, 29, .07);
+    --topbar-height: 4.35rem;
+}
+

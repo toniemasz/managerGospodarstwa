@@ -25,12 +25,10 @@
     <section class="panel">
         <form method="post" class="responsive-form">
             {% csrf_token %}
+            {% include 'components/form_errors.html' with form=form %}
+            <div class="form-section-heading"><h2>Dane podstawowe</h2><p>Numer maciory i data wejścia do stada.</p></div>
             {% for field in form %}
-            <div class="form-field">
-                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {{ field.errors }}
-            </div>
+                {% include 'components/form_field.html' with field=field %}
             {% endfor %}
             <div class="form-actions">
                 {% if is_edit %}

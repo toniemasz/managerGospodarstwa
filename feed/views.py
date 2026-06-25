@@ -13,6 +13,7 @@ from .services.feed_management_service import FeedManagementService
 from .services.feed_repository import FeedRepository
 from farms.services.current_farm import get_current_farm
 from farms.services.date_range import PERIOD_OPTIONS, parse_date_range
+from farms.services.filter_ui import filter_ui_state, parse_filter_date
 from farms.services.audit_log_service import log_action
 from feed.services.inventory_service import InventoryMovementService
 from feed.models import InventoryMovementModel
@@ -95,7 +96,19 @@ def feed_inventory_view(request):
     context = service.get_inventory_dashboard()
     # Dodajemy historię dostaw do widoku
     context['deliveries'] = service.repository.get_deliveries()
-    context['movements'] = InventoryMovementModel.objects.filter(farm=farm).select_related('ingredient')[:50]
+    movements = InventoryMovementModel.objects.filter(farm=farm).select_related('ingredient')
+    movement_type = request.GET.get('movement_type', '')
+    date_from = parse_filter_date(request.GET.get('date_from'))
+    date_to = parse_filter_date(request.GET.get('date_to'))
+    if movement_type:
+        movements = movements.filter(movement_type=movement_type)
+    if date_from:
+        movements = movements.filter(movement_date__gte=date_from)
+    if date_to:
+        movements = movements.filter(movement_date__lte=date_to)
+    context['movements'] = movements[:50]
+    context['movement_types'] = InventoryMovementModel.Types.choices
+    context.update(filter_ui_state(request.GET, {'movement_type': 'Typ', 'date_from': 'Od', 'date_to': 'Do'}))
     return render(request, 'feed/inventory.html', context)
 
 
@@ -124,9 +137,9 @@ def edit_delivery_view(request, pk):
         form = DeliveryForm(request.POST, instance=delivery, farm=farm)
         if form.is_valid():
             with transaction.atomic():
-                InventoryMovementService(farm).remove_delivery(delivery)
                 delivery = form.save()
                 InventoryMovementService(farm).sync_delivery(delivery, user=request.user)
+                InventoryMovementService(farm).rebuild()
             log_action(farm=farm, user=request.user, action="UPDATE", obj=delivery)
             messages.success(request, "Dostawa zaktualizowana.")
             return redirect('feed_inventory')
@@ -154,11 +167,15 @@ def delete_delivery_view(request, pk):
     if request.method == 'POST':
         representation = str(delivery)
         object_id = delivery.pk
-        with transaction.atomic():
-            InventoryMovementService(farm).remove_delivery(delivery)
-            delivery.delete()
-        log_action(farm=farm, user=request.user, action="DELETE", model_label="feed.DeliveryModel", object_id=object_id, object_repr=representation)
-        messages.success(request, "Dostawa usunięta z historii.")
+        try:
+            with transaction.atomic():
+                InventoryMovementService(farm).remove_delivery(delivery)
+                delivery.delete()
+        except ValidationError as error:
+            messages.error(request, error.messages[0])
+        else:
+            log_action(farm=farm, user=request.user, action="DELETE", model_label="feed.DeliveryModel", object_id=object_id, object_repr=representation)
+            messages.success(request, "Dostawa usunięta z historii.")
     return redirect('feed_inventory')
 
 
@@ -177,10 +194,22 @@ def feed_recipes_view(request):
 def recipe_detail_view(request, pk):
     farm = get_current_farm(request)
     date_range = parse_date_range(request.GET, default_period='6m')
+    try:
+        production_year = int(request.GET.get('year') or timezone.localdate().year)
+    except (TypeError, ValueError):
+        production_year = timezone.localdate().year
     service = FeedManagementService(farm=farm)
-    context = service.get_recipe_detail(pk, date_from=date_range.date_from, date_to=date_range.date_to)
+    context = service.get_recipe_detail(
+        pk,
+        date_from=date_range.date_from,
+        date_to=date_range.date_to,
+        production_year=production_year,
+    )
     context['date_filter'] = date_range
     context['period_options'] = PERIOD_OPTIONS
+    context.update(filter_ui_state(request.GET, {
+        'period': 'Okres', 'date_from': 'Od', 'date_to': 'Do',
+    }))
     return render(request, 'feed/recipe_detail.html', context)
 
 
@@ -248,7 +277,18 @@ def feed_production_view(request):
     farm = get_current_farm(request)
     # Sortujemy najpierw po dacie malejąco, a potem po godzinie malejąco
     productions = FeedRepository(farm=farm).get_productions()
-    return render(request, 'feed/productions.html', {'productions': productions})
+    status = request.GET.get('status', '')
+    date_from = parse_filter_date(request.GET.get('date_from'))
+    date_to = parse_filter_date(request.GET.get('date_to'))
+    if status:
+        productions = productions.filter(status=status)
+    if date_from:
+        productions = productions.filter(date__gte=date_from)
+    if date_to:
+        productions = productions.filter(date__lte=date_to)
+    context = {'productions': productions, 'production_statuses': ProductionModel.Statuses.choices}
+    context.update(filter_ui_state(request.GET, {'status': 'Status', 'date_from': 'Od', 'date_to': 'Do'}))
+    return render(request, 'feed/productions.html', context)
 
 
 @login_required
@@ -295,10 +335,15 @@ def edit_production_view(request, pk):
     if request.method == 'POST':
         form = ProductionForm(request.POST, instance=production, farm=farm)
         if form.is_valid():
-            production = form.save()
-            log_action(farm=farm, user=request.user, action="UPDATE", obj=production)
-            messages.success(request, "Zaktualizowano parametry śrutowania.")
-            return redirect('feed_productions')
+            try:
+                with transaction.atomic():
+                    production = form.save()
+            except ValidationError as error:
+                form.add_error(None, error.messages[0])
+            else:
+                log_action(farm=farm, user=request.user, action="UPDATE", obj=production)
+                messages.success(request, "Zaktualizowano parametry śrutowania i przeliczono FIFO.")
+                return redirect('feed_productions')
     else:
         form = ProductionForm(instance=production, farm=farm)
 
@@ -318,10 +363,9 @@ def delete_production_view(request, pk):
     if request.method == 'POST':
         representation = str(production)
         object_id = production.pk
-        InventoryMovementModel.objects.filter(
-            farm=farm, source_model=production._meta.label, source_id=str(production.pk)
-        ).delete()
-        production.delete()
+        with transaction.atomic():
+            InventoryMovementService(farm).release_production(production)
+            production.delete()
         log_action(farm=farm, user=request.user, action="DELETE", model_label="feed.ProductionModel", object_id=object_id, object_repr=representation)
         messages.success(request, "Usunięto śrutowanie.")
     return redirect('feed_productions')

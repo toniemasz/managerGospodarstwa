@@ -4,6 +4,7 @@ from .models import (
     IngredientModel,
     IngredientPriceConfigModel,
     ProductionModel,
+    ProductionIngredientUsageModel,
     RecipeItemModel,
     RecipeModel,
     InventoryMovementModel,
@@ -26,7 +27,7 @@ class RecipeAdmin(admin.ModelAdmin):
 
 @admin.register(DeliveryModel)
 class DeliveryAdmin(admin.ModelAdmin):
-    list_display = ('date', 'ingredient', 'quantity_kg', 'price_per_kg')
+    list_display = ('date', 'ingredient', 'quantity_kg', 'remaining_quantity_kg', 'price_per_kg')
     list_filter = ('ingredient__farm', 'ingredient')
     search_fields = ('ingredient__name', 'ingredient__farm__name')
 
@@ -47,7 +48,7 @@ class RecipeItemAdmin(admin.ModelAdmin):
 
 @admin.register(ProductionModel)
 class ProductionAdmin(admin.ModelAdmin):
-    list_display = ('date', 'time', 'recipe', 'quantity_kg', 'status')
+    list_display = ('date', 'time', 'recipe', 'quantity_kg', 'status', 'feed_cost_total', 'feed_cost_per_kg')
     list_filter = ('recipe__farm', 'status')
     search_fields = ('recipe__name', 'recipe__farm__name')
 
@@ -57,3 +58,10 @@ class InventoryMovementAdmin(admin.ModelAdmin):
     list_display = ('movement_date', 'farm', 'ingredient', 'movement_type', 'quantity_kg', 'source_model')
     list_filter = ('farm', 'movement_type')
     search_fields = ('ingredient__name', 'note', 'source_id')
+
+
+@admin.register(ProductionIngredientUsageModel)
+class ProductionIngredientUsageAdmin(admin.ModelAdmin):
+    list_display = ('production', 'ingredient', 'delivery', 'quantity_kg', 'unit_price', 'cost')
+    list_filter = ('farm', 'ingredient')
+    search_fields = ('production__recipe__name', 'ingredient__name', 'delivery__id')

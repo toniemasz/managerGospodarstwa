@@ -92,8 +92,8 @@ def test_sales_list_displays_net_values(auth_client):
     assert response.status_code == 200
     assert 'Przychód netto' in content
     assert '>Netto<' in content
-    assert '8000,00' in content
-    assert '8640,00' not in content
+    assert '8\xa0000,00' in content
+    assert '8\xa0640,00' in content
 
 
 @pytest.mark.django_db
@@ -169,6 +169,43 @@ def test_sale_repository_filters_sales_between_dates():
     )
 
     assert [sale.id for sale in sales] == [in_range.id]
+
+
+@pytest.mark.django_db
+def test_sales_year_filter_and_document_number_uniqueness_per_year(auth_client):
+    PigSaleModel.objects.create(
+        farm=auth_client.farm,
+        sale_date=date(2025, 5, 1),
+        document_number="FV/1",
+        quantity=5,
+        net_value=Decimal("5000"),
+    )
+    PigSaleModel.objects.create(
+        farm=auth_client.farm,
+        sale_date=date(2026, 5, 1),
+        document_number="FV/2",
+        quantity=6,
+        net_value=Decimal("6000"),
+    )
+
+    response = auth_client.get(reverse("sales_list"), {"year": 2025})
+    content = response.content.decode()
+    assert "FV/1" in content
+    assert "FV/2" not in content
+    assert response.context["selected_year"] == 2025
+
+    same_year = PigSaleForm(
+        data={"sale_date": "2025-08-01", "document_number": "fv/1"},
+        instance=PigSaleModel(farm=auth_client.farm),
+        farm=auth_client.farm,
+    )
+    other_year = PigSaleForm(
+        data={"sale_date": "2026-08-01", "document_number": "FV/1"},
+        instance=PigSaleModel(farm=auth_client.farm),
+        farm=auth_client.farm,
+    )
+    assert not same_year.is_valid()
+    assert other_year.is_valid()
 
 
 @pytest.mark.django_db

@@ -15,6 +15,8 @@
         </div>
     </section>
 
+    {% url 'feed_inventory' as inventory_filter_url %}{% include 'components/filter_panel.html' with filter_action=inventory_filter_url filter_clear_url=inventory_filter_url filter_fields_template='feed/_inventory_filters.html' %}
+
     <section class="panel table-panel">
         <div class="section-heading"><div><h2>Ruchy magazynowe</h2><p>Dostawy, zużycia produkcyjne i ręczne korekty.</p></div></div>
         <div class="table-scroll">
@@ -80,6 +82,7 @@
                         <th>Data</th>
                         <th>Składnik</th>
                         <th class="text-right">Ilość</th>
+                        <th class="text-right">Pozostało FIFO</th>
                         <th class="text-right">Cena/kg</th>
                         <th class="text-right">Akcje</th>
                     </tr>
@@ -90,6 +93,7 @@
                         <td>{{ delivery.date|date:"d.m.Y" }}</td>
                         <td><strong>{{ delivery.ingredient.name }}</strong></td>
                         <td class="text-right"><strong>{{ delivery.quantity_kg|floatformat:2 }}</strong> kg</td>
+                        <td class="text-right">{{ delivery.remaining_quantity_kg|floatformat:2 }} kg</td>
                         <td class="text-right">{{ delivery.price_per_kg|default:"-" }} PLN</td>
                         <td class="text-right">
                             <div class="row-actions">
@@ -99,7 +103,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="empty-table">Brak historii wprowadzonych dostaw.</td>
+                        <td colspan="6" class="empty-table">Brak historii wprowadzonych dostaw.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

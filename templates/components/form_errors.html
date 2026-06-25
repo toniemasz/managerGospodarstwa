@@ -1,0 +1,6 @@
+{% if form.errors %}
+<div class="alert alert-error form-error-summary" role="alert">
+    <strong>Popraw oznaczone pola.</strong>
+    {% if form.non_field_errors %}{{ form.non_field_errors }}{% endif %}
+</div>
+{% endif %}

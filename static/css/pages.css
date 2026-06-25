@@ -1,0 +1,135 @@
+/* pages.css - wydzielone style aplikacji. */
+
+.auth-page {
+    width: min(100% - 2rem, 28rem);
+    margin: 8vh auto;
+}
+
+.auth-card {
+    padding: 1.25rem;
+}
+
+.auth-card .page-header {
+    margin-bottom: 1rem;
+    padding: 0 0 1rem;
+    border-width: 0 0 1px;
+    box-shadow: none;
+}
+
+.settings-page {
+    max-width: 72rem;
+}
+
+.settings-summary-grid,
+.settings-admin-grid {
+    display: grid;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.settings-summary-grid {
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+
+.settings-admin-grid {
+    grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+    align-items: start;
+}
+
+.settings-save-bar {
+    position: sticky;
+    bottom: 1rem;
+    z-index: 5;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: rgba(255, 255, 255, .94);
+    padding: .75rem;
+    box-shadow: 0 12px 32px rgba(18, 33, 29, .12);
+    backdrop-filter: blur(12px);
+}
+
+.settings-action-list {
+    display: grid;
+    gap: .65rem;
+    padding-top: 1rem;
+}
+
+.settings-danger-panel {
+    border-color: #f0b8b8;
+}
+
+.settings-danger-panel .section-heading {
+    background: linear-gradient(180deg, #fffafa, #fff2f2);
+}
+
+
+.finance-section,
+.finance-grid,
+.chart-panel {
+    margin-bottom: 1.25rem;
+}
+
+.finance-section {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+}
+
+.finance-section .stats-grid {
+    margin: 0;
+    padding: 1rem;
+}
+
+.finance-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+}
+
+.panel-list {
+    display: grid;
+}
+
+.summary-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border-bottom: 1px solid var(--border);
+    padding: .9rem 1rem;
+}
+
+.summary-row:last-child {
+    border-bottom: 0;
+}
+
+.summary-row span,
+.summary-row small {
+    display: block;
+}
+
+.summary-row small {
+    margin-top: .2rem;
+    color: var(--muted);
+}
+
+.result-tile.is-positive {
+    border-color: #a9dec8;
+    background: var(--success-soft);
+}
+
+.result-tile.is-negative {
+    border-color: #f0b8b8;
+    background: var(--danger-soft);
+}
+
+.value-positive {
+    color: var(--success);
+}
+
+.value-negative {
+    color: var(--danger);
+}
+

@@ -1,15 +1,25 @@
 {% extends 'base.html' %}
-{% block title %}Dzisiejsze zadania{% endblock %}
+{% block title %}Panel zadań{% endblock %}
 {% block content %}
 <main class="app-page">
-<section class="page-header"><div><p class="eyebrow">Centrala</p><h1>Dzisiejsze zadania</h1><p class="page-subtitle">Łącznie: {{ task_count }} pozycji wymagających uwagi.</p></div></section>
-<section class="module-grid">
-<div class="panel"><h2>Maciory do USG</h2>{% for sow in sows_to_check %}<p><a href="{% url 'sow_detail' sow.id %}">{{ sow.ear_tag }}</a> — {{ sow.dynamic_status_display }}</p>{% empty %}<p>Brak.</p>{% endfor %}</div>
-<div class="panel"><h2>Zbliżające się oproszenia</h2>{% for item in farrowings %}<p><a href="{% url 'sow_detail' item.id %}">{{ item.ear_tag }}</a> — {{ item.expected_farrowing_date|date:"d.m.Y" }}</p>{% empty %}<p>Brak.</p>{% endfor %}</div>
-<div class="panel"><h2>Szczepienia</h2>{% for group, items in vaccination_groups.items %}<p><a href="{% url 'bulk_vaccinate' %}">{{ group }}</a> ({{ items|length }})</p>{% empty %}<p>Brak.</p>{% endfor %}</div>
-<div class="panel"><h2>Niskie stany</h2>{% for item in low_stock %}<p><a href="{% url 'feed_inventory' %}">{{ item.name }}</a> — {{ item.current_stock|floatformat:2 }} kg</p>{% empty %}<p>Brak.</p>{% endfor %}</div>
-<div class="panel"><h2>Śrutowania w kolejce</h2>{% for item in queued_productions %}<p><a href="{% url 'process_stage1' item.id %}">{{ item.recipe.name }}</a> — {{ item.quantity_kg }} kg</p>{% empty %}<p>Brak.</p>{% endfor %}</div>
-<div class="panel"><h2>Śrutowania po etapie 1</h2>{% for item in stage_one_productions %}<p><a href="{% url 'process_stage2' item.id %}">{{ item.recipe.name }}</a> — {{ item.quantity_kg }} kg</p>{% empty %}<p>Brak.</p>{% endfor %}</div>
-<div class="panel"><h2>Sprzedaże bez rozliczenia</h2>{% for sale in unsettled_sales %}<p><a href="{% url 'edit_sale' sale.id %}">{{ sale.sale_date|date:"d.m.Y" }} — {{ sale.quantity }} szt.</a></p>{% empty %}<p>Brak.</p>{% endfor %}</div>
-</section></main>
+    <section class="page-header">
+        <div><p class="eyebrow">Centrala</p><h1>Panel zadań</h1><p class="page-subtitle">{{ task_count }} aktywnych zadań. Karty są skrótem prowadzącym do właściwych paneli obsługi.</p></div>
+    </section>
+
+    <nav class="task-tabs" aria-label="Kategorie zadań">
+        {% for tab in tab_list %}
+        <a href="{% url 'task_center' %}?tab={{ tab.key }}" class="task-tab{% if active_tab == tab.key %} is-active{% endif %}{% if tab.urgent_count %} has-urgent{% endif %}"{% if active_tab == tab.key %} aria-current="page"{% endif %}>
+            <span>{{ tab.title }}</span><span class="task-tab-badge{% if tab.urgent_count %} is-urgent{% endif %}">{{ tab.count }}</span>
+        </a>
+        {% endfor %}
+    </nav>
+
+    {% if active_tab_data.count %}
+    <section class="task-summary-grid">
+        {% for section in active_tab_data.sections %}{% include 'components/task_summary_card.html' with section=section %}{% endfor %}
+    </section>
+    {% else %}
+    <section class="panel">{% include 'components/empty_state.html' with empty_title=active_tab_data.title empty_message=active_tab_data.empty_message %}</section>
+    {% endif %}
+</main>
 {% endblock %}

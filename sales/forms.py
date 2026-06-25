@@ -46,13 +46,28 @@ class PigSaleForm(forms.ModelForm):
             'no_settlement': forms.CheckboxInput(attrs={'class': 'checkbox-input'}),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, farm=None, **kwargs):
+        self.farm = farm or getattr(kwargs.get('instance'), 'farm', None)
         super().__init__(*args, **kwargs)
         for name, field in self.fields.items():
             if name == 'no_settlement':
                 continue
             existing = field.widget.attrs.get('class', '')
             field.widget.attrs['class'] = f'{existing} {FORM_FIELD_CLASS}'.strip()
+
+    def clean(self):
+        data = super().clean()
+        document_number = (data.get('document_number') or '').strip()
+        sale_date = data.get('sale_date')
+        if self.farm and document_number and sale_date:
+            duplicate = PigSaleModel.objects.filter(
+                farm=self.farm,
+                document_number__iexact=document_number,
+                sale_date__year=sale_date.year,
+            ).exclude(pk=self.instance.pk)
+            if duplicate.exists():
+                self.add_error('document_number', 'Numer dokumentu jest już używany w tym roku rozliczeniowym.')
+        return data
 
     def clean_settlement_pdf(self):
         uploaded = self.cleaned_data.get('settlement_pdf')

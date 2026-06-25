@@ -20,8 +20,8 @@ from .views import (
     edit_vaccination_plan_view,
     delete_vaccination_plan_view,
     archived_sows_view,
-    general_statistics_view
-
+    general_statistics_view,
+    farrowing_panel_view,
 )
 
 urlpatterns = [
@@ -37,6 +37,7 @@ urlpatterns = [
     path('maciory/<int:sow_id>/', sow_detail_view, name='sow_detail'),
     path('maciory/szczepienie-grupowe/', bulk_vaccinate_view, name='bulk_vaccinate'),
     path('maciory/badania-grupowe/', bulk_pregnancy_check_view, name='bulk_pregnancy_check'),
+    path('maciory/oproszenia/', farrowing_panel_view, name='farrowing_panel'),
     path('maciory/zdarzenia/masowo/', bulk_sow_events_view, name='bulk_sow_events'),
     path('maciory/<int:sow_id>/zdarzenie/dodaj/', add_event_view, name='add_event'),
     path('maciory/statystyki/', general_statistics_view, name='general_statistics'),

@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from django.urls import reverse
 
 from farms.services.farm_service import get_or_create_user_farm
-from feed.models import DeliveryModel, IngredientModel, InventoryMovementModel, ProductionModel, RecipeItemModel, RecipeModel
+from feed.models import DeliveryModel, IngredientModel, InventoryMovementModel, ProductionIngredientUsageModel, ProductionModel, RecipeItemModel, RecipeModel
 from feed.services.feed_management_service import FeedManagementService
 from feed.services.inventory_service import InventoryMovementService
 from feed.forms import InventoryAdjustmentForm
@@ -34,6 +34,56 @@ def test_delivery_production_and_repeated_completion_movements(inventory_data):
     assert service.complete_production(production.pk, user=user)[0] is False
     assert InventoryMovementModel.objects.filter(farm=farm, movement_type="PRODUCTION_USAGE").count() == 1
     assert InventoryMovementService(farm).balances()[ingredient.pk] == Decimal("600")
+
+
+@pytest.mark.django_db
+def test_completed_production_edit_and_delete_rebuilds_fifo_usage(inventory_data):
+    user, farm, ingredient, recipe = inventory_data
+    DeliveryModel.objects.all().delete()
+    first_delivery = DeliveryModel.objects.create(
+        ingredient=ingredient,
+        date=date(2026, 1, 1),
+        quantity_kg=Decimal("1000.00"),
+        price_per_kg=Decimal("1.20000"),
+    )
+    second_delivery = DeliveryModel.objects.create(
+        ingredient=ingredient,
+        date=date(2026, 2, 1),
+        quantity_kg=Decimal("1000.00"),
+        price_per_kg=Decimal("1.50000"),
+    )
+    production = ProductionModel.objects.create(
+        recipe=recipe,
+        date=date(2026, 3, 1),
+        quantity_kg=Decimal("1200.00"),
+        status=ProductionModel.Statuses.STAGE_1_DONE,
+    )
+    assert FeedManagementService(farm).complete_production(production.pk, user=user)[0] is True
+    production.refresh_from_db()
+    assert production.feed_cost_total == Decimal("1500.00")
+    assert ProductionIngredientUsageModel.objects.filter(production=production).count() == 2
+    first_delivery.refresh_from_db()
+    second_delivery.refresh_from_db()
+    assert first_delivery.remaining_quantity_kg == Decimal("0.00")
+    assert second_delivery.remaining_quantity_kg == Decimal("800.00")
+
+    production.quantity_kg = Decimal("500.00")
+    production.save()
+    production.refresh_from_db()
+    assert production.feed_cost_total == Decimal("600.00")
+    assert ProductionIngredientUsageModel.objects.filter(production=production).count() == 1
+    first_delivery.refresh_from_db()
+    second_delivery.refresh_from_db()
+    assert first_delivery.remaining_quantity_kg == Decimal("500.00")
+    assert second_delivery.remaining_quantity_kg == Decimal("1000.00")
+
+    production.delete()
+    first_delivery.refresh_from_db()
+    second_delivery.refresh_from_db()
+    assert first_delivery.remaining_quantity_kg == Decimal("1000.00")
+    assert second_delivery.remaining_quantity_kg == Decimal("1000.00")
+    assert not ProductionIngredientUsageModel.objects.exists()
+    assert not InventoryMovementModel.objects.filter(movement_type=InventoryMovementModel.Types.PRODUCTION_USAGE).exists()
 
 
 @pytest.mark.django_db

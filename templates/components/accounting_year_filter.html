@@ -1,0 +1,9 @@
+{% load l10n %}
+<div class="filter-field filter-field-compact">
+    <label for="{{ year_field_id|default:'accounting-year' }}">Rok rozliczeniowy</label>
+    <select id="{{ year_field_id|default:'accounting-year' }}" name="year" class="form-control">
+        {% for year in available_years %}
+            <option value="{{ year|unlocalize }}" {% if selected_year == year %}selected{% endif %}>{{ year|unlocalize }}</option>
+        {% endfor %}
+    </select>
+</div>

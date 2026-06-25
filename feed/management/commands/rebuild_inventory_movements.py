@@ -5,7 +5,7 @@ from feed.services.inventory_service import InventoryMovementService
 
 
 class Command(BaseCommand):
-    help = "Odbudowuje ruchy magazynowe z dostaw i zakończonych produkcji."
+    help = "Odbudowuje ruchy magazynowe oraz rozliczenia FIFO z dostaw i zakończonych produkcji."
 
     def add_arguments(self, parser):
         parser.add_argument("--farm-id", type=int)

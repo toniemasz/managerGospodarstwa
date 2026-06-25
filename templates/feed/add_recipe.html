@@ -22,6 +22,7 @@
 
         <form method="post" class="responsive-form" id="recipe-form">
             {% csrf_token %}
+            {% include 'components/form_errors.html' with form=form %}
 
             <div class="form-field">
                 <label for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
@@ -68,6 +69,7 @@
                 </div>
                 {% endfor %}
             </div>
+            <p id="ingredient-forms-empty" class="empty-inline" hidden>Brak składników. Dodaj pierwszą pozycję receptury.</p>
 
             <template id="empty-form-template">
                 <div class="ingredient-row-card">

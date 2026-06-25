@@ -12,6 +12,7 @@ from django.core import serializers
 from django.core.management import call_command
 from django.db import transaction
 
+from costs.models import CostCategoryModel, CostModel
 from farms.models import FarmModel, FarmSettingsModel
 from farms.services.settings_service import get_farm_settings
 from feed.models import (
@@ -44,6 +45,8 @@ USER_EXPORT_QUERYSETS = {
     'feed.ProductionModel': lambda farm: ProductionModel.objects.filter(recipe__farm=farm).order_by('id'),
     'sales.PigSaleModel': lambda farm: PigSaleModel.objects.filter(farm=farm).order_by('id'),
     'sales.SaleClassRowModel': lambda farm: SaleClassRowModel.objects.filter(sale__farm=farm).order_by('id'),
+    'costs.CostCategoryModel': lambda farm: CostCategoryModel.objects.filter(farm=farm).order_by('id'),
+    'costs.CostModel': lambda farm: CostModel.objects.filter(farm=farm).order_by('id'),
 }
 
 BUSINESS_MODELS = (
@@ -58,6 +61,8 @@ BUSINESS_MODELS = (
     ProductionModel,
     PigSaleModel,
     SaleClassRowModel,
+    CostCategoryModel,
+    CostModel,
 )
 
 
@@ -185,6 +190,8 @@ def user_business_data_counts(farm: FarmModel) -> dict[str, int]:
         'produkcje': ProductionModel.objects.filter(recipe__farm=farm),
         'sprzedaże': PigSaleModel.objects.filter(farm=farm),
         'wiersze sprzedaży': SaleClassRowModel.objects.filter(sale__farm=farm),
+        'kategorie kosztów': CostCategoryModel.objects.filter(farm=farm),
+        'koszty': CostModel.objects.filter(farm=farm),
     }
     return {label: queryset.count() for label, queryset in querysets.items() if queryset.exists()}
 
@@ -209,6 +216,7 @@ def _restore_user_records(payload, data, farm):
             'default_production_quantity_kg',
             'default_dashboard_period',
             'date_format',
+            'visible_modules',
         }
         for name in allowed_fields:
             if name in settings_records[0]['fields']:
@@ -221,6 +229,7 @@ def _restore_user_records(payload, data, farm):
     ingredient_map = _create_farm_models(data, 'feed.IngredientModel', IngredientModel, farm, counts)
     recipe_map = _create_farm_models(data, 'feed.RecipeModel', RecipeModel, farm, counts)
     sale_map = _create_farm_models(data, 'sales.PigSaleModel', PigSaleModel, farm, counts)
+    cost_category_map = _create_farm_models(data, 'costs.CostCategoryModel', CostCategoryModel, farm, counts)
 
     _create_related_models(data, 'sows.SowEventModel', SowEventModel, 'sow', sow_map, counts)
     _create_related_models(data, 'feed.DeliveryModel', DeliveryModel, 'ingredient', ingredient_map, counts)
@@ -257,6 +266,21 @@ def _restore_user_records(payload, data, farm):
         counts['produkcje'] += 1
 
     _create_related_models(data, 'sales.SaleClassRowModel', SaleClassRowModel, 'sale', sale_map, counts)
+    for record in _records(data, 'costs.CostModel'):
+        fields = _clean_fields(record['fields'], {'farm', 'category', 'created_by'})
+        category_id = record['fields'].get('category')
+        category = _mapped(cost_category_map, category_id, 'kategorie kosztów') if category_id else None
+        created_at = fields.pop('created_at', None)
+        updated_at = fields.pop('updated_at', None)
+        obj = CostModel.objects.create(farm=farm, category=category, created_by=None, **fields)
+        timestamp_values = {}
+        if created_at:
+            timestamp_values['created_at'] = created_at
+        if updated_at:
+            timestamp_values['updated_at'] = updated_at
+        if timestamp_values:
+            CostModel.objects.filter(pk=obj.pk).update(**timestamp_values)
+        counts['koszty'] += 1
     counts['plany szczepień'] += len(plan_map)
     return dict(counts)
 
@@ -268,6 +292,7 @@ def _create_farm_models(data, label, model, farm, counts):
         'feed.IngredientModel': 'składniki',
         'feed.RecipeModel': 'receptury',
         'sales.PigSaleModel': 'sprzedaże',
+        'costs.CostCategoryModel': 'kategorie kosztów',
     }.get(label)
     for record in _records(data, label):
         fields = _clean_fields(record['fields'], {'farm'})
@@ -318,6 +343,7 @@ def _validate_user_records(data):
         'feed.IngredientModel': 'name',
         'feed.RecipeModel': 'name',
         'sales.PigSaleModel': 'document_number',
+        'costs.CostCategoryModel': 'name',
     }
     for label, field_name in unique_names.items():
         values = [str(record['fields'].get(field_name, '')).strip().casefold() for record in _records(data, label)]

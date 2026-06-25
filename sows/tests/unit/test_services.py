@@ -92,3 +92,16 @@ class TestSowDashboardService:
 
         assert result['farrowing_due_count'] == 1
         assert result['farrowing_due_sows'][0]['ear_tag'] == "DUE-1"
+
+    def test_dashboard_reuses_shared_notifications_method(self, mock_repo):
+        service = SowDashboardService(repository=mock_repo)
+        empty_notifications = {
+            'sows_to_check_usg': [],
+            'farrowing_due_sows': [],
+            'farrowing_due_count': 0,
+            'vaccination_groups': {},
+            'vaccinations_due_count': 0,
+        }
+        with patch.object(service, 'get_notifications', return_value=empty_notifications) as notifications:
+            service.get_dashboard_summary()
+        notifications.assert_called_once()

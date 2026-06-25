@@ -1,9 +1,10 @@
 from decimal import Decimal
 from django import forms
+from django.db.models import Sum
 from django.forms import inlineformset_factory
 from django.forms.formsets import DELETION_FIELD_NAME
 from .models import IngredientModel, RecipeModel, RecipeItemModel, DeliveryModel, ProductionModel, \
-    IngredientPriceConfigModel
+    IngredientPriceConfigModel, ProductionIngredientUsageModel
 from feed.domain.rules import LOW_STOCK_THRESHOLD_KG
 
 
@@ -139,8 +140,40 @@ class DeliveryForm(forms.ModelForm):
     def __init__(self, *args, farm=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['quantity_kg'].min_value = Decimal('0.01')
+        self.fields['price_per_kg'].required = True
+        self.fields['price_per_kg'].min_value = Decimal('0.00001')
         if farm is not None:
             self.fields['ingredient'].queryset = IngredientModel.objects.filter(farm=farm).order_by('name')
+        for field in self.fields.values():
+            _apply_widget_class(field)
+
+    def clean_quantity_kg(self):
+        quantity = self.cleaned_data['quantity_kg']
+        if self.instance.pk:
+            allocated = ProductionIngredientUsageModel.objects.filter(
+                delivery=self.instance,
+            ).aggregate(total=Sum('quantity_kg'))['total'] or Decimal('0.00')
+            if quantity < allocated:
+                raise forms.ValidationError(
+                    f"Ta dostawa ma już rozliczone {allocated:.2f} kg w produkcji. "
+                    "Nie można ustawić mniejszej ilości."
+                )
+        return quantity
+
+    def clean(self):
+        cleaned_data = super().clean()
+        ingredient = cleaned_data.get('ingredient')
+        if (
+            self.instance.pk
+            and ingredient is not None
+            and ingredient.pk != self.instance.ingredient_id
+            and ProductionIngredientUsageModel.objects.filter(delivery=self.instance).exists()
+        ):
+            self.add_error(
+                'ingredient',
+                "Nie można zmienić składnika dostawy, która została już rozliczona w produkcji.",
+            )
+        return cleaned_data
 
 
 class InventoryAdjustmentForm(forms.Form):

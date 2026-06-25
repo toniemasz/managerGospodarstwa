@@ -13,6 +13,9 @@ from farms.services.settings_service import get_farm_settings
 from farms.services.task_center import TaskCenterService
 from farms.services.profitability import ProfitabilityAnalyticsService
 from farms.services.date_range import PERIOD_OPTIONS, parse_date_range
+from farms.services.accounting_year import get_available_years, parse_accounting_year
+from farms.services.module_navigation import module_visibility_groups
+from farms.services.filter_ui import filter_ui_state, parse_filter_date
 
 
 @login_required
@@ -61,7 +64,12 @@ def farm_settings_view(request):
         import_form = UserBackupImportForm()
         csv_import_form = CsvImportForm()
 
-    return render(request, 'farms/settings.html', {'form': form, 'import_form': import_form, 'csv_import_form': csv_import_form})
+    return render(request, 'farms/settings.html', {
+        'form': form,
+        'import_form': import_form,
+        'csv_import_form': csv_import_form,
+        'module_visibility_groups': module_visibility_groups(form),
+    })
 
 
 @login_required
@@ -77,7 +85,8 @@ def export_user_data_view(request):
 @login_required
 def export_csv_view(request):
     farm = get_current_farm(request)
-    archive, filename = build_csv_export(farm)
+    accounting_year = parse_accounting_year(request.GET)
+    archive, filename = build_csv_export(farm, year=accounting_year.year)
     log_action(farm=farm, user=request.user, action="CSV_EXPORT", model_label="farms.FarmModel", object_id=farm.pk, object_repr=str(farm))
     response = HttpResponse(archive, content_type="application/zip")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
@@ -87,22 +96,46 @@ def export_csv_view(request):
 @login_required
 def audit_log_view(request):
     farm = get_current_farm(request)
-    logs = AuditLogModel.objects.filter(farm=farm).select_related("user")[:250]
-    return render(request, "farms/audit_log.html", {"logs": logs})
+    logs = AuditLogModel.objects.filter(farm=farm).select_related("user")
+    action = request.GET.get('action', '')
+    date_from = parse_filter_date(request.GET.get('date_from'))
+    date_to = parse_filter_date(request.GET.get('date_to'))
+    if action:
+        logs = logs.filter(action=action)
+    if date_from:
+        logs = logs.filter(created_at__date__gte=date_from)
+    if date_to:
+        logs = logs.filter(created_at__date__lte=date_to)
+    context = {
+        "logs": logs[:250],
+        "audit_actions": AuditLogModel.objects.filter(farm=farm).values_list('action', flat=True).distinct().order_by('action'),
+    }
+    context.update(filter_ui_state(request.GET, {'action': 'Akcja', 'date_from': 'Od', 'date_to': 'Do'}))
+    return render(request, "farms/audit_log.html", context)
 
 
 @login_required
 def task_center_view(request):
     context = TaskCenterService(get_current_farm(request)).get_tasks()
+    active_tab = request.GET.get("tab", "production")
+    if active_tab not in context["tabs"]:
+        active_tab = "production"
+    context["active_tab"] = active_tab
+    context["active_tab_data"] = context["tabs"][active_tab]
     return render(request, "farms/task_center.html", context)
 
 
 @login_required
 def profitability_view(request):
-    date_range = parse_date_range(request.GET, default_period="6m")
+    farm = get_current_farm(request)
+    accounting_year = parse_accounting_year(request.GET)
     context = ProfitabilityAnalyticsService(get_current_farm(request)).calculate(
-        date_from=date_range.date_from,
-        date_to=date_range.date_to,
+        date_from=accounting_year.date_from,
+        date_to=accounting_year.date_to,
     )
-    context.update({"date_filter": date_range, "period_options": PERIOD_OPTIONS})
+    context.update({
+        "selected_year": accounting_year.year,
+        "available_years": get_available_years(farm),
+    })
+    context.update(filter_ui_state(request.GET, {'year': 'Rok'}))
     return render(request, "farms/profitability.html", context)

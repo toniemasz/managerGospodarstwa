@@ -49,9 +49,21 @@ class DeliveryModel(models.Model):
     date = models.DateField(verbose_name="Data dostawy")
     ingredient = models.ForeignKey(IngredientModel, on_delete=models.RESTRICT, related_name='deliveries',
                                    verbose_name="Składnik")
-    quantity_kg = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Ilość (kg)")
+    quantity_kg = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal('0.01'))],
+        verbose_name="Ilość (kg)",
+    )
     price_per_kg = models.DecimalField(max_digits=14, decimal_places=5, verbose_name="Cena za kg", null=True,
                                        blank=True)
+    remaining_quantity_kg = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        verbose_name="Pozostało do rozliczenia FIFO (kg)",
+    )
 
     def __str__(self):
         return f"Dostawa: {self.ingredient.name} - {self.quantity_kg}kg ({self.date})"
@@ -132,6 +144,27 @@ class ProductionModel(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+    feed_cost_total = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Koszt składników paszy",
+    )
+    feed_cost_per_kg = models.DecimalField(
+        max_digits=14,
+        decimal_places=5,
+        default=Decimal('0.00000'),
+        verbose_name="Koszt składników paszy za kg",
+    )
+    feed_cost_is_partial = models.BooleanField(
+        default=False,
+        verbose_name="Koszt składników jest częściowy",
+    )
+    feed_cost_note = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Uwagi do kosztu składników",
+    )
 
     @property
     def status_label(self) -> str:
@@ -140,6 +173,87 @@ class ProductionModel(models.Model):
 
     def __str__(self):
         return f"Śrutowanie: {self.recipe.name} ({self.quantity_kg}kg) - {self.status_label}"
+
+
+class ProductionIngredientUsageModel(models.Model):
+    farm = models.ForeignKey(
+        'farms.FarmModel',
+        on_delete=models.CASCADE,
+        related_name='feed_ingredient_usages',
+        verbose_name="Gospodarstwo",
+    )
+    production = models.ForeignKey(
+        ProductionModel,
+        on_delete=models.CASCADE,
+        related_name='ingredient_usages',
+        verbose_name="Produkcja paszy",
+    )
+    ingredient = models.ForeignKey(
+        IngredientModel,
+        on_delete=models.RESTRICT,
+        related_name='production_usages',
+        verbose_name="Składnik",
+    )
+    delivery = models.ForeignKey(
+        DeliveryModel,
+        on_delete=models.PROTECT,
+        related_name='production_usages',
+        null=True,
+        blank=True,
+        verbose_name="Dostawa FIFO",
+    )
+    quantity_kg = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal('0.01'))],
+        verbose_name="Zużyta ilość (kg)",
+    )
+    unit_price = models.DecimalField(
+        max_digits=14,
+        decimal_places=5,
+        default=Decimal('0.00000'),
+        verbose_name="Cena jednostkowa",
+    )
+    cost = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Koszt",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ('production_id', 'ingredient__name', 'delivery__date', 'delivery_id', 'id')
+        constraints = [
+            models.UniqueConstraint(
+                fields=('production', 'ingredient', 'delivery'),
+                name='unique_fifo_usage_per_delivery',
+            ),
+            models.CheckConstraint(
+                condition=Q(quantity_kg__gt=0),
+                name='fifo_usage_quantity_positive',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=('farm', 'ingredient', 'production'), name='fifo_usage_farm_ing_prod_idx'),
+            models.Index(fields=('delivery',), name='fifo_usage_delivery_idx'),
+        ]
+        verbose_name = "Rozliczenie składnika FIFO"
+        verbose_name_plural = "Rozliczenia składników FIFO"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        if self.production_id and self.farm_id != self.production.recipe.farm_id:
+            raise ValidationError("Produkcja nie należy do wskazanego gospodarstwa.")
+        if self.ingredient_id and self.farm_id != self.ingredient.farm_id:
+            raise ValidationError("Składnik nie należy do wskazanego gospodarstwa.")
+        if self.delivery_id and self.delivery.ingredient_id != self.ingredient_id:
+            raise ValidationError("Dostawa FIFO dotyczy innego składnika.")
+
+    def __str__(self):
+        delivery_label = f"z dostawy {self.delivery_id}" if self.delivery_id else "bez przypisanej dostawy"
+        return f"{self.production}: {self.ingredient.name} {self.quantity_kg} kg {delivery_label}"
 
 
 class InventoryMovementModel(models.Model):

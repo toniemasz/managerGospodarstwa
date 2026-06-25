@@ -17,6 +17,7 @@ class PigSaleEntity:
     live_weight: Decimal | None = None
     dressing_percentage: Decimal | None = None
     net_value: Decimal = Decimal('0.00')
+    vat_value: Decimal = Decimal('0.00')
     gross_value: Decimal = Decimal('0.00')
 
     @property

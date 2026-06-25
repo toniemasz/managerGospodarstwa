@@ -1,10 +1,144 @@
 {% extends 'base.html' %}
+{% load l10n %}
 {% block title %}Analityka opłacalności{% endblock %}
 {% block content %}
 <main class="app-page">
-<section class="page-header"><div><p class="eyebrow">Finanse</p><h1>Analityka opłacalności</h1><p class="page-subtitle">Sprzedaż i koszt paszy w wybranym okresie.</p></div></section>
-<form method="get" class="panel compact-panel"><select name="period" class="form-control">{% for key,label in period_options %}<option value="{{ key }}" {% if date_filter.period == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select><button class="button button-secondary">Filtruj</button></form>
-<section class="stats-grid"><div class="stat-tile"><span>Sprzedaż brutto</span><strong>{{ gross_sales|floatformat:2 }} zł</strong></div><div class="stat-tile"><span>Sprzedaż netto</span><strong>{{ net_sales|floatformat:2 }} zł</strong></div><div class="stat-tile"><span>Sprzedane sztuki</span><strong>{{ sold_quantity }}</strong></div><div class="stat-tile"><span>Średnia cena/kg</span><strong>{{ average_price_per_kg|floatformat:2 }} zł</strong></div><div class="stat-tile"><span>Wyprodukowana pasza</span><strong>{{ feed_quantity_kg|floatformat:2 }} kg</strong></div><div class="stat-tile"><span>Szacowany koszt paszy</span><strong>{{ feed_cost|floatformat:2 }} zł</strong></div><div class="stat-tile"><span>Koszt paszy/t</span><strong>{{ feed_cost_per_ton|floatformat:2 }} zł</strong></div></section>
-<section class="module-grid"><div class="panel"><h2>Najdroższe receptury</h2>{% for item in recipe_ranking %}<p>{{ forloop.counter }}. {{ item.recipe_name }} — {{ item.cost_per_ton|floatformat:2 }} zł/t</p>{% empty %}<p>Brak danych.</p>{% endfor %}</div><div class="panel"><h2>Produkcja i sprzedaż w czasie</h2>{% for row in timeline %}<p>{{ row.month }} — produkcja {{ row.production_kg|floatformat:0 }} kg, sprzedaż netto {{ row.sales_net|floatformat:2 }} zł</p>{% empty %}<p>Brak danych.</p>{% endfor %}</div></section>
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Finanse</p>
+            <h1>Opłacalność — {{ selected_year|unlocalize }}</h1>
+            <p class="page-subtitle">Przychody ze sprzedaży minus rzeczywisty koszt zakończonych śrutowań i dodatkowe koszty.</p>
+        </div>
+        <div class="header-actions">
+            <a href="{% url 'cost_list' %}?year={{ selected_year|unlocalize }}" class="button button-secondary">Koszty</a>
+        </div>
+    </section>
+
+    {% url 'profitability' as profitability_filter_url %}
+    {% include 'components/filter_panel.html' with filter_action=profitability_filter_url filter_clear_url=profitability_filter_url filter_fields_template='farms/_profitability_filters.html' %}
+
+    <section class="finance-section">
+        <div class="section-heading">
+            <div><h2>Podsumowanie roku</h2><p>Wynik obejmuje sprzedaż, koszt paszy i ręcznie zarejestrowane koszty.</p></div>
+        </div>
+        <div class="stats-grid">
+            <div class="stat-tile"><span>Sprzedaż netto</span><strong>{{ net_sales|floatformat:2 }} zł</strong></div>
+            <div class="stat-tile"><span>Sprzedaż brutto</span><strong>{{ gross_sales|floatformat:2 }} zł</strong></div>
+            <div class="stat-tile"><span>Koszt paszy</span><strong>{{ feed_cost|floatformat:2 }} zł</strong></div>
+            <div class="stat-tile"><span>Koszty dodatkowe</span><strong>{{ additional_cost|floatformat:2 }} zł</strong></div>
+            <div class="stat-tile result-tile {% if net_result < 0 %}is-negative{% else %}is-positive{% endif %}">
+                <span>Wynik netto</span><strong>{{ net_result|floatformat:2 }} zł</strong>
+            </div>
+            <div class="stat-tile result-tile {% if gross_result < 0 %}is-negative{% else %}is-positive{% endif %}">
+                <span>Wynik brutto</span><strong>{{ gross_result|floatformat:2 }} zł</strong>
+            </div>
+        </div>
+    </section>
+
+    <section class="finance-section">
+        <div class="section-heading">
+            <div><h2>Produkcja i sprzedaż</h2><p>Produkcje są przypisywane do roku według daty produkcji.</p></div>
+        </div>
+        <div class="stats-grid">
+            <div class="stat-tile"><span>Sprzedane sztuki</span><strong>{{ sold_quantity }}</strong></div>
+            <div class="stat-tile"><span>Waga żywa</span><strong>{{ live_weight_kg|floatformat:0 }} kg</strong></div>
+            <div class="stat-tile"><span>Waga poubojowa</span><strong>{{ slaughter_weight_kg|floatformat:0 }} kg</strong></div>
+            <div class="stat-tile"><span>Uśrutowana pasza</span><strong>{{ feed_quantity_kg|floatformat:0 }} kg</strong></div>
+            <div class="stat-tile"><span>Średni koszt paszy/kg</span><strong>{{ feed_cost_per_kg|floatformat:4 }} zł</strong></div>
+            <div class="stat-tile"><span>Średni koszt paszy/t</span><strong>{{ feed_cost_per_ton|floatformat:2 }} zł</strong></div>
+        </div>
+    </section>
+
+    <section class="finance-section">
+        <div class="section-heading">
+            <div><h2>Wskaźniki na wagę żywą</h2><p>Wskaźniki są dostępne, gdy sprzedaże mają uzupełnioną wagę żywą.</p></div>
+        </div>
+        {% if feed_to_live_weight_ratio != None %}
+        <div class="stats-grid">
+            <div class="stat-tile">
+                <span>Pasza / waga żywa</span><strong>{{ feed_to_live_weight_ratio|floatformat:3 }} t/t</strong>
+                <small>Tony paszy na tonę sprzedanej wagi żywej.</small>
+            </div>
+            <div class="stat-tile"><span>Koszt paszy/kg żywej</span><strong>{{ feed_cost_per_live_kg|floatformat:2 }} zł</strong></div>
+            <div class="stat-tile"><span>Koszt całkowity/kg żywej</span><strong>{{ total_cost_per_live_kg|floatformat:2 }} zł</strong></div>
+            <div class="stat-tile"><span>Sprzedaż brutto/kg żywej</span><strong>{{ gross_per_live_kg|floatformat:2 }} zł</strong></div>
+        </div>
+        {% else %}
+            {% include 'components/empty_state.html' with empty_title='Brak wagi żywej' empty_message='Uzupełnij wagę żywą w dokumentach sprzedaży, aby zobaczyć wskaźniki produkcyjne.' %}
+        {% endif %}
+    </section>
+
+    <section class="finance-grid">
+        <div class="panel">
+            <div class="section-heading"><div><h2>Najdroższe receptury</h2><p>Ranking ważony rzeczywistą ilością zakończonych produkcji.</p></div></div>
+            <div class="panel-list">
+                {% for item in recipe_ranking %}
+                <div class="summary-row"><span>{{ item.recipe_name }}<small>{{ item.quantity_kg|floatformat:0 }} kg</small></span><strong>{{ item.cost_per_ton|floatformat:2 }} zł/t</strong></div>
+                {% empty %}
+                    {% include 'components/empty_state.html' with empty_message='Brak zakończonych produkcji w tym roku.' %}
+                {% endfor %}
+            </div>
+        </div>
+        <div class="panel">
+            <div class="section-heading"><div><h2>Kategorie kosztów</h2><p>Największe koszty dodatkowe.</p></div></div>
+            <div class="panel-list">
+                {% for item in additional_cost_categories %}
+                <div class="summary-row"><span>{{ item.category__name|default:'Bez kategorii' }}</span><strong>{{ item.total|floatformat:2 }} zł</strong></div>
+                {% empty %}
+                    {% include 'components/empty_state.html' with empty_message='Brak dodatkowych kosztów w tym roku.' %}
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <section class="panel chart-panel">
+        <div class="section-heading"><div><h2>Przebieg miesięczny</h2><p>Sprzedaż netto, wszystkie koszty i wynik netto.</p></div></div>
+        <div class="chart-box">
+            {{ chart_labels|json_script:"profit-chart-labels" }}
+            {{ chart_datasets|json_script:"profit-chart-datasets" }}
+            <canvas data-chart-type="line" data-chart-labels-id="profit-chart-labels" data-chart-datasets-id="profit-chart-datasets" role="img" aria-label="Miesięczny wykres sprzedaży, kosztów i wyniku"></canvas>
+            <p class="chart-empty" data-chart-message hidden></p>
+        </div>
+    </section>
+
+    <section class="panel table-panel">
+        <div class="section-heading"><div><h2>Miesięczne zestawienie</h2><p>Sprzedaż, koszty i wynik finansowy miesiąc po miesiącu.</p></div></div>
+        {% if timeline %}
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead><tr><th>Miesiąc</th><th class="text-right">Sprzedaż netto</th><th class="text-right">Koszt paszy</th><th class="text-right">Inne koszty</th><th class="text-right">Wynik netto</th></tr></thead>
+                <tbody>
+                    {% for row in timeline %}
+                    <tr>
+                        <td>{{ row.month }}</td><td class="text-right">{{ row.sales_net|floatformat:2 }} zł</td><td class="text-right">{{ row.feed_cost|floatformat:2 }} zł</td><td class="text-right">{{ row.additional_cost|floatformat:2 }} zł</td>
+                        <td class="text-right {% if row.result_net < 0 %}value-negative{% else %}value-positive{% endif %}"><strong>{{ row.result_net|floatformat:2 }} zł</strong></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            {% include 'components/empty_state.html' with empty_message='Brak danych finansowych dla wybranego roku.' %}
+        {% endif %}
+    </section>
+
+    <section class="panel table-panel">
+        <div class="section-heading"><div><h2>Produkcje zaliczone do kosztu paszy</h2><p>Tylko zakończone śrutowania, przypisane według daty produkcji.</p></div></div>
+        {% if production_details %}
+        <div class="table-scroll">
+            <table class="data-table mobile-card-table">
+                <thead><tr><th>Data</th><th>Receptura</th><th class="text-right">Ilość</th><th class="text-right">Koszt/kg</th><th class="text-right">Koszt łączny</th></tr></thead>
+                <tbody>
+                    {% for item in production_details %}
+                    <tr><td data-label="Data">{{ item.date|date:'d.m.Y' }}</td><td data-label="Receptura">{{ item.recipe_name }}</td><td data-label="Ilość" class="text-right">{{ item.quantity_kg|floatformat:0 }} kg</td><td data-label="Koszt/kg" class="text-right">{{ item.cost_per_kg|floatformat:4 }} zł</td><td data-label="Koszt łączny" class="text-right"><strong>{{ item.total_cost|floatformat:2 }} zł</strong></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            {% include 'components/empty_state.html' with empty_message='Brak zakończonych śrutowań w wybranym roku.' %}
+        {% endif %}
+    </section>
 </main>
 {% endblock %}
+{% block scripts %}<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>{% endblock %}

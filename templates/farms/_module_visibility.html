@@ -1,0 +1,40 @@
+<section class="form-section">
+    <div class="form-section-heading">
+        <h2>Widoczność modułów</h2>
+        <p>Wybierz moduły dostępne w aplikacji oraz te, które mają być przypięte bezpośrednio na górnym pasku.</p>
+    </div>
+    <div class="module-visibility-groups">
+        {% for group in module_visibility_groups %}
+        <fieldset class="module-visibility-group">
+            <legend>{{ group.title }}</legend>
+            {% for item in group.fields %}
+                {% if item.field %}
+                <div class="module-settings-card">
+                    <label class="module-toggle">
+                        {{ item.field }}
+                        <span class="module-toggle-copy">
+                            <strong>{{ item.field.label }}</strong>
+                            <small>{{ item.description }}</small>
+                        </span>
+                    </label>
+                    <label class="module-nav-toggle">
+                        {{ item.nav_field }}
+                        <span>Pokaż na pasku nawigacji</span>
+                    </label>
+                </div>
+                {% else %}
+                <div class="module-settings-card is-locked">
+                    <div class="module-toggle is-locked">
+                    <input type="checkbox" checked disabled aria-label="Ustawienia zawsze widoczne">
+                        <span class="module-toggle-copy">
+                            <strong>{{ item.title }}</strong>
+                            <small>{{ item.description }} Zawsze dostępne w menu gospodarstwa.</small>
+                        </span>
+                    </div>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </fieldset>
+        {% endfor %}
+    </div>
+</section>

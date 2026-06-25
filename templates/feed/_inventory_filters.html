@@ -1,0 +1,3 @@
+<div class="filter-field"><label for="movement-type">Typ ruchu</label><select id="movement-type" name="movement_type"><option value="">Wszystkie</option>{% for value, label in movement_types %}<option value="{{ value }}" {% if request.GET.movement_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+<div class="filter-field"><label for="movement-date-from">Od</label><input id="movement-date-from" type="date" name="date_from" value="{{ request.GET.date_from }}"></div>
+<div class="filter-field"><label for="movement-date-to">Do</label><input id="movement-date-to" type="date" name="date_to" value="{{ request.GET.date_to }}"></div>
