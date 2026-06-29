@@ -34,12 +34,33 @@
         </div>
     </section>
 
-    <section class="panel">
-        <form method="post" class="responsive-form">
-            {% csrf_token %}
-            {% include 'components/form_errors.html' with form=form %}
+    <section class="settings-layout">
+        <aside class="settings-side">
+            <section class="panel">
+                <nav class="settings-index" aria-label="Sekcje ustawień">
+                    <a href="#settings-profile">Profil <span>›</span></a>
+                    <a href="#settings-modules">Moduły <span>›</span></a>
+                    <a href="#settings-sows">Maciory i alerty <span>›</span></a>
+                    <a href="#settings-feed">Pasze <span>›</span></a>
+                    <a href="#settings-data">Dane <span>›</span></a>
+                </nav>
+            </section>
+            <section class="panel settings-profile-card">
+                <span class="settings-avatar">{{ request.user.username|slice:":2"|upper }}</span>
+                <div>
+                    <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
+                    <span>Użytkownik gospodarstwa</span>
+                </div>
+            </section>
+        </aside>
 
-            <div class="form-section">
+        <div class="settings-main">
+            <section class="panel">
+                <form method="post" class="responsive-form">
+                    {% csrf_token %}
+                    {% include 'components/form_errors.html' with form=form %}
+
+            <div class="form-section" id="settings-profile">
                 <div class="section-heading">
                     <div>
                         <h2>Dane gospodarstwa</h2>
@@ -54,7 +75,7 @@
 
             {% include 'farms/_module_visibility.html' %}
 
-            <div class="form-section">
+            <div class="form-section" id="settings-sows">
                 <div class="section-heading">
                     <div>
                         <h2>Maciory i alerty</h2>
@@ -92,7 +113,7 @@
                 </label>
             </div>
 
-            <div class="form-section">
+            <div class="form-section" id="settings-feed">
                 <div class="section-heading">
                     <div>
                         <h2>Pasze</h2>
@@ -111,10 +132,12 @@
             <div class="form-actions settings-save-bar">
                 <button type="submit" class="button button-primary">Zapisz ustawienia</button>
             </div>
-        </form>
+                </form>
+            </section>
+        </div>
     </section>
 
-    <section class="settings-admin-grid">
+    <section class="settings-admin-grid" id="settings-data">
         <article class="panel compact-panel">
             <div class="section-heading">
                 <div>

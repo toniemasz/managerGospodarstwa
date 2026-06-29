@@ -8,10 +8,10 @@
     gap: .4rem;
     border: 1px solid transparent;
     border-radius: var(--radius);
-    padding: .65rem .95rem;
+    padding: .65rem 1rem;
     color: inherit;
     font-size: .875rem;
-    font-weight: 900;
+    font-weight: 850;
     line-height: 1;
     text-align: center;
     transition: background .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease, transform .18s ease;
@@ -30,7 +30,7 @@
 .button-primary {
     background: var(--primary);
     color: #fff;
-    box-shadow: 0 8px 18px rgba(35, 100, 170, .18);
+    box-shadow: 0 8px 18px rgba(0, 108, 73, .18);
 }
 
 .button-primary:hover {
@@ -40,11 +40,11 @@
 .button-secondary {
     border-color: var(--border);
     background: #fff;
-    color: #31465a;
+    color: var(--muted);
 }
 
 .button-secondary:hover {
-    border-color: #a9caee;
+    border-color: rgba(0, 108, 73, .22);
     background: var(--primary-soft);
     color: var(--primary);
 }
@@ -77,15 +77,16 @@
     align-items: center;
     justify-content: center;
     border-radius: var(--radius);
-    background: #edf2ff;
-    padding: .45rem .65rem;
-    color: #2f419b;
+    border: 1px solid rgba(0, 108, 73, .18);
+    background: var(--primary-soft);
+    padding: .45rem .7rem;
+    color: var(--primary-dark);
     font-size: .8rem;
     font-weight: 900;
 }
 
 .table-link:hover {
-    background: #dfe7ff;
+    background: #d8f1e6;
 }
 
 .table-card {
@@ -164,7 +165,7 @@
 }
 
 .mini-button:hover {
-    border-color: #a9caee;
+    border-color: rgba(0, 108, 73, .22);
     background: var(--primary-soft);
     color: var(--primary);
 }
@@ -214,7 +215,7 @@
 }
 
 .pagination-button:hover:not(.is-disabled):not(.is-active) {
-    border-color: #a9caee;
+    border-color: rgba(0, 108, 73, .22);
     background: var(--primary-soft);
     color: var(--primary);
 }
@@ -223,7 +224,7 @@
     border-color: var(--primary);
     background: var(--primary);
     color: #fff;
-    box-shadow: 0 8px 18px rgba(35, 100, 170, .18);
+    box-shadow: 0 8px 18px rgba(0, 108, 73, .18);
 }
 
 .pagination-button.is-disabled {
@@ -242,5 +243,4 @@
     color: var(--primary);
     font-weight: 900;
 }
-
 

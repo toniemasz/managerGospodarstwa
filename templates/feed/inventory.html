@@ -15,6 +15,49 @@
         </div>
     </section>
 
+    {% include 'feed/_feed_nav.html' %}
+
+    <section class="inventory-dashboard">
+        <div class="inventory-main">
+            <section class="stats-grid featured-stats compact-stats">
+                <a href="{% url 'feed_full_inventory' %}" class="stat-tile stat-link is-success">
+                    <span>Łączny stan magazynu</span>
+                    <strong>{{ total_inventory_t|floatformat:2 }} t</strong>
+                    <small>Pełny widok surowców i progów alarmowych.</small>
+                </a>
+                <div class="stat-tile{% if low_stock_alerts %} is-danger{% endif %}">
+                    <span>Niskie stany</span>
+                    <strong>{{ low_stock_alerts|length }}</strong>
+                    <small>{% if low_stock_alerts %}Wymagają kontroli lub dostawy.{% else %}Brak aktywnych alertów magazynowych.{% endif %}</small>
+                </div>
+                <div class="stat-tile">
+                    <span>Dostawy w historii</span>
+                    <strong>{{ deliveries|length }}</strong>
+                    <small>Ostatnie przyjęcia surowców na magazyn.</small>
+                </div>
+            </section>
+        </div>
+
+        <aside class="inventory-side">
+            <section class="side-summary-card {% if low_stock_alerts %}is-tinted{% endif %}">
+                <h2>Alerty magazynowe</h2>
+                {% if low_stock_alerts %}
+                    <ul class="inventory-alert-list">
+                        {% for alert in low_stock_alerts %}
+                        <li>
+                            <strong>{{ alert.name }}</strong>
+                            <span>{{ alert.current_stock|floatformat:0 }} kg / próg {{ alert.low_stock_threshold_kg|floatformat:0 }} kg</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    <a href="{% url 'feed_full_inventory' %}" class="button button-secondary">Pełny magazyn</a>
+                {% else %}
+                    <p>Stany surowców są powyżej progów alarmowych.</p>
+                {% endif %}
+            </section>
+        </aside>
+    </section>
+
     {% url 'feed_inventory' as inventory_filter_url %}{% include 'components/filter_panel.html' with filter_action=inventory_filter_url filter_clear_url=inventory_filter_url filter_fields_template='feed/_inventory_filters.html' %}
 
     <section class="panel table-panel">
@@ -36,37 +79,6 @@
             </table>
         </div>
     </section>
-
-    {% include 'feed/_feed_nav.html' %}
-
-    <section class="stats-grid">
-        <a href="{% url 'feed_full_inventory' %}" class="stat-tile stat-link">
-            <span>Łączny stan magazynu</span>
-            <strong>{{ total_inventory_t|floatformat:2 }} t</strong>
-        </a>
-        <div class="stat-tile">
-            <span>Niskie stany</span>
-            <strong>{{ low_stock_alerts|length }}</strong>
-        </div>
-        <div class="stat-tile">
-            <span>Dostawy</span>
-            <strong>{{ deliveries|length }}</strong>
-        </div>
-    </section>
-
-    {% if low_stock_alerts %}
-    <section class="notice notice-danger">
-        <div>
-            <h2>Niski stan surowców</h2>
-            <p>
-                {% for alert in low_stock_alerts %}
-                    {{ alert.name }}: {{ alert.current_stock|floatformat:0 }} kg / próg {{ alert.low_stock_threshold_kg|floatformat:0 }} kg{% if not forloop.last %}, {% endif %}
-                {% endfor %}
-            </p>
-        </div>
-        <a href="{% url 'feed_full_inventory' %}" class="button button-secondary">Pełny magazyn</a>
-    </section>
-    {% endif %}
 
     <section class="panel table-panel">
         <div class="section-heading">

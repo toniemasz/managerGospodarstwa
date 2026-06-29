@@ -59,7 +59,8 @@
         </div>
     </section>
 
-    <section class="detail-layout">
+    <section class="recipe-detail-grid">
+        <div class="recipe-detail-main">
         <div class="panel">
             <div class="section-heading">
                 <div>
@@ -100,15 +101,16 @@
                 </table>
             </div>
         </div>
+        </div>
 
-        <aside class="panel">
+        <aside class="panel panel-tint recipe-detail-side">
             <div class="section-heading">
                 <div>
                     <h2>Statystyki</h2>
                     <p>Podsumowanie wszystkich śrutowań tej receptury.</p>
                 </div>
             </div>
-            <dl class="summary-list">
+            <dl class="summary-list is-carded">
                 <div>
                     <dt>Wszystkie zlecenia</dt>
                     <dd>{{ stats.total_count }}</dd>

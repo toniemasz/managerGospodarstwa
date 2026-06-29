@@ -21,7 +21,7 @@
 </head>
 <body>
     <a href="#main-content" class="skip-link">Przejdź do treści</a>
-    <div class="site-shell">
+    <div class="site-shell{% if user.is_authenticated %} has-app-nav{% endif %}">
         {% if user.is_authenticated %}
             {% include 'components/topbar.html' %}
         {% endif %}

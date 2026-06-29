@@ -1,10 +1,6 @@
 /* responsive.css - wydzielone style aplikacji. */
 
 @media (min-width: 640px) {
-    .stats-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
     .year-summary-panel {
         grid-template-columns: minmax(0, 1fr) minmax(10rem, 14rem);
     }
@@ -41,51 +37,55 @@
 }
 
 @media (min-width: 1024px) {
-    .stats-grid {
-        grid-template-columns: repeat(5, minmax(0, 1fr));
-    }
-
     .calculator-layout,
     .detail-layout,
     .sale-document-layout {
         grid-template-columns: minmax(0, 1fr) 22rem;
         align-items: start;
     }
+
+    .dashboard-grid {
+        grid-template-columns: minmax(0, 2fr) minmax(20rem, .95fr);
+        align-items: start;
+    }
+
+    .record-layout,
+    .recipe-detail-grid,
+    .inventory-dashboard {
+        grid-template-columns: minmax(0, 1fr) minmax(19rem, 22rem);
+        align-items: start;
+    }
+
+    .settings-layout {
+        grid-template-columns: minmax(15rem, 19rem) minmax(0, 1fr);
+        align-items: start;
+    }
+
+    .record-hero {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
 }
 
 @media (max-width: 1180px) {
-    .topbar {
-        grid-template-columns: minmax(9rem, 1fr) minmax(0, 27rem) auto;
-        gap: .75rem;
-    }
-
-    .main-nav {
-        max-width: 27rem;
-    }
-
     .username {
         display: none;
     }
 
-    .account-menu-trigger {
+    .topbar .account-menu-trigger {
         grid-template-columns: auto;
         padding: .3rem;
     }
 
-    .account-copy {
+    .topbar .account-copy {
         display: none;
+    }
+
+    .sidebar-account .account-copy {
+        display: grid;
     }
 }
 
 @media (max-width: 900px) {
-    .topbar {
-        grid-template-columns: minmax(0, 1fr) auto;
-    }
-
-    .main-nav {
-        display: none;
-    }
-
     .user-menu {
         gap: .5rem;
     }
@@ -113,6 +113,7 @@
 
     .mobile-nav-link {
         display: inline-flex;
+        flex-direction: column;
         min-height: 2.65rem;
         min-width: 4.35rem;
         flex: 1 0 auto;
@@ -123,7 +124,30 @@
     }
 
     body {
-        padding-bottom: 4.75rem;
+        padding-bottom: 5.75rem;
+    }
+}
+
+@media (min-width: 901px) {
+    .desktop-sidebar {
+        display: flex;
+    }
+
+    .topbar {
+        left: var(--sidebar-width);
+        padding-inline: 1.5rem;
+    }
+
+    .mobile-brand {
+        display: none;
+    }
+
+    .topbar-context {
+        display: block;
+    }
+
+    .topbar-action {
+        display: inline-flex;
     }
 }
 
@@ -158,7 +182,6 @@
         padding: .75rem;
     }
 
-    .page-header,
     .compact-panel,
     .responsive-form,
     .quick-actions-grid {
@@ -166,12 +189,14 @@
     }
 
     .header-actions,
+    .page-actions,
     .form-actions {
         width: 100%;
         justify-content: stretch;
     }
 
     .header-actions .button,
+    .page-actions .button,
     .form-actions .button,
     .form-actions a,
     .form-actions button {
@@ -280,7 +305,11 @@
     }
 
     .task-summary-grid,
-    .module-visibility-groups {
+    .module-visibility-groups,
+    .settings-layout,
+    .record-layout,
+    .recipe-detail-grid,
+    .inventory-dashboard {
         grid-template-columns: 1fr;
     }
 

@@ -5,10 +5,17 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models.deletion import ProtectedError, RestrictedError
 from django.utils import timezone
-from decimal import Decimal, InvalidOperation
 
 from .models import RecipeModel, ProductionModel, IngredientModel, DeliveryModel
-from .forms import IngredientForm, RecipeForm, RecipeItemFormSet, DeliveryForm, ProductionForm, InventoryAdjustmentForm
+from .forms import (
+    CalculatorPriceForm,
+    DeliveryForm,
+    IngredientForm,
+    InventoryAdjustmentForm,
+    ProductionForm,
+    RecipeForm,
+    RecipeItemFormSet,
+)
 from .services.feed_management_service import FeedManagementService
 from .services.feed_repository import FeedRepository
 from farms.services.current_farm import get_current_farm
@@ -416,18 +423,32 @@ def process_stage2_view(request, pk):
 def feed_calculator_view(request):
     farm = get_current_farm(request)
     service = FeedManagementService(farm=farm)
+    ingredients = list(service.repository.get_all_ingredients())
+    base_prices = service.repository.get_latest_delivery_prices_map()
+    price_form = CalculatorPriceForm(
+        request.POST or None,
+        ingredients=ingredients,
+        prices=base_prices,
+    )
 
     overrides = {}
     if request.method == 'POST':
-        overrides = _parse_calculator_overrides(request.POST)
-        messages.success(request, "Przeliczono koszt paszy dla podanych cen.")
+        if price_form.is_valid():
+            overrides = price_form.price_overrides()
+            messages.success(request, "Przeliczono koszt paszy dla podanych cen.")
+        else:
+            messages.error(request, "Nie przeliczono kosztu paszy. Popraw oznaczone ceny składników.")
 
     costs = service.get_recipe_costs(price_overrides=overrides)
     ingredient_prices = service.get_calculator_price_rows(overrides=overrides)
+    for row in ingredient_prices:
+        field_name = CalculatorPriceForm.field_name_for_ingredient(row['ingredient'].id)
+        row['field'] = price_form[field_name]
 
     return render(request, 'feed/calculator.html', {
         'costs': costs,
         'ingredient_prices': ingredient_prices,
+        'price_form': price_form,
     })
 
 
@@ -464,20 +485,3 @@ def inventory_adjustment_view(request):
         "title": "Korekta stanu magazynowego",
         "back_url": "feed_inventory",
     })
-
-
-def _parse_calculator_overrides(post_data) -> dict[int, Decimal]:
-    overrides = {}
-    for key, value in post_data.items():
-        if not key.startswith('price_'):
-            continue
-        ingredient_id = key.removeprefix('price_')
-        if not ingredient_id.isdigit():
-            continue
-        normalized = (value or '0').replace(',', '.').strip()
-        try:
-            price = Decimal(normalized or '0')
-        except InvalidOperation:
-            price = Decimal('0.00')
-        overrides[int(ingredient_id)] = price
-    return overrides

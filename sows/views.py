@@ -26,6 +26,7 @@ from .models import SowModel, SowEventModel
 from farms.services.current_farm import get_current_farm
 from farms.services.date_range import PERIOD_OPTIONS, parse_date_range
 from farms.services.audit_log_service import log_action
+from sows.domain.event_details import initial_data_from_event_details
 
 logger = logging.getLogger(__name__)
 
@@ -343,7 +344,11 @@ def edit_event_view(request, event_id):
             log_action(farm=farm, user=request.user, action="UPDATE", obj=event)
             return redirect('sow_detail', sow_id=sow_id)
     else:
-        initial_data = _get_event_initial_data(db_event)
+        try:
+            initial_data = _get_event_initial_data(db_event)
+        except ValidationError as error:
+            messages.error(request, error.messages[0])
+            initial_data = {}
         form = SowEventForm(instance=db_event, initial=initial_data, farm=farm)
 
     return render(request, 'sows/add_event.html', {
@@ -448,14 +453,4 @@ def _create_vaccination_events(sow_ids: list, vaccine_name: str, cycle_id: str, 
 
 def _get_event_initial_data(db_event: SowEventModel) -> dict:
     """Przygotowuje dane początkowe formularza na podstawie typu zdarzenia."""
-    event_details_mapping = {
-        'INSEMINATION': {'technician': db_event.details.get('technician', '')},
-        'PREGNANCY_CHECK': {'pregnancy_result': db_event.details.get('result', '')},
-        'FARROWING': {
-            'born_alive': db_event.details.get('born_alive', 0),
-            'born_dead': db_event.details.get('born_dead', 0)
-        },
-        'WEANING': {'count': db_event.details.get('count', 0)},
-        'VACCINATION': {'vaccine_name': db_event.details.get('vaccine_name', '')},
-    }
-    return event_details_mapping.get(db_event.event_type, {})
+    return initial_data_from_event_details(db_event.event_type, db_event.details)

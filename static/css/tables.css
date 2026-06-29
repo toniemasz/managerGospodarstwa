@@ -13,12 +13,12 @@ table,
     min-width: 720px;
     border-collapse: separate;
     border-spacing: 0;
-    color: #31465a;
+    color: var(--text);
     font-size: .875rem;
 }
 
 .table-panel {
-    border-color: #cfdcd7;
+    border-color: var(--border);
 }
 
 .table-panel .table-scroll {
@@ -31,7 +31,7 @@ table,
 }
 
 thead {
-    background: #f5f8f6;
+    background: var(--surface-muted);
 }
 
 th {
@@ -39,7 +39,7 @@ th {
     top: 0;
     z-index: 1;
     white-space: nowrap;
-    border-bottom: 1px solid #cfdcd7;
+    border-bottom: 1px solid var(--border);
     padding: .85rem 1rem;
     color: var(--muted);
     font-size: .72rem;
@@ -50,17 +50,17 @@ th {
 }
 
 td {
-    border-bottom: 1px solid #edf2ef;
+    border-bottom: 1px solid #edf2f7;
     padding: .9rem 1rem;
     vertical-align: middle;
 }
 
 tbody tr:nth-child(even) {
-    background: rgba(248, 250, 252, .7);
+    background: rgba(248, 250, 252, .72);
 }
 
 tbody tr:hover {
-    background: #edf7f5;
+    background: var(--primary-soft);
 }
 
 tbody tr:last-child td {
@@ -81,7 +81,7 @@ tbody tr:last-child td {
     align-items: center;
     justify-content: center;
     border-radius: var(--radius);
-    border: 1px solid #c7dedf;
+    border: 1px solid rgba(0, 108, 73, .18);
     background: var(--primary-soft);
     padding: .45rem .65rem;
     color: var(--primary-dark);
@@ -90,7 +90,7 @@ tbody tr:last-child td {
 }
 
 .table-link:hover {
-    background: #d5eaed;
+    background: #d8f1e6;
 }
 
 .table-card {
@@ -278,4 +278,3 @@ tbody tr:last-child td {
 .is-hidden-by-table-manager {
     display: none !important;
 }
-

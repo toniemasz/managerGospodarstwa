@@ -8,7 +8,7 @@
     <section class="page-header">
         <div>
             <p class="eyebrow">Maciory</p>
-            <h1>Przegląd stada</h1>
+            <h1>Lista macior</h1>
             <p class="page-subtitle">Lista, statusy, szczepienia i archiwum bieżącego gospodarstwa.</p>
         </div>
         <div class="header-actions">
@@ -21,22 +21,26 @@
         </div>
     </section>
 
-    <section class="stats-grid">
-        <div class="stat-tile">
+    <section class="stats-grid featured-stats compact-stats">
+        <div class="stat-tile is-success">
             <span>W stadzie</span>
             <strong>{{ total_sows }}</strong>
+            <small>Aktywne maciory w bieżącym gospodarstwie.</small>
         </div>
         <div class="stat-tile">
             <span>Prośne</span>
             <strong>{{ pregnant_count }}</strong>
+            <small>Monitorowane w cyklu rozrodczym.</small>
         </div>
-        <div class="stat-tile">
+        <div class="stat-tile{% if inseminated_count %} is-warning{% endif %}">
             <span>Po inseminacji</span>
             <strong>{{ inseminated_count }}</strong>
+            <small>Do dalszej kontroli według harmonogramu.</small>
         </div>
-        <div class="stat-tile">
+        <div class="stat-tile{% if sows_to_check_usg %} is-danger{% endif %}">
             <span>Do badania</span>
             <strong>{{ sows_to_check_usg|length }}</strong>
+            <small>{% if sows_to_check_usg %}Wymagają potwierdzenia USG.{% else %}Brak zaległych badań USG.{% endif %}</small>
         </div>
     </section>
 
@@ -57,7 +61,7 @@
         </div>
 
         <div class="table-scroll">
-            <table class="data-table" id="sowsTable">
+            <table class="data-table" id="sowsTable" data-mobile-cards="true">
                 <thead>
                     <tr>
                         <th>Nr kolczyka</th>
@@ -94,6 +98,7 @@
                         <td class="text-right"><strong>{{ sow.total_born_alive }}</strong> szt.</td>
                         <td class="text-right">
                             <div class="row-actions">
+                                <a href="{% url 'sow_detail' sow.id %}" class="table-link">Szczegóły</a>
                                 <a href="{% url 'edit_sow' sow.id %}" class="table-link">Edytuj</a>
                             </div>
                         </td>

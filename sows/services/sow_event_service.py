@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from farms.services.settings_service import get_farm_settings
+from sows.domain.event_details import build_event_details
 from sows.domain.sow_state_machine import SowStateMachine
 from sows.services.sow_repository import SowRepository
 
@@ -35,18 +36,7 @@ class SowEventService:
         self.settings = get_farm_settings(farm) if farm is not None else None
 
     def build_details(self, data: dict) -> dict:
-        event_type = data.get('event_type')
-        details_mapping = {
-            SowStateMachine.INSEMINATION: {'technician': data.get('technician') or ""},
-            SowStateMachine.PREGNANCY_CHECK: {'result': data.get('pregnancy_result') or ""},
-            SowStateMachine.FARROWING: {
-                'born_alive': data.get('born_alive') or 0,
-                'born_dead': data.get('born_dead') or 0,
-            },
-            SowStateMachine.WEANING: {'count': data.get('count') or 0},
-            SowStateMachine.VACCINATION: {'vaccine_name': data.get('vaccine_name') or ""},
-        }
-        return details_mapping.get(event_type, {})
+        return build_event_details(data)
 
     def needs_farrowing_confirmation(self, sow_status: str, data: dict) -> bool:
         event_type = data.get('event_type')

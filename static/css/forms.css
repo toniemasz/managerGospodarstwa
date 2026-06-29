@@ -8,14 +8,14 @@
     padding: 1rem 1.25rem;
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    background: var(--surface);
-    box-shadow: var(--shadow);
+    background: rgba(255, 255, 255, .9);
+    box-shadow: 0 1px 2px rgba(21, 28, 39, .04);
 }
 
 .table-panel .table-footer-controls {
     border-width: 0 0 1px;
     border-radius: 0;
-    background: #f8fafc;
+    background: var(--surface-soft);
     box-shadow: none;
 }
 
@@ -42,10 +42,10 @@ select,
 textarea {
     width: 100%;
     min-height: 2.75rem;
-    border: 1px solid var(--border-strong);
+    border: 1px solid var(--border);
     border-radius: var(--radius);
     background: #fff;
-    color: #1e2f44;
+    color: var(--text);
     padding: .62rem .8rem;
     font-size: .92rem;
     font-weight: 650;
@@ -69,7 +69,7 @@ select:focus,
 textarea:focus {
     border-color: var(--primary);
     background: #fff;
-    box-shadow: 0 0 0 4px rgba(31, 111, 120, .16);
+    box-shadow: 0 0 0 4px rgba(0, 108, 73, .14);
 }
 
 input[readonly],
@@ -154,9 +154,9 @@ input[type="file"] {
 
 .form-section,
 .option-box {
-    border: 1px solid #d2ded9;
+    border: 1px solid var(--border);
     border-radius: var(--radius);
-    background: linear-gradient(180deg, #ffffff, #f8fbfa);
+    background: linear-gradient(180deg, #ffffff, var(--surface-soft));
     padding: 1rem;
 }
 
@@ -170,6 +170,7 @@ input[type="file"] {
 
 .field-hint,
 .help-text,
+.field-error,
 .error-text,
 .errorlist {
     font-size: .8rem;
@@ -189,8 +190,14 @@ input[type="file"] {
 }
 
 .error-text,
+.field-error,
 .errorlist {
     color: var(--danger);
+}
+
+.field-error {
+    display: block;
+    margin-top: .15rem;
 }
 
 .errorlist {
@@ -371,8 +378,8 @@ input[type="file"] {
     overflow: hidden;
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    background: var(--surface);
-    box-shadow: var(--shadow);
+    background: rgba(255, 255, 255, .9);
+    box-shadow: 0 1px 2px rgba(21, 28, 39, .04);
 }
 
 .filter-disclosure > summary,
@@ -400,6 +407,7 @@ input[type="file"] {
     margin-left: auto;
     color: var(--primary);
     font-size: 1.3rem;
+    line-height: 1;
 }
 
 .filter-disclosure[open] > summary::after,

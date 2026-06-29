@@ -333,3 +333,41 @@ class PriceConfigForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if farm is not None:
             self.fields['ingredient'].queryset = IngredientModel.objects.filter(farm=farm).order_by('name')
+
+
+class CalculatorPriceForm(forms.Form):
+    price_field_prefix = 'price_'
+
+    def __init__(self, *args, ingredients=None, prices=None, **kwargs):
+        self.ingredients = list(ingredients or [])
+        self.prices = prices or {}
+        super().__init__(*args, **kwargs)
+
+        for ingredient in self.ingredients:
+            field_name = self.field_name_for_ingredient(ingredient.id)
+            self.fields[field_name] = forms.DecimalField(
+                label=ingredient.name,
+                min_value=Decimal('0.00000'),
+                max_digits=14,
+                decimal_places=5,
+                required=False,
+                error_messages={
+                    'invalid': "Podaj poprawną cenę składnika.",
+                    'min_value': "Cena składnika nie może być ujemna.",
+                },
+                widget=forms.NumberInput(attrs={'min': '0', 'step': '0.00001'}),
+            )
+            self.fields[field_name].initial = self.prices.get(ingredient.id)
+
+    @classmethod
+    def field_name_for_ingredient(cls, ingredient_id: int) -> str:
+        return f'{cls.price_field_prefix}{ingredient_id}'
+
+    def price_overrides(self) -> dict[int, Decimal]:
+        overrides = {}
+        for ingredient in self.ingredients:
+            field_name = self.field_name_for_ingredient(ingredient.id)
+            price = self.cleaned_data.get(field_name)
+            if price is not None:
+                overrides[ingredient.id] = price
+        return overrides

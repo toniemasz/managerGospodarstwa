@@ -214,11 +214,13 @@ class FeedManagementService:
         rows = []
         for ingredient in self.repository.get_all_ingredients():
             delivery = sources.get(ingredient.id)
+            price = prices_map.get(ingredient.id)
             rows.append({
                 'ingredient': ingredient,
-                'price_per_kg': prices_map.get(ingredient.id, Decimal('0.00')),
+                'price_per_kg': price,
                 'source_date': delivery.date if delivery else None,
                 'has_delivery': delivery is not None,
+                'has_price': price is not None,
             })
         return rows
 

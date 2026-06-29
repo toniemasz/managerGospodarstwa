@@ -1,43 +1,62 @@
-<header class="topbar">
-    <a href="{% url 'modules_home' %}" class="brand" aria-label="Przejdź do centrali">
+<aside class="desktop-sidebar" aria-label="Nawigacja główna">
+    <a href="{% url 'modules_home' %}" class="sidebar-brand" aria-label="Przejdź do centrali">
         <span class="brand-mark">MG</span>
         <span class="brand-copy">
-        <span class="brand-title">Manager Gospodarstwa</span>
-        <span class="brand-subtitle">{{ current_farm.name|default:"Gospodarstwo" }}</span>
+            <span class="brand-title">Manager Gospodarstwa</span>
+            <span class="brand-subtitle">{{ current_farm.name|default:"Gospodarstwo" }}</span>
         </span>
     </a>
 
-    <nav class="main-nav" aria-label="Główna nawigacja">
-        <a href="{% url 'modules_home' %}" class="main-nav-link{% if request.resolver_match.url_name == 'modules_home' %} is-active{% endif %}">Centrala</a>
+    <nav class="sidebar-nav">
+        <a href="{% url 'modules_home' %}" class="sidebar-nav-link{% if request.resolver_match.url_name == 'modules_home' %} is-active{% endif %}">
+            <span class="module-icon compact">C</span>
+            <span>Centrala</span>
+        </a>
         {% for module in ui_primary_modules %}
-            <a href="{{ module.url }}" class="main-nav-link{% if module.is_active %} is-active{% endif %}"{% if module.is_active %} aria-current="page"{% endif %}>{{ module.title }}</a>
+            <a href="{{ module.url }}" class="sidebar-nav-link{% if module.is_active %} is-active{% endif %}"{% if module.is_active %} aria-current="page"{% endif %}>
+                <span class="module-icon compact {{ module.tone }}">{{ module.icon }}</span>
+                <span>{{ module.title }}</span>
+            </a>
         {% endfor %}
-        <details class="nav-menu">
-            <summary class="main-nav-link nav-menu-trigger">Moduły</summary>
-            <div class="nav-menu-panel">
-                {% for group in ui_module_groups %}
-                    <section class="nav-menu-group" aria-labelledby="nav-group-{{ group.key }}">
-                        <h2 id="nav-group-{{ group.key }}">{{ group.title }}</h2>
-                        <div class="nav-menu-list">
-                            {% for module in group.modules %}
-                                <a href="{{ module.url }}" class="nav-menu-item{% if module.is_active %} is-active{% endif %}"{% if module.is_active %} aria-current="page"{% endif %}>
-                                    <span class="module-icon {{ module.tone }}">{{ module.icon }}</span>
-                                    <span>
-                                        <strong>{{ module.title }}</strong>
-                                        <small>{{ module.description }}</small>
-                                    </span>
-                                </a>
-                            {% endfor %}
-                        </div>
-                    </section>
-                {% endfor %}
-            </div>
-        </details>
+        <a href="{% url 'modules_home' %}#modules" class="sidebar-nav-link">
+            <span class="module-icon compact">+</span>
+            <span>Wszystkie moduły</span>
+        </a>
     </nav>
 
+    <div class="sidebar-footer">
+        <a href="{% url 'farm_settings' %}" class="sidebar-nav-link sidebar-secondary-link{% if request.resolver_match.url_name == 'farm_settings' %} is-active{% endif %}">
+            <span class="module-icon compact">U</span>
+            <span>Ustawienia</span>
+        </a>
+        <div class="sidebar-account">
+            <span class="account-avatar">{{ current_farm.name|default:"Gospodarstwo"|first|upper }}</span>
+            <span class="account-copy">
+                <strong>{{ current_farm.name|default:"Gospodarstwo" }}</strong>
+                <small>{{ user.get_username }}</small>
+            </span>
+        </div>
+    </div>
+</aside>
+
+<header class="topbar">
+    <a href="{% url 'modules_home' %}" class="mobile-brand" aria-label="Przejdź do centrali">
+        <span class="brand-mark">MG</span>
+        <span class="brand-copy">
+            <span class="brand-title">Manager Gospodarstwa</span>
+            <span class="brand-subtitle">{{ current_farm.name|default:"Gospodarstwo" }}</span>
+        </span>
+    </a>
+
+    <div class="topbar-context">
+        <span class="context-label">Panel pracy</span>
+        <strong>{{ current_farm.name|default:"Gospodarstwo" }}</strong>
+    </div>
+
     <div class="user-menu">
+        <a href="{% url 'modules_home' %}" class="topbar-action">Moduły</a>
         <details class="account-menu">
-            <summary class="account-menu-trigger" aria-label="Menu gospodarstwa">
+            <summary class="account-menu-trigger" aria-label="Menu użytkownika">
                 <span class="account-avatar">{{ current_farm.name|default:"Gospodarstwo"|first|upper }}</span>
                 <span class="account-copy">
                     <strong>{{ current_farm.name|default:"Gospodarstwo" }}</strong>
@@ -65,8 +84,14 @@
 </header>
 
 <nav class="mobile-bottom-nav" aria-label="Nawigacja mobilna">
-    <a href="{% url 'modules_home' %}" class="mobile-nav-link{% if request.resolver_match.url_name == 'modules_home' %} is-active{% endif %}">Centrala</a>
+    <a href="{% url 'modules_home' %}" class="mobile-nav-link{% if request.resolver_match.url_name == 'modules_home' %} is-active{% endif %}">
+        <span class="mobile-nav-icon">C</span>
+        <span>Centrala</span>
+    </a>
     {% for module in ui_mobile_modules %}
-        <a href="{{ module.url }}" class="mobile-nav-link{% if module.is_active %} is-active{% endif %}"{% if module.is_active %} aria-current="page"{% endif %}>{{ module.title }}</a>
+        <a href="{{ module.url }}" class="mobile-nav-link{% if module.is_active %} is-active{% endif %}"{% if module.is_active %} aria-current="page"{% endif %}>
+            <span class="mobile-nav-icon {{ module.tone }}">{{ module.icon }}</span>
+            <span>{{ module.title }}</span>
+        </a>
     {% endfor %}
 </nav>

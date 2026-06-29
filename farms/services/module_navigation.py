@@ -2,7 +2,7 @@ from django.urls import reverse
 
 from farms.module_registry import MODULE_DEFINITIONS, MODULE_GROUPS, MODULE_KEYS, default_nav_modules
 
-MOBILE_NAV_KEYS = ("tasks", "sows", "production", "feed")
+MOBILE_NAV_KEYS = ("sows", "inventory", "sales")
 
 
 def normalize_visible_modules(value) -> list[str]:
@@ -76,7 +76,7 @@ class ModuleNavigationService:
         active = next((module for module in modules if module["is_active"] and module["key"] != "settings"), None)
         if active and active["key"] not in {module["key"] for module in mobile}:
             mobile = [active, *mobile]
-        return mobile[:4]
+        return mobile[:3]
 
 
 def module_visibility_groups(form) -> list[dict]:
