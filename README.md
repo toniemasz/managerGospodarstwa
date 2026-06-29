@@ -2,7 +2,7 @@
 
 ## Opis projektu
 
-Manager Gospodarstwa to aplikacja webowa napisana w Django, której celem jest wspomaganie zarządzania gospodarstwem trzody chlewnej. Projekt obejmuje kilka głównych obszarów pracy gospodarstwa: ewidencję macior, obsługę zdarzeń produkcyjnych, kontrolę szczepień, analizę wyników rozrodu, sprzedaż tuczników oraz moduł paszowy związany z magazynem, recepturami i śrutowaniem.
+Manager Gospodarstwa to aplikacja webowa napisana w Django, której celem jest wspomaganie zarządzania gospodarstwem trzody chlewnej. Projekt obejmuje ewidencję macior, panel zadań, kontrolę szczepień, analizę rozrodu, sprzedaż tuczników, koszty i roczną opłacalność oraz moduł paszowy związany z magazynem, recepturami i śrutowaniem.
 
 Projekt jest działający, ale pozostaje w ciągłym rozwoju przeze mnie. Jest rozwijany jako praktyczna aplikacja, która ma odwzorowywać realne procesy występujące w gospodarstwie.
 
@@ -198,6 +198,34 @@ Testy można uruchomić komendą:
 pytest
 ```
 
+### Lokalna baza demonstracyjna
+
+Przy `DEBUG=True` można utworzyć kompletny zestaw demonstracyjny:
+
+```bash
+python manage.py seed_demo_data
+```
+
+Logowanie do danych demo: `testtest` / `testtest`. Polecenie jest idempotentne. Pełne wyczyszczenie lokalnej bazy i ponowne utworzenie danych wykonuje:
+
+```bash
+python manage.py seed_demo_data --reset
+```
+
+`--reset` działa wyłącznie lokalnie przy `DEBUG=True` i usuwa wszystkie dane z lokalnej bazy.
+
+### Bezpieczeństwo danych i nowe narzędzia
+
+- Centrum zadań zbiera badania USG, oproszenia, szczepienia, niskie stany, kolejkę śrutowań i sprzedaże bez rozliczenia.
+- Historia zmian zapisuje najważniejsze operacje i jest izolowana per gospodarstwo.
+- Stan magazynu wynika z ruchów magazynowych: dostaw, zużycia produkcyjnego i korekt plus/minus.
+- Korekta stanu jest dostępna w module magazynu i blokuje zejście poniżej zera.
+- Ustawienia gospodarstwa udostępniają eksport/import CSV w archiwum ZIP; import jest atomowy i domyślnie wymaga pustego gospodarstwa.
+- Analityka opłacalności pokazuje sprzedaż, produkcję i szacowany koszt paszy w wybranym okresie.
+- Moduł kosztów rejestruje dodatkowe wydatki, ich kategorie i status płatności; dane trafiają do opłacalności oraz eksportów CSV/JSON.
+- Backup/restore całej bazy w panelu administracyjnym jest dostępny wyłącznie dla superusera; restore wymaga żądania POST i potwierdzenia.
+- Istniejący eksport/import danych użytkownika w formacie ZIP/JSON pozostaje dostępny.
+
 ### 10. Najczęstsze problemy lokalne
 
 Jeżeli po zmianach w modelach baza danych nie jest aktualna, należy wykonać:
@@ -233,6 +261,7 @@ farms/
 sows/
 sales/
 feed/
+costs/
 templates/
 static/
 ```
@@ -274,6 +303,18 @@ Po zalogowaniu aplikacja:
 4. przekazuje tę informację do pozostałych modułów.
 
 Dzięki temu moduły `sows`, `sales` oraz `feed` mogą filtrować dane tylko do gospodarstwa aktualnego użytkownika.
+
+## Panel zadań
+
+Panel zadań jest dostępny w górnej i mobilnej nawigacji, jeżeli moduł jest widoczny w ustawieniach gospodarstwa. Dzieli zadania na trzy zakładki: `Produkcja`, `Magazyn i pasza` oraz `Finanse`. Każda zakładka pokazuje liczbę wszystkich i pilnych zadań, a jej sekcje są krótkimi kartami nawigacyjnymi: prezentują najwyżej cztery pozycje oraz licznik pozostałych rekordów. Pełna obsługa odbywa się w panelu docelowym danego modułu.
+
+Alerty USG, oproszeń i szczepień są liczone przez wspólny serwis używany również przez dashboard macior. Oproszenia uwzględniają ustawienia `gestation_days` i `farrowing_alert_days_ahead` oraz statusy: zbliża się, dzisiaj i po terminie. Dedykowany panel oproszeń pokazuje pełną listę planowanych terminów i pozwala szybko przejść do dodania zdarzenia `FARROWING`.
+
+## Widoczność modułów
+
+Sekcja `Widoczność modułów` w ustawieniach gospodarstwa pozwala włączać i wyłączać elementy strony głównej oraz nawigacji. Konfiguracja jest przechowywana osobno dla każdego gospodarstwa i obejmuje moduły produkcyjne, paszowe, finansowe i systemowe. Ukrycie modułu nie usuwa danych ani nie blokuje bezpośredniego adresu URL. Moduł ustawień pozostaje zawsze dostępny, aby użytkownik mógł ponownie zmienić konfigurację.
+
+Lista modułów, ich adresy, ikony, grupy i reguły aktywnego elementu są utrzymywane w jednym rejestrze `farms/module_registry.py`. Ten sam serwis buduje nawigację i stronę główną, dzięki czemu obie powierzchnie respektują identyczne ustawienia widoczności.
 
 ---
 
@@ -495,10 +536,13 @@ Dashboard sprzedaży wylicza:
 
 - liczbę dokumentów sprzedaży,
 - łączną liczbę sprzedanych sztuk,
-- łączną wagę,
-- łączny przychód,
+- łączną wagę żywą i poubojową,
+- przychód netto, VAT i brutto,
 - średnią cenę za kg,
-- średnią wagę jednej sztuki.
+- średnią wagę jednej sztuki i średnią mięsność,
+- wskaźnik ton zakończonej produkcji paszy do ton sprzedanej wagi żywej.
+
+Sprzedaż, koszty i opłacalność domyślnie pokazują aktualny rok kalendarzowy. Użytkownik może wybrać wcześniejszy rok lub zawęzić sprzedaż i koszty zakresem dat. Numer dokumentu sprzedaży jest sprawdzany w obrębie gospodarstwa i roku, więc ten sam numer może wystąpić w różnych latach.
 
 ---
 
@@ -633,6 +677,28 @@ stan = suma dostaw - suma zużycia w zakończonych produkcjach
 
 Moduł obsługuje również jednorazową zmianę proporcji receptury dla konkretnej produkcji przez pole `custom_recipe_data`.
 
+## Koszt rzeczywiście wyprodukowanej paszy
+
+Analityka finansowa bierze wyłącznie produkcje ze statusem `COMPLETED` i przypisuje je do roku według daty produkcji. Dla każdej produkcji uwzględnia ilość, recepturę albo `custom_recipe_data` oraz ostatnią znaną cenę dostawy składnika z dnia produkcji. Średni koszt jest ważony ilością:
+
+```text
+średni koszt 1 kg = łączny koszt zakończonych produkcji / łączna liczba wyprodukowanych kg
+```
+
+## Moduł `costs` i opłacalność
+
+`CostCategoryModel` przechowuje własne, możliwe do dezaktywacji kategorie gospodarstwa. `CostModel` zapisuje datę, kwotę, kategorię, opis, numer dokumentu, dostawcę, status płatności i autora wpisu. Lista kosztów obsługuje rok, zakres dat, kategorię i płatność oraz pokazuje sumy i ranking kategorii.
+
+Panel opłacalności łączy sprzedaż, rzeczywisty koszt zakończonych śrutowań i koszty ręczne. Pokazuje wynik netto i brutto, koszty na kilogram wagi żywej, wskaźnik tony paszy / tony wagi żywej, rankingi receptur i kategorii, miesięczny wykres oraz szczegóły produkcji zaliczonych do kosztu.
+
+## System wyglądu
+
+Frontend korzysta z jednego systemu komponentów w `static/css/app.css`: layoutu stron, nawigacji, kart, tabel mobilnych, formularzy, filtrów, komunikatów, zakładek i empty states. Powtarzalne elementy znajdują się w `templates/components/`, m.in. wspólne pole formularza, podsumowanie błędów, panel filtrów, karta podsumowania zadań i pusty stan.
+
+Formularze dodawania i edycji mają wspólny responsywny układ, logiczne sekcje, zestaw akcji i komunikaty błędów przy polach oraz nad formularzem. Formsety receptur, sprzedaży i zdarzeń obsługują dodawanie, usuwanie oraz pustą listę pozycji bez wyłączania walidacji serwerowej.
+
+Rozbudowane filtry są domyślnie schowane w elemencie `<details>`. Po zastosowaniu filtrów sekcja otwiera się automatycznie, pokazuje aktywny status i chipy wartości oraz udostępnia wspólną akcję czyszczenia. Ten wzorzec jest używany w sprzedaży, kosztach, opłacalności, historii zmian, magazynie, produkcji, statystykach macior i szczegółach receptury.
+
 ---
 
 ## Struktura adresów URL
@@ -644,6 +710,9 @@ Główne ścieżki aplikacji:
 /maciory/         - dashboard macior
 /sprzedaz/        - moduł sprzedaży
 /pasza/           - moduł paszowy
+/koszty/          - koszty i kategorie
+/ustawienia/centrum-zadan/         - panel zadań
+/ustawienia/analityka-oplacalnosci/ - roczna opłacalność
 /admin/           - panel administratora Django
 ```
 
@@ -655,6 +724,7 @@ Przykładowe adresy modułu macior:
 /maciory/<id>/
 /maciory/archiwum/
 /maciory/statystyki/
+/maciory/oproszenia/
 /maciory/szczepienie-grupowe/
 /maciory/badania-grupowe/
 /maciory/zdarzenia/masowo/
@@ -764,6 +834,8 @@ Aktualnie aplikacja obejmuje podstawowe i zaawansowane funkcje zarządzania gosp
 - receptury,
 - kalkulator kosztów paszy,
 - produkcję / śrutowanie,
+- koszty, rozliczenie roczne i opłacalność,
+- panel zadań z alertami produkcyjnymi, paszowymi i finansowymi,
 - wielogospodarstwowość opartą o użytkownika.
 
 W przyszłości projekt może być dalej rozwijany m.in. o dodatkowe raporty, lepsze wykresy, eksport danych, rozbudowany system uprawnień, powiadomienia oraz kolejne automatyzacje procesów gospodarstwa.

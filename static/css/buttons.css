@@ -1,0 +1,246 @@
+/* buttons.css - wydzielone style aplikacji. */
+
+.button {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    gap: .4rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    padding: .65rem 1rem;
+    color: inherit;
+    font-size: .875rem;
+    font-weight: 850;
+    line-height: 1;
+    text-align: center;
+    transition: background .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+.button:hover {
+    transform: translateY(-1px);
+}
+
+.button-small {
+    min-height: 2.35rem;
+    padding: .5rem .75rem;
+    font-size: .8rem;
+}
+
+.button-primary {
+    background: var(--primary);
+    color: #fff;
+    box-shadow: 0 8px 18px rgba(0, 108, 73, .18);
+}
+
+.button-primary:hover {
+    background: var(--primary-dark);
+}
+
+.button-secondary {
+    border-color: var(--border);
+    background: #fff;
+    color: var(--muted);
+}
+
+.button-secondary:hover {
+    border-color: rgba(0, 108, 73, .22);
+    background: var(--primary-soft);
+    color: var(--primary);
+}
+
+.button-danger {
+    background: var(--danger);
+    color: #fff;
+}
+
+.button-danger:hover {
+    background: #a61e1e;
+}
+
+.button-ghost-danger {
+    border-color: var(--border);
+    background: #fff;
+    color: #425466;
+}
+
+.button-ghost-danger:hover {
+    border-color: #f0b8b8;
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+
+.table-link {
+    display: inline-flex;
+    min-height: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius);
+    border: 1px solid rgba(0, 108, 73, .18);
+    background: var(--primary-soft);
+    padding: .45rem .7rem;
+    color: var(--primary-dark);
+    font-size: .8rem;
+    font-weight: 900;
+}
+
+.table-link:hover {
+    background: #d8f1e6;
+}
+
+.table-card {
+    overflow: hidden;
+}
+
+.table-search,
+.table-limit,
+.form-control {
+    width: 100%;
+}
+
+.sow-row,
+.sale-row,
+.event-row,
+.settlement-row,
+.bulk-event-row {
+    scroll-margin-top: calc(var(--topbar-height) + 1rem);
+}
+
+.delete-cell {
+    text-align: center;
+}
+
+.chronology-note,
+.sales-filter-bar {
+    margin-bottom: 1.25rem;
+}
+
+.remove-row-btn,
+.copy-sow,
+.ingredient-checkbox {
+    flex: 0 0 auto;
+}
+
+.row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: .45rem;
+}
+
+.link-button-danger {
+    display: inline-flex;
+    min-height: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: var(--radius);
+    background: var(--danger-soft);
+    padding: .45rem .65rem;
+    color: var(--danger);
+    font-size: .8rem;
+    font-weight: 900;
+}
+
+.link-button-danger:hover {
+    background: #ffe2e2;
+}
+
+
+.mini-button {
+    display: inline-flex;
+    width: 2.25rem;
+    min-width: 2.25rem;
+    height: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: #fff;
+    color: #425466;
+    font-weight: 950;
+    transition: background .18s ease, border-color .18s ease, color .18s ease;
+}
+
+.mini-button:hover {
+    border-color: rgba(0, 108, 73, .22);
+    background: var(--primary-soft);
+    color: var(--primary);
+}
+
+
+.pagination-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--border);
+    background: #f8fafc;
+}
+
+.pagination-summary {
+    color: var(--muted);
+    font-size: .85rem;
+    font-weight: 850;
+}
+
+.pagination-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: .35rem;
+}
+
+.pagination-button,
+.pagination-ellipsis {
+    display: inline-flex;
+    min-width: 2.4rem;
+    min-height: 2.4rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius);
+    font-size: .85rem;
+    font-weight: 900;
+}
+
+.pagination-button {
+    border: 1px solid var(--border-strong);
+    background: #fff;
+    color: #31465a;
+    transition: background .18s ease, border-color .18s ease, color .18s ease;
+}
+
+.pagination-button:hover:not(.is-disabled):not(.is-active) {
+    border-color: rgba(0, 108, 73, .22);
+    background: var(--primary-soft);
+    color: var(--primary);
+}
+
+.pagination-button.is-active {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: #fff;
+    box-shadow: 0 8px 18px rgba(0, 108, 73, .18);
+}
+
+.pagination-button.is-disabled {
+    cursor: not-allowed;
+    opacity: .45;
+}
+
+.pagination-ellipsis {
+    color: #8594a6;
+}
+
+
+.button-link {
+    border: 0;
+    background: transparent;
+    color: var(--primary);
+    font-weight: 900;
+}
+

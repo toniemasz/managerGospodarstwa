@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load l10n %}
 
 {% block title %}Sprzedaż{% endblock %}
 
@@ -8,65 +9,57 @@
     <section class="page-header">
         <div>
             <p class="eyebrow">Sprzedaż</p>
-            <h1>Dokumenty sprzedaży</h1>
-            <p class="page-subtitle">Rejestr sprzedaży z rozliczeniami klas i importem PDF.</p>
+            <h1>Zarządzanie sprzedażą</h1>
+            <p class="page-subtitle">Rejestr sprzedaży i statystyki roku rozliczeniowego {{ selected_year|unlocalize }}.</p>
         </div>
-        <a href="{% url 'add_sale' %}" class="button button-primary">Dodaj sprzedaż</a>
+        <a href="{% url 'add_sale' %}" class="button button-primary">Nowa sprzedaż</a>
     </section>
 
-    <section class="panel compact-panel">
-        <form method="get" action="{% url 'sales_list' %}" class="filter-bar sales-filter-bar">
-            <div class="table-control">
-                <label for="period">Okres statystyk</label>
-                <select id="period" name="period">
-                    {% for value, label in period_options %}
-                        <option value="{{ value }}" {% if date_filter.period == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="table-control">
-                <label for="date_from">Od</label>
-                <input id="date_from" type="date" name="date_from" value="{{ date_filter.date_from_value }}">
-            </div>
-            <div class="table-control">
-                <label for="date_to">Do</label>
-                <input id="date_to" type="date" name="date_to" value="{{ date_filter.date_to_value }}">
-            </div>
-            <button type="submit" class="button button-primary">Pokaż</button>
-        </form>
-    </section>
-
-    <section class="stats-grid">
+    <section class="stats-grid featured-stats">
+        <div class="stat-tile is-success">
+            <span>Przychód netto</span>
+            <strong>{{ stats.total_net_revenue|floatformat:2 }} PLN</strong>
+            <small>Sprzedaż w wybranym roku rozliczeniowym.</small>
+        </div>
         <div class="stat-tile">
+            <span>Średnia cena/kg</span>
+            <strong>{{ stats.avg_price_per_kg|floatformat:2 }}</strong>
+            <small>Wartość uśredniona dla widocznych dokumentów.</small>
+        </div>
+        <div class="stat-tile{% if stats.sale_count == 0 %} is-warning{% endif %}">
             <span>Dokumenty</span>
             <strong>{{ stats.sale_count }}</strong>
+            <small>Liczba dokumentów sprzedaży po filtrach.</small>
         </div>
+    </section>
+
+    <section class="metrics-strip">
         <div class="stat-tile">
             <span>Sprzedane</span>
             <strong>{{ stats.total_pigs }}</strong>
         </div>
         <div class="stat-tile">
-            <span>Suma wagi</span>
+            <span>Waga poubojowa</span>
             <strong>{{ stats.total_weight|floatformat:0 }} kg</strong>
         </div>
-        <div class="stat-tile">
-            <span>Przychód netto</span>
-            <strong>{{ stats.total_net_revenue|floatformat:2 }} PLN</strong>
-        </div>
-        <div class="stat-tile">
-            <span>Średnia cena/kg</span>
-            <strong>{{ stats.avg_price_per_kg|floatformat:2 }}</strong>
-        </div>
+        <div class="stat-tile"><span>Waga żywa</span><strong>{{ stats.total_live_weight|floatformat:0 }} kg</strong></div>
+        <div class="stat-tile"><span>VAT</span><strong>{{ stats.total_vat|floatformat:2 }} PLN</strong></div>
+        <div class="stat-tile"><span>Przychód brutto</span><strong>{{ stats.total_gross_revenue|floatformat:2 }} PLN</strong></div>
+        <div class="stat-tile"><span>Średnia mięsność</span><strong>{% if stats.avg_meatiness != None %}{{ stats.avg_meatiness|floatformat:2 }}%{% else %}Brak danych{% endif %}</strong></div>
+        <div class="stat-tile"><span>Pasza / waga żywa</span><strong>{% if stats.feed_to_live_weight_ratio != None %}{{ stats.feed_to_live_weight_ratio|floatformat:2 }} t/t{% else %}Brak wagi żywej{% endif %}</strong><small>Ton uśrutowanej paszy na tonę wagi żywej.</small></div>
         <div class="stat-tile">
             <span>Śr. waga sztuki</span>
             <strong>{{ stats.avg_weight_per_pig|floatformat:2 }} kg</strong>
         </div>
     </section>
 
+    {% url 'sales_list' as sales_filter_url %}
+    {% include 'components/filter_panel.html' with filter_action=sales_filter_url filter_clear_url=sales_filter_url filter_fields_template='sales/_filters.html' %}
+
     <section class="panel table-panel">
         <div class="section-heading">
             <div>
-                <h2>Rejestr sprzedaży</h2>
+                <h2>Lista dokumentów sprzedaży</h2>
                 <p>Rekordy sprzedaży z rozliczeniami i importem PDF.</p>
             </div>
         </div>

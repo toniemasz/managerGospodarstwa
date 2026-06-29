@@ -1,9 +1,10 @@
 from decimal import Decimal
 from django import forms
+from django.db.models import Sum
 from django.forms import inlineformset_factory
 from django.forms.formsets import DELETION_FIELD_NAME
 from .models import IngredientModel, RecipeModel, RecipeItemModel, DeliveryModel, ProductionModel, \
-    IngredientPriceConfigModel
+    IngredientPriceConfigModel, ProductionIngredientUsageModel
 from feed.domain.rules import LOW_STOCK_THRESHOLD_KG
 
 
@@ -138,8 +139,73 @@ class DeliveryForm(forms.ModelForm):
 
     def __init__(self, *args, farm=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['quantity_kg'].min_value = Decimal('0.01')
+        self.fields['price_per_kg'].required = True
+        self.fields['price_per_kg'].min_value = Decimal('0.00001')
         if farm is not None:
             self.fields['ingredient'].queryset = IngredientModel.objects.filter(farm=farm).order_by('name')
+        for field in self.fields.values():
+            _apply_widget_class(field)
+
+    def clean_quantity_kg(self):
+        quantity = self.cleaned_data['quantity_kg']
+        if self.instance.pk:
+            allocated = ProductionIngredientUsageModel.objects.filter(
+                delivery=self.instance,
+            ).aggregate(total=Sum('quantity_kg'))['total'] or Decimal('0.00')
+            if quantity < allocated:
+                raise forms.ValidationError(
+                    f"Ta dostawa ma już rozliczone {allocated:.2f} kg w produkcji. "
+                    "Nie można ustawić mniejszej ilości."
+                )
+        return quantity
+
+    def clean(self):
+        cleaned_data = super().clean()
+        ingredient = cleaned_data.get('ingredient')
+        if (
+            self.instance.pk
+            and ingredient is not None
+            and ingredient.pk != self.instance.ingredient_id
+            and ProductionIngredientUsageModel.objects.filter(delivery=self.instance).exists()
+        ):
+            self.add_error(
+                'ingredient',
+                "Nie można zmienić składnika dostawy, która została już rozliczona w produkcji.",
+            )
+        return cleaned_data
+
+
+class InventoryAdjustmentForm(forms.Form):
+    ingredient = forms.ModelChoiceField(queryset=IngredientModel.objects.none(), label="Składnik")
+    movement_date = forms.DateField(
+        label="Data korekty",
+        widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+    )
+    quantity_kg = forms.DecimalField(
+        label="Ilość (kg)", min_value=Decimal("0.01"), max_digits=12, decimal_places=2,
+        widget=forms.NumberInput(attrs={"step": "0.01", "min": "0.01"}),
+    )
+    direction = forms.ChoiceField(
+        label="Typ korekty",
+        choices=(("plus", "Zwiększenie stanu"), ("minus", "Zmniejszenie stanu")),
+    )
+    reason = forms.CharField(label="Powód", max_length=500, widget=forms.Textarea(attrs={"rows": 3}))
+
+    def __init__(self, *args, farm=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if farm is not None:
+            self.fields["ingredient"].queryset = IngredientModel.objects.filter(farm=farm).order_by("name")
+        for field in self.fields.values():
+            _apply_widget_class(field)
+
+    def clean_movement_date(self):
+        from django.utils import timezone
+
+        movement_date = self.cleaned_data["movement_date"]
+        if movement_date > timezone.localdate():
+            raise forms.ValidationError("Data korekty nie może być z przyszłości.")
+        return movement_date
 
 
 class ProductionForm(forms.ModelForm):
@@ -267,3 +333,41 @@ class PriceConfigForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if farm is not None:
             self.fields['ingredient'].queryset = IngredientModel.objects.filter(farm=farm).order_by('name')
+
+
+class CalculatorPriceForm(forms.Form):
+    price_field_prefix = 'price_'
+
+    def __init__(self, *args, ingredients=None, prices=None, **kwargs):
+        self.ingredients = list(ingredients or [])
+        self.prices = prices or {}
+        super().__init__(*args, **kwargs)
+
+        for ingredient in self.ingredients:
+            field_name = self.field_name_for_ingredient(ingredient.id)
+            self.fields[field_name] = forms.DecimalField(
+                label=ingredient.name,
+                min_value=Decimal('0.00000'),
+                max_digits=14,
+                decimal_places=5,
+                required=False,
+                error_messages={
+                    'invalid': "Podaj poprawną cenę składnika.",
+                    'min_value': "Cena składnika nie może być ujemna.",
+                },
+                widget=forms.NumberInput(attrs={'min': '0', 'step': '0.00001'}),
+            )
+            self.fields[field_name].initial = self.prices.get(ingredient.id)
+
+    @classmethod
+    def field_name_for_ingredient(cls, ingredient_id: int) -> str:
+        return f'{cls.price_field_prefix}{ingredient_id}'
+
+    def price_overrides(self) -> dict[int, Decimal]:
+        overrides = {}
+        for ingredient in self.ingredients:
+            field_name = self.field_name_for_ingredient(ingredient.id)
+            price = self.cleaned_data.get(field_name)
+            if price is not None:
+                overrides[ingredient.id] = price
+        return overrides

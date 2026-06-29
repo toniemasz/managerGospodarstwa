@@ -63,6 +63,16 @@ class SaleFormService:
                 'vat_value',
                 'gross_value',
             ])
+        else:
+            sale.recalculate_from_rows()
+            sale.save(update_fields=[
+                'quantity',
+                'total_weight',
+                'price_per_kg',
+                'net_value',
+                'vat_value',
+                'gross_value',
+            ])
 
     def parse_pdf_import(self, uploaded_pdf, post_data) -> SalePdfImportResult:
         parsed = SaleSettlementParserFactory.create('pdf').parse(uploaded_pdf)

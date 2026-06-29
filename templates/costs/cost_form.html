@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}{% if is_edit %}Edytuj koszt{% else %}Dodaj koszt{% endif %}{% endblock %}
+{% block content %}
+<main class="app-page app-page-narrow">
+    <section class="page-header">
+        <div><p class="eyebrow">Koszty</p><h1>{% if is_edit %}Edytuj koszt{% else %}Dodaj koszt{% endif %}</h1><p class="page-subtitle">Uzupełnij podstawowe dane kosztu, a informacje dokumentowe dodaj opcjonalnie.</p></div>
+        <a href="{% url 'cost_list' %}" class="button button-secondary">Wróć</a>
+    </section>
+    <section class="panel">
+        <form method="post" class="responsive-form">
+            {% csrf_token %}{% include 'components/form_errors.html' with form=form %}
+            <div class="form-section-heading"><h2>Dane podstawowe</h2><p>Data, kwota, kategoria i opis są najważniejsze dla rozliczenia.</p></div>
+            <div class="form-grid two-columns">
+                {% include 'components/form_field.html' with field=form.date %}
+                {% include 'components/form_field.html' with field=form.amount %}
+                {% include 'components/form_field.html' with field=form.category %}
+                {% include 'components/form_field.html' with field=form.is_paid %}
+                {% include 'components/form_field.html' with field=form.description wide=True %}
+            </div>
+            <details class="form-disclosure">
+                <summary>Dane dokumentu i dostawcy <small>Opcjonalne</small></summary>
+                <div class="form-grid two-columns">{% include 'components/form_field.html' with field=form.document_number %}{% include 'components/form_field.html' with field=form.supplier %}</div>
+            </details>
+            <div class="form-actions"><a href="{% url 'cost_list' %}" class="button button-secondary">Anuluj</a><button class="button button-primary">Zapisz koszt</button></div>
+        </form>
+    </section>
+    {% if is_edit %}<section class="danger-zone"><form method="post" action="{% url 'delete_cost' cost.id %}">{% csrf_token %}<button class="button button-danger">Usuń koszt</button></form></section>{% endif %}
+</main>
+{% endblock %}

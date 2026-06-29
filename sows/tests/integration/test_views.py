@@ -255,7 +255,7 @@ class TestSowViews:
             'events-MAX_NUM_FORMS': '1000',
             'events-0-sow_ear_tag': sow.ear_tag,
             'events-0-event_type': 'INSEMINATION',
-            'events-0-event_date': '2026-06-20',
+            'events-0-event_date': sow.entry_date.isoformat(),
             'events-0-technician': 'Jan',
         })
 

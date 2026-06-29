@@ -253,3 +253,58 @@ def test_feed_views_show_only_current_farm_data(auth_client):
     assert response.status_code == 200
     assert 'Własna pszenica' in response.content.decode()
     assert 'Cudza pszenica' not in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_recipe_detail_shows_completed_production_for_selected_year(auth_client, feed_objects):
+    recipe = feed_objects['recipe']
+    DeliveryModel.objects.create(
+        ingredient=feed_objects['ingredient'],
+        date=timezone.datetime(2026, 1, 1).date(),
+        quantity_kg=Decimal('20000.00'),
+        price_per_kg=Decimal('1.00000'),
+    )
+    ProductionModel.objects.create(
+        date=timezone.datetime(2026, 4, 1).date(),
+        recipe=recipe,
+        quantity_kg=Decimal('18450.00'),
+        status=ProductionModel.Statuses.COMPLETED,
+    )
+    ProductionModel.objects.create(
+        date=timezone.datetime(2025, 4, 1).date(),
+        recipe=recipe,
+        quantity_kg=Decimal('1000.00'),
+        status=ProductionModel.Statuses.QUEUED,
+    )
+
+    response = auth_client.get(reverse('recipe_detail', args=[recipe.id]), {'year': '2026'})
+
+    assert response.status_code == 200
+    assert response.context['yearly_production']['year'] == 2026
+    assert response.context['yearly_production']['quantity_t'] == Decimal('18.45')
+    assert 'Wyprodukowano w 2026 roku' in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_feed_calculator_rejects_invalid_price_override(auth_client, feed_objects):
+    ingredient = feed_objects['ingredient']
+
+    response = auth_client.post(reverse('feed_calculator'), {
+        f'price_{ingredient.id}': 'nie-liczba',
+    })
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert "Podaj poprawną cenę składnika" in content
+    assert "Nie przeliczono kosztu paszy" in content
+    assert response.context['costs'][0].cost_per_kg == Decimal('1.00000')
+
+
+@pytest.mark.django_db
+def test_feed_calculator_marks_missing_delivery_price(auth_client):
+    IngredientModel.objects.create(name='Bez ceny', farm=auth_client.farm)
+
+    response = auth_client.get(reverse('feed_calculator'))
+
+    assert response.status_code == 200
+    assert "Brak zakupu, brak ceny" in response.content.decode()

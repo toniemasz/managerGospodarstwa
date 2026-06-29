@@ -1,0 +1,17 @@
+<article class="task-item priority-{{ task.priority }}">
+    <div class="task-item-body">
+        <div class="task-item-heading">
+            {% if task.object_url %}
+            <a href="{{ task.object_url }}" class="task-item-title">{{ task.title }}</a>
+            {% else %}
+            <strong class="task-item-title">{{ task.title }}</strong>
+            {% endif %}
+            <span class="task-status">{{ task.status_label }}</span>
+        </div>
+        <p>{{ task.description }}</p>
+        {% if task.due_date %}<small>Termin: {{ task.due_date|date:"d.m.Y" }}</small>{% endif %}
+    </div>
+    {% if task.action_url %}
+    <a href="{{ task.action_url }}" class="button button-secondary button-small">{{ task.action_label }}</a>
+    {% endif %}
+</article>

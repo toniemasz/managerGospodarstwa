@@ -2,8 +2,10 @@ from datetime import date, timedelta
 
 import pytest
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 
 from farms.services.farm_service import get_or_create_user_farm
+from sows.domain.event_details import build_event_details, initial_data_from_event_details
 from sows.models import SowEventModel, SowModel
 from sows.services.sow_event_service import (
     FARROWING_DECISION_AUTO_CHECK,
@@ -49,6 +51,29 @@ def test_single_event_service_creates_supported_events(sow_with_farm, status, ev
 
     assert result.created_event.event_type == event_type
     assert result.created_event.details == expected_details
+
+
+@pytest.mark.parametrize("event_type, extra, expected_initial", [
+    ('INSEMINATION', {'technician': 'Jan'}, {'technician': 'Jan'}),
+    ('PREGNANCY_CHECK', {'pregnancy_result': 'TAK'}, {'pregnancy_result': 'TAK'}),
+    ('FARROWING', {'born_alive': 11, 'born_dead': 1}, {'born_alive': 11, 'born_dead': 1}),
+    ('WEANING', {'count': 10}, {'count': 10}),
+    ('VACCINATION', {'vaccine_name': 'Parwo'}, {'vaccine_name': 'Parwo'}),
+])
+def test_event_details_mapper_builds_and_restores_each_event_type(event_type, extra, expected_initial):
+    details = build_event_details(_data(event_type, **extra))
+
+    restored = initial_data_from_event_details(event_type, details)
+
+    assert restored == expected_initial
+
+
+def test_event_details_mapper_rejects_unknown_event_type():
+    with pytest.raises(ValidationError):
+        build_event_details(_data('UNKNOWN_EVENT'))
+
+    with pytest.raises(ValidationError):
+        initial_data_from_event_details('UNKNOWN_EVENT', {})
 
 
 @pytest.mark.django_db

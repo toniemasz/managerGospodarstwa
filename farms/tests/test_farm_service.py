@@ -58,13 +58,31 @@ def test_current_farm_middleware_sets_request_farm():
 
 
 @pytest.mark.django_db
+def test_current_farm_middleware_handles_anonymous_superuser_and_admin_request():
+    anonymous_request = RequestFactory().get('/admin/login/')
+    anonymous_request.user = AnonymousUser()
+    assert CurrentFarmMiddleware(lambda req: req)(anonymous_request).farm is None
+
+    admin = User.objects.create_superuser(username='root-admin', password='password', email='root@example.com')
+    admin_request = RequestFactory().get('/admin/')
+    admin_request.user = admin
+    response = CurrentFarmMiddleware(lambda req: req)(admin_request)
+    assert response.farm.owner == admin
+    assert CurrentFarmMiddleware(lambda req: req)(admin_request).farm.pk == response.farm.pk
+
+
+@pytest.mark.django_db
 def test_current_farm_context_processor_exposes_request_farm():
     user = User.objects.create_user(username='context-user')
     farm = get_or_create_user_farm(user)
     request = RequestFactory().get('/')
     request.farm = farm
 
-    assert current_farm(request) == {'current_farm': farm}
+    assert current_farm(request) == {
+        'current_farm': farm,
+        'ui_modules': [],
+        'ui_visible_module_keys': [],
+    }
 
 
 @pytest.mark.django_db
@@ -88,6 +106,7 @@ def test_get_farm_settings_creates_default_settings():
     assert settings.farm == farm
     assert settings.pregnancy_check_after_days == 30
     assert settings.gestation_days == 114
+    assert settings.nav_modules == ["tasks", "sows", "feed", "sales"]
     assert FarmSettingsModel.objects.filter(farm=farm).count() == 1
 
 
@@ -103,7 +122,6 @@ def test_farm_settings_view_updates_farm_and_rules(client):
         'gestation_days': '115',
         'farrowing_alert_days_ahead': '5',
         'vaccination_alert_days_ahead': '9',
-        'low_stock_threshold_kg': '750.00',
         'default_production_quantity_kg': '1800.00',
         'allow_farrowing_without_pregnancy_check': 'on',
         'ask_before_auto_pregnancy_check': 'on',

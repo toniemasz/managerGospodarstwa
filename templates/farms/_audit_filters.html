@@ -1,0 +1,3 @@
+<div class="filter-field"><label for="audit-action">Akcja</label><select id="audit-action" name="action"><option value="">Wszystkie</option>{% for action in audit_actions %}<option value="{{ action }}" {% if request.GET.action == action %}selected{% endif %}>{{ action }}</option>{% endfor %}</select></div>
+<div class="filter-field"><label for="audit-date-from">Od</label><input id="audit-date-from" type="date" name="date_from" value="{{ request.GET.date_from }}"></div>
+<div class="filter-field"><label for="audit-date-to">Do</label><input id="audit-date-to" type="date" name="date_to" value="{{ request.GET.date_to }}"></div>

@@ -1,0 +1,7 @@
+<div class="empty-state">
+    {% if empty_title %}<h3>{{ empty_title }}</h3>{% endif %}
+    <p>{{ empty_message }}</p>
+    {% if empty_action_url and empty_action_label %}
+        <a href="{{ empty_action_url }}" class="button button-secondary">{{ empty_action_label }}</a>
+    {% endif %}
+</div>

@@ -1,0 +1,280 @@
+/* tables.css - wydzielone style aplikacji. */
+
+.table-scroll,
+.overflow-x-auto {
+    width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+}
+
+table,
+.data-table {
+    width: 100%;
+    min-width: 720px;
+    border-collapse: separate;
+    border-spacing: 0;
+    color: var(--text);
+    font-size: .875rem;
+}
+
+.table-panel {
+    border-color: var(--border);
+}
+
+.table-panel .table-scroll {
+    background: #fff;
+}
+
+.compact-table,
+.mobile-card-table {
+    min-width: 0;
+}
+
+thead {
+    background: var(--surface-muted);
+}
+
+th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--border);
+    padding: .85rem 1rem;
+    color: var(--muted);
+    font-size: .72rem;
+    font-weight: 950;
+    letter-spacing: .08em;
+    text-align: left;
+    text-transform: uppercase;
+}
+
+td {
+    border-bottom: 1px solid #edf2f7;
+    padding: .9rem 1rem;
+    vertical-align: middle;
+}
+
+tbody tr:nth-child(even) {
+    background: rgba(248, 250, 252, .72);
+}
+
+tbody tr:hover {
+    background: var(--primary-soft);
+}
+
+tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.table-link {
+    display: inline-flex;
+    min-height: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius);
+    border: 1px solid rgba(0, 108, 73, .18);
+    background: var(--primary-soft);
+    padding: .45rem .65rem;
+    color: var(--primary-dark);
+    font-size: .8rem;
+    font-weight: 900;
+}
+
+.table-link:hover {
+    background: #d8f1e6;
+}
+
+.table-card {
+    overflow: hidden;
+}
+
+.table-search,
+.table-limit,
+.form-control {
+    width: 100%;
+}
+
+.sow-row,
+.sale-row,
+.event-row,
+.settlement-row,
+.bulk-event-row {
+    scroll-margin-top: calc(var(--topbar-height) + 1rem);
+}
+
+.delete-cell {
+    text-align: center;
+}
+
+.chronology-note,
+.sales-filter-bar {
+    margin-bottom: 1.25rem;
+}
+
+.remove-row-btn,
+.copy-sow,
+.ingredient-checkbox {
+    flex: 0 0 auto;
+}
+
+.row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: .45rem;
+}
+
+.link-button-danger {
+    display: inline-flex;
+    min-height: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: var(--radius);
+    background: var(--danger-soft);
+    padding: .45rem .65rem;
+    color: var(--danger);
+    font-size: .8rem;
+    font-weight: 900;
+}
+
+.link-button-danger:hover {
+    background: #ffe2e2;
+}
+
+.muted-small {
+    color: var(--muted);
+    font-size: .8rem;
+    font-weight: 750;
+}
+
+.empty-table,
+.empty-state {
+    padding: 2rem;
+    color: #8594a6;
+    font-weight: 800;
+    text-align: center;
+}
+
+.empty-state h3,
+.empty-state p {
+    margin: 0;
+}
+
+.empty-state p + .button,
+.empty-state h3 + p {
+    margin-top: .6rem;
+}
+
+
+.wide-table,
+.settlement-table,
+.bulk-event-table {
+    width: max-content;
+    min-width: 100%;
+    table-layout: auto;
+}
+
+.wide-table th,
+.wide-table td,
+.settlement-table th,
+.settlement-table td,
+.bulk-event-table th,
+.bulk-event-table td {
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.wide-table th:first-child,
+.wide-table td:first-child,
+.settlement-table th:first-child,
+.settlement-table td:first-child,
+.bulk-event-table th:first-child,
+.bulk-event-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: inherit;
+    box-shadow: 1px 0 0 var(--border);
+}
+
+.wide-table th:first-child,
+.settlement-table th:first-child,
+.bulk-event-table th:first-child {
+    z-index: 3;
+    background: #f8fafc;
+}
+
+.wide-table td:first-child,
+.settlement-table td:first-child,
+.bulk-event-table td:first-child {
+    background: #fff;
+}
+
+.settlement-table input,
+.settlement-table select,
+.bulk-event-table input,
+.bulk-event-table select,
+.bulk-event-table textarea {
+    width: auto;
+    min-width: 8ch;
+    max-width: none;
+}
+
+.settlement-table input[type="checkbox"],
+.bulk-event-table input[type="checkbox"] {
+    width: 1.15rem;
+    min-width: 1.15rem;
+}
+
+.settlement-table input[name$="-line_no"] {
+    min-width: 4ch;
+}
+
+.settlement-table input[name$="-quantity"] {
+    min-width: 7ch;
+}
+
+.settlement-table input[name$="-weight"],
+.settlement-table input[name$="-avg_weight"],
+.settlement-table input[name$="-avg_meatiness"],
+.settlement-table input[name$="-price_per_kg"],
+.settlement-table input[name$="-net_value"],
+.settlement-table input[name$="-vat_value"],
+.settlement-table input[name$="-gross_value"] {
+    min-width: 10ch;
+}
+
+.bulk-event-table input[name$="-sow_ear_tag"] {
+    min-width: 12ch;
+}
+
+.bulk-event-table input[type="date"] {
+    min-width: 13ch;
+}
+
+.bulk-event-table select[name$="-event_type"],
+.bulk-event-table select[name$="-vaccine_name"] {
+    min-width: 18ch;
+}
+
+.bulk-cell-with-action {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+}
+
+
+.is-hidden-by-table-manager {
+    display: none !important;
+}

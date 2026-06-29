@@ -9,39 +9,76 @@
             <h1>Magazyn</h1>
             <p class="page-subtitle">Dostawy, stan surowców i ostrzeżenia niskiego poziomu.</p>
         </div>
-        <a href="{% url 'add_delivery' %}" class="button button-primary">Przyjmij dostawę</a>
+        <div class="page-actions">
+            <a href="{% url 'inventory_adjustment' %}" class="button button-secondary">Korekta stanu</a>
+            <a href="{% url 'add_delivery' %}" class="button button-primary">Przyjmij dostawę</a>
+        </div>
     </section>
 
     {% include 'feed/_feed_nav.html' %}
 
-    <section class="stats-grid">
-        <a href="{% url 'feed_full_inventory' %}" class="stat-tile stat-link">
-            <span>Łączny stan magazynu</span>
-            <strong>{{ total_inventory_t|floatformat:2 }} t</strong>
-        </a>
-        <div class="stat-tile">
-            <span>Niskie stany</span>
-            <strong>{{ low_stock_alerts|length }}</strong>
+    <section class="inventory-dashboard">
+        <div class="inventory-main">
+            <section class="stats-grid featured-stats compact-stats">
+                <a href="{% url 'feed_full_inventory' %}" class="stat-tile stat-link is-success">
+                    <span>Łączny stan magazynu</span>
+                    <strong>{{ total_inventory_t|floatformat:2 }} t</strong>
+                    <small>Pełny widok surowców i progów alarmowych.</small>
+                </a>
+                <div class="stat-tile{% if low_stock_alerts %} is-danger{% endif %}">
+                    <span>Niskie stany</span>
+                    <strong>{{ low_stock_alerts|length }}</strong>
+                    <small>{% if low_stock_alerts %}Wymagają kontroli lub dostawy.{% else %}Brak aktywnych alertów magazynowych.{% endif %}</small>
+                </div>
+                <div class="stat-tile">
+                    <span>Dostawy w historii</span>
+                    <strong>{{ deliveries|length }}</strong>
+                    <small>Ostatnie przyjęcia surowców na magazyn.</small>
+                </div>
+            </section>
         </div>
-        <div class="stat-tile">
-            <span>Dostawy</span>
-            <strong>{{ deliveries|length }}</strong>
-        </div>
+
+        <aside class="inventory-side">
+            <section class="side-summary-card {% if low_stock_alerts %}is-tinted{% endif %}">
+                <h2>Alerty magazynowe</h2>
+                {% if low_stock_alerts %}
+                    <ul class="inventory-alert-list">
+                        {% for alert in low_stock_alerts %}
+                        <li>
+                            <strong>{{ alert.name }}</strong>
+                            <span>{{ alert.current_stock|floatformat:0 }} kg / próg {{ alert.low_stock_threshold_kg|floatformat:0 }} kg</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    <a href="{% url 'feed_full_inventory' %}" class="button button-secondary">Pełny magazyn</a>
+                {% else %}
+                    <p>Stany surowców są powyżej progów alarmowych.</p>
+                {% endif %}
+            </section>
+        </aside>
     </section>
 
-    {% if low_stock_alerts %}
-    <section class="notice notice-danger">
-        <div>
-            <h2>Niski stan surowców</h2>
-            <p>
-                {% for alert in low_stock_alerts %}
-                    {{ alert.name }}: {{ alert.current_stock|floatformat:0 }} kg / próg {{ alert.low_stock_threshold_kg|floatformat:0 }} kg{% if not forloop.last %}, {% endif %}
-                {% endfor %}
-            </p>
+    {% url 'feed_inventory' as inventory_filter_url %}{% include 'components/filter_panel.html' with filter_action=inventory_filter_url filter_clear_url=inventory_filter_url filter_fields_template='feed/_inventory_filters.html' %}
+
+    <section class="panel table-panel">
+        <div class="section-heading"><div><h2>Ruchy magazynowe</h2><p>Dostawy, zużycia produkcyjne i ręczne korekty.</p></div></div>
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead><tr><th>Data</th><th>Składnik</th><th>Typ</th><th class="text-right">Zmiana</th><th>Powód</th></tr></thead>
+                <tbody>
+                {% for movement in movements %}
+                    <tr>
+                        <td>{{ movement.movement_date|date:"d.m.Y" }}</td>
+                        <td>{{ movement.ingredient.name }}</td>
+                        <td>{{ movement.get_movement_type_display }}</td>
+                        <td class="text-right">{{ movement.quantity_kg|floatformat:2 }} kg</td>
+                        <td>{{ movement.note|default:"-" }}</td>
+                    </tr>
+                {% empty %}<tr><td colspan="5" class="empty-table">Brak ruchów magazynowych.</td></tr>{% endfor %}
+                </tbody>
+            </table>
         </div>
-        <a href="{% url 'feed_full_inventory' %}" class="button button-secondary">Pełny magazyn</a>
     </section>
-    {% endif %}
 
     <section class="panel table-panel">
         <div class="section-heading">
@@ -57,6 +94,7 @@
                         <th>Data</th>
                         <th>Składnik</th>
                         <th class="text-right">Ilość</th>
+                        <th class="text-right">Pozostało FIFO</th>
                         <th class="text-right">Cena/kg</th>
                         <th class="text-right">Akcje</th>
                     </tr>
@@ -67,6 +105,7 @@
                         <td>{{ delivery.date|date:"d.m.Y" }}</td>
                         <td><strong>{{ delivery.ingredient.name }}</strong></td>
                         <td class="text-right"><strong>{{ delivery.quantity_kg|floatformat:2 }}</strong> kg</td>
+                        <td class="text-right">{{ delivery.remaining_quantity_kg|floatformat:2 }} kg</td>
                         <td class="text-right">{{ delivery.price_per_kg|default:"-" }} PLN</td>
                         <td class="text-right">
                             <div class="row-actions">
@@ -76,7 +115,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="empty-table">Brak historii wprowadzonych dostaw.</td>
+                        <td colspan="6" class="empty-table">Brak historii wprowadzonych dostaw.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

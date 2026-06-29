@@ -28,6 +28,7 @@ class SaleRepository:
             live_weight=db_model.live_weight,
             dressing_percentage=db_model.dressing_percentage,
             net_value=db_model.net_value,
+            vat_value=db_model.vat_value,
             gross_value=db_model.gross_value,
         )
 

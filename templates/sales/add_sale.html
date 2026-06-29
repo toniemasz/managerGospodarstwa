@@ -14,6 +14,7 @@
 
     <form method="post" enctype="multipart/form-data" class="responsive-form" id="sale-form">
         {% csrf_token %}
+        {% include 'components/form_errors.html' with form=form %}
 
         <section class="sale-document-layout">
             <div class="panel">
@@ -102,6 +103,9 @@
             </div>
 
             {{ row_formset.management_form }}
+            {% if row_formset.non_form_errors %}
+                <div class="notice notice-danger">{{ row_formset.non_form_errors }}</div>
+            {% endif %}
             <div class="table-scroll">
                 <table class="data-table settlement-table" data-no-pagination="true">
                     <thead>
@@ -121,7 +125,7 @@
                     </thead>
                     <tbody id="settlement-rows">
                         {% for row_form in row_formset %}
-                        <tr class="settlement-row">
+                        <tr class="settlement-row{% if row_form.DELETE.value %} hidden{% endif %}">
                             <td>{{ row_form.line_no }}</td>
                             <td>{{ row_form.meat_class }}</td>
                             <td>{{ row_form.quantity }}</td>
@@ -132,12 +136,13 @@
                             <td>{{ row_form.net_value }}</td>
                             <td>{{ row_form.vat_value }}</td>
                             <td>{{ row_form.gross_value }}</td>
-                            <td class="delete-cell">{{ row_form.DELETE }}</td>
+                            <td class="delete-cell"><span class="hidden">{{ row_form.DELETE }}</span><button type="button" class="link-button-danger remove-settlement-row">Usuń</button></td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
+            <p id="settlement-rows-empty" class="empty-inline" hidden>Brak pozycji rozliczenia. Użyj przycisku „Dodaj wiersz”, aby utworzyć pierwszą.</p>
         </section>
 
         <template id="settlement-row-template">
@@ -152,7 +157,7 @@
                 <td>{{ row_formset.empty_form.net_value }}</td>
                 <td>{{ row_formset.empty_form.vat_value }}</td>
                 <td>{{ row_formset.empty_form.gross_value }}</td>
-                <td class="delete-cell">{{ row_formset.empty_form.DELETE }}</td>
+                <td class="delete-cell"><span class="hidden">{{ row_formset.empty_form.DELETE }}</span><button type="button" class="link-button-danger remove-settlement-row">Usuń</button></td>
             </tr>
         </template>
 

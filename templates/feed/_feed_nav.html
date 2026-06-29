@@ -1,19 +1,19 @@
 {% with active=request.resolver_match.url_name %}
 <nav class="subnav" aria-label="Nawigacja pasz">
-    <a href="{% url 'ingredient_list' %}" class="{% if active == 'ingredient_list' or active == 'add_ingredient' or active == 'edit_ingredient' %}is-active{% endif %}">
+    {% if 'feed' in ui_visible_module_keys %}<a href="{% url 'ingredient_list' %}" class="{% if active == 'ingredient_list' or active == 'add_ingredient' or active == 'edit_ingredient' %}is-active{% endif %}">
         Składniki
-    </a>
-    <a href="{% url 'feed_inventory' %}" class="{% if active == 'feed_inventory' or active == 'feed_full_inventory' or active == 'add_delivery' or active == 'edit_delivery' %}is-active{% endif %}">
+    </a>{% endif %}
+    {% if 'inventory' in ui_visible_module_keys %}<a href="{% url 'feed_inventory' %}" class="{% if active == 'feed_inventory' or active == 'feed_full_inventory' or active == 'add_delivery' or active == 'edit_delivery' %}is-active{% endif %}">
         Magazyn
-    </a>
-    <a href="{% url 'feed_recipes' %}" class="{% if active == 'feed_recipes' or active == 'recipe_detail' or active == 'add_recipe' or active == 'edit_recipe' %}is-active{% endif %}">
+    </a>{% endif %}
+    {% if 'recipes' in ui_visible_module_keys %}<a href="{% url 'feed_recipes' %}" class="{% if active == 'feed_recipes' or active == 'recipe_detail' or active == 'add_recipe' or active == 'edit_recipe' %}is-active{% endif %}">
         Receptury
-    </a>
-    <a href="{% url 'feed_productions' %}" class="{% if active == 'feed_productions' or active == 'add_production' or active == 'edit_production' or active == 'process_stage1' or active == 'process_stage2' %}is-active{% endif %}">
+    </a>{% endif %}
+    {% if 'production' in ui_visible_module_keys %}<a href="{% url 'feed_productions' %}" class="{% if active == 'feed_productions' or active == 'add_production' or active == 'edit_production' or active == 'process_stage1' or active == 'process_stage2' %}is-active{% endif %}">
         Śrutowanie
-    </a>
-    <a href="{% url 'feed_calculator' %}" class="{% if active == 'feed_calculator' %}is-active{% endif %}">
+    </a>{% endif %}
+    {% if 'feed' in ui_visible_module_keys %}<a href="{% url 'feed_calculator' %}" class="{% if active == 'feed_calculator' %}is-active{% endif %}">
         Kalkulator
-    </a>
+    </a>{% endif %}
 </nav>
 {% endwith %}

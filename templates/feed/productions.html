@@ -14,6 +14,8 @@
 
     {% include 'feed/_feed_nav.html' %}
 
+    {% url 'feed_productions' as production_filter_url %}{% include 'components/filter_panel.html' with filter_action=production_filter_url filter_clear_url=production_filter_url filter_fields_template='feed/_production_filters.html' %}
+
     <section class="panel table-panel">
         <div class="section-heading">
             <div>
@@ -28,6 +30,7 @@
                         <th>Data</th>
                         <th>Receptura</th>
                         <th class="text-right">Ilość</th>
+                        <th class="text-right">Koszt FIFO</th>
                         <th>Status</th>
                         <th class="text-right">Akcje</th>
                     </tr>
@@ -46,6 +49,16 @@
                             {% endif %}
                         </td>
                         <td class="text-right"><strong>{{ prod.quantity_kg|floatformat:0 }}</strong> kg</td>
+                        <td class="text-right">
+                            {% if prod.status == 'COMPLETED' %}
+                                <strong>{{ prod.feed_cost_total|floatformat:2 }}</strong> zł
+                                {% if prod.feed_cost_is_partial %}
+                                    <br><span class="status-pill status-amber">Częściowy</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="muted-small">--</span>
+                            {% endif %}
+                        </td>
                         <td>
                             {% if prod.status == 'QUEUED' %}
                                 <span class="status-pill">W kolejce</span>
@@ -70,7 +83,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="empty-table">Brak zarejestrowanych operacji śrutowania.</td>
+                        <td colspan="6" class="empty-table">Brak zarejestrowanych operacji śrutowania.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

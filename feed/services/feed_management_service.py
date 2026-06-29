@@ -1,5 +1,6 @@
 from decimal import Decimal
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Count, Sum
 
@@ -8,6 +9,7 @@ from feed.domain.rules import DEFAULT_PRODUCTION_QUANTITY_KG, LOW_STOCK_THRESHOL
 from feed.services.feed_calculators import InventoryItem, ProductionCalculator, RecipeCostCalculator
 from feed.services.feed_repository import FeedRepository
 from feed.models import ProductionModel
+from feed.services.inventory_service import InventoryMovementService
 
 
 class FeedManagementService:
@@ -38,20 +40,14 @@ class FeedManagementService:
     def get_inventory_dashboard(self) -> dict:
         """Orkiestruje wyliczanie stanu magazynu bez dotykania ORM."""
         ingredients = self.repository.get_all_ingredients()
-        delivery_map = self.repository.get_delivery_aggregates()
-        completed_productions = self.repository.get_completed_productions()
-
-        consumed_map = {ing.id: Decimal('0.00') for ing in ingredients}
-
-        for prod in completed_productions:
-            for req in self._calculator_for_production(prod).get_requirements():
-                if req.ingredient_id in consumed_map:
-                    consumed_map[req.ingredient_id] += req.required_kg
+        movement_totals = InventoryMovementService(self.farm).movement_totals()
 
         inventory_state = []
         for ing in ingredients:
-            total_delivered = delivery_map.get(ing.id, Decimal('0.00'))
-            total_consumed = consumed_map.get(ing.id, Decimal('0.00'))
+            total_delivered, total_consumed = movement_totals.get(
+                ing.id,
+                (Decimal('0.00'), Decimal('0.00')),
+            )
 
             inventory_state.append(InventoryItem(
                 ingredient_id=ing.id,
@@ -59,7 +55,7 @@ class FeedManagementService:
                 is_in_bin=ing.is_in_bin,
                 low_stock_threshold_kg=ing.low_stock_threshold_kg,
                 total_delivered=total_delivered,
-                total_used=total_consumed
+                total_used=total_consumed,
             ))
 
         low_stock = [item for item in inventory_state if item.is_low_stock]
@@ -142,26 +138,36 @@ class FeedManagementService:
         self.repository.save_production(production)
         return True, "Zakończono pobieranie z binów. Gotowe do Etapu 2."
 
-    @transaction.atomic
-    def complete_production(self, production_id: int, skip_stages: bool = False, force_inventory: bool = False) -> \
+    def complete_production(self, production_id: int, skip_stages: bool = False, force_inventory: bool = False, user=None) -> \
     tuple[bool, str]:
-        production = self.repository.get_production_for_processing(production_id, lock_for_update=True)
+        try:
+            with transaction.atomic():
+                production = self.repository.get_production_for_processing(production_id, lock_for_update=True)
 
-        if production.status == 'COMPLETED':
-            return False, "To śrutowanie zostało już wcześniej zaksięgowane."
+                if production.status == 'COMPLETED':
+                    return False, "To śrutowanie zostało już wcześniej zaksięgowane."
 
-        if not skip_stages and production.status != 'STAGE_1_DONE':
-            return False, "Nie można zakończyć produkcji przed wykonaniem Etapu 1."
+                if not skip_stages and production.status != 'STAGE_1_DONE':
+                    return False, "Nie można zakończyć produkcji przed wykonaniem Etapu 1."
 
-        if not force_inventory:
-            is_possible, errors = self.validate_production_capacity(production_id)
-            if not is_possible:
-                return False, "Brak wystarczającej ilości składników na magazynie: " + " | ".join(errors)
+                if not force_inventory:
+                    is_possible, errors = self.validate_production_capacity(production_id)
+                    if not is_possible:
+                        return False, "Brak wystarczającej ilości składników na magazynie: " + " | ".join(errors)
 
-        production.status = 'COMPLETED'
-        production.completed_at = timezone.now()
-        self.repository.save_production(production)
-        return True, "Śrutowanie zakończone pomyślnie. Zaktualizowano stany magazynowe."
+                production.status = 'COMPLETED'
+                production.completed_at = timezone.now()
+                production._skip_inventory_sync = True
+                self.repository.save_production(production)
+                InventoryMovementService(self.farm).book_production(
+                    production,
+                    user=user,
+                    forced=force_inventory,
+                )
+        except ValidationError as error:
+            message = error.messages[0] if hasattr(error, "messages") else str(error)
+            return False, message
+        return True, "Śrutowanie zakończone pomyślnie. Zaktualizowano stany magazynowe i koszt FIFO."
 
     def get_calculator_data(self):
         """
@@ -208,15 +214,17 @@ class FeedManagementService:
         rows = []
         for ingredient in self.repository.get_all_ingredients():
             delivery = sources.get(ingredient.id)
+            price = prices_map.get(ingredient.id)
             rows.append({
                 'ingredient': ingredient,
-                'price_per_kg': prices_map.get(ingredient.id, Decimal('0.00')),
+                'price_per_kg': price,
                 'source_date': delivery.date if delivery else None,
                 'has_delivery': delivery is not None,
+                'has_price': price is not None,
             })
         return rows
 
-    def get_recipe_detail(self, recipe_id: int, date_from=None, date_to=None) -> dict:
+    def get_recipe_detail(self, recipe_id: int, date_from=None, date_to=None, production_year: int | None = None) -> dict:
         recipe = self.repository.get_recipe_with_items(recipe_id)
         prices_map = self.repository.get_latest_delivery_prices_map()
 
@@ -235,7 +243,21 @@ class FeedManagementService:
             price_map=prices_map,
         ).calculate_cost()
 
-        productions = self.repository.get_productions_for_recipe(recipe_id)
+        all_productions = self.repository.get_productions_for_recipe(recipe_id)
+        year = production_year or timezone.localdate().year
+        available_years = [
+            row.year for row in all_productions.filter(
+                status=ProductionModel.Statuses.COMPLETED,
+            ).dates('date', 'year', order='DESC')
+        ]
+        if year not in available_years:
+            available_years.insert(0, year)
+        yearly_quantity_kg = all_productions.filter(
+            status=ProductionModel.Statuses.COMPLETED,
+            date__year=year,
+        ).aggregate(quantity_kg=Sum('quantity_kg'))['quantity_kg'] or Decimal('0.00')
+
+        productions = all_productions
         if date_from is not None:
             productions = productions.filter(date__gte=date_from)
         if date_to is not None:
@@ -248,6 +270,7 @@ class FeedManagementService:
         completed = productions.filter(status=ProductionModel.Statuses.COMPLETED).aggregate(
             count=Count('id'),
             quantity_kg=Sum('quantity_kg'),
+            feed_cost=Sum('feed_cost_total'),
         )
         queued = productions.filter(status=ProductionModel.Statuses.QUEUED).aggregate(
             count=Count('id'),
@@ -268,10 +291,16 @@ class FeedManagementService:
                 'completed_count': completed['count'] or 0,
                 'completed_kg': completed['quantity_kg'] or Decimal('0.00'),
                 'completed_t': (completed['quantity_kg'] or Decimal('0.00'))/ Decimal('1000.00'),
-                'completed_cost': (completed['quantity_kg'] or Decimal('0.00')) * cost.cost_per_kg,
+                'completed_cost': completed['feed_cost'] or Decimal('0.00'),
                 'queued_count': queued['count'] or 0,
                 'queued_kg': queued['quantity_kg'] or Decimal('0.00'),
                 'in_progress_count': in_progress['count'] or 0,
                 'in_progress_kg': in_progress['quantity_kg'] or Decimal('0.00'),
+            },
+            'yearly_production': {
+                'year': year,
+                'available_years': available_years,
+                'quantity_kg': yearly_quantity_kg,
+                'quantity_t': yearly_quantity_kg / Decimal('1000.00'),
             },
         }

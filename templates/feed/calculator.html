@@ -65,23 +65,19 @@
             </div>
             <div class="price-input-list">
                 {% for row in ingredient_prices %}
-                <label class="price-input-row" for="price_{{ row.ingredient.id }}">
+                <label class="price-input-row" for="{{ row.field.id_for_label }}">
                     <span>
                         <strong>{{ row.ingredient.name }}</strong>
                         {% if row.has_delivery %}
                             <small>Ostatni zakup: {{ row.source_date|date:"d.m.Y" }}</small>
                         {% else %}
-                            <small>Brak zakupu, cena 0</small>
+                            <small>Brak zakupu, brak ceny</small>
+                        {% endif %}
+                        {% if row.field.errors %}
+                            <small class="field-error">{{ row.field.errors.0 }}</small>
                         {% endif %}
                     </span>
-                    <input
-                        type="number"
-                        id="price_{{ row.ingredient.id }}"
-                        name="price_{{ row.ingredient.id }}"
-                        value="{{ row.price_per_kg|stringformat:'.5f' }}"
-                        min="0"
-                        step="0.00001"
-                    >
+                    {{ row.field }}
                 </label>
                 {% empty %}
                 <p class="empty-table">Brak składników w magazynie.</p>

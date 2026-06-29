@@ -1,65 +1,41 @@
 {% extends 'base.html' %}
 {% block title %}Centrala Gospodarstwa{% endblock %}
-
 {% block content %}
 <main class="app-page">
     <section class="page-header">
-        <div>
-            <p class="eyebrow">Centrala</p>
-            <h1>{{ current_farm.name|default:"Manager gospodarstwa" }}</h1>
-            <p class="page-subtitle">Wybierz moduł pracy dla bieżącego gospodarstwa.</p>
-        </div>
+        <div><p class="eyebrow">Centrala</p><h1>{{ current_farm.name|default:"Manager gospodarstwa" }}</h1><p class="page-subtitle">Wybierz moduł pracy dla bieżącego gospodarstwa.</p></div>
     </section>
 
     <section class="quick-actions-panel">
-        <div class="section-heading">
-            <div>
-                <h2>Szybkie akcje</h2>
-                <p>Najczęstsze operacje dostępne od razu po wejściu do systemu.</p>
-            </div>
-        </div>
+        <div class="section-heading"><div><h2>Szybkie akcje</h2><p>Najczęstsze operacje dostępne od razu po wejściu do systemu.</p></div></div>
         <div class="quick-actions-grid">
-            <a href="{% url 'bulk_sow_events' %}?rows=1" class="quick-action">
-                <span class="module-icon">Z</span>
-                <div>
-                    <strong>Utwórz zdarzenie maciory</strong>
-                    <small>Bez wchodzenia w kartę konkretnej maciory.</small>
-                </div>
-            </a>
-            <a href="{% url 'add_production' %}" class="quick-action">
-                <span class="module-icon amber">Ś</span>
-                <div>
-                    <strong>Zleć śrutowanie</strong>
-                    <small>Dodaj nowe śrutowanie do kolejki pasz.</small>
-                </div>
-            </a>
+            {% if 'sows' in ui_visible_module_keys %}<a href="{% url 'bulk_sow_events' %}?rows=1" class="quick-action"><span class="module-icon">Z</span><div><strong>Utwórz zdarzenie maciory</strong><small>Bez wchodzenia w kartę konkretnej maciory.</small></div></a>{% endif %}
+            {% if 'production' in ui_visible_module_keys %}<a href="{% url 'add_production' %}" class="quick-action"><span class="module-icon amber">Ś</span><div><strong>Zleć śrutowanie</strong><small>Dodaj nowe śrutowanie do kolejki pasz.</small></div></a>{% endif %}
+            {% if 'costs' in ui_visible_module_keys %}<a href="{% url 'add_cost' %}" class="quick-action"><span class="module-icon green">K</span><div><strong>Dodaj koszt</strong><small>Zapisz dokument, kategorię i status płatności.</small></div></a>{% endif %}
         </div>
     </section>
 
-    <section class="module-grid">
-        <a href="{% url 'dashboard' %}" class="module-card">
-            <span class="module-icon">M</span>
-            <div>
-                <h2>Maciory</h2>
-                <p>Cykle rozrodcze, zdarzenia, szczepienia, archiwum i statystyki stada.</p>
+    <section class="module-group-list" id="modules">
+        {% for group in ui_module_groups %}
+        <div class="module-group-section">
+            <div class="section-heading">
+                <div>
+                    <h2>{{ group.title }}</h2>
+                    <p>Najważniejsze narzędzia w tej części gospodarstwa.</p>
+                </div>
             </div>
-        </a>
-
-        <a href="{% url 'feed_inventory' %}" class="module-card">
-            <span class="module-icon amber">P</span>
-            <div>
-                <h2>Pasze i magazyn</h2>
-                <p>Składniki, dostawy, receptury, śrutowanie oraz koszt paszy liczony przez backend.</p>
+            <div class="module-grid">
+                {% for module in group.modules %}
+                <a href="{{ module.url }}" class="module-card">
+                    <span class="module-icon {{ module.tone }}">{{ module.icon }}</span>
+                    <div><h2>{{ module.title }}</h2><p>{{ module.description }}</p></div>
+                </a>
+                {% endfor %}
             </div>
-        </a>
-
-        <a href="{% url 'sales_list' %}" class="module-card">
-            <span class="module-icon green">S</span>
-            <div>
-                <h2>Sprzedaż</h2>
-                <p>Rejestr sprzedaży, klasy mięsności, wagi i podsumowania finansowe.</p>
-            </div>
-        </a>
+        </div>
+        {% empty %}
+        {% include 'components/empty_state.html' with title='Brak widocznych modułów' message='Włącz moduły w ustawieniach gospodarstwa.' %}
+        {% endfor %}
     </section>
 </main>
 {% endblock %}

@@ -48,9 +48,9 @@ class SaleSettlementPdfParser:
 
         first_page = pages[0]
         result = SaleSettlementImport()
-        result.sale_fields = self._extract_sale_fields(first_page)
-        result.rows = self._extract_main_table_rows(first_page)
-        result.summary = self._extract_summary(first_page)
+        result.sale_fields = self._extract_sale_fields(first_page, result.warnings)
+        result.rows = self._extract_main_table_rows(first_page, result.warnings)
+        result.summary = self._extract_summary(first_page, result.warnings)
 
         result.sale_fields.update({
             'avg_meatiness_seurop': result.summary.get('avg_meatiness_seurop'),
@@ -157,17 +157,33 @@ class SaleSettlementPdfParser:
                 continue
         return ''
 
-    def _extract_sale_fields(self, items: list[PdfTextItem]) -> dict:
+    def _extract_sale_fields(self, items: list[PdfTextItem], warnings: list[str]) -> dict:
         text = '\n'.join(item.text for item in items)
         fields = {}
 
         slaughter_match = re.search(r'Data uboju:\s*(\d{4}-\d{2}-\d{2})', text)
         if slaughter_match:
-            fields['sale_date'] = self._parse_date(slaughter_match.group(1))
+            raw_date = slaughter_match.group(1)
+            sale_date = self._parse_date(raw_date)
+            if sale_date is None:
+                warnings.append(
+                    f"Nie udało się rozpoznać daty uboju z PDF: {raw_date}. "
+                    "Uzupełnij datę ręcznie przed zapisem."
+                )
+            else:
+                fields['sale_date'] = sale_date
+        else:
+            warnings.append(
+                "Nie znaleziono daty uboju w PDF. Uzupełnij datę ręcznie przed zapisem."
+            )
 
         document_match = re.search(r'Dokument nr:\s*([^\n]+)', text)
         if document_match:
             fields['document_number'] = document_match.group(1).strip()
+        else:
+            warnings.append(
+                "Nie znaleziono numeru dokumentu w PDF. Uzupełnij numer ręcznie przed zapisem."
+            )
 
         tattoo_label = self._find_item(items, 'Tatuaż:')
         if tattoo_label:
@@ -177,7 +193,7 @@ class SaleSettlementPdfParser:
 
         return fields
 
-    def _extract_main_table_rows(self, items: list[PdfTextItem]) -> list[dict]:
+    def _extract_main_table_rows(self, items: list[PdfTextItem], warnings: list[str]) -> list[dict]:
         header_y = self._find_header_y(items)
         if header_y is None:
             return []
@@ -193,51 +209,132 @@ class SaleSettlementPdfParser:
             if not line_text or not line_text.strip().isdigit():
                 continue
 
+            row_label = f"wiersz {line_text.strip()}"
             row = {
-                'line_no': self._parse_int(line_text),
+                'line_no': self._parse_int_field(line_text, 'Lp', warnings, row_label),
                 'meat_class': self._text_in_column(row_items, 'meat_class'),
-                'quantity': self._parse_int(self._text_in_column(row_items, 'quantity')),
-                'weight': self._parse_decimal(self._text_in_column(row_items, 'weight')),
-                'avg_weight': self._parse_decimal(self._text_in_column(row_items, 'avg_weight')),
-                'avg_meatiness': self._parse_decimal(self._text_in_column(row_items, 'avg_meatiness')),
-                'price_per_kg': self._parse_decimal(self._text_in_column(row_items, 'price_per_kg')),
-                'net_value': self._parse_decimal(self._text_in_column(row_items, 'net_value')),
-                'vat_value': self._parse_decimal(self._text_in_column(row_items, 'vat_value')),
-                'gross_value': self._parse_decimal(self._text_in_column(row_items, 'gross_value')),
+                'quantity': self._parse_int_field(
+                    self._text_in_column(row_items, 'quantity'),
+                    'ilość',
+                    warnings,
+                    row_label,
+                ),
+                'weight': self._parse_decimal_field(
+                    self._text_in_column(row_items, 'weight'),
+                    'waga',
+                    warnings,
+                    row_label,
+                ),
+                'avg_weight': self._parse_decimal_field(
+                    self._text_in_column(row_items, 'avg_weight'),
+                    'średnia waga',
+                    warnings,
+                    row_label,
+                ),
+                'avg_meatiness': self._parse_decimal_field(
+                    self._text_in_column(row_items, 'avg_meatiness'),
+                    'średnia mięsność',
+                    warnings,
+                    row_label,
+                ),
+                'price_per_kg': self._parse_decimal_field(
+                    self._text_in_column(row_items, 'price_per_kg'),
+                    'cena za kg',
+                    warnings,
+                    row_label,
+                ),
+                'net_value': self._parse_decimal_field(
+                    self._text_in_column(row_items, 'net_value'),
+                    'wartość netto',
+                    warnings,
+                    row_label,
+                ),
+                'vat_value': self._parse_decimal_field(
+                    self._text_in_column(row_items, 'vat_value'),
+                    'VAT',
+                    warnings,
+                    row_label,
+                ),
+                'gross_value': self._parse_decimal_field(
+                    self._text_in_column(row_items, 'gross_value'),
+                    'wartość brutto',
+                    warnings,
+                    row_label,
+                ),
             }
             rows.append(row)
 
         return rows
 
-    def _extract_summary(self, items: list[PdfTextItem]) -> dict:
+    def _extract_summary(self, items: list[PdfTextItem], warnings: list[str]) -> dict:
         summary = {}
 
         total_label = self._find_item(items, 'Razem:')
         if total_label:
             same_line = self._items_on_same_line(items, total_label.y)
-            summary['total_weight'] = self._parse_decimal(self._text_between_x(same_line, 130, 230))
-            summary['quantity'] = self._parse_int(self._text_between_x(same_line, 250, 320))
-            summary['net_value'] = self._parse_decimal(self._text_between_x(same_line, 430, 520))
+            summary['total_weight'] = self._parse_decimal_field(
+                self._text_between_x(same_line, 130, 230),
+                'waga razem',
+                warnings,
+                'podsumowanie',
+            )
+            summary['quantity'] = self._parse_int_field(
+                self._text_between_x(same_line, 250, 320),
+                'ilość razem',
+                warnings,
+                'podsumowanie',
+            )
+            summary['net_value'] = self._parse_decimal_field(
+                self._text_between_x(same_line, 430, 520),
+                'wartość netto razem',
+                warnings,
+                'podsumowanie',
+            )
 
         live_label = self._find_item(items, 'Waga żywa:')
         if live_label:
-            summary['live_weight'] = self._parse_decimal(self._text_between_x(self._items_on_same_line(items, live_label.y), 130, 230))
+            summary['live_weight'] = self._parse_decimal_field(
+                self._text_between_x(self._items_on_same_line(items, live_label.y), 130, 230),
+                'waga żywa',
+                warnings,
+                'podsumowanie',
+            )
 
         dressing_label = self._find_item(items, 'Wybój:')
         if dressing_label:
-            summary['dressing_percentage'] = self._parse_decimal(self._text_between_x(self._items_on_same_line(items, dressing_label.y), 130, 230))
+            summary['dressing_percentage'] = self._parse_decimal_field(
+                self._text_between_x(self._items_on_same_line(items, dressing_label.y), 130, 230),
+                'wybój',
+                warnings,
+                'podsumowanie',
+            )
 
         meatiness_label = self._find_item(items, 'Średnia mięsność dla SEUROP:')
         if meatiness_label:
-            summary['avg_meatiness_seurop'] = self._parse_decimal(self._text_between_x(self._items_on_same_line(items, meatiness_label.y), 250, 330))
+            summary['avg_meatiness_seurop'] = self._parse_decimal_field(
+                self._text_between_x(self._items_on_same_line(items, meatiness_label.y), 250, 330),
+                'średnia mięsność SEUROP',
+                warnings,
+                'podsumowanie',
+            )
 
         gross_label = self._find_item(items, 'Brutto:')
         if gross_label:
-            summary['gross_value'] = self._parse_decimal(self._text_between_x(self._items_on_same_line(items, gross_label.y), 430, 520))
+            summary['gross_value'] = self._parse_decimal_field(
+                self._text_between_x(self._items_on_same_line(items, gross_label.y), 430, 520),
+                'wartość brutto',
+                warnings,
+                'podsumowanie',
+            )
 
         vat_label = self._find_item(items, 'VAT (8%):')
         if vat_label:
-            summary['vat_value'] = self._parse_decimal(self._text_between_x(self._items_on_same_line(items, vat_label.y), 430, 520))
+            summary['vat_value'] = self._parse_decimal_field(
+                self._text_between_x(self._items_on_same_line(items, vat_label.y), 430, 520),
+                'VAT',
+                warnings,
+                'podsumowanie',
+            )
 
         return summary
 
@@ -295,15 +392,19 @@ class SaleSettlementPdfParser:
     def _parse_date(value: str) -> date | None:
         try:
             year, month, day = [int(part) for part in value.split('-')]
+            return date(year, month, day)
         except (TypeError, ValueError):
             return None
-        return date(year, month, day)
 
     @staticmethod
     def _parse_decimal(value: str | None) -> Decimal | None:
         if not value:
             return None
-        normalized = re.sub(r'[^\d,\.\-]', '', value.replace(' ', '')).replace(',', '.')
+        without_units = re.sub(r'\bPLN\b', '', value, flags=re.I)
+        without_units = without_units.replace('zł', '').replace('ZŁ', '').replace('%', '')
+        if re.search(r'[A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż]', without_units):
+            return None
+        normalized = re.sub(r'[^\d,\.\-]', '', without_units.replace(' ', '')).replace(',', '.')
         if normalized in ('', '-', '.', '-.'):
             return None
         try:
@@ -315,5 +416,37 @@ class SaleSettlementPdfParser:
     def _parse_int(value: str | None) -> int | None:
         if not value:
             return None
-        match = re.search(r'\d+', value.replace(' ', ''))
-        return int(match.group(0)) if match else None
+        normalized = value.replace(' ', '')
+        if not re.fullmatch(r'\d+', normalized):
+            return None
+        return int(normalized)
+
+    def _parse_decimal_field(
+        self,
+        value: str | None,
+        label: str,
+        warnings: list[str],
+        context: str,
+    ) -> Decimal | None:
+        parsed = self._parse_decimal(value)
+        if parsed is None and value and value.strip():
+            warnings.append(
+                f"Nie udało się rozpoznać wartości liczbowej pola '{label}' ({context}): {value}. "
+                "Uzupełnij ją ręcznie przed zapisem."
+            )
+        return parsed
+
+    def _parse_int_field(
+        self,
+        value: str | None,
+        label: str,
+        warnings: list[str],
+        context: str,
+    ) -> int | None:
+        parsed = self._parse_int(value)
+        if parsed is None and value and value.strip():
+            warnings.append(
+                f"Nie udało się rozpoznać liczby całkowitej pola '{label}' ({context}): {value}. "
+                "Uzupełnij ją ręcznie przed zapisem."
+            )
+        return parsed

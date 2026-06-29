@@ -81,7 +81,7 @@
                             <td>{{ form.born_dead }}{{ form.born_dead.errors }}</td>
                             <td>{{ form.count }}{{ form.count.errors }}</td>
                             <td>{{ form.vaccine_name }}{{ form.vaccine_name.errors }}</td>
-                            <td class="delete-cell">{{ form.DELETE }}</td>
+                            <td class="delete-cell"><span class="hidden">{{ form.DELETE }}</span><button type="button" class="link-button-danger remove-bulk-event-row">Usuń</button></td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -105,7 +105,7 @@
                 <td>{{ formset.empty_form.born_dead }}</td>
                 <td>{{ formset.empty_form.count }}</td>
                 <td>{{ formset.empty_form.vaccine_name }}</td>
-                <td class="delete-cell">{{ formset.empty_form.DELETE }}</td>
+                <td class="delete-cell"><span class="hidden">{{ formset.empty_form.DELETE }}</span><button type="button" class="link-button-danger remove-bulk-event-row">Usuń</button></td>
             </tr>
         </template>
 

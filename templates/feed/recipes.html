@@ -7,7 +7,7 @@
         <div>
             <p class="eyebrow">Pasze</p>
             <h1>Receptury</h1>
-            <p class="page-subtitle">Skład, koszt z ostatnich dostaw i wejście do szczegółów produkcji.</p>
+            <p class="page-subtitle">Skład, koszt poglądowy z ostatnich dostaw i wejście do szczegółów produkcji.</p>
         </div>
         <a href="{% url 'add_recipe' %}" class="button button-primary">Utwórz recepturę</a>
     </section>
@@ -16,9 +16,10 @@
 
     <section class="recipe-grid">
         {% for card in recipe_cards %}
-        <article class="recipe-card">
+        <article class="recipe-card{% if forloop.first %} is-featured{% endif %}">
             <div class="recipe-card-header">
                 <div>
+                    <span class="recipe-card-kicker">Receptura paszowa</span>
                     <h2>{{ card.recipe.name }}</h2>
                     <p>ID #{{ card.recipe.id }}</p>
                 </div>
@@ -47,6 +48,7 @@
 
             <div class="recipe-card-actions">
                 <a href="{% url 'edit_recipe' card.recipe.id %}" class="button button-secondary">Edytuj</a>
+                <a href="{% url 'add_production' %}?recipe={{ card.recipe.id }}" class="button button-primary">Zleć śrutowanie</a>
             </div>
         </article>
         {% empty %}

@@ -18,21 +18,11 @@
         <form method="post" class="responsive-form" id="generic-form">
             {% csrf_token %}
 
-            {% if form.non_field_errors %}
-            <div class="alert alert-error">
-                {{ form.non_field_errors }}
-            </div>
-            {% endif %}
+            {% include 'components/form_errors.html' with form=form %}
+            <div class="form-section-heading"><h2>Dane rekordu</h2><p>Pola oznaczone błędem wymagają poprawy przed zapisem.</p></div>
 
             {% for field in form %}
-            <div class="form-field {% if field.errors %}has-error{% endif %}">
-                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {% if field.help_text %}
-                <p class="field-hint">{{ field.help_text }}</p>
-                {% endif %}
-                {{ field.errors }}
-            </div>
+                {% include 'components/form_field.html' with field=field %}
             {% endfor %}
 
             <div class="form-actions">

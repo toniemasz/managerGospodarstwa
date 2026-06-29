@@ -5,6 +5,7 @@ from django.forms import formset_factory
 from .services.sow_repository import VaccinationPlanRepository
 from .models import SowModel, SowEventModel, VaccinationPlanModel
 from django.core.exceptions import ValidationError
+from sows.domain.event_details import build_event_details
 from sows.domain.sow_state_machine import SowStateMachine
 
 
@@ -144,17 +145,7 @@ class SowEventForm(forms.ModelForm):
 
     def _build_event_details(self, event_type: str) -> dict:
         """Mapuje dane dynamiczne do pola JSONB na podstawie typu zdarzenia."""
-        details_mapping = {
-            'INSEMINATION': {'technician': self.cleaned_data.get('technician') or ""},
-            'PREGNANCY_CHECK': {'result': self.cleaned_data.get('pregnancy_result') or ""},
-            'FARROWING': {
-                'born_alive': self.cleaned_data.get('born_alive') or 0,
-                'born_dead': self.cleaned_data.get('born_dead') or 0
-            },
-            'WEANING': {'count': self.cleaned_data.get('count') or 0},
-            'VACCINATION': {'vaccine_name': self.cleaned_data.get('vaccine_name') or ""},
-        }
-        return details_mapping.get(event_type, {})
+        return build_event_details({**self.cleaned_data, 'event_type': event_type})
 
 
 class BulkSowEventRowForm(forms.Form):
@@ -235,18 +226,7 @@ class BulkSowEventRowForm(forms.Form):
         return cleaned_data
 
     def build_details(self) -> dict:
-        event_type = self.cleaned_data.get('event_type')
-        details_mapping = {
-            'INSEMINATION': {'technician': self.cleaned_data.get('technician') or ""},
-            'PREGNANCY_CHECK': {'result': self.cleaned_data.get('pregnancy_result') or ""},
-            'FARROWING': {
-                'born_alive': self.cleaned_data.get('born_alive') or 0,
-                'born_dead': self.cleaned_data.get('born_dead') or 0,
-            },
-            'WEANING': {'count': self.cleaned_data.get('count') or 0},
-            'VACCINATION': {'vaccine_name': self.cleaned_data.get('vaccine_name') or ""},
-        }
-        return details_mapping.get(event_type, {})
+        return build_event_details(self.cleaned_data)
 
 
 BulkSowEventFormSet = formset_factory(BulkSowEventRowForm, extra=0, can_delete=True)

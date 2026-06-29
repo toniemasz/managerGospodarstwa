@@ -1,0 +1,62 @@
+/* messages.css - wydzielone style aplikacji. */
+
+.notice {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.1rem;
+    border: 1px solid;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+.notice h2 {
+    margin: 0;
+    font-weight: 950;
+}
+
+.notice p {
+    margin: .25rem 0 0;
+    font-weight: 650;
+    line-height: 1.5;
+}
+
+.notice-danger {
+    border-color: #f0b8b8;
+    background: var(--danger-soft);
+    color: #8a1c1c;
+}
+
+.notice-warning {
+    border-color: #f7d08b;
+    background: var(--warning-soft);
+    color: #7a4c00;
+}
+
+.alert {
+    border: 1px solid;
+    border-radius: var(--radius);
+    padding: .95rem 1rem;
+    font-weight: 800;
+    line-height: 1.45;
+}
+
+.alert-success {
+    border-color: #a9dec8;
+    background: var(--success-soft);
+    color: #07533d;
+}
+
+.alert-error {
+    border-color: #f0b8b8;
+    background: var(--danger-soft);
+    color: #8a1c1c;
+}
+
+.alert-warning {
+    border-color: #f7d08b;
+    background: var(--warning-soft);
+    color: #7a4c00;
+}
+
+

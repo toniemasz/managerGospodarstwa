@@ -1,31 +1,97 @@
-{% with active=request.resolver_match.url_name %}
-<header class="topbar">
-    <a href="{% url 'modules_home' %}" class="brand" aria-label="Przejdź do centrali">
-        <span class="brand-title">Manager Gospodarstwa</span>
-        <span class="brand-subtitle">{{ current_farm.name|default:"Gospodarstwo" }}</span>
+<aside class="desktop-sidebar" aria-label="Nawigacja główna">
+    <a href="{% url 'modules_home' %}" class="sidebar-brand" aria-label="Przejdź do centrali">
+        <span class="brand-mark">MG</span>
+        <span class="brand-copy">
+            <span class="brand-title">Manager Gospodarstwa</span>
+            <span class="brand-subtitle">{{ current_farm.name|default:"Gospodarstwo" }}</span>
+        </span>
     </a>
 
-    <nav class="main-nav" aria-label="Główna nawigacja">
-        <a href="{% url 'modules_home' %}" class="main-nav-link {% if active == 'modules_home' %}is-active{% endif %}" {% if active == 'modules_home' %}aria-current="page"{% endif %}>Centrala</a>
-        <a href="{% url 'dashboard' %}" class="main-nav-link {% if active == 'dashboard' or active == 'sow_detail' or active == 'add_sow' or active == 'edit_sow' or active == 'add_event' or active == 'edit_event' or active == 'bulk_sow_events' or active == 'bulk_pregnancy_check' or active == 'bulk_vaccinate' or active == 'general_statistics' or active == 'archived_sows' or active == 'vaccination_plans' or active == 'add_vaccination_plan' or active == 'edit_vaccination_plan' %}is-active{% endif %}" {% if active == 'dashboard' or active == 'sow_detail' or active == 'add_sow' or active == 'edit_sow' or active == 'add_event' or active == 'edit_event' or active == 'bulk_sow_events' or active == 'bulk_pregnancy_check' or active == 'bulk_vaccinate' or active == 'general_statistics' or active == 'archived_sows' or active == 'vaccination_plans' or active == 'add_vaccination_plan' or active == 'edit_vaccination_plan' %}aria-current="page"{% endif %}>Maciory</a>
-        <a href="{% url 'feed_inventory' %}" class="main-nav-link {% if active == 'ingredient_list' or active == 'add_ingredient' or active == 'edit_ingredient' or active == 'feed_inventory' or active == 'add_delivery' or active == 'edit_delivery' or active == 'feed_full_inventory' or active == 'feed_recipes' or active == 'recipe_detail' or active == 'add_recipe' or active == 'edit_recipe' or active == 'feed_productions' or active == 'add_production' or active == 'edit_production' or active == 'process_stage1' or active == 'process_stage2' or active == 'feed_calculator' %}is-active{% endif %}" {% if active == 'ingredient_list' or active == 'add_ingredient' or active == 'edit_ingredient' or active == 'feed_inventory' or active == 'add_delivery' or active == 'edit_delivery' or active == 'feed_full_inventory' or active == 'feed_recipes' or active == 'recipe_detail' or active == 'add_recipe' or active == 'edit_recipe' or active == 'feed_productions' or active == 'add_production' or active == 'edit_production' or active == 'process_stage1' or active == 'process_stage2' or active == 'feed_calculator' %}aria-current="page"{% endif %}>Pasze</a>
-        <a href="{% url 'sales_list' %}" class="main-nav-link {% if active == 'sales_list' or active == 'add_sale' or active == 'edit_sale' %}is-active{% endif %}" {% if active == 'sales_list' or active == 'add_sale' or active == 'edit_sale' %}aria-current="page"{% endif %}>Sprzedaż</a>
+    <nav class="sidebar-nav">
+        <a href="{% url 'modules_home' %}" class="sidebar-nav-link{% if request.resolver_match.url_name == 'modules_home' %} is-active{% endif %}">
+            <span class="module-icon compact">C</span>
+            <span>Centrala</span>
+        </a>
+        {% for module in ui_primary_modules %}
+            <a href="{{ module.url }}" class="sidebar-nav-link{% if module.is_active %} is-active{% endif %}"{% if module.is_active %} aria-current="page"{% endif %}>
+                <span class="module-icon compact {{ module.tone }}">{{ module.icon }}</span>
+                <span>{{ module.title }}</span>
+            </a>
+        {% endfor %}
+        <a href="{% url 'modules_home' %}#modules" class="sidebar-nav-link">
+            <span class="module-icon compact">+</span>
+            <span>Wszystkie moduły</span>
+        </a>
     </nav>
 
+    <div class="sidebar-footer">
+        <a href="{% url 'farm_settings' %}" class="sidebar-nav-link sidebar-secondary-link{% if request.resolver_match.url_name == 'farm_settings' %} is-active{% endif %}">
+            <span class="module-icon compact">U</span>
+            <span>Ustawienia</span>
+        </a>
+        <div class="sidebar-account">
+            <span class="account-avatar">{{ current_farm.name|default:"Gospodarstwo"|first|upper }}</span>
+            <span class="account-copy">
+                <strong>{{ current_farm.name|default:"Gospodarstwo" }}</strong>
+                <small>{{ user.get_username }}</small>
+            </span>
+        </div>
+    </div>
+</aside>
+
+<header class="topbar">
+    <a href="{% url 'modules_home' %}" class="mobile-brand" aria-label="Przejdź do centrali">
+        <span class="brand-mark">MG</span>
+        <span class="brand-copy">
+            <span class="brand-title">Manager Gospodarstwa</span>
+            <span class="brand-subtitle">{{ current_farm.name|default:"Gospodarstwo" }}</span>
+        </span>
+    </a>
+
+    <div class="topbar-context">
+        <span class="context-label">Panel pracy</span>
+        <strong>{{ current_farm.name|default:"Gospodarstwo" }}</strong>
+    </div>
+
     <div class="user-menu">
-        <span class="username">{{ user.get_username }}</span>
-        <a href="{% url 'farm_settings' %}" class="button button-secondary settings-icon-button {% if active == 'farm_settings' %}is-active{% endif %}" aria-label="Ustawienia" title="Ustawienia">⚙</a>
-        <form method="post" action="{% url 'logout' %}">
-            {% csrf_token %}
-            <button type="submit" class="button button-ghost-danger">Wyloguj</button>
-        </form>
+        <a href="{% url 'modules_home' %}" class="topbar-action">Moduły</a>
+        <details class="account-menu">
+            <summary class="account-menu-trigger" aria-label="Menu użytkownika">
+                <span class="account-avatar">{{ current_farm.name|default:"Gospodarstwo"|first|upper }}</span>
+                <span class="account-copy">
+                    <strong>{{ current_farm.name|default:"Gospodarstwo" }}</strong>
+                    <small>{{ user.get_username }}</small>
+                </span>
+            </summary>
+            <div class="account-menu-panel">
+                <div class="account-menu-header">
+                    <strong>{{ current_farm.name|default:"Gospodarstwo" }}</strong>
+                    <small>{{ user.get_username }}</small>
+                </div>
+                <a href="{% url 'farm_settings' %}" class="account-menu-link{% if request.resolver_match.url_name == 'farm_settings' %} is-active{% endif %}">
+                    Ustawienia gospodarstwa
+                </a>
+                <a href="{% url 'audit_log' %}" class="account-menu-link{% if request.resolver_match.url_name == 'audit_log' %} is-active{% endif %}">
+                    Historia zmian
+                </a>
+                <form method="post" action="{% url 'logout' %}" class="account-menu-form">
+                    {% csrf_token %}
+                    <button type="submit" class="account-menu-link account-menu-danger">Wyloguj</button>
+                </form>
+            </div>
+        </details>
     </div>
 </header>
 
 <nav class="mobile-bottom-nav" aria-label="Nawigacja mobilna">
-    <a href="{% url 'modules_home' %}" class="mobile-nav-link {% if active == 'modules_home' %}is-active{% endif %}" {% if active == 'modules_home' %}aria-current="page"{% endif %}>Centrala</a>
-    <a href="{% url 'dashboard' %}" class="mobile-nav-link {% if active == 'dashboard' or active == 'sow_detail' or active == 'add_sow' or active == 'edit_sow' or active == 'add_event' or active == 'edit_event' or active == 'bulk_sow_events' or active == 'bulk_pregnancy_check' or active == 'bulk_vaccinate' or active == 'general_statistics' or active == 'archived_sows' or active == 'vaccination_plans' or active == 'add_vaccination_plan' or active == 'edit_vaccination_plan' %}is-active{% endif %}" {% if active == 'dashboard' or active == 'sow_detail' or active == 'add_sow' or active == 'edit_sow' or active == 'add_event' or active == 'edit_event' or active == 'bulk_sow_events' or active == 'bulk_pregnancy_check' or active == 'bulk_vaccinate' or active == 'general_statistics' or active == 'archived_sows' or active == 'vaccination_plans' or active == 'add_vaccination_plan' or active == 'edit_vaccination_plan' %}aria-current="page"{% endif %}>Maciory</a>
-    <a href="{% url 'feed_inventory' %}" class="mobile-nav-link {% if active == 'ingredient_list' or active == 'add_ingredient' or active == 'edit_ingredient' or active == 'feed_inventory' or active == 'add_delivery' or active == 'edit_delivery' or active == 'feed_full_inventory' or active == 'feed_recipes' or active == 'recipe_detail' or active == 'add_recipe' or active == 'edit_recipe' or active == 'feed_productions' or active == 'add_production' or active == 'edit_production' or active == 'process_stage1' or active == 'process_stage2' or active == 'feed_calculator' %}is-active{% endif %}" {% if active == 'ingredient_list' or active == 'add_ingredient' or active == 'edit_ingredient' or active == 'feed_inventory' or active == 'add_delivery' or active == 'edit_delivery' or active == 'feed_full_inventory' or active == 'feed_recipes' or active == 'recipe_detail' or active == 'add_recipe' or active == 'edit_recipe' or active == 'feed_productions' or active == 'add_production' or active == 'edit_production' or active == 'process_stage1' or active == 'process_stage2' or active == 'feed_calculator' %}aria-current="page"{% endif %}>Pasze</a>
-    <a href="{% url 'sales_list' %}" class="mobile-nav-link {% if active == 'sales_list' or active == 'add_sale' or active == 'edit_sale' %}is-active{% endif %}" {% if active == 'sales_list' or active == 'add_sale' or active == 'edit_sale' %}aria-current="page"{% endif %}>Sprzedaż</a>
+    <a href="{% url 'modules_home' %}" class="mobile-nav-link{% if request.resolver_match.url_name == 'modules_home' %} is-active{% endif %}">
+        <span class="mobile-nav-icon">C</span>
+        <span>Centrala</span>
+    </a>
+    {% for module in ui_mobile_modules %}
+        <a href="{{ module.url }}" class="mobile-nav-link{% if module.is_active %} is-active{% endif %}"{% if module.is_active %} aria-current="page"{% endif %}>
+            <span class="mobile-nav-icon {{ module.tone }}">{{ module.icon }}</span>
+            <span>{{ module.title }}</span>
+        </a>
+    {% endfor %}
 </nav>
-{% endwith %}

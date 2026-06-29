@@ -1,0 +1,5 @@
+{% include 'components/accounting_year_filter.html' with selected_year=selected_year available_years=available_years %}
+<div class="filter-field"><label for="{{ filter_form.date_from.id_for_label }}">{{ filter_form.date_from.label }}</label>{{ filter_form.date_from }}</div>
+<div class="filter-field"><label for="{{ filter_form.date_to.id_for_label }}">{{ filter_form.date_to.label }}</label>{{ filter_form.date_to }}</div>
+<div class="filter-field"><label for="{{ filter_form.category.id_for_label }}">{{ filter_form.category.label }}</label>{{ filter_form.category }}</div>
+<div class="filter-field"><label for="{{ filter_form.payment_status.id_for_label }}">{{ filter_form.payment_status.label }}</label>{{ filter_form.payment_status }}</div>

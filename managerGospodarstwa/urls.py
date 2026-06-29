@@ -29,4 +29,5 @@ urlpatterns = [
     path('ustawienia/', include('farms.urls')),
     path('sprzedaz/', include('sales.urls')),
     path('pasza/', include('feed.urls')),
+    path('koszty/', include('costs.urls')),
 ]

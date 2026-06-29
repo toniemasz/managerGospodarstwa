@@ -11,6 +11,8 @@ from farms.services.data_backup import (
     build_database_backup,
     restore_database_backup,
 )
+from farms.services.audit_log_service import log_action
+from farms.services.farm_service import get_or_create_user_farm
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +23,7 @@ def admin_database_backup_view(request):
         raise PermissionDenied("Tylko superadministrator może pobrać kopię zapasową bazy danych.")
 
     archive, zip_filename = build_database_backup()
+    log_action(farm=getattr(request, 'farm', None), user=request.user, action="DATABASE_BACKUP", model_label="database", object_repr="Kopia bazy danych")
     response = HttpResponse(archive, content_type="application/zip")
     response["Content-Disposition"] = f'attachment; filename="{zip_filename}"'
     return response
@@ -47,5 +50,7 @@ def admin_database_restore_view(request):
         logger.exception('Nie udało się przywrócić kopii bazy danych')
         messages.error(request, 'Nie udało się przywrócić kopii. Nie zapisano żadnych danych.')
     else:
+        farm = get_or_create_user_farm(request.user)
+        log_action(farm=farm, user=request.user, action="DATABASE_RESTORE", model_label="database", object_repr="Przywrócenie bazy danych", metadata={"records": restored_count})
         messages.success(request, f'Przywrócono kopię bazy ({restored_count} rekordów).')
     return redirect('admin:index')

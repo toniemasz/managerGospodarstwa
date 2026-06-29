@@ -32,10 +32,8 @@
     <section class="panel">
         <form method="post" class="responsive-form">
             {% csrf_token %}
-
-            {% if form.non_field_errors %}
-            <div class="alert alert-error">{{ form.non_field_errors }}</div>
-            {% endif %}
+            {% include 'components/form_errors.html' with form=form %}
+            <div class="form-section-heading"><h2>Plan śrutowania</h2><p>Termin, ilość i receptura bazowa.</p></div>
 
             <div class="form-grid three-columns">
                 <div class="form-field">
@@ -65,14 +63,10 @@
             </div>
 
             {% if form.recipe_item_fields %}
-            <div class="section-divider">
-                <div>
-                    <h2>Jednorazowe proporcje</h2>
-                    <p>Wartości pozostawione bez zmian zapiszą śrutowanie według receptury bazowej.</p>
-                </div>
-            </div>
-
-            <div class="ingredient-editor">
+            <details class="form-disclosure" open>
+                <summary>Jednorazowe proporcje <small>Opcjonalne</small></summary>
+                <p class="field-hint">Wartości pozostawione bez zmian zapiszą śrutowanie według receptury bazowej.</p>
+                <div class="ingredient-editor">
                 {% for item in form.recipe_item_fields %}
                 <div class="ingredient-line">
                     <div>
@@ -86,7 +80,8 @@
                     {{ item.field.errors }}
                 </div>
                 {% endfor %}
-            </div>
+                </div>
+            </details>
             {% endif %}
 
             {% if not is_edit %}

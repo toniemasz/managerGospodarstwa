@@ -46,13 +46,49 @@ class PigSaleForm(forms.ModelForm):
             'no_settlement': forms.CheckboxInput(attrs={'class': 'checkbox-input'}),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, farm=None, **kwargs):
+        self.farm = farm or getattr(kwargs.get('instance'), 'farm', None)
         super().__init__(*args, **kwargs)
         for name, field in self.fields.items():
             if name == 'no_settlement':
                 continue
             existing = field.widget.attrs.get('class', '')
             field.widget.attrs['class'] = f'{existing} {FORM_FIELD_CLASS}'.strip()
+
+    def clean(self):
+        data = super().clean()
+        document_number = (data.get('document_number') or '').strip()
+        sale_date = data.get('sale_date')
+        if self.farm and document_number and sale_date:
+            duplicate = PigSaleModel.objects.filter(
+                farm=self.farm,
+                document_number__iexact=document_number,
+                sale_date__year=sale_date.year,
+            ).exclude(pk=self.instance.pk)
+            if duplicate.exists():
+                self.add_error('document_number', 'Numer dokumentu jest już używany w tym roku rozliczeniowym.')
+        return data
+
+    def clean_settlement_pdf(self):
+        uploaded = self.cleaned_data.get('settlement_pdf')
+        if uploaded is None:
+            return uploaded
+        return self.validate_settlement_pdf(uploaded)
+
+    @staticmethod
+    def validate_settlement_pdf(uploaded):
+        if uploaded.size > 10 * 1024 * 1024:
+            raise forms.ValidationError("Plik PDF może mieć maksymalnie 10 MB.")
+        if not uploaded.name.lower().endswith('.pdf'):
+            raise forms.ValidationError("Wybierz plik z rozszerzeniem .pdf.")
+        content_type = getattr(uploaded, 'content_type', '')
+        if content_type not in ('application/pdf', 'application/x-pdf'):
+            raise forms.ValidationError("Przesłany plik nie ma typu PDF.")
+        header = uploaded.read(5)
+        uploaded.seek(0)
+        if header != b'%PDF-':
+            raise forms.ValidationError("Plik nie jest prawidłowym dokumentem PDF.")
+        return uploaded
 
 
 class SaleClassRowForm(forms.Form):

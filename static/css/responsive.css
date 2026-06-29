@@ -1,0 +1,334 @@
+/* responsive.css - wydzielone style aplikacji. */
+
+@media (min-width: 640px) {
+    .year-summary-panel {
+        grid-template-columns: minmax(0, 1fr) minmax(10rem, 14rem);
+    }
+
+    .table-footer-controls,
+    .filter-bar {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: flex-end;
+    }
+
+    .table-control {
+        min-width: 12rem;
+        flex: 1;
+    }
+
+    .notice,
+    .page-header,
+    .section-heading {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .pagination-controls {
+        flex-direction: row;
+    }
+}
+
+@media (min-width: 900px) {
+    .ingredient-line {
+        grid-template-columns: minmax(0, 1fr) minmax(8rem, 12rem);
+    }
+}
+
+@media (min-width: 1024px) {
+    .calculator-layout,
+    .detail-layout,
+    .sale-document-layout {
+        grid-template-columns: minmax(0, 1fr) 22rem;
+        align-items: start;
+    }
+
+    .dashboard-grid {
+        grid-template-columns: minmax(0, 2fr) minmax(20rem, .95fr);
+        align-items: start;
+    }
+
+    .record-layout,
+    .recipe-detail-grid,
+    .inventory-dashboard {
+        grid-template-columns: minmax(0, 1fr) minmax(19rem, 22rem);
+        align-items: start;
+    }
+
+    .settings-layout {
+        grid-template-columns: minmax(15rem, 19rem) minmax(0, 1fr);
+        align-items: start;
+    }
+
+    .record-hero {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+}
+
+@media (max-width: 1180px) {
+    .username {
+        display: none;
+    }
+
+    .topbar .account-menu-trigger {
+        grid-template-columns: auto;
+        padding: .3rem;
+    }
+
+    .topbar .account-copy {
+        display: none;
+    }
+
+    .sidebar-account .account-copy {
+        display: grid;
+    }
+}
+
+@media (max-width: 900px) {
+    .user-menu {
+        gap: .5rem;
+    }
+
+    .username {
+        display: none;
+    }
+
+    .mobile-bottom-nav {
+        position: fixed;
+        right: .75rem;
+        bottom: .75rem;
+        left: .75rem;
+        z-index: 40;
+        display: flex;
+        gap: .25rem;
+        overflow-x: auto;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: rgba(255, 255, 255, .96);
+        padding: .35rem;
+        box-shadow: 0 14px 38px rgba(16, 32, 51, .18);
+        backdrop-filter: blur(14px);
+    }
+
+    .mobile-nav-link {
+        display: inline-flex;
+        flex-direction: column;
+        min-height: 2.65rem;
+        min-width: 4.35rem;
+        flex: 1 0 auto;
+        align-items: center;
+        justify-content: center;
+        padding: .55rem .25rem;
+        font-size: .72rem;
+    }
+
+    body {
+        padding-bottom: 5.75rem;
+    }
+}
+
+@media (min-width: 901px) {
+    .desktop-sidebar {
+        display: flex;
+    }
+
+    .topbar {
+        left: var(--sidebar-width);
+        padding-inline: 1.5rem;
+    }
+
+    .mobile-brand {
+        display: none;
+    }
+
+    .topbar-context {
+        display: block;
+    }
+
+    .topbar-action {
+        display: inline-flex;
+    }
+}
+
+@media (max-width: 720px) {
+    .app-page,
+    .container,
+    .message-stack {
+        width: min(100% - 1rem, 80rem);
+    }
+
+    .topbar {
+        padding: .7rem .75rem;
+    }
+
+    .brand-title {
+        font-size: .92rem;
+    }
+
+    .brand-subtitle {
+        max-width: 14rem;
+    }
+
+    .brand-mark {
+        width: 2.35rem;
+        height: 2.35rem;
+        border-radius: .7rem;
+    }
+
+    .nav-menu-panel {
+        width: min(100vw - 1rem, 28rem);
+        grid-template-columns: 1fr;
+        padding: .75rem;
+    }
+
+    .compact-panel,
+    .responsive-form,
+    .quick-actions-grid {
+        padding: 1rem;
+    }
+
+    .header-actions,
+    .page-actions,
+    .form-actions {
+        width: 100%;
+        justify-content: stretch;
+    }
+
+    .header-actions .button,
+    .page-actions .button,
+    .form-actions .button,
+    .form-actions a,
+    .form-actions button {
+        flex: 1 1 11rem;
+    }
+
+    .mobile-card-table {
+        min-width: 0;
+        border-collapse: separate;
+    }
+
+    .mobile-card-table thead {
+        display: none;
+    }
+
+    .mobile-card-table,
+    .mobile-card-table tbody,
+    .mobile-card-table tr,
+    .mobile-card-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .mobile-card-table tbody {
+        display: grid;
+        gap: .75rem;
+        padding: .85rem;
+    }
+
+    .mobile-card-table tr {
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: #fff;
+        box-shadow: 0 1px 2px rgba(16, 32, 51, .04);
+    }
+
+    .mobile-card-table td {
+        display: grid;
+        grid-template-columns: minmax(7.5rem, 38%) minmax(0, 1fr);
+        gap: .75rem;
+        border-bottom: 1px solid #eef2f7;
+        padding: .8rem;
+        text-align: left;
+    }
+
+    .mobile-card-table td::before {
+        content: attr(data-label);
+        color: var(--muted);
+        font-size: .72rem;
+        font-weight: 950;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+    }
+
+    .mobile-card-table td.empty-table,
+    .mobile-card-table td[colspan] {
+        display: block;
+        text-align: center;
+    }
+
+    .mobile-card-table td.empty-table::before,
+    .mobile-card-table td[colspan]::before {
+        content: none;
+    }
+
+    .mobile-card-table .text-right {
+        text-align: left;
+    }
+
+    .mobile-card-table .row-actions {
+        justify-content: flex-start;
+    }
+
+    .inventory-card,
+    .price-input-row,
+    .ingredient-row-fields,
+    .ingredient-line {
+        grid-template-columns: 1fr;
+    }
+
+    .inventory-stock {
+        text-align: left;
+    }
+
+    .recipe-cost-strip {
+        grid-template-columns: 1fr;
+    }
+
+    .task-item {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .task-item .button {
+        width: 100%;
+    }
+
+    .filter-actions {
+        width: 100%;
+        flex-direction: column;
+    }
+
+    .filter-actions .button {
+        width: 100%;
+    }
+
+    .task-summary-grid,
+    .module-visibility-groups,
+    .settings-layout,
+    .record-layout,
+    .recipe-detail-grid,
+    .inventory-dashboard {
+        grid-template-columns: 1fr;
+    }
+
+    .auth-page {
+        margin-top: 4vh;
+    }
+}
+
+@media (max-width: 480px) {
+    .button {
+        width: 100%;
+    }
+
+    .page-header h1 {
+        font-size: 1.45rem;
+    }
+
+    .stat-tile strong,
+    .inventory-stock strong {
+        font-size: 1.35rem;
+    }
+}

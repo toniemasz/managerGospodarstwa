@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load l10n %}
 {% block title %}Szczegóły receptury{% endblock %}
 
 {% block content %}
@@ -7,7 +8,7 @@
         <div>
             <p class="eyebrow">Receptura</p>
             <h1>{{ recipe.name }}</h1>
-            <p class="page-subtitle">Koszt liczony z ostatnich dostaw składników w magazynie.</p>
+            <p class="page-subtitle">Podgląd receptury, historia produkcji i zapisane koszty FIFO zakończonych śrutowań.</p>
         </div>
         <div class="header-actions">
             <a href="{% url 'add_production' %}?recipe={{ recipe.id }}" class="button button-primary">Zleć śrutowanie</a>
@@ -18,25 +19,24 @@
 
     {% include 'feed/_feed_nav.html' %}
 
-    <section class="panel compact-panel">
-        <form method="get" action="{% url 'recipe_detail' recipe.id %}" class="filter-bar sales-filter-bar">
-            <div class="table-control">
-                <label for="period">Okres statystyk</label>
-                <select id="period" name="period">
-                    {% for value, label in period_options %}
-                        <option value="{{ value }}" {% if date_filter.period == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="table-control">
-                <label for="date_from">Od</label>
-                <input id="date_from" type="date" name="date_from" value="{{ date_filter.date_from_value }}">
-            </div>
-            <div class="table-control">
-                <label for="date_to">Do</label>
-                <input id="date_to" type="date" name="date_to" value="{{ date_filter.date_to_value }}">
-            </div>
-            <button type="submit" class="button button-primary">Pokaż</button>
+    {% url 'recipe_detail' recipe.id as recipe_filter_url %}
+    {% include 'components/filter_panel.html' with filter_action=recipe_filter_url filter_clear_url=recipe_filter_url filter_fields_template='feed/_recipe_filters.html' %}
+
+    <section class="panel compact-panel year-summary-panel">
+        <div>
+            <p class="eyebrow">Produkcja roczna</p>
+            <h2>Wyprodukowano w {{ yearly_production.year|unlocalize }} roku: {{ yearly_production.quantity_t|floatformat:2 }} t</h2>
+        </div>
+        <form method="get" class="year-selector" action="{% url 'recipe_detail' recipe.id %}">
+            {% if request.GET.period %}<input type="hidden" name="period" value="{{ request.GET.period }}">{% endif %}
+            {% if request.GET.date_from %}<input type="hidden" name="date_from" value="{{ request.GET.date_from }}">{% endif %}
+            {% if request.GET.date_to %}<input type="hidden" name="date_to" value="{{ request.GET.date_to }}">{% endif %}
+            <label for="recipe-production-year">Rok</label>
+            <select id="recipe-production-year" name="year" onchange="this.form.submit()">
+                {% for year in yearly_production.available_years %}
+                    <option value="{{ year|unlocalize }}" {% if year == yearly_production.year %}selected{% endif %}>{{ year|unlocalize }}</option>
+                {% endfor %}
+            </select>
         </form>
     </section>
 
@@ -59,12 +59,13 @@
         </div>
     </section>
 
-    <section class="detail-layout">
+    <section class="recipe-detail-grid">
+        <div class="recipe-detail-main">
         <div class="panel">
             <div class="section-heading">
                 <div>
                     <h2>Skład i koszt</h2>
-                    <p>Wyliczenie dla 1 kg oraz 1 tony gotowej paszy.</p>
+                    <p>Szacunek dla 1 kg oraz 1 tony gotowej paszy na podstawie ostatnich cen zakupu.</p>
                 </div>
             </div>
             <div class="table-scroll">
@@ -100,15 +101,16 @@
                 </table>
             </div>
         </div>
+        </div>
 
-        <aside class="panel">
+        <aside class="panel panel-tint recipe-detail-side">
             <div class="section-heading">
                 <div>
                     <h2>Statystyki</h2>
                     <p>Podsumowanie wszystkich śrutowań tej receptury.</p>
                 </div>
             </div>
-            <dl class="summary-list">
+            <dl class="summary-list is-carded">
                 <div>
                     <dt>Wszystkie zlecenia</dt>
                     <dd>{{ stats.total_count }}</dd>
@@ -124,6 +126,10 @@
                 <div>
                     <dt>Łączny koszt zakończonych</dt>
                     <dd>{{ stats.completed_cost|floatformat:2 }} PLN</dd>
+                </div>
+                <div>
+                    <dt>Wyprodukowano w {{ yearly_production.year|unlocalize }} roku</dt>
+                    <dd>{{ yearly_production.quantity_t|floatformat:2 }} t</dd>
                 </div>
                 <div>
                     <dt>W kolejce</dt>
@@ -150,6 +156,7 @@
                     <tr>
                         <th>Data</th>
                         <th class="text-right">Ilość</th>
+                        <th class="text-right">Koszt FIFO</th>
                         <th>Status</th>
                         <th>Zakończono</th>
                         <th class="text-right">Akcje</th>
@@ -160,6 +167,16 @@
                     <tr>
                         <td>{{ production.date|date:"d.m.Y" }}{% if production.time %}, {{ production.time|time:"H:i" }}{% endif %}</td>
                         <td class="text-right"><strong>{{ production.quantity_kg|floatformat:0 }}</strong> kg</td>
+                        <td class="text-right">
+                            {% if production.status == 'COMPLETED' %}
+                                <strong>{{ production.feed_cost_total|floatformat:2 }}</strong> zł
+                                {% if production.feed_cost_is_partial %}
+                                    <br><span class="status-pill status-amber">Częściowy</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="muted-small">--</span>
+                            {% endif %}
+                        </td>
                         <td><span class="status-pill">{{ production.status_label }}</span></td>
                         <td>{{ production.completed_at|date:"d.m.Y H:i"|default:"--" }}</td>
                         <td class="text-right">
@@ -168,7 +185,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="empty-table">Brak śrutowań dla tej receptury.</td>
+                        <td colspan="6" class="empty-table">Brak śrutowań dla tej receptury.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
