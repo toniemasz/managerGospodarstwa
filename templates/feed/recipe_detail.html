@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load l10n %}
+{% load feed_format %}
 {% block title %}Szczegóły receptury{% endblock %}
 
 {% block content %}
@@ -25,7 +26,7 @@
     <section class="panel compact-panel year-summary-panel">
         <div>
             <p class="eyebrow">Produkcja roczna</p>
-            <h2>Wyprodukowano w {{ yearly_production.year|unlocalize }} roku: {{ yearly_production.quantity_t|floatformat:2 }} t</h2>
+            <h2>Wyprodukowano w {{ yearly_production.year|unlocalize }} roku: {{ yearly_production.quantity_kg|feed_quantity }}</h2>
         </div>
         <form method="get" class="year-selector" action="{% url 'recipe_detail' recipe.id %}">
             {% if request.GET.period %}<input type="hidden" name="period" value="{{ request.GET.period }}">{% endif %}
@@ -43,7 +44,7 @@
     <section class="stats-grid">
         <div class="stat-tile">
             <span>Wyprodukowane</span>
-            <strong>{{ stats.completed_t|floatformat:0 }} t</strong>
+            <strong>{{ stats.completed_kg|feed_quantity }}</strong>
         </div>
         <div class="stat-tile">
             <span>Łączny koszt FIFO</span>
@@ -51,21 +52,29 @@
         </div>
         <div class="stat-tile">
             <span>Koszt poglądowy tony</span>
-            <strong>{{ cost.cost_per_ton|floatformat:2 }} zł</strong>
+            {% if cost.is_complete %}
+                <strong>{{ cost.cost_per_kg|feed_price:'ton' }}</strong>
+            {% else %}
+                <strong>Brak pełnej wyceny</strong>
+            {% endif %}
         </div>
         <div class="stat-tile">
             <span>W kolejce</span>
-            <strong>{{ stats.queued_kg|floatformat:0 }} kg</strong>
+            <strong>{{ stats.queued_kg|feed_quantity }}</strong>
         </div>
     </section>
 
-    <section class="recipe-detail-grid">
+    <section class="recipe-detail-grid" id="recipe-detail-costs" data-price-unit-scope>
         <div class="recipe-detail-main">
         <div class="panel">
             <div class="section-heading">
                 <div>
                     <h2>Skład i koszt poglądowy</h2>
-                    <p>Szacunek dla 1 kg oraz 1 tony gotowej paszy na podstawie ostatnich cen zakupu.</p>
+                    <p>Szacunek dla gotowej paszy na podstawie ostatnich cen zakupu. Brak ceny blokuje pełną wycenę.</p>
+                </div>
+                <div class="unit-toggle" data-price-unit-toggle data-price-unit-scope="#recipe-detail-costs" data-default-price-unit="ton" aria-label="Jednostka ceny">
+                    <button type="button" data-price-unit="ton">PLN/t</button>
+                    <button type="button" data-price-unit="kg">PLN/kg</button>
                 </div>
             </div>
             <div class="table-scroll">
@@ -74,9 +83,9 @@
                         <tr>
                             <th>Składnik</th>
                             <th class="text-right">Udział</th>
-                            <th class="text-right">Cena/kg</th>
-                            <th class="text-right">Poglądowo/kg paszy</th>
-                            <th class="text-right">Poglądowo/t paszy</th>
+                            <th class="text-right">Ilość dla 1 t</th>
+                            <th class="text-right">Cena składnika</th>
+                            <th class="text-right">Koszt <span data-price-unit-label>PLN/t</span></th>
                             <th class="text-right">Akcje</th>
                         </tr>
                     </thead>
@@ -85,9 +94,21 @@
                         <tr>
                             <td><strong>{{ item.ingredient_name }}</strong></td>
                             <td class="text-right">{{ item.percentage|floatformat:2 }}%</td>
-                            <td class="text-right">{{ item.price_per_kg|floatformat:5 }} PLN</td>
-                            <td class="text-right">{{ item.cost_per_kg|floatformat:4 }} PLN</td>
-                            <td class="text-right">{{ item.cost_per_ton|floatformat:2 }} PLN</td>
+                            <td class="text-right">{{ item.quantity_per_ton_kg|feed_quantity }}</td>
+                            <td class="text-right">
+                                {% if item.has_price %}
+                                    <span data-price-kg="{{ item.price_per_kg|feed_price:'kg' }}" data-price-ton="{{ item.price_per_kg|feed_price:'ton' }}">{{ item.price_per_kg|feed_price:'ton' }}</span>
+                                {% else %}
+                                    <span class="status-pill status-red">Brak ceny</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-right">
+                                {% if item.has_price %}
+                                    <strong data-price-kg="{{ item.cost_per_kg|feed_price:'kg' }}" data-price-ton="{{ item.cost_per_kg|feed_price:'ton' }}">{{ item.cost_per_kg|feed_price:'ton' }}</strong>
+                                {% else %}
+                                    <span class="muted-small">Nie liczono</span>
+                                {% endif %}
+                            </td>
                             <td class="text-right">
                                 <a href="{% url 'edit_recipe' recipe.id %}" class="table-link">Edytuj</a>
                             </td>
@@ -117,11 +138,11 @@
                 </div>
                 <div>
                     <dt>Łącznie zaplanowano</dt>
-                    <dd>{{ stats.total_planned_kg|floatformat:0 }} kg</dd>
+                    <dd>{{ stats.total_planned_kg|feed_quantity }}</dd>
                 </div>
                 <div>
                     <dt>Zakończone</dt>
-                    <dd>{{ stats.completed_count }} / {{ stats.completed_kg|floatformat:0 }} kg</dd>
+                    <dd>{{ stats.completed_count }} / {{ stats.completed_kg|feed_quantity }}</dd>
                 </div>
                 <div>
                     <dt>Łączny koszt zakończonych</dt>
@@ -129,15 +150,15 @@
                 </div>
                 <div>
                     <dt>Wyprodukowano w {{ yearly_production.year|unlocalize }} roku</dt>
-                    <dd>{{ yearly_production.quantity_t|floatformat:2 }} t</dd>
+                    <dd>{{ yearly_production.quantity_kg|feed_quantity }}</dd>
                 </div>
                 <div>
                     <dt>W kolejce</dt>
-                    <dd>{{ stats.queued_count }} / {{ stats.queued_kg|floatformat:0 }} kg</dd>
+                    <dd>{{ stats.queued_count }} / {{ stats.queued_kg|feed_quantity }}</dd>
                 </div>
                 <div>
                     <dt>Po etapie binów</dt>
-                    <dd>{{ stats.in_progress_count }} / {{ stats.in_progress_kg|floatformat:0 }} kg</dd>
+                    <dd>{{ stats.in_progress_count }} / {{ stats.in_progress_kg|feed_quantity }}</dd>
                 </div>
             </dl>
         </aside>
@@ -166,7 +187,7 @@
                     {% for production in productions %}
                     <tr>
                         <td>{{ production.date|date:"d.m.Y" }}{% if production.time %}, {{ production.time|time:"H:i" }}{% endif %}</td>
-                        <td class="text-right"><strong>{{ production.quantity_kg|floatformat:0 }}</strong> kg</td>
+                        <td class="text-right"><strong>{{ production.quantity_kg|feed_quantity }}</strong></td>
                         <td class="text-right">
                             {% if production.status == 'COMPLETED' %}
                                 <strong>{{ production.feed_cost_total|floatformat:2 }}</strong> zł

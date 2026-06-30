@@ -32,10 +32,15 @@ class RecipeCostInfo:
     cost_per_kg: Decimal
     recipe_id: int | None = None
     item_costs: List[Dict] | None = None
+    missing_price_ingredients: List[str] | None = None
 
     @property
     def cost_per_ton(self) -> Decimal:
         return self.cost_per_kg * Decimal('1000.00')
+
+    @property
+    def is_complete(self) -> bool:
+        return not self.missing_price_ingredients
 
 
 @dataclass
@@ -99,7 +104,7 @@ class RecipeCostCalculator:
     Oczekuje czystych słowników Pythona, bez modeli Django.
     """
 
-    def __init__(self, recipe_name: str, recipe_items: List[Dict], price_map: Dict[int, Decimal], recipe_id: int | None = None):
+    def __init__(self, recipe_name: str, recipe_items: List[Dict], price_map: Dict[int, Decimal | None], recipe_id: int | None = None):
         self.recipe_name = recipe_name
         self.recipe_items = recipe_items
         self.price_map = price_map
@@ -108,11 +113,29 @@ class RecipeCostCalculator:
     def calculate_cost(self) -> RecipeCostInfo:
         total_cost = Decimal('0.00')
         item_costs = []
+        missing_price_ingredients = []
 
         for item in self.recipe_items:
-            # Pobieramy cenę ze słownika (jeśli nie ma, to 0.00)
-            price = self.price_map.get(item['ingredient_id'], Decimal('0.00'))
+            price = self.price_map.get(item['ingredient_id'])
             percentage = Decimal(str(item['percentage']))
+            quantity_per_ton_kg = Decimal('1000.00') * (percentage / Decimal('100.00'))
+
+            if price is None or price <= Decimal('0.00000'):
+                ingredient_name = item.get('ingredient_name', '')
+                if ingredient_name:
+                    missing_price_ingredients.append(ingredient_name)
+                item_costs.append({
+                    'ingredient_id': item['ingredient_id'],
+                    'ingredient_name': ingredient_name,
+                    'percentage': percentage,
+                    'quantity_per_ton_kg': quantity_per_ton_kg,
+                    'price_per_kg': None,
+                    'price_per_ton': None,
+                    'cost_per_kg': None,
+                    'cost_per_ton': None,
+                    'has_price': False,
+                })
+                continue
 
             # Obliczamy koszt z proporcji
             cost_part = price * (percentage / Decimal('100.00'))
@@ -121,9 +144,12 @@ class RecipeCostCalculator:
                 'ingredient_id': item['ingredient_id'],
                 'ingredient_name': item.get('ingredient_name', ''),
                 'percentage': percentage,
+                'quantity_per_ton_kg': quantity_per_ton_kg,
                 'price_per_kg': price,
+                'price_per_ton': price * Decimal('1000.00'),
                 'cost_per_kg': cost_part,
                 'cost_per_ton': cost_part * Decimal('1000.00'),
+                'has_price': True,
             })
 
         return RecipeCostInfo(
@@ -131,4 +157,5 @@ class RecipeCostCalculator:
             cost_per_kg=total_cost,
             recipe_id=self.recipe_id,
             item_costs=item_costs,
+            missing_price_ingredients=missing_price_ingredients,
         )

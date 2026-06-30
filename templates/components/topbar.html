@@ -1,39 +1,36 @@
 <aside class="desktop-sidebar" aria-label="Nawigacja główna">
     <a href="{% url 'modules_home' %}" class="sidebar-brand" aria-label="Przejdź do centrali">
-        <span class="brand-mark">MG</span>
-        <span class="brand-copy">
-            <span class="brand-title">Manager Gospodarstwa</span>
-            <span class="brand-subtitle">{{ current_farm.name|default:"Gospodarstwo" }}</span>
-        </span>
+        <span class="brand-title">Gospodarstwo Rolne</span>
+        <span class="brand-subtitle">Precision Farming</span>
     </a>
 
     <nav class="sidebar-nav">
         <a href="{% url 'modules_home' %}" class="sidebar-nav-link{% if request.resolver_match.url_name == 'modules_home' %} is-active{% endif %}">
-            <span class="module-icon compact">C</span>
+            <span class="module-icon compact">{% include 'components/app_icon.html' with name='dashboard' %}</span>
             <span>Centrala</span>
         </a>
         {% for module in ui_primary_modules %}
             <a href="{{ module.url }}" class="sidebar-nav-link{% if module.is_active %} is-active{% endif %}"{% if module.is_active %} aria-current="page"{% endif %}>
-                <span class="module-icon compact {{ module.tone }}">{{ module.icon }}</span>
+                <span class="module-icon compact {{ module.tone }}">{% include 'components/app_icon.html' with name=module.icon_name %}</span>
                 <span>{{ module.title }}</span>
             </a>
         {% endfor %}
-        <a href="{% url 'modules_home' %}#modules" class="sidebar-nav-link">
-            <span class="module-icon compact">+</span>
+        <a href="{% url 'modules_catalog' %}" class="sidebar-nav-link{% if request.resolver_match.url_name == 'modules_catalog' %} is-active{% endif %}">
+            <span class="module-icon compact">{% include 'components/app_icon.html' with name='dashboard' %}</span>
             <span>Wszystkie moduły</span>
         </a>
     </nav>
 
     <div class="sidebar-footer">
         <a href="{% url 'farm_settings' %}" class="sidebar-nav-link sidebar-secondary-link{% if request.resolver_match.url_name == 'farm_settings' %} is-active{% endif %}">
-            <span class="module-icon compact">U</span>
+            <span class="module-icon compact">{% include 'components/app_icon.html' with name='settings' %}</span>
             <span>Ustawienia</span>
         </a>
         <div class="sidebar-account">
-            <span class="account-avatar">{{ current_farm.name|default:"Gospodarstwo"|first|upper }}</span>
+            <span class="account-avatar">{{ request.user.username|slice:":2"|upper }}</span>
             <span class="account-copy">
-                <strong>{{ current_farm.name|default:"Gospodarstwo" }}</strong>
-                <small>{{ user.get_username }}</small>
+                <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
+                <small>{{ current_farm.name|default:"Gospodarstwo" }}</small>
             </span>
         </div>
     </div>
@@ -41,27 +38,58 @@
 
 <header class="topbar">
     <a href="{% url 'modules_home' %}" class="mobile-brand" aria-label="Przejdź do centrali">
-        <span class="brand-mark">MG</span>
-        <span class="brand-copy">
-            <span class="brand-title">Manager Gospodarstwa</span>
-            <span class="brand-subtitle">{{ current_farm.name|default:"Gospodarstwo" }}</span>
-        </span>
+        <span class="brand-title">Gospodarstwo Rolne</span>
+        <span class="brand-subtitle">Precision Farming</span>
     </a>
 
     <div class="topbar-context">
-        <span class="context-label">Panel pracy</span>
-        <strong>{{ current_farm.name|default:"Gospodarstwo" }}</strong>
+        <strong>Manager Gospodarstwa</strong>
     </div>
 
+    <form class="topbar-search" role="search" method="get" action="{% url 'global_search' %}">
+        <span class="topbar-search-icon">{% include 'components/app_icon.html' with name='search' %}</span>
+        <input type="search" name="q" aria-label="Szukaj" placeholder="Szukaj..." value="{{ global_search_query|default:'' }}">
+    </form>
+
     <div class="user-menu">
-        <a href="{% url 'modules_home' %}" class="topbar-action">Moduły</a>
+        <details class="notification-menu">
+            <summary class="topbar-icon-button" aria-label="Powiadomienia">
+                {% include 'components/app_icon.html' with name='bell' %}
+                {% if ui_notification_count %}
+                    <span class="notification-badge" aria-label="{{ ui_notification_count }} powiadomień">{{ ui_notification_count }}</span>
+                {% endif %}
+            </summary>
+            <div class="notification-menu-panel">
+                <div class="notification-menu-header">
+                    <strong>Powiadomienia</strong>
+                    <small>{{ ui_notification_count }} aktywnych</small>
+                </div>
+                {% if ui_notifications %}
+                    <div class="notification-list">
+                        {% for item in ui_notifications %}
+                            <a href="{{ item.url }}" class="notification-item notification-item--{{ item.priority }}">
+                                <span class="notification-marker" aria-hidden="true"></span>
+                                <span>
+                                    <strong>{{ item.title }}</strong>
+                                    <small>{{ item.status_label }}{% if item.due_date %} • {{ item.due_date|date:"d.m.Y" }}{% endif %}</small>
+                                </span>
+                            </a>
+                        {% endfor %}
+                    </div>
+                    {% if ui_notification_more_count %}
+                        <a href="{% url 'task_center' %}" class="notification-more">+{{ ui_notification_more_count }} więcej w centrum zadań</a>
+                    {% endif %}
+                {% else %}
+                    <div class="notification-empty">
+                        <strong>Brak nowych powiadomień</strong>
+                        <small>Najważniejsze zadania pojawią się tutaj automatycznie.</small>
+                    </div>
+                {% endif %}
+            </div>
+        </details>
         <details class="account-menu">
             <summary class="account-menu-trigger" aria-label="Menu użytkownika">
-                <span class="account-avatar">{{ current_farm.name|default:"Gospodarstwo"|first|upper }}</span>
-                <span class="account-copy">
-                    <strong>{{ current_farm.name|default:"Gospodarstwo" }}</strong>
-                    <small>{{ user.get_username }}</small>
-                </span>
+                <span class="account-menu-icon">{% include 'components/app_icon.html' with name='user' %}</span>
             </summary>
             <div class="account-menu-panel">
                 <div class="account-menu-header">
@@ -85,12 +113,12 @@
 
 <nav class="mobile-bottom-nav" aria-label="Nawigacja mobilna">
     <a href="{% url 'modules_home' %}" class="mobile-nav-link{% if request.resolver_match.url_name == 'modules_home' %} is-active{% endif %}">
-        <span class="mobile-nav-icon">C</span>
+        <span class="mobile-nav-icon">{% include 'components/app_icon.html' with name='dashboard' %}</span>
         <span>Centrala</span>
     </a>
     {% for module in ui_mobile_modules %}
         <a href="{{ module.url }}" class="mobile-nav-link{% if module.is_active %} is-active{% endif %}"{% if module.is_active %} aria-current="page"{% endif %}>
-            <span class="mobile-nav-icon {{ module.tone }}">{{ module.icon }}</span>
+            <span class="mobile-nav-icon {{ module.tone }}">{% include 'components/app_icon.html' with name=module.icon_name %}</span>
             <span>{{ module.title }}</span>
         </a>
     {% endfor %}

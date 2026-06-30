@@ -39,7 +39,9 @@
             <section class="panel">
                 <nav class="settings-index" aria-label="Sekcje ustawień">
                     <a href="#settings-profile">Profil <span>›</span></a>
+                    <a href="#settings-interface">Wygląd <span>›</span></a>
                     <a href="#settings-modules">Moduły <span>›</span></a>
+                    <a href="#settings-dashboard">Centrala <span>›</span></a>
                     <a href="#settings-sows">Maciory i alerty <span>›</span></a>
                     <a href="#settings-feed">Pasze <span>›</span></a>
                     <a href="#settings-data">Dane <span>›</span></a>
@@ -73,7 +75,22 @@
                 </div>
             </div>
 
+            <div class="form-section" id="settings-interface">
+                <div class="form-section-heading">
+                    <h2>Wygląd</h2>
+                    <p>Dopasuj rozmiar tekstu, pól i kafelków do sposobu pracy.</p>
+                </div>
+                <div class="form-grid two-columns">
+                    <div class="form-field">
+                        <label for="{{ form.interface_scale.id_for_label }}">{{ form.interface_scale.label }}</label>
+                        {{ form.interface_scale }}
+                        {{ form.interface_scale.errors }}
+                    </div>
+                </div>
+            </div>
+
             {% include 'farms/_module_visibility.html' %}
+            {% include 'farms/_dashboard_stats_visibility.html' %}
 
             <div class="form-section" id="settings-sows">
                 <div class="section-heading">

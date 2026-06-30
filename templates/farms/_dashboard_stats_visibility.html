@@ -1,0 +1,34 @@
+<section class="form-section" id="settings-dashboard">
+    <div class="form-section-heading">
+        <h2>Centrala</h2>
+        <p>Wybierz statystyki widoczne na głównym pulpicie gospodarstwa.</p>
+    </div>
+    <div class="module-visibility-groups">
+        {% for group in dashboard_stat_groups %}
+        <fieldset class="module-visibility-group">
+            <legend>{{ group.title }}</legend>
+            {% for item in group.stats %}
+            <div class="module-settings-card">
+                <label class="module-toggle">
+                    {{ item.field }}
+                    <span class="module-icon compact {{ item.tone }}">{% include 'components/app_icon.html' with name=item.icon_name %}</span>
+                    <span class="module-toggle-copy">
+                        <strong>{{ item.field.label }}</strong>
+                        <small>{{ item.description }}</small>
+                    </span>
+                </label>
+            </div>
+            {% endfor %}
+        </fieldset>
+        {% empty %}
+        <div class="module-settings-card is-locked">
+            <div class="module-toggle is-locked">
+                <span class="module-toggle-copy">
+                    <strong>Brak statystyk</strong>
+                    <small>Włącz odpowiednie moduły, aby pokazać kafelki centrali.</small>
+                </span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>

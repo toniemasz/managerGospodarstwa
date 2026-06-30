@@ -217,6 +217,9 @@ def _restore_user_records(payload, data, farm):
             'default_dashboard_period',
             'date_format',
             'visible_modules',
+            'nav_modules',
+            'dashboard_stats',
+            'interface_scale',
         }
         for name in allowed_fields:
             if name in settings_records[0]['fields']:

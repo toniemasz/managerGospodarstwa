@@ -17,6 +17,7 @@ class FarmSettingsAdmin(admin.ModelAdmin):
         'gestation_days',
         'farrowing_alert_days_ahead',
         'default_production_quantity_kg',
+        'interface_scale',
     )
     search_fields = ('farm__name', 'farm__owner__username', 'farm__owner__email')
 

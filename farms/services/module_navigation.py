@@ -46,11 +46,27 @@ class ModuleNavigationService:
             if definition["key"] in visible
         ]
 
-    def grouped_modules(self, modules: list[dict] | None = None) -> list[dict]:
+    def all_modules(self) -> list[dict]:
+        visible = set(self.visible_keys())
+        return [
+            {
+                **definition,
+                "url": reverse(definition["url_name"]),
+                "is_active": self.active_url_name in definition["active_urls"],
+                "is_visible": definition["key"] in visible,
+            }
+            for definition in MODULE_DEFINITIONS
+        ]
+
+    def grouped_modules(self, modules: list[dict] | None = None, *, include_settings=False) -> list[dict]:
         modules = modules if modules is not None else self.modules()
         grouped = []
         for group_key, title in MODULE_GROUPS:
-            items = [module for module in modules if module["group"] == group_key and module["key"] != "settings"]
+            items = [
+                module
+                for module in modules
+                if module["group"] == group_key and (include_settings or module["key"] != "settings")
+            ]
             if items:
                 grouped.append({"key": group_key, "title": title, "modules": items})
         return grouped
@@ -94,8 +110,17 @@ def module_visibility_groups(form) -> list[dict]:
                     "field": form[field_name],
                     "nav_field": form[f"nav_{key}"],
                     "description": definitions[key]["description"],
+                    "icon_name": definitions[key]["icon_name"],
+                    "tone": definitions[key]["tone"],
                 })
         if group_key == "system":
-            fields.append({"key": "settings", "field": None, "title": "Ustawienia", "description": definitions["settings"]["description"]})
+            fields.append({
+                "key": "settings",
+                "field": None,
+                "title": "Ustawienia",
+                "description": definitions["settings"]["description"],
+                "icon_name": definitions["settings"]["icon_name"],
+                "tone": definitions["settings"]["tone"],
+            })
         groups.append({"key": group_key, "title": title, "fields": fields})
     return groups

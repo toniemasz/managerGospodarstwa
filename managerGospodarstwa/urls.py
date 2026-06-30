@@ -17,6 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
+from farms.views import global_search_view
 from managerGospodarstwa.admin_backup import admin_database_backup_view, admin_database_restore_view
 
 admin.site.index_template = 'admin/custom_index.html'
@@ -25,6 +26,7 @@ urlpatterns = [
     path('admin/kopia-zapasowa-bazy/', admin_database_backup_view, name='admin_database_backup'),
     path('admin/przywroc-kopie-bazy/', admin_database_restore_view, name='admin_database_restore'),
     path('admin/', admin.site.urls),
+    path('szukaj/', global_search_view, name='global_search'),
     path('', include('sows.urls')),
     path('ustawienia/', include('farms.urls')),
     path('sprzedaz/', include('sales.urls')),

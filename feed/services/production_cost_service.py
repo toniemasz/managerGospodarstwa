@@ -30,12 +30,13 @@ class ProductionCostService:
             custom_recipe_data=production.custom_recipe_data,
         ).get_requirements()
 
-    def _price_at(self, ingredient_id, production_date) -> Decimal:
+    def _price_at(self, ingredient_id, production_date) -> Decimal | None:
         delivery = DeliveryModel.objects.filter(
             ingredient_id=ingredient_id,
             ingredient__farm=self.farm,
             date__lte=production_date,
             price_per_kg__isnull=False,
+            price_per_kg__gt=0,
         ).order_by("-date", "-id").first()
         if delivery:
             return delivery.price_per_kg
@@ -43,16 +44,22 @@ class ProductionCostService:
             ingredient_id=ingredient_id,
             ingredient__farm=self.farm,
             price_per_kg__isnull=False,
+            price_per_kg__gt=0,
         ).order_by("date", "id").first()
-        return fallback.price_per_kg if fallback else Decimal("0.00")
+        return fallback.price_per_kg if fallback else None
 
     def _legacy_components(self, production):
         components = []
         production_cost = Decimal("0.00")
+        missing_prices = []
         for requirement in self._requirements(production):
             price = self._price_at(requirement.ingredient_id, production.date)
-            component_cost = requirement.required_kg * price
-            production_cost += component_cost
+            component_cost = None
+            if price is None:
+                missing_prices.append(requirement.name)
+            else:
+                component_cost = requirement.required_kg * price
+                production_cost += component_cost
             components.append({
                 "ingredient_id": requirement.ingredient_id,
                 "name": requirement.name,
@@ -62,7 +69,7 @@ class ProductionCostService:
                 "delivery": None,
                 "is_estimate": True,
             })
-        return production_cost, components
+        return production_cost, components, missing_prices
 
     @staticmethod
     def _fifo_components(production):
@@ -107,9 +114,17 @@ class ProductionCostService:
         for production in productions:
             fifo_result = self._fifo_components(production)
             if fifo_result is None:
-                production_cost, components = self._legacy_components(production)
+                production_cost, components, missing_prices = self._legacy_components(production)
+                is_partial = bool(missing_prices)
+                cost_note = (
+                    "Częściowy koszt - brak ceny składników: " + ", ".join(missing_prices)
+                    if missing_prices
+                    else production.feed_cost_note
+                )
             else:
                 production_cost, components = fifo_result
+                is_partial = production.feed_cost_is_partial
+                cost_note = production.feed_cost_note
 
             total_quantity += production.quantity_kg
             total_cost += production_cost
@@ -128,8 +143,8 @@ class ProductionCostService:
                 "cost_per_kg": production_cost / production.quantity_kg if production.quantity_kg else Decimal("0.00"),
                 "quantity_kg": production.quantity_kg,
                 "components": components,
-                "is_partial": production.feed_cost_is_partial,
-                "cost_note": production.feed_cost_note,
+                "is_partial": is_partial,
+                "cost_note": cost_note,
             })
 
         ranking = []

@@ -4,6 +4,7 @@ from django.contrib.auth import views as auth_views
 from .auth_views import SecureLoginView
 from .views import (
     modules_home_view,
+    modules_catalog_view,
     dashboard_view,
     add_sow_view,
     edit_sow_view,
@@ -26,6 +27,7 @@ from .views import (
 
 urlpatterns = [
     path('', modules_home_view, name='modules_home'),
+    path('moduly/', modules_catalog_view, name='modules_catalog'),
     path('maciory/', dashboard_view, name='dashboard'),
     path('maciory/dodaj/', add_sow_view, name='add_sow'),
     path('maciory/<int:sow_id>/edytuj/', edit_sow_view, name='edit_sow'),

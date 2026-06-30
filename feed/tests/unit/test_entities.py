@@ -91,13 +91,14 @@ class TestRecipeCostCalculator:
         assert result.cost_per_kg == Decimal('1.80')
 
     def test_calculate_cost_with_missing_price(self):
-        # Sprawdzamy, czy system poradzi sobie, gdy nie ma ustawionej ceny
         recipe_items = [
-            {'ingredient_id': 1, 'percentage': Decimal('100.00')}
+            {'ingredient_id': 1, 'ingredient_name': 'Pszenica', 'percentage': Decimal('100.00')}
         ]
-        price_map = {}  # Pusty cennik
+        price_map = {}
 
-        calc = RecipeCostCalculator("Darmowa Pasza", recipe_items, price_map)
+        calc = RecipeCostCalculator("Pasza bez ceny", recipe_items, price_map)
         result = calc.calculate_cost()
 
-        assert result.cost_per_kg == Decimal('0.00')
+        assert result.is_complete is False
+        assert result.missing_price_ingredients == ['Pszenica']
+        assert result.item_costs[0]['cost_per_kg'] is None

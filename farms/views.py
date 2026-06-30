@@ -15,7 +15,9 @@ from farms.services.profitability import ProfitabilityAnalyticsService
 from farms.services.date_range import PERIOD_OPTIONS, parse_date_range
 from farms.services.accounting_year import get_available_years, parse_accounting_year
 from farms.services.module_navigation import module_visibility_groups
+from farms.services.farm_dashboard import dashboard_stat_groups
 from farms.services.filter_ui import filter_ui_state, parse_filter_date
+from farms.services.global_search import build_global_search_context
 
 
 @login_required
@@ -69,6 +71,7 @@ def farm_settings_view(request):
         'import_form': import_form,
         'csv_import_form': csv_import_form,
         'module_visibility_groups': module_visibility_groups(form),
+        'dashboard_stat_groups': dashboard_stat_groups(form),
     })
 
 
@@ -139,3 +142,14 @@ def profitability_view(request):
     })
     context.update(filter_ui_state(request.GET, {'year': 'Rok'}))
     return render(request, "farms/profitability.html", context)
+
+
+@login_required
+def global_search_view(request):
+    farm = get_current_farm(request)
+    context = build_global_search_context(
+        farm,
+        request.GET.get("q", ""),
+        active_url_name=getattr(getattr(request, "resolver_match", None), "url_name", ""),
+    )
+    return render(request, "farms/search_results.html", context)

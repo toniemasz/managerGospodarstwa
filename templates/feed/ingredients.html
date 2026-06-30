@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load feed_format %}
 {% block title %}Składniki{% endblock %}
 
 {% block content %}
@@ -44,7 +45,7 @@
                                 <span class="status-pill">Worek</span>
                             {% endif %}
                         </td>
-                        <td class="text-right">{{ ingredient.low_stock_threshold_kg|floatformat:2 }} kg</td>
+                        <td class="text-right">{{ ingredient.low_stock_threshold_kg|feed_quantity }}</td>
                         <td class="text-right">
                             <div class="row-actions">
                                 <a href="{% url 'edit_ingredient' ingredient.id %}" class="table-link">Edytuj</a>

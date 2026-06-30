@@ -24,6 +24,8 @@ from .forms import (
 )
 from .models import SowModel, SowEventModel
 from farms.services.current_farm import get_current_farm
+from farms.services.farm_dashboard import FarmDashboardService
+from farms.services.module_navigation import ModuleNavigationService
 from farms.services.date_range import PERIOD_OPTIONS, parse_date_range
 from farms.services.audit_log_service import log_action
 from sows.domain.event_details import initial_data_from_event_details
@@ -32,7 +34,18 @@ logger = logging.getLogger(__name__)
 
 @login_required
 def modules_home_view(request):
-    return render(request, 'sows/modules_home.html')
+    context = FarmDashboardService(get_current_farm(request)).get_context()
+    return render(request, 'sows/modules_home.html', context)
+
+
+@login_required
+def modules_catalog_view(request):
+    farm = get_current_farm(request)
+    service = ModuleNavigationService(farm, request.resolver_match.url_name)
+    modules = service.all_modules()
+    return render(request, 'sows/modules_catalog.html', {
+        'module_groups': service.grouped_modules(modules, include_settings=True),
+    })
 
 
 @login_required

@@ -19,7 +19,7 @@
     <script src="{% static 'js/app.js' %}" defer></script>
     {% block extra_head %}{% endblock %}
 </head>
-<body>
+<body class="ui-scale-{{ ui_interface_scale|default:'compact' }}">
     <a href="#main-content" class="skip-link">Przejdź do treści</a>
     <div class="site-shell{% if user.is_authenticated %} has-app-nav{% endif %}">
         {% if user.is_authenticated %}

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load feed_format %}
 {% block title %}Magazyn pasz{% endblock %}
 
 {% block content %}
@@ -22,7 +23,7 @@
             <section class="stats-grid featured-stats compact-stats">
                 <a href="{% url 'feed_full_inventory' %}" class="stat-tile stat-link is-success">
                     <span>Łączny stan magazynu</span>
-                    <strong>{{ total_inventory_t|floatformat:2 }} t</strong>
+                    <strong>{{ total_inventory_kg|feed_quantity }}</strong>
                     <small>Pełny widok surowców i progów alarmowych.</small>
                 </a>
                 <div class="stat-tile{% if low_stock_alerts %} is-danger{% endif %}">
@@ -46,7 +47,7 @@
                         {% for alert in low_stock_alerts %}
                         <li>
                             <strong>{{ alert.name }}</strong>
-                            <span>{{ alert.current_stock|floatformat:0 }} kg / próg {{ alert.low_stock_threshold_kg|floatformat:0 }} kg</span>
+                            <span>{{ alert.current_stock|feed_quantity }} / próg {{ alert.low_stock_threshold_kg|feed_quantity }}</span>
                         </li>
                         {% endfor %}
                     </ul>
@@ -71,7 +72,7 @@
                         <td>{{ movement.movement_date|date:"d.m.Y" }}</td>
                         <td>{{ movement.ingredient.name }}</td>
                         <td>{{ movement.get_movement_type_display }}</td>
-                        <td class="text-right">{{ movement.quantity_kg|floatformat:2 }} kg</td>
+                        <td class="text-right">{{ movement.quantity_kg|feed_quantity }}</td>
                         <td>{{ movement.note|default:"-" }}</td>
                     </tr>
                 {% empty %}<tr><td colspan="5" class="empty-table">Brak ruchów magazynowych.</td></tr>{% endfor %}
@@ -80,11 +81,15 @@
         </div>
     </section>
 
-    <section class="panel table-panel">
+    <section class="panel table-panel" id="delivery-price-list" data-price-unit-scope>
         <div class="section-heading">
             <div>
                 <h2>Historia dostaw</h2>
                 <p>Ostatnie przyjęcia surowców na magazyn.</p>
+            </div>
+            <div class="unit-toggle" data-price-unit-toggle data-price-unit-scope="#delivery-price-list" data-default-price-unit="ton" aria-label="Jednostka ceny">
+                <button type="button" data-price-unit="ton">PLN/t</button>
+                <button type="button" data-price-unit="kg">PLN/kg</button>
             </div>
         </div>
         <div class="table-scroll">
@@ -95,7 +100,7 @@
                         <th>Składnik</th>
                         <th class="text-right">Ilość</th>
                         <th class="text-right">Pozostało FIFO</th>
-                        <th class="text-right">Cena/kg</th>
+                        <th class="text-right">Cena</th>
                         <th class="text-right">Akcje</th>
                     </tr>
                 </thead>
@@ -104,9 +109,15 @@
                     <tr>
                         <td>{{ delivery.date|date:"d.m.Y" }}</td>
                         <td><strong>{{ delivery.ingredient.name }}</strong></td>
-                        <td class="text-right"><strong>{{ delivery.quantity_kg|floatformat:2 }}</strong> kg</td>
-                        <td class="text-right">{{ delivery.remaining_quantity_kg|floatformat:2 }} kg</td>
-                        <td class="text-right">{{ delivery.price_per_kg|default:"-" }} PLN</td>
+                        <td class="text-right"><strong>{{ delivery.quantity_kg|feed_quantity }}</strong></td>
+                        <td class="text-right">{{ delivery.remaining_quantity_kg|feed_quantity }}</td>
+                        <td class="text-right">
+                            {% if delivery.price_per_kg %}
+                                <span data-price-kg="{{ delivery.price_per_kg|feed_price:'kg' }}" data-price-ton="{{ delivery.price_per_kg|feed_price:'ton' }}">{{ delivery.price_per_kg|feed_price:'ton' }}</span>
+                            {% else %}
+                                <span class="status-pill status-red">Brak ceny</span>
+                            {% endif %}
+                        </td>
                         <td class="text-right">
                             <div class="row-actions">
                                 <a href="{% url 'edit_delivery' delivery.id %}" class="table-link">Edytuj</a>

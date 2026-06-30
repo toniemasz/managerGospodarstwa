@@ -88,8 +88,9 @@ def test_cost_list_filters_summary_and_farm_isolation(cost_context):
     response = client.get(reverse("cost_list"), {"year": 2026, "category": category_a.pk})
     content = response.content.decode()
     assert response.status_code == 200
+    listed_descriptions = [cost.description for cost in response.context["costs"]]
     assert "Prąd" in content
-    assert "Przewóz" not in content
+    assert listed_descriptions == ["Prąd"]
     assert "UKRYTY" not in content
     assert response.context["summary"]["total"] == Decimal("100")
 

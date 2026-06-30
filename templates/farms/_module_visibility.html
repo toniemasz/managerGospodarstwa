@@ -12,6 +12,7 @@
                 <div class="module-settings-card">
                     <label class="module-toggle">
                         {{ item.field }}
+                        <span class="module-icon compact {{ item.tone }}">{% include 'components/app_icon.html' with name=item.icon_name %}</span>
                         <span class="module-toggle-copy">
                             <strong>{{ item.field.label }}</strong>
                             <small>{{ item.description }}</small>
@@ -26,6 +27,7 @@
                 <div class="module-settings-card is-locked">
                     <div class="module-toggle is-locked">
                     <input type="checkbox" checked disabled aria-label="Ustawienia zawsze widoczne">
+                        <span class="module-icon compact {{ item.tone }}">{% include 'components/app_icon.html' with name=item.icon_name %}</span>
                         <span class="module-toggle-copy">
                             <strong>{{ item.title }}</strong>
                             <small>{{ item.description }} Zawsze dostępne w menu gospodarstwa.</small>

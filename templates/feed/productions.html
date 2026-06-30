@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load feed_format %}
 {% block title %}Śrutowanie{% endblock %}
 
 {% block content %}
@@ -48,7 +49,7 @@
                                 <br><span class="status-pill status-amber">Zmienione proporcje</span>
                             {% endif %}
                         </td>
-                        <td class="text-right"><strong>{{ prod.quantity_kg|floatformat:0 }}</strong> kg</td>
+                        <td class="text-right"><strong>{{ prod.quantity_kg|feed_quantity }}</strong></td>
                         <td class="text-right">
                             {% if prod.status == 'COMPLETED' %}
                                 <strong>{{ prod.feed_cost_total|floatformat:2 }}</strong> zł

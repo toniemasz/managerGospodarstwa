@@ -256,6 +256,7 @@ class InventoryMovementService:
                 ingredient__farm=farm,
                 date__lte=production.date,
                 price_per_kg__isnull=False,
+                price_per_kg__gt=0,
                 remaining_quantity_kg__gt=0,
             ).order_by("date", "id")
 
@@ -267,7 +268,7 @@ class InventoryMovementService:
                     continue
                 quantity = min(available, remaining_to_allocate)
                 quantity = self._quantize_kg(quantity)
-                unit_price = delivery.price_per_kg or Decimal("0.00000")
+                unit_price = delivery.price_per_kg
                 cost = self._quantize_money(quantity * unit_price)
                 ProductionIngredientUsageModel.objects.create(
                     farm=farm,

@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+
+{% block title %}Wyniki wyszukiwania{% endblock %}
+
+{% block content %}
+<main class="app-page">
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Wyszukiwarka</p>
+            <h1>Wyniki wyszukiwania</h1>
+            {% if search_has_query and not search_is_short %}
+                <p class="page-subtitle">{{ search_total_count }} wyników dla „{{ global_search_query }}”.</p>
+            {% else %}
+                <p class="page-subtitle">Szukaj modułów, macior, pasz, receptur, sprzedaży i kosztów.</p>
+            {% endif %}
+        </div>
+    </section>
+
+    <form class="global-search-panel" method="get" action="{% url 'global_search' %}" role="search">
+        <span class="global-search-icon">{% include 'components/app_icon.html' with name='search' %}</span>
+        <input type="search" name="q" value="{{ global_search_query }}" placeholder="Wpisz minimum {{ search_min_length }} znaki" aria-label="Szukaj w gospodarstwie" autofocus>
+        <button type="submit" class="button button-primary">Szukaj</button>
+    </form>
+
+    {% if search_is_short %}
+        <section class="panel compact-panel empty-state">
+            <h2>Wpisz co najmniej {{ search_min_length }} znaki</h2>
+            <p>Krótsze hasła są zbyt szerokie, żeby pokazać sensowne wyniki.</p>
+        </section>
+    {% elif search_has_query and not search_groups %}
+        <section class="panel compact-panel empty-state">
+            <h2>Brak wyników</h2>
+            <p>Nie znaleziono pasujących rekordów w aktualnym gospodarstwie.</p>
+        </section>
+    {% elif search_groups %}
+        <section class="search-results-list">
+            {% for group in search_groups %}
+                <article class="panel search-result-group">
+                    <div class="section-heading">
+                        <div>
+                            <h2>{{ group.title }}</h2>
+                        </div>
+                        <span class="count-badge">{{ group.items|length }}</span>
+                    </div>
+                    <div class="search-result-grid">
+                        {% for item in group.items %}
+                            <a href="{{ item.url }}" class="search-result-card">
+                                <span class="dashboard-card-icon {{ item.tone }}">{% include 'components/app_icon.html' with name=item.icon_name %}</span>
+                                <span class="search-result-copy">
+                                    <strong>{{ item.title }}</strong>
+                                    <small>{{ item.subtitle }}</small>
+                                    <em>{{ item.meta }}</em>
+                                </span>
+                            </a>
+                        {% endfor %}
+                    </div>
+                </article>
+            {% endfor %}
+        </section>
+    {% else %}
+        <section class="panel compact-panel empty-state">
+            <h2>Wpisz hasło</h2>
+            <p>Wyniki pojawią się po uruchomieniu wyszukiwania.</p>
+        </section>
+    {% endif %}
+</main>
+{% endblock %}

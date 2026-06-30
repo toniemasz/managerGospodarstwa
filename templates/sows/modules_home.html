@@ -1,41 +1,140 @@
 {% extends 'base.html' %}
 {% block title %}Centrala Gospodarstwa{% endblock %}
 {% block content %}
-<main class="app-page">
-    <section class="page-header">
-        <div><p class="eyebrow">Centrala</p><h1>{{ current_farm.name|default:"Manager gospodarstwa" }}</h1><p class="page-subtitle">Wybierz moduł pracy dla bieżącego gospodarstwa.</p></div>
-    </section>
-
-    <section class="quick-actions-panel">
-        <div class="section-heading"><div><h2>Szybkie akcje</h2><p>Najczęstsze operacje dostępne od razu po wejściu do systemu.</p></div></div>
-        <div class="quick-actions-grid">
-            {% if 'sows' in ui_visible_module_keys %}<a href="{% url 'bulk_sow_events' %}?rows=1" class="quick-action"><span class="module-icon">Z</span><div><strong>Utwórz zdarzenie maciory</strong><small>Bez wchodzenia w kartę konkretnej maciory.</small></div></a>{% endif %}
-            {% if 'production' in ui_visible_module_keys %}<a href="{% url 'add_production' %}" class="quick-action"><span class="module-icon amber">Ś</span><div><strong>Zleć śrutowanie</strong><small>Dodaj nowe śrutowanie do kolejki pasz.</small></div></a>{% endif %}
-            {% if 'costs' in ui_visible_module_keys %}<a href="{% url 'add_cost' %}" class="quick-action"><span class="module-icon green">K</span><div><strong>Dodaj koszt</strong><small>Zapisz dokument, kategorię i status płatności.</small></div></a>{% endif %}
+<main class="app-page farm-dashboard-page">
+    <section class="dashboard-heading">
+        <div>
+            <p class="eyebrow">Centrala</p>
+            <h1>{{ current_farm.name|default:"Manager gospodarstwa" }}</h1>
+            <p class="page-subtitle">Przegląd operacyjny gospodarstwa.</p>
+        </div>
+        <div class="header-actions">
+            <a href="{% url 'modules_catalog' %}" class="button button-secondary">Wszystkie moduły</a>
+            {% if 'tasks' in ui_visible_module_keys %}
+            <a href="{% url 'task_center' %}" class="button button-primary">Zadania</a>
+            {% endif %}
         </div>
     </section>
 
-    <section class="module-group-list" id="modules">
-        {% for group in ui_module_groups %}
-        <div class="module-group-section">
-            <div class="section-heading">
-                <div>
-                    <h2>{{ group.title }}</h2>
-                    <p>Najważniejsze narzędzia w tej części gospodarstwa.</p>
+    <section class="dashboard-stat-grid">
+        {% for stat in dashboard_stats %}
+        <a href="{{ stat.url }}" class="dashboard-stat-card dashboard-stat-card--{{ stat.tone|default:'neutral' }}">
+            <span class="dashboard-card-icon">{% include 'components/app_icon.html' with name=stat.icon_name %}</span>
+            <span class="dashboard-card-label">{{ stat.title }}</span>
+            <strong>{{ stat.value }}{% if stat.unit %} <small>{{ stat.unit }}</small>{% endif %}</strong>
+            <small>{{ stat.note }}</small>
+        </a>
+        {% empty %}
+        <article class="dashboard-stat-card">
+            <span class="dashboard-card-icon">{% include 'components/app_icon.html' with name='dashboard' %}</span>
+            <span class="dashboard-card-label">Centrala</span>
+            <strong>0</strong>
+            <small>Włącz statystyki w ustawieniach.</small>
+        </article>
+        {% endfor %}
+    </section>
+
+    <section class="dashboard-grid">
+        <div class="dashboard-main">
+            <section class="panel management-panel">
+                <div class="section-heading">
+                    <div>
+                        <h2>Moduły zarządzania</h2>
+                    </div>
+                    <a href="{% url 'modules_catalog' %}" class="table-link">Zobacz wszystkie</a>
                 </div>
-            </div>
-            <div class="module-grid">
-                {% for module in group.modules %}
-                <a href="{{ module.url }}" class="module-card">
-                    <span class="module-icon {{ module.tone }}">{{ module.icon }}</span>
-                    <div><h2>{{ module.title }}</h2><p>{{ module.description }}</p></div>
+                <div class="management-module-grid">
+                    {% for module in dashboard_modules %}
+                    <a href="{{ module.url }}" class="management-module-tile{% if module.is_active %} is-active{% endif %}">
+                        <span class="module-icon {{ module.tone }}">{% include 'components/app_icon.html' with name=module.icon_name %}</span>
+                        <strong>{{ module.title }}</strong>
+                    </a>
+                    {% empty %}
+                    <p class="empty-table">Brak przypiętych modułów.</p>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section class="dashboard-action-grid">
+                {% for action in dashboard_actions %}
+                <a href="{{ action.url }}" class="dashboard-action-card">
+                    <span class="module-icon {{ action.tone }}">{% include 'components/app_icon.html' with name=action.icon_name %}</span>
+                    <div>
+                        <strong>{{ action.title }}</strong>
+                        <small>{{ action.description }}</small>
+                    </div>
                 </a>
                 {% endfor %}
-            </div>
+            </section>
+
+            <section class="panel alerts-panel">
+                <div class="section-heading">
+                    <div>
+                        <h2>Powiadomienia i alerty</h2>
+                    </div>
+                    {% if 'tasks' in ui_visible_module_keys %}
+                    <a href="{% url 'task_center' %}" class="table-link">Zobacz wszystkie</a>
+                    {% endif %}
+                </div>
+                <div class="dashboard-alert-list">
+                    {% for alert in dashboard_alerts %}
+                    <a href="{{ alert.action_url|default:alert.object_url }}" class="dashboard-alert dashboard-alert--{{ alert.priority }}">
+                        <span class="dashboard-alert-marker">!</span>
+                        <div>
+                            <strong>{{ alert.title }}</strong>
+                            <small>{{ alert.description }}</small>
+                        </div>
+                        <span class="status-pill">{{ alert.status_label }}</span>
+                    </a>
+                    {% empty %}
+                    <div class="dashboard-alert">
+                        <span class="dashboard-alert-marker">i</span>
+                        <div>
+                            <strong>Brak pilnych alertów</strong>
+                            <small>Wszystkie aktywne obszary są teraz spokojne.</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
         </div>
-        {% empty %}
-        {% include 'components/empty_state.html' with title='Brak widocznych modułów' message='Włącz moduły w ustawieniach gospodarstwa.' %}
-        {% endfor %}
+
+        <aside class="dashboard-side">
+            <section class="panel activity-panel">
+                <div class="section-heading">
+                    <div>
+                        <h2>Ostatnia aktywność</h2>
+                    </div>
+                </div>
+                <div class="activity-timeline">
+                    {% for item in dashboard_activity %}
+                    <article class="activity-item">
+                        <span class="activity-icon">{% include 'components/app_icon.html' with name=item.icon_name %}</span>
+                        <div>
+                            <time>{{ item.time_label }}</time>
+                            <strong>{{ item.title }}</strong>
+                            <small>{{ item.description }}</small>
+                        </div>
+                    </article>
+                    {% empty %}
+                    <article class="activity-item">
+                        <span class="activity-icon">{% include 'components/app_icon.html' with name='history' %}</span>
+                        <div>
+                            <strong>Brak ostatnich wpisów</strong>
+                            <small>Historia pojawi się po pierwszych operacjach.</small>
+                        </div>
+                    </article>
+                    {% endfor %}
+                </div>
+                <a href="{% url 'audit_log' %}" class="activity-link">Historia zdarzeń</a>
+            </section>
+
+            <section class="conditions-card">
+                <p class="eyebrow">Stan pracy</p>
+                <strong>Operacyjnie</strong>
+                <span>{{ current_farm.name|default:"Gospodarstwo" }}</span>
+            </section>
+        </aside>
     </section>
 </main>
 {% endblock %}
