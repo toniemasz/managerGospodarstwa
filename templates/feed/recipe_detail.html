@@ -46,11 +46,11 @@
             <strong>{{ stats.completed_t|floatformat:0 }} t</strong>
         </div>
         <div class="stat-tile">
-            <span>Łączny koszt paszy</span>
+            <span>Łączny koszt FIFO</span>
             <strong>{{ stats.completed_cost|floatformat:2 }} zł</strong>
         </div>
         <div class="stat-tile">
-            <span>Średni koszt tony</span>
+            <span>Koszt poglądowy tony</span>
             <strong>{{ cost.cost_per_ton|floatformat:2 }} zł</strong>
         </div>
         <div class="stat-tile">
@@ -64,7 +64,7 @@
         <div class="panel">
             <div class="section-heading">
                 <div>
-                    <h2>Skład i koszt</h2>
+                    <h2>Skład i koszt poglądowy</h2>
                     <p>Szacunek dla 1 kg oraz 1 tony gotowej paszy na podstawie ostatnich cen zakupu.</p>
                 </div>
             </div>
@@ -75,8 +75,8 @@
                             <th>Składnik</th>
                             <th class="text-right">Udział</th>
                             <th class="text-right">Cena/kg</th>
-                            <th class="text-right">Koszt/kg paszy</th>
-                            <th class="text-right">Koszt/t paszy</th>
+                            <th class="text-right">Poglądowo/kg paszy</th>
+                            <th class="text-right">Poglądowo/t paszy</th>
                             <th class="text-right">Akcje</th>
                         </tr>
                     </thead>

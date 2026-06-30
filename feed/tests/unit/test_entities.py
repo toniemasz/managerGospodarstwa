@@ -65,12 +65,14 @@ class TestProductionCalculator:
 
 class TestRecipeCostCalculator:
 
+
     def test_calculate_cost_correctly(self):
-        # Symulujemy czyste dane odpięte od bazy (to co przyjdzie z Serwisu)
+
         recipe_items = [
             {'ingredient_id': 1, 'percentage': Decimal('60.00')},  # np. Pszenica
             {'ingredient_id': 2, 'percentage': Decimal('40.00')},  # np. Soja
         ]
+
         price_map = {
             1: Decimal('1.00'),  # Pszenica po 1 zł
             2: Decimal('3.00')  # Soja po 3 zł

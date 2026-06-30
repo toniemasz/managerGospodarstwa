@@ -33,13 +33,29 @@ def delete_delivery_movement(sender, instance, **kwargs):
     ).delete()
 
 
+@receiver(pre_save, sender=ProductionModel)
+def remember_previous_production_status(sender, instance, **kwargs):
+    instance._previous_inventory_status = None
+    if not instance.pk:
+        return
+    instance._previous_inventory_status = ProductionModel.objects.filter(
+        pk=instance.pk,
+    ).values_list("status", flat=True).first()
+
+
 @receiver(post_save, sender=ProductionModel)
 def sync_production_movement(sender, instance, **kwargs):
     if getattr(instance, "_skip_inventory_sync", False):
         return
     service = InventoryMovementService(instance.recipe.farm)
+    previous_status = getattr(instance, "_previous_inventory_status", None)
     if instance.status == ProductionModel.Statuses.COMPLETED:
-        service.book_production(instance)
+        if previous_status == ProductionModel.Statuses.COMPLETED:
+            service.rebuild(reconstruct_production_ids={instance.pk})
+        else:
+            service.book_production(instance)
+    elif previous_status == ProductionModel.Statuses.COMPLETED:
+        service.rebuild()
     else:
         service.release_production(instance)
 
@@ -57,3 +73,5 @@ def delete_production_movements(sender, instance, **kwargs):
         source_model=instance._meta.label,
         source_id=str(instance.pk),
     ).delete()
+    if instance.status == ProductionModel.Statuses.COMPLETED:
+        InventoryMovementService(instance.recipe.farm).rebuild()
