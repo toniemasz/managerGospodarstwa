@@ -487,6 +487,42 @@
         });
     }
 
+    function initPriceUnitToggles(root = document) {
+        root.querySelectorAll('[data-price-unit-toggle]').forEach((toggle) => {
+            if (toggle.dataset.priceUnitBound === 'true') return;
+
+            const scopeSelector = toggle.dataset.priceUnitScope;
+            const scope = scopeSelector ? document.querySelector(scopeSelector) : toggle.closest('[data-price-unit-scope]');
+            if (!scope) return;
+
+            toggle.dataset.priceUnitBound = 'true';
+            const buttons = Array.from(toggle.querySelectorAll('[data-price-unit]'));
+            const storageKey = toggle.dataset.priceUnitStorage || 'feed-price-unit';
+
+            const applyUnit = (unit) => {
+                const safeUnit = unit === 'kg' ? 'kg' : 'ton';
+                scope.querySelectorAll('[data-price-kg][data-price-ton]').forEach((element) => {
+                    element.textContent = safeUnit === 'kg' ? element.dataset.priceKg : element.dataset.priceTon;
+                });
+                scope.querySelectorAll('[data-price-unit-label]').forEach((element) => {
+                    element.textContent = safeUnit === 'kg' ? 'PLN/kg' : 'PLN/t';
+                });
+                buttons.forEach((button) => {
+                    const isActive = button.dataset.priceUnit === safeUnit;
+                    button.classList.toggle('is-active', isActive);
+                    button.setAttribute('aria-pressed', String(isActive));
+                });
+                localStorage.setItem(storageKey, safeUnit);
+            };
+
+            buttons.forEach((button) => {
+                button.addEventListener('click', () => applyUnit(button.dataset.priceUnit));
+            });
+
+            applyUnit(localStorage.getItem(storageKey) || toggle.dataset.defaultPriceUnit || 'ton');
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         initDateRangeFilters();
         initSingleSowEventForm();
@@ -496,6 +532,7 @@
         initProductionStageChecklist();
         initConfirmations();
         initDisclosureMenus();
+        initPriceUnitToggles();
         initTrendCharts();
     });
 })();

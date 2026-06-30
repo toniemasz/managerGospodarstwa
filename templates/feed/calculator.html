@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load feed_format %}
 {% block title %}Kalkulator paszy{% endblock %}
 
 {% block content %}
@@ -14,7 +15,7 @@
 
     {% include 'feed/_feed_nav.html' %}
 
-    <form method="post" class="calculator-layout">
+    <form method="post" class="calculator-layout" id="feed-calculator-costs" data-price-unit-scope>
         {% csrf_token %}
         <section class="panel table-panel">
             <div class="section-heading">
@@ -22,15 +23,21 @@
                     <h2>Koszt według receptur</h2>
                     <p>Wartości liczone tylko dla tej symulacji.</p>
                 </div>
-                <button type="submit" class="button button-primary">Przelicz</button>
+                <div class="header-actions">
+                    <div class="unit-toggle" data-price-unit-toggle data-price-unit-scope="#feed-calculator-costs" data-default-price-unit="ton" aria-label="Jednostka ceny">
+                        <button type="button" data-price-unit="ton">PLN/t</button>
+                        <button type="button" data-price-unit="kg">PLN/kg</button>
+                    </div>
+                    <button type="submit" class="button button-primary">Przelicz</button>
+                </div>
             </div>
             <div class="table-scroll">
                 <table class="data-table">
                     <thead>
                         <tr>
                             <th>Receptura</th>
-                            <th class="text-right">Koszt 1 kg</th>
-                            <th class="text-right">Koszt 1 tony</th>
+                            <th class="text-right">Koszt <span data-price-unit-label>PLN/t</span></th>
+                            <th>Kompletność</th>
                             <th class="text-right">Akcje</th>
                         </tr>
                     </thead>
@@ -40,8 +47,20 @@
                             <td>
                                 <a href="{% url 'recipe_detail' cost.recipe_id %}" class="table-link">{{ cost.recipe_name }}</a>
                             </td>
-                            <td class="text-right"><strong>{{ cost.cost_per_kg|floatformat:4 }}</strong> PLN</td>
-                            <td class="text-right"><strong>{{ cost.cost_per_ton|floatformat:2 }}</strong> PLN</td>
+                            <td class="text-right">
+                                {% if cost.is_complete %}
+                                    <strong data-price-kg="{{ cost.cost_per_kg|feed_price:'kg' }}" data-price-ton="{{ cost.cost_per_kg|feed_price:'ton' }}">{{ cost.cost_per_kg|feed_price:'ton' }}</strong>
+                                {% else %}
+                                    <span class="status-pill status-red">Brak pełnej wyceny</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if cost.is_complete %}
+                                    <span class="status-pill status-green">Kompletna</span>
+                                {% else %}
+                                    <span class="muted-small">Brak ceny: {{ cost.missing_price_ingredients|join:", " }}</span>
+                                {% endif %}
+                            </td>
                             <td class="text-right">
                                 <a href="{% url 'edit_recipe' cost.recipe_id %}" class="table-link">Edytuj</a>
                             </td>
@@ -61,6 +80,7 @@
                 <div>
                     <h2>Ceny składników</h2>
                     <p>Domyślnie z ostatniej dostawy, bez zapisu do innych zakładek.</p>
+                    <p>System zapisuje ceny w PLN/kg. Widoki kosztów mogą przełączać prezentację na PLN/t.</p>
                 </div>
             </div>
             <div class="price-input-list">

@@ -295,6 +295,32 @@ def test_future_delivery_is_not_used_and_forced_completion_is_partial(inventory_
 
 
 @pytest.mark.django_db
+def test_zero_price_delivery_is_not_used_as_free_fifo_cost(inventory_data):
+    user, farm, ingredient, recipe = inventory_data
+    DeliveryModel.objects.filter(ingredient=ingredient).delete()
+    zero_price_delivery = DeliveryModel.objects.create(
+        ingredient=ingredient,
+        date=date(2026, 1, 1),
+        quantity_kg=Decimal("1000.00"),
+        price_per_kg=Decimal("0.00000"),
+    )
+    production = ProductionModel.objects.create(
+        recipe=recipe,
+        date=date(2026, 1, 2),
+        quantity_kg=Decimal("500.00"),
+        status=ProductionModel.Statuses.STAGE_1_DONE,
+    )
+
+    success, message = FeedManagementService(farm).complete_production(production.pk, user=user)
+
+    assert success is False
+    assert "Brakuje rozliczalnych dostaw FIFO" in message
+    assert not ProductionIngredientUsageModel.objects.filter(production=production).exists()
+    zero_price_delivery.refresh_from_db()
+    assert zero_price_delivery.remaining_quantity_kg == Decimal("1000.00")
+
+
+@pytest.mark.django_db
 def test_rebuild_feed_fifo_command_rolls_back_by_default_and_applies_when_requested(inventory_data):
     user, farm, ingredient, recipe = inventory_data
     delivery = DeliveryModel.objects.get(ingredient=ingredient)

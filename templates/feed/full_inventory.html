@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load feed_format %}
 {% block title %}Pełny stan magazynu{% endblock %}
 
 {% block content %}
@@ -22,18 +23,11 @@
                 {% else %}
                     <span class="status-pill status-amber">Worek</span>
                 {% endif %}
-                <p>Próg alertu: <strong>{{ item.low_stock_threshold_kg|floatformat:2 }} kg</strong></p>
+                <p>Próg alertu: <strong>{{ item.low_stock_threshold_kg|feed_quantity }}</strong></p>
                 <p><a href="{% url 'edit_ingredient' item.ingredient_id %}" class="table-link">Edytuj składnik</a></p>
             </div>
             <div class="inventory-stock {% if item.is_low_stock %}is-low{% endif %}">
-                <strong>
-                    {% if item.current_stock > 1000 %}
-                        {{ item.current_stock_in_t|floatformat:2 }}
-                    {% else %}
-                        {{ item.current_stock|floatformat:2 }}
-                    {% endif %}
-                </strong>
-                <span>{% if item.current_stock > 1000 %}t{% else %}kg{% endif %}</span>
+                <strong>{{ item.current_stock|feed_quantity }}</strong>
             </div>
         </article>
         {% empty %}

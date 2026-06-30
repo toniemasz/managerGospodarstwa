@@ -347,15 +347,15 @@ class CalculatorPriceForm(forms.Form):
             field_name = self.field_name_for_ingredient(ingredient.id)
             self.fields[field_name] = forms.DecimalField(
                 label=ingredient.name,
-                min_value=Decimal('0.00000'),
+                min_value=Decimal('0.00001'),
                 max_digits=14,
                 decimal_places=5,
                 required=False,
                 error_messages={
                     'invalid': "Podaj poprawną cenę składnika.",
-                    'min_value': "Cena składnika nie może być ujemna.",
+                    'min_value': "Cena składnika musi być większa od 0.",
                 },
-                widget=forms.NumberInput(attrs={'min': '0', 'step': '0.00001'}),
+                widget=forms.NumberInput(attrs={'min': '0.00001', 'step': '0.00001'}),
             )
             self.fields[field_name].initial = self.prices.get(ingredient.id)
 

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load feed_format %}
 {% block title %}Receptury paszowe{% endblock %}
 
 {% block content %}
@@ -14,7 +15,20 @@
 
     {% include 'feed/_feed_nav.html' %}
 
-    <section class="recipe-grid">
+    <section class="panel compact-panel">
+        <div class="section-heading">
+            <div>
+                <h2>Prezentacja kosztu</h2>
+                <p>Koszty liczone są z cen PLN/kg, a tutaj możesz przełączyć jednostkę wyświetlania.</p>
+            </div>
+            <div class="unit-toggle" data-price-unit-toggle data-price-unit-scope="#recipe-cost-list" data-default-price-unit="ton" aria-label="Jednostka ceny">
+                <button type="button" data-price-unit="ton">PLN/t</button>
+                <button type="button" data-price-unit="kg">PLN/kg</button>
+            </div>
+        </div>
+    </section>
+
+    <section class="recipe-grid" id="recipe-cost-list" data-price-unit-scope>
         {% for card in recipe_cards %}
         <article class="recipe-card{% if forloop.first %} is-featured{% endif %}">
             <div class="recipe-card-header">
@@ -28,12 +42,13 @@
 
             <div class="recipe-cost-strip">
                 <div>
-                    <span>Poglądowo 1 kg</span>
-                    <strong>{{ card.cost.cost_per_kg|default:0|floatformat:4 }} PLN</strong>
-                </div>
-                <div>
-                    <span>Poglądowo tona</span>
-                    <strong>{{ card.cost.cost_per_ton|default:0|floatformat:2 }} PLN</strong>
+                    <span>Poglądowo <span data-price-unit-label>PLN/t</span></span>
+                    {% if card.cost.is_complete %}
+                        <strong data-price-kg="{{ card.cost.cost_per_kg|feed_price:'kg' }}" data-price-ton="{{ card.cost.cost_per_kg|feed_price:'ton' }}">{{ card.cost.cost_per_kg|feed_price:'ton' }}</strong>
+                    {% else %}
+                        <strong>Brak pełnej wyceny</strong>
+                        <small>Brak ceny: {{ card.cost.missing_price_ingredients|join:", " }}</small>
+                    {% endif %}
                 </div>
             </div>
 

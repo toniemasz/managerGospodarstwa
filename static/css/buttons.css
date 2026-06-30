@@ -244,3 +244,28 @@
     font-weight: 900;
 }
 
+.unit-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: .2rem;
+}
+
+.unit-toggle button {
+    min-height: 2.2rem;
+    border: 0;
+    border-radius: calc(var(--radius) - .15rem);
+    background: transparent;
+    color: var(--muted);
+    padding: .45rem .7rem;
+    font-size: .78rem;
+    font-weight: 950;
+}
+
+.unit-toggle button.is-active {
+    background: var(--primary);
+    color: #fff;
+}

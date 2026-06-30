@@ -6,7 +6,8 @@
     }
 
     .table-footer-controls,
-    .filter-bar {
+    .filter-bar,
+    .global-search-panel {
         flex-direction: row;
         flex-wrap: wrap;
         align-items: flex-end;
@@ -19,6 +20,7 @@
 
     .notice,
     .page-header,
+    .dashboard-heading,
     .section-heading {
         flex-direction: row;
         align-items: center;
@@ -149,6 +151,10 @@
     .topbar-action {
         display: inline-flex;
     }
+
+    .topbar-search {
+        display: block;
+    }
 }
 
 @media (max-width: 720px) {
@@ -168,12 +174,6 @@
 
     .brand-subtitle {
         max-width: 14rem;
-    }
-
-    .brand-mark {
-        width: 2.35rem;
-        height: 2.35rem;
-        border-radius: .7rem;
     }
 
     .nav-menu-panel {
@@ -306,6 +306,7 @@
 
     .task-summary-grid,
     .module-visibility-groups,
+    .dashboard-alert,
     .settings-layout,
     .record-layout,
     .recipe-detail-grid,

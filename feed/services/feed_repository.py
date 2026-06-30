@@ -101,7 +101,8 @@ class FeedRepository:
         for delivery in deliveries:
             if delivery.ingredient_id in prices:
                 continue
-            prices[delivery.ingredient_id] = delivery.price_per_kg or Decimal('0.00')
+            if delivery.price_per_kg is not None and delivery.price_per_kg > Decimal('0.00000'):
+                prices[delivery.ingredient_id] = delivery.price_per_kg
         return prices
 
     def get_latest_delivery_price_sources(self) -> dict:

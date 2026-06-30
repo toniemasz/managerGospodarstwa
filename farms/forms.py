@@ -1,5 +1,6 @@
 from django import forms
 
+from farms.dashboard_registry import DASHBOARD_STAT_DEFINITIONS, normalize_dashboard_stats
 from farms.models import FarmSettingsModel
 from farms.module_registry import MODULE_DEFINITIONS
 from farms.services.module_navigation import normalize_nav_modules, normalize_visible_modules
@@ -12,6 +13,7 @@ class FarmSettingsForm(forms.ModelForm):
         model = FarmSettingsModel
         fields = [
             'farm_name',
+            'interface_scale',
             'pregnancy_check_after_days',
             'gestation_days',
             'farrowing_alert_days_ahead',
@@ -21,6 +23,7 @@ class FarmSettingsForm(forms.ModelForm):
             'ask_before_auto_pregnancy_check',
         ]
         labels = {
+            'interface_scale': 'Rozmiar interfejsu',
             'pregnancy_check_after_days': 'Dni do badania USG',
             'gestation_days': 'Długość ciąży',
             'farrowing_alert_days_ahead': 'Dni alertu przed oproszeniem',
@@ -42,6 +45,10 @@ class FarmSettingsForm(forms.ModelForm):
             getattr(self.instance, 'nav_modules', None),
             visible_keys=visible,
         )
+        dashboard_stats = normalize_dashboard_stats(
+            getattr(self.instance, 'dashboard_stats', None),
+            visible_keys=visible,
+        )
         for module in MODULE_DEFINITIONS:
             if module['key'] == 'settings':
                 continue
@@ -55,6 +62,13 @@ class FarmSettingsForm(forms.ModelForm):
                 required=False,
                 label=f"{module['title']} na pasku",
                 initial=module['key'] in nav_modules,
+                widget=forms.CheckboxInput(attrs={'class': 'checkbox-input'}),
+            )
+        for stat in DASHBOARD_STAT_DEFINITIONS:
+            self.fields[f"stat_{stat['key']}"] = forms.BooleanField(
+                required=False,
+                label=stat['title'],
+                initial=stat['key'] in dashboard_stats,
                 widget=forms.CheckboxInput(attrs={'class': 'checkbox-input'}),
             )
         for field in self.fields.values():
@@ -82,6 +96,14 @@ class FarmSettingsForm(forms.ModelForm):
                 module['key']
                 for module in MODULE_DEFINITIONS
                 if module['key'] != 'settings' and self.cleaned_data.get(f"nav_{module['key']}")
+            ],
+            visible_keys=visible_modules,
+        )
+        settings.dashboard_stats = normalize_dashboard_stats(
+            [
+                stat['key']
+                for stat in DASHBOARD_STAT_DEFINITIONS
+                if self.cleaned_data.get(f"stat_{stat['key']}")
             ],
             visible_keys=visible_modules,
         )

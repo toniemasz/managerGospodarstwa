@@ -24,6 +24,7 @@ def ui_client(client):
 def _settings_payload(**overrides):
     data = {
         "farm_name": "Gospodarstwo UI",
+        "interface_scale": "compact",
         "pregnancy_check_after_days": 30,
         "gestation_days": 114,
         "farrowing_alert_days_ahead": 7,
@@ -82,8 +83,13 @@ def test_task_center_uses_short_previews_and_links_to_full_panels(ui_client):
     response = ui_client.get(reverse("task_center"), {"tab": "production"})
     content = response.content.decode()
     assert response.status_code == 200
+    preview_titles = [
+        item["title"]
+        for section in response.context["active_tab_data"]["sections"]
+        for item in section["preview_items"]
+    ]
     assert "SHORT-1" in content and "SHORT-4" in content
-    assert "SHORT-5" not in content and "SHORT-6" not in content
+    assert all("SHORT-5" not in title and "SHORT-6" not in title for title in preview_titles)
     assert "+ 2 więcej" in content
     assert reverse("bulk_pregnancy_check") in content
     assert reverse("bulk_vaccinate") in content
@@ -134,3 +140,31 @@ def test_settings_visibility_section_is_grouped(ui_client):
     assert all(label in content for label in ["Widoczność modułów", "Produkcja", "Pasza i magazyn", "Finanse", "System"])
     assert "Ustawienia zawsze widoczne" in content
     assert "Pokaż na pasku nawigacji" in content
+    assert "Rozmiar interfejsu" in content
+
+
+@pytest.mark.django_db
+def test_global_search_finds_owned_records_modules_and_handles_short_query(ui_client):
+    SowModel.objects.create(farm=ui_client.farm, ear_tag="SEARCH-SOW")
+    PigSaleModel.objects.create(farm=ui_client.farm, document_number="FV-SEARCH", quantity=12)
+
+    other_user = get_user_model().objects.create_user(username="ui-search-other")
+    other_farm = get_or_create_user_farm(other_user)
+    SowModel.objects.create(farm=other_farm, ear_tag="SECRET-SOW")
+
+    response = ui_client.get(reverse("global_search"), {"q": "search"})
+    content = response.content.decode()
+    assert response.status_code == 200
+    assert "SEARCH-SOW" in content
+    assert "FV-SEARCH" in content
+    assert "SECRET-SOW" not in content
+
+    module_response = ui_client.get(reverse("global_search"), {"q": "maciory"})
+    module_content = module_response.content.decode()
+    assert module_response.status_code == 200
+    assert "Moduły" in module_content
+    assert "Maciory" in module_content
+
+    short = ui_client.get(reverse("global_search"), {"q": "s"})
+    assert short.status_code == 200
+    assert "Wpisz co najmniej 2 znaki" in short.content.decode()

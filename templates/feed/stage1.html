@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load feed_format %}
 {% block title %}Etap 1 śrutowania{% endblock %}
 
 {% block content %}
@@ -7,7 +8,7 @@
         <div>
             <p class="eyebrow">Śrutowanie</p>
             <h1>Etap 1: silosy i biny</h1>
-            <p class="page-subtitle">{{ production.recipe.name }} · {{ production.quantity_kg|floatformat:0 }} kg</p>
+            <p class="page-subtitle">{{ production.recipe.name }} · {{ production.quantity_kg|feed_quantity }}</p>
         </div>
         <div class="header-actions">
             <a href="{% url 'edit_production' production.id %}" class="button button-secondary">Edytuj śrutowanie</a>
@@ -18,21 +19,26 @@
     <section class="stats-grid">
         <div class="stat-tile">
             <span>Ilość produkcji</span>
-            <strong>{{ production.quantity_kg|floatformat:0 }} kg</strong>
+            <strong>{{ production.quantity_kg|feed_quantity }}</strong>
         </div>
         <div class="stat-tile">
             <span>Szac. koszt paszy</span>
-            <strong>{{ production_cost.total_cost|floatformat:2 }}</strong>
-        </div>
-        <div class="stat-tile">
-            <span>Szac. koszt 1 kg</span>
-            <strong>{{ production_cost.cost_per_kg|floatformat:4 }}</strong>
-        </div>
-        <div class="stat-tile">
-            <span>Szac. koszt tony</span>
-            <strong>{{ production_cost.cost_per_ton|floatformat:2 }}</strong>
+            {% if production_cost.is_complete %}
+                <strong>{{ production_cost.total_cost|feed_money }}</strong>
+            {% else %}
+                <strong>Brak pełnej wyceny</strong>
+            {% endif %}
         </div>
     </section>
+
+    {% if not production_cost.is_complete %}
+    <section class="notice notice-danger">
+        <div>
+            <h2>Brak cen składników</h2>
+            <p>Nie można pokazać pełnego kosztu. Uzupełnij ceny dla: {{ production_cost.missing_price_ingredients|join:", " }}.</p>
+        </div>
+    </section>
+    {% endif %}
 
     {% if production.custom_recipe_data %}
     <section class="notice notice-warning">
@@ -43,11 +49,15 @@
     </section>
     {% endif %}
 
-    <section class="panel table-panel">
+    <section class="panel table-panel" id="stage1-costs" data-price-unit-scope>
         <div class="section-heading">
             <div>
                 <h2>Składniki z silosów</h2>
                 <p>Odhacz surowce pobrane do śrutowania. Finalny koszt powstanie po zatwierdzeniu FIFO.</p>
+            </div>
+            <div class="unit-toggle" data-price-unit-toggle data-price-unit-scope="#stage1-costs" data-default-price-unit="ton" aria-label="Jednostka ceny">
+                <button type="button" data-price-unit="ton">PLN/t</button>
+                <button type="button" data-price-unit="kg">PLN/kg</button>
             </div>
         </div>
         <div class="table-scroll">
@@ -58,7 +68,7 @@
                         <th>Składnik</th>
                         <th class="text-right">Udział</th>
                         <th class="text-right">Ilość</th>
-                        <th class="text-right">Cena/kg</th>
+                        <th class="text-right">Cena składnika</th>
                         <th class="text-right">Koszt</th>
                     </tr>
                 </thead>
@@ -68,9 +78,15 @@
                         <td><input type="checkbox" class="ingredient-checkbox" data-id="{{ item.id }}" aria-label="Oznacz {{ item.name }} jako gotowe"></td>
                         <td><strong class="row-name">{{ item.name }}</strong></td>
                         <td class="text-right">{{ item.percentage|floatformat:2 }}%</td>
-                        <td class="text-right"><strong>{{ item.weight_kg|floatformat:2 }}</strong> kg</td>
-                        <td class="text-right">{{ item.price_per_kg|floatformat:5 }} PLN</td>
-                        <td class="text-right">{{ item.cost|floatformat:2 }} PLN</td>
+                        <td class="text-right"><strong>{{ item.weight_kg|feed_quantity }}</strong></td>
+                        <td class="text-right">
+                            {% if item.has_price %}
+                                <span data-price-kg="{{ item.price_per_kg|feed_price:'kg' }}" data-price-ton="{{ item.price_per_kg|feed_price:'ton' }}">{{ item.price_per_kg|feed_price:'ton' }}</span>
+                            {% else %}
+                                <span class="status-pill status-red">Brak ceny</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-right">{% if item.has_price %}{{ item.cost|feed_money }}{% else %}<span class="muted-small">Nie liczono</span>{% endif %}</td>
                     </tr>
                     {% empty %}
                     <tr>

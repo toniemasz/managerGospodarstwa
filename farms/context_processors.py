@@ -1,15 +1,60 @@
+def _interface_scale(settings):
+    scale = getattr(settings, "interface_scale", "compact") or "compact"
+    return scale if scale in {"compact", "comfortable", "large"} else "compact"
+
+
+def _topbar_notifications(farm):
+    from datetime import date
+
+    from django.urls import reverse
+
+    from farms.services.task_center import TaskCenterService
+
+    priority_order = {"urgent": 0, "today": 1, "upcoming": 2}
+    task_summary = TaskCenterService(farm).get_tasks()
+    items = [
+        item
+        for tab in task_summary["tab_list"]
+        for section in tab["sections"]
+        for item in section["items"]
+    ]
+    items.sort(key=lambda item: (priority_order.get(item["priority"], 9), item.get("due_date") or date.max))
+    return [
+        {
+            **item,
+            "url": item.get("object_url") or item.get("action_url") or reverse("task_center"),
+        }
+        for item in items[:6]
+    ], len(items)
+
+
 def current_farm(request):
     farm = getattr(request, 'farm', None)
-    context = {'current_farm': farm, 'ui_modules': [], 'ui_visible_module_keys': []}
+    context = {
+        'current_farm': farm,
+        'ui_modules': [],
+        'ui_visible_module_keys': [],
+        'ui_interface_scale': 'compact',
+        'ui_notifications': [],
+        'ui_notification_count': 0,
+        'ui_notification_more_count': 0,
+    }
     if getattr(request, 'user', None) and request.user.is_authenticated and farm:
         from farms.services.module_navigation import ModuleNavigationService
+        from farms.services.settings_service import get_farm_settings
 
         active = getattr(getattr(request, 'resolver_match', None), 'url_name', '')
+        settings = get_farm_settings(farm)
         service = ModuleNavigationService(farm, active)
         modules = service.modules()
+        notifications, notification_count = _topbar_notifications(farm)
         context['ui_modules'] = modules
         context['ui_module_groups'] = service.grouped_modules(modules)
         context['ui_primary_modules'] = service.primary_modules(modules)
         context['ui_mobile_modules'] = service.mobile_modules(modules)
         context['ui_visible_module_keys'] = service.visible_keys()
+        context['ui_interface_scale'] = _interface_scale(settings)
+        context['ui_notifications'] = notifications
+        context['ui_notification_count'] = notification_count
+        context['ui_notification_more_count'] = max(0, notification_count - len(notifications))
     return context

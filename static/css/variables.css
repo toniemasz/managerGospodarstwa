@@ -1,21 +1,21 @@
 /* variables.css - wydzielone style aplikacji. */
 
 :root {
-    --bg: #f9f9ff;
+    --bg: #f7f8ff;
     --surface: #ffffff;
-    --surface-muted: #f0f3ff;
-    --surface-soft: #f6f8ff;
-    --surface-container: #e7eefe;
-    --surface-container-high: #e2e8f8;
-    --border: #dce2f3;
-    --border-strong: #bbcabf;
+    --surface-muted: #edf2ff;
+    --surface-soft: #f4f6ff;
+    --surface-container: #e8eefb;
+    --surface-container-high: #dde7f6;
+    --border: #d5dfd8;
+    --border-strong: #b7c8bf;
     --text: #151c27;
     --muted: #3c4a42;
     --primary: #006c49;
     --primary-dark: #00422b;
-    --primary-soft: #e5f8ef;
+    --primary-soft: #dffbf3;
     --secondary: #006b5f;
-    --secondary-soft: #e1fbf7;
+    --secondary-soft: #d9fbf1;
     --tertiary: #a43a3a;
     --tertiary-soft: #ffefee;
     --danger: #ba1a1a;
@@ -26,8 +26,8 @@
     --warning-soft: #fff6db;
     --violet: #5f4bb6;
     --radius: .5rem;
-    --shadow: 0 1px 2px rgba(21, 28, 39, .06), 0 14px 32px rgba(21, 28, 39, .07);
-    --shadow-strong: 0 24px 70px rgba(21, 28, 39, .16);
+    --shadow: 0 1px 2px rgba(21, 28, 39, .04), 0 12px 30px rgba(21, 28, 39, .06);
+    --shadow-strong: 0 24px 70px rgba(21, 28, 39, .14);
     --topbar-height: 4rem;
     --sidebar-width: 16.25rem;
     --content-max: 90rem;

@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import models
 
 from feed.domain.rules import DEFAULT_PRODUCTION_QUANTITY_KG
+from farms.dashboard_registry import default_dashboard_stats
 from sows.domain.rules import (
     FARROWING_ALERT_DAYS_AHEAD,
     GESTATION_DAYS,
@@ -24,6 +25,12 @@ class FarmModel(models.Model):
 
 
 class FarmSettingsModel(models.Model):
+    INTERFACE_SCALE_CHOICES = [
+        ("compact", "Kompaktowy"),
+        ("comfortable", "Wygodny"),
+        ("large", "Powiększony"),
+    ]
+
     farm = models.OneToOneField(
         "farms.FarmModel",
         on_delete=models.CASCADE,
@@ -44,6 +51,12 @@ class FarmSettingsModel(models.Model):
     date_format = models.CharField(max_length=20, default="YYYY-MM-DD")
     visible_modules = models.JSONField(default=default_visible_modules, blank=True)
     nav_modules = models.JSONField(default=default_nav_modules, blank=True)
+    dashboard_stats = models.JSONField(default=default_dashboard_stats, blank=True)
+    interface_scale = models.CharField(
+        max_length=16,
+        choices=INTERFACE_SCALE_CHOICES,
+        default="compact",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

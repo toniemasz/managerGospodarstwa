@@ -98,10 +98,15 @@ class FeedManagementService:
 
         enriched_reqs = []
         total_cost = Decimal('0.00')
+        missing_price_ingredients = []
         for req in sorted_reqs:
-            price = price_map.get(req.ingredient_id, Decimal('0.00'))
-            cost = req.required_kg * price
-            total_cost += cost
+            price = price_map.get(req.ingredient_id)
+            cost = None
+            if price is None or price <= Decimal('0.00000'):
+                missing_price_ingredients.append(req.name)
+            else:
+                cost = req.required_kg * price
+                total_cost += cost
             enriched_reqs.append({
                 'id': req.ingredient_id,
                 'name': req.name,
@@ -109,7 +114,9 @@ class FeedManagementService:
                 'percentage': req.percentage,
                 'weight_kg': req.required_kg,
                 'price_per_kg': price,
+                'price_per_ton': price * Decimal('1000.00') if price is not None and price > Decimal('0.00000') else None,
                 'cost': cost,
+                'has_price': price is not None and price > Decimal('0.00000'),
             })
 
         stage1_items = [item for item in enriched_reqs if item['is_in_bin']]
@@ -125,6 +132,8 @@ class FeedManagementService:
                 'total_cost': total_cost,
                 'cost_per_kg': cost_per_kg,
                 'cost_per_ton': cost_per_kg * Decimal('1000.00'),
+                'is_complete': not missing_price_ingredients,
+                'missing_price_ingredients': missing_price_ingredients,
             },
         }
 
@@ -220,7 +229,7 @@ class FeedManagementService:
                 'price_per_kg': price,
                 'source_date': delivery.date if delivery else None,
                 'has_delivery': delivery is not None,
-                'has_price': price is not None,
+                'has_price': price is not None and price > Decimal('0.00000'),
             })
         return rows
 
