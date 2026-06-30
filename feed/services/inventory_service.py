@@ -29,6 +29,25 @@ class InventoryBalance:
     quantity_kg: Decimal
 
 
+class InventoryRebuildError(Exception):
+    def __init__(self, message: str, *, farm=None, production: ProductionModel | None = None):
+        self.farm = farm
+        self.production = production
+        super().__init__(message)
+
+    def __str__(self) -> str:
+        details = []
+        if self.farm is not None:
+            details.append(f"farm.id={self.farm.id}")
+            details.append(f"farm.name={self.farm.name}")
+        if self.production is not None:
+            details.append(f"production.id={self.production.id}")
+            details.append(f"date={self.production.date}")
+            details.append(f"recipe={self.production.recipe.name}")
+        suffix = f" ({', '.join(details)})" if details else ""
+        return f"{super().__str__()}{suffix}"
+
+
 class InventoryMovementService:
     def __init__(self, farm):
         self.farm = farm
@@ -158,16 +177,23 @@ class InventoryMovementService:
     @transaction.atomic
     def release_production(self, production: ProductionModel) -> None:
         farm = self.farm or production.recipe.farm
-        usages = ProductionIngredientUsageModel.objects.select_for_update().filter(
-            farm=farm,
-            production=production,
-        ).select_related("delivery")
+        usages = (
+            ProductionIngredientUsageModel.objects.select_for_update()
+            .filter(
+                farm=farm,
+                production=production,
+            )
+            .order_by("id")
+        )
+        usage_ids = []
         for usage in usages:
+            usage_ids.append(usage.pk)
             if usage.delivery_id:
                 DeliveryModel.objects.filter(pk=usage.delivery_id).update(
                     remaining_quantity_kg=F("remaining_quantity_kg") + usage.quantity_kg,
                 )
-        usages.delete()
+        if usage_ids:
+            ProductionIngredientUsageModel.objects.filter(pk__in=usage_ids).delete()
         InventoryMovementModel.objects.filter(
             farm=farm,
             movement_type=InventoryMovementModel.Types.PRODUCTION_USAGE,
@@ -208,6 +234,8 @@ class InventoryMovementService:
         if prefer_existing_movements:
             requirements = self._movement_requirements(production, farm)
         if not requirements:
+            # Przy odbudowie FIFO bez starych ruchów rekonstruujemy zużycie z obecnej
+            # receptury/custom_recipe_data. To najlepsze przybliżenie, nie dowód historii.
             requirements = list(self._production_requirements(production))
 
         self.release_production(production)
@@ -339,7 +367,13 @@ class InventoryMovementService:
         )
 
     @transaction.atomic
-    def rebuild(self) -> dict[str, int]:
+    def rebuild(
+        self,
+        *,
+        prefer_existing_movements: bool = True,
+        reconstruct_production_ids: set[int] | None = None,
+    ) -> dict[str, int]:
+        reconstruct_production_ids = reconstruct_production_ids or set()
         ProductionIngredientUsageModel.objects.filter(farm=self.farm).delete()
         DeliveryModel.objects.filter(ingredient__farm=self.farm).update(remaining_quantity_kg=F("quantity_kg"))
         InventoryMovementModel.objects.filter(
@@ -348,21 +382,38 @@ class InventoryMovementService:
         ).delete()
         delivery_count = 0
         for delivery in DeliveryModel.objects.filter(ingredient__farm=self.farm).select_related("ingredient"):
-            self.sync_delivery(delivery)
+            try:
+                self.sync_delivery(delivery)
+            except Exception as error:
+                raise InventoryRebuildError(
+                    "Błąd synchronizacji dostawy podczas odbudowy FIFO",
+                    farm=self.farm,
+                ) from error
             delivery_count += 1
         production_count = 0
         productions = ProductionModel.objects.filter(
             recipe__farm=self.farm,
             status=ProductionModel.Statuses.COMPLETED,
         ).select_related("recipe").prefetch_related("recipe__items__ingredient").order_by("date", "time", "id")
+        production_ids = [str(pk) for pk in productions.values_list("pk", flat=True)]
         for production in productions:
-            production_count += self.book_production(
-                production,
-                forced=True,
-                prefer_existing_movements=True,
-            )
+            try:
+                production_count += self.book_production(
+                    production,
+                    forced=True,
+                    prefer_existing_movements=(
+                        prefer_existing_movements
+                        and production.pk not in reconstruct_production_ids
+                    ),
+                )
+            except Exception as error:
+                raise InventoryRebuildError(
+                    "Błąd rozliczenia produkcji podczas odbudowy FIFO",
+                    farm=self.farm,
+                    production=production,
+                ) from error
         InventoryMovementModel.objects.filter(
             farm=self.farm,
             movement_type=InventoryMovementModel.Types.PRODUCTION_USAGE,
-        ).exclude(source_id__in=[str(pk) for pk in productions.values_list("pk", flat=True)]).delete()
+        ).exclude(source_id__in=production_ids).delete()
         return {"deliveries": delivery_count, "production_movements": production_count}

@@ -3,7 +3,7 @@ from django.db import transaction
 
 from farms.models import FarmModel
 from feed.models import ProductionModel
-from feed.services.inventory_service import InventoryMovementService
+from feed.services.inventory_service import InventoryMovementService, InventoryRebuildError
 
 
 class Command(BaseCommand):
@@ -41,15 +41,24 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING("Tryb podglądu: zmiany zostaną wycofane. Dodaj --apply, aby je zapisać."))
 
         for farm in farms:
-            with transaction.atomic():
-                result = InventoryMovementService(farm).rebuild()
-                partial_count = ProductionModel.objects.filter(
-                    recipe__farm=farm,
-                    status=ProductionModel.Statuses.COMPLETED,
-                    feed_cost_is_partial=True,
-                ).count()
-                if not apply_changes:
-                    transaction.set_rollback(True)
+            try:
+                with transaction.atomic():
+                    result = InventoryMovementService(farm).rebuild()
+                    partial_count = ProductionModel.objects.filter(
+                        recipe__farm=farm,
+                        status=ProductionModel.Statuses.COMPLETED,
+                        feed_cost_is_partial=True,
+                    ).count()
+                    if not apply_changes:
+                        transaction.set_rollback(True)
+            except InventoryRebuildError as error:
+                cause = f": {error.__cause__}" if error.__cause__ else ""
+                raise CommandError(f"Nie udało się przebudować FIFO: {error}{cause}") from error
+            except Exception as error:
+                raise CommandError(
+                    f"Nie udało się przebudować FIFO "
+                    f"(farm.id={farm.id}, farm.name={farm.name}): {error}"
+                ) from error
 
             label = "zapisano" if apply_changes else "podgląd"
             self.stdout.write(
