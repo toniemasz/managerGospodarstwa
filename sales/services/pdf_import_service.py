@@ -4,8 +4,10 @@ import re
 import zlib
 from dataclasses import dataclass, field
 from datetime import date
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import BinaryIO
+
+from sales.number_parsing import parse_polish_decimal, parse_polish_int
 
 
 @dataclass
@@ -46,11 +48,20 @@ class SaleSettlementPdfParser:
         if not pages:
             return SaleSettlementImport(warnings=["Nie udało się odczytać tekstu z PDF."])
 
-        first_page = pages[0]
         result = SaleSettlementImport()
-        result.sale_fields = self._extract_sale_fields(first_page, result.warnings)
-        result.rows = self._extract_main_table_rows(first_page, result.warnings)
-        result.summary = self._extract_summary(first_page, result.warnings)
+        result.sale_fields = self._extract_sale_fields(
+            [item for page in pages for item in page],
+            result.warnings,
+        )
+
+        table_page, rows, row_warnings = self._extract_best_table(pages)
+        result.rows = rows
+        result.warnings.extend(row_warnings)
+
+        if table_page:
+            result.summary = self._extract_summary(table_page, result.warnings)
+        else:
+            result.summary = self._extract_first_summary(pages, result.warnings)
 
         result.sale_fields.update({
             'avg_meatiness_seurop': result.summary.get('avg_meatiness_seurop'),
@@ -161,37 +172,82 @@ class SaleSettlementPdfParser:
         text = '\n'.join(item.text for item in items)
         fields = {}
 
-        slaughter_match = re.search(r'Data uboju:\s*(\d{4}-\d{2}-\d{2})', text)
-        if slaughter_match:
-            raw_date = slaughter_match.group(1)
+        raw_date = self._find_labeled_value(text, (
+            'Data uboju',
+            'Data sprzedaży',
+            'Data sprzedazy',
+            'Data dostawy',
+        ))
+        if raw_date:
             sale_date = self._parse_date(raw_date)
             if sale_date is None:
                 warnings.append(
-                    f"Nie udało się rozpoznać daty uboju z PDF: {raw_date}. "
+                    f"Nie udało się rozpoznać daty sprzedaży/uboju z PDF: {raw_date}. "
                     "Uzupełnij datę ręcznie przed zapisem."
                 )
             else:
                 fields['sale_date'] = sale_date
         else:
             warnings.append(
-                "Nie znaleziono daty uboju w PDF. Uzupełnij datę ręcznie przed zapisem."
+                "Nie znaleziono daty sprzedaży/uboju w PDF. Uzupełnij datę ręcznie przed zapisem."
             )
 
-        document_match = re.search(r'Dokument nr:\s*([^\n]+)', text)
-        if document_match:
-            fields['document_number'] = document_match.group(1).strip()
+        document_number = self._find_labeled_value(text, (
+            'Dokument nr',
+            'Nr dokumentu',
+            'Numer dokumentu',
+        ))
+        if document_number:
+            fields['document_number'] = document_number
         else:
             warnings.append(
                 "Nie znaleziono numeru dokumentu w PDF. Uzupełnij numer ręcznie przed zapisem."
             )
 
-        tattoo_label = self._find_item(items, 'Tatuaż:')
-        if tattoo_label:
-            tattoo = self._nearest_right_item(items, tattoo_label)
-            if tattoo:
-                fields['tattoo'] = tattoo.text
+        tattoo = self._find_labeled_value(text, ('Tatuaż', 'Tatuaz'))
+        if tattoo:
+            fields['tattoo'] = tattoo
+        else:
+            tattoo_label = self._find_item(items, 'Tatuaż:')
+            if tattoo_label:
+                tattoo = self._nearest_right_item(items, tattoo_label)
+                if tattoo:
+                    fields['tattoo'] = tattoo.text
 
         return fields
+
+    def _extract_best_table(
+        self,
+        pages: list[list[PdfTextItem]],
+    ) -> tuple[list[PdfTextItem] | None, list[dict], list[str]]:
+        best_page = None
+        best_rows = []
+        best_warnings = []
+
+        for page in pages:
+            page_warnings: list[str] = []
+            rows = self._extract_main_table_rows(page, page_warnings)
+            if len(rows) > len(best_rows):
+                best_page = page
+                best_rows = rows
+                best_warnings = page_warnings
+
+        return best_page, best_rows, best_warnings
+
+    def _extract_first_summary(self, pages: list[list[PdfTextItem]], warnings: list[str]) -> dict:
+        for page in pages:
+            summary = self._extract_summary(page, warnings)
+            if any(value not in (None, '') for value in summary.values()):
+                return summary
+        return {}
+
+    def _find_labeled_value(self, text: str, labels: tuple[str, ...]) -> str | None:
+        for label in labels:
+            pattern = rf'{re.escape(label)}[ \t]*:[ \t]*([^\n]*)'
+            match = re.search(pattern, text, flags=re.IGNORECASE)
+            if match and match.group(1).strip():
+                return match.group(1).strip()
+        return None
 
     def _extract_main_table_rows(self, items: list[PdfTextItem], warnings: list[str]) -> list[dict]:
         header_y = self._find_header_y(items)
@@ -390,36 +446,33 @@ class SaleSettlementPdfParser:
 
     @staticmethod
     def _parse_date(value: str) -> date | None:
+        if not value:
+            return None
+
+        text = value.strip()
+        date_match = re.search(r'\d{4}[-.]\d{2}[-.]\d{2}|\d{2}[-.]\d{2}[-.]\d{4}', text)
+        if not date_match:
+            return None
+
+        raw_date = date_match.group(0)
+        separator = '-' if '-' in raw_date else '.'
+        parts = [int(part) for part in raw_date.split(separator)]
         try:
-            year, month, day = [int(part) for part in value.split('-')]
+            if parts[0] > 31:
+                year, month, day = parts
+            else:
+                day, month, year = parts
             return date(year, month, day)
         except (TypeError, ValueError):
             return None
 
     @staticmethod
     def _parse_decimal(value: str | None) -> Decimal | None:
-        if not value:
-            return None
-        without_units = re.sub(r'\bPLN\b', '', value, flags=re.I)
-        without_units = without_units.replace('zł', '').replace('ZŁ', '').replace('%', '')
-        if re.search(r'[A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż]', without_units):
-            return None
-        normalized = re.sub(r'[^\d,\.\-]', '', without_units.replace(' ', '')).replace(',', '.')
-        if normalized in ('', '-', '.', '-.'):
-            return None
-        try:
-            return Decimal(normalized)
-        except InvalidOperation:
-            return None
+        return parse_polish_decimal(value)
 
     @staticmethod
     def _parse_int(value: str | None) -> int | None:
-        if not value:
-            return None
-        normalized = value.replace(' ', '')
-        if not re.fullmatch(r'\d+', normalized):
-            return None
-        return int(normalized)
+        return parse_polish_int(value)
 
     def _parse_decimal_field(
         self,

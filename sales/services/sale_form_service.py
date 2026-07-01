@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from django.db import transaction
@@ -15,6 +16,43 @@ class SalePdfImportResult:
     row_initial: list[dict] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     has_rows: bool = False
+    problem_line_numbers: list[str] = field(default_factory=list)
+
+    @property
+    def imported_rows_count(self) -> int:
+        return len(self.row_initial) if self.has_rows else 0
+
+    @property
+    def warning_count(self) -> int:
+        return len(self.warnings)
+
+    def as_feedback(self) -> dict:
+        if self.has_rows:
+            title = "Import PDF zakończony"
+            if self.warning_count:
+                summary = (
+                    f"Zaimportowano {self.imported_rows_count} wierszy. "
+                    f"Liczba uwag do sprawdzenia: {self.warning_count}."
+                )
+            else:
+                summary = (
+                    f"Zaimportowano {self.imported_rows_count} wierszy. "
+                    "Nie wykryto pól wymagających ręcznej korekty."
+                )
+        else:
+            title = "Import PDF wymaga sprawdzenia"
+            summary = (
+                "Nie zaimportowano wierszy rozliczenia. "
+                f"Liczba uwag do sprawdzenia: {self.warning_count}."
+            )
+
+        return {
+            'title': title,
+            'summary': summary,
+            'warnings': self.warnings,
+            'warning_count': self.warning_count,
+            'has_warnings': bool(self.warnings),
+        }
 
 
 class SaleFormService:
@@ -85,6 +123,7 @@ class SaleFormService:
             row_initial=parsed.rows or empty_sale_row_initials(),
             warnings=parsed.warnings,
             has_rows=bool(parsed.rows),
+            problem_line_numbers=self.warning_line_numbers(parsed.warnings),
         )
 
     def initial_rows_for_sale(self, sale: PigSaleModel) -> list[dict]:
@@ -134,6 +173,15 @@ class SaleFormService:
     @staticmethod
     def without_empty_values(values: dict) -> dict:
         return {key: value for key, value in values.items() if value not in (None, '')}
+
+    @staticmethod
+    def warning_line_numbers(warnings: list[str]) -> list[str]:
+        line_numbers = {
+            match
+            for warning in warnings
+            for match in re.findall(r'\(wiersz\s+(\d+)\)', warning, flags=re.IGNORECASE)
+        }
+        return sorted(line_numbers, key=lambda value: int(value))
 
     @staticmethod
     def row_formset_from_post(post_data):

@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from feed.templatetags.feed_format import feed_money, feed_price, feed_quantity
+from feed.templatetags.feed_format import feed_money, feed_percent, feed_price, feed_quantity
 
 
 def test_feed_quantity_uses_tonnes_for_large_values_and_strips_zero_decimals():
@@ -17,3 +17,8 @@ def test_feed_price_can_display_per_kg_or_per_tonne():
 
 def test_feed_money_keeps_thousand_grouping():
     assert feed_money(Decimal("2000000.00")) == "2 000 000 PLN"
+
+
+def test_feed_percent_strips_zero_decimals():
+    assert feed_percent(Decimal("2.00")) == "2%"
+    assert feed_percent(Decimal("2.50")) == "2,5%"

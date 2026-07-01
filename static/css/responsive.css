@@ -107,7 +107,7 @@
         overflow-x: auto;
         border: 1px solid var(--border);
         border-radius: var(--radius);
-        background: rgba(255, 255, 255, .96);
+        background: color-mix(in srgb, var(--surface) 96%, transparent);
         padding: .35rem;
         box-shadow: 0 14px 38px rgba(16, 32, 51, .18);
         backdrop-filter: blur(14px);
@@ -158,6 +158,14 @@
 }
 
 @media (max-width: 720px) {
+    html {
+        --control-height: max(2.85rem, var(--control-height));
+        --button-height: max(2.85rem, var(--button-height));
+        --table-cell-padding-y: .75rem;
+        --table-cell-padding-x: .8rem;
+        --page-block-padding: 1rem 1.5rem;
+    }
+
     .app-page,
     .container,
     .message-stack {
@@ -230,7 +238,7 @@
         overflow: hidden;
         border: 1px solid var(--border);
         border-radius: var(--radius);
-        background: #fff;
+        background: var(--surface);
         box-shadow: 0 1px 2px rgba(16, 32, 51, .04);
     }
 
@@ -238,7 +246,7 @@
         display: grid;
         grid-template-columns: minmax(7.5rem, 38%) minmax(0, 1fr);
         gap: .75rem;
-        border-bottom: 1px solid #eef2f7;
+        border-bottom: 1px solid var(--border);
         padding: .8rem;
         text-align: left;
     }

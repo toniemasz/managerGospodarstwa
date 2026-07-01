@@ -1,6 +1,6 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="pl">
+<html lang="pl" class="theme-{{ ui_theme|default:'light' }} ui-density-{{ ui_interface_scale|default:'standard' }}" style="--user-font-scale: {{ ui_font_scale_ratio|default:'1' }};">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -19,7 +19,7 @@
     <script src="{% static 'js/app.js' %}" defer></script>
     {% block extra_head %}{% endblock %}
 </head>
-<body class="ui-scale-{{ ui_interface_scale|default:'compact' }}">
+<body class="ui-scale-{{ ui_interface_scale|default:'standard' }}">
     <a href="#main-content" class="skip-link">Przejdź do treści</a>
     <div class="site-shell{% if user.is_authenticated %} has-app-nav{% endif %}">
         {% if user.is_authenticated %}

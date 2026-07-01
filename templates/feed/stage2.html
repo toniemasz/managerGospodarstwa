@@ -68,7 +68,7 @@
                     <tr class="ingredient-row">
                         <td><input type="checkbox" class="ingredient-checkbox" data-id="{{ item.id }}" aria-label="Oznacz {{ item.name }} jako gotowe"></td>
                         <td><strong class="row-name">{{ item.name }}</strong></td>
-                        <td class="text-right">{{ item.percentage|floatformat:2 }}%</td>
+                        <td class="text-right">{{ item.percentage|feed_percent }}</td>
                         <td class="text-right"><strong>{{ item.weight_kg|feed_quantity }}</strong></td>
                         <td class="text-right">
                             {% if item.has_price %}

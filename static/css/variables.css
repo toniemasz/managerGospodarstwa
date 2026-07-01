@@ -1,6 +1,7 @@
 /* variables.css - wydzielone style aplikacji. */
 
 :root {
+    --user-font-scale: 1;
     --bg: #f7f8ff;
     --surface: #ffffff;
     --surface-muted: #edf2ff;
@@ -31,4 +32,132 @@
     --topbar-height: 4rem;
     --sidebar-width: 16.25rem;
     --content-max: 90rem;
+    --space-xs: .35rem;
+    --space-sm: .6rem;
+    --space-md: .9rem;
+    --space-lg: 1.2rem;
+    --space-xl: 1.5rem;
+    --control-height: 2.55rem;
+    --button-height: 2.55rem;
+    --card-padding: .9rem;
+    --panel-padding: 1rem;
+    --table-cell-padding-y: .72rem;
+    --table-cell-padding-x: .85rem;
+    --section-gap: 1rem;
+    --grid-gap: .85rem;
+    --stat-tile-min-height: 6.2rem;
+    --page-title-size: clamp(1.35rem, 2.4vw, 1.9rem);
+    --page-block-padding: 1.2rem 1.6rem;
+    --focus-ring: rgba(35, 100, 170, .35);
+}
+
+html {
+    font-size: calc(100% * var(--user-font-scale, 1));
+}
+
+html.ui-density-compact {
+    --topbar-height: 3.35rem;
+    --sidebar-width: 14.75rem;
+    --space-xs: .25rem;
+    --space-sm: .45rem;
+    --space-md: .7rem;
+    --space-lg: .95rem;
+    --space-xl: 1.15rem;
+    --control-height: 2.25rem;
+    --button-height: 2.25rem;
+    --card-padding: .72rem;
+    --panel-padding: .85rem;
+    --table-cell-padding-y: .55rem;
+    --table-cell-padding-x: .7rem;
+    --section-gap: .8rem;
+    --grid-gap: .7rem;
+    --stat-tile-min-height: 5.15rem;
+    --page-title-size: clamp(1.25rem, 2vw, 1.65rem);
+    --page-block-padding: .95rem 1.25rem;
+}
+
+html.ui-density-comfortable {
+    --topbar-height: 4.25rem;
+    --sidebar-width: 16.75rem;
+    --space-xs: .45rem;
+    --space-sm: .75rem;
+    --space-md: 1rem;
+    --space-lg: 1.35rem;
+    --space-xl: 1.75rem;
+    --control-height: 2.95rem;
+    --button-height: 2.95rem;
+    --card-padding: 1.05rem;
+    --panel-padding: 1.25rem;
+    --table-cell-padding-y: .9rem;
+    --table-cell-padding-x: 1rem;
+    --section-gap: 1.25rem;
+    --grid-gap: 1rem;
+    --stat-tile-min-height: 7.4rem;
+    --page-title-size: clamp(1.5rem, 3vw, 2.25rem);
+    --page-block-padding: 1.5rem 2rem;
+}
+
+html.theme-dark {
+    color-scheme: dark;
+}
+
+html.theme-dark {
+    --bg: #0e1412;
+    --surface: #151d1a;
+    --surface-muted: #1f2a26;
+    --surface-soft: #18231f;
+    --surface-container: #22302b;
+    --surface-container-high: #2b3b35;
+    --border: #33463f;
+    --border-strong: #496159;
+    --text: #edf7f2;
+    --muted: #b6c7c0;
+    --primary: #68e0bd;
+    --primary-dark: #9ff5dc;
+    --primary-soft: #173c32;
+    --secondary: #65d8c7;
+    --secondary-soft: #163c38;
+    --tertiary: #ffaaa5;
+    --tertiary-soft: #4a2526;
+    --danger: #ffb4ab;
+    --danger-soft: #4d1f1d;
+    --success: #70e1cc;
+    --success-soft: #173f38;
+    --warning: #f7cf73;
+    --warning-soft: #3f3214;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .28), 0 16px 36px rgba(0, 0, 0, .24);
+    --shadow-strong: 0 24px 70px rgba(0, 0, 0, .42);
+    --focus-ring: rgba(104, 224, 189, .35);
+}
+
+@media (prefers-color-scheme: dark) {
+    html.theme-system {
+        color-scheme: dark;
+        --bg: #0e1412;
+        --surface: #151d1a;
+        --surface-muted: #1f2a26;
+        --surface-soft: #18231f;
+        --surface-container: #22302b;
+        --surface-container-high: #2b3b35;
+        --border: #33463f;
+        --border-strong: #496159;
+        --text: #edf7f2;
+        --muted: #b6c7c0;
+        --primary: #68e0bd;
+        --primary-dark: #9ff5dc;
+        --primary-soft: #173c32;
+        --secondary: #65d8c7;
+        --secondary-soft: #163c38;
+        --tertiary: #ffaaa5;
+        --tertiary-soft: #4a2526;
+        --danger: #ffb4ab;
+        --danger-soft: #4d1f1d;
+        --success: #70e1cc;
+        --success-soft: #173f38;
+        --warning: #f7cf73;
+        --warning-soft: #3f3214;
+        --shadow: 0 1px 2px rgba(0, 0, 0, .28), 0 16px 36px rgba(0, 0, 0, .24);
+        --shadow-strong: 0 24px 70px rgba(0, 0, 0, .42);
+        --focus-ring: rgba(104, 224, 189, .35);
+    }
 }

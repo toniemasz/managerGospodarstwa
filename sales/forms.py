@@ -4,12 +4,61 @@ from django import forms
 from django.forms import formset_factory
 
 from .models import PigSaleModel
+from .number_parsing import parse_polish_decimal, parse_polish_int
 
 
 FORM_FIELD_CLASS = 'form-control'
 
 
+class PolishDecimalField(forms.DecimalField):
+    def prepare_value(self, value):
+        if isinstance(value, Decimal):
+            places = self.decimal_places if self.decimal_places is not None else 2
+            return f"{value:.{places}f}".replace('.', ',')
+        return super().prepare_value(value)
+
+    def to_python(self, value):
+        if isinstance(value, str) and value.strip():
+            parsed = parse_polish_decimal(value)
+            if parsed is not None:
+                value = str(parsed)
+        return super().to_python(value)
+
+
+class PolishIntegerField(forms.IntegerField):
+    def to_python(self, value):
+        if isinstance(value, str) and value.strip():
+            parsed = parse_polish_int(value)
+            if parsed is not None:
+                value = str(parsed)
+        return super().to_python(value)
+
+
 class PigSaleForm(forms.ModelForm):
+    avg_meatiness_seurop = PolishDecimalField(
+        label="Średnia mięsność SEUROP (%)",
+        required=False,
+        max_digits=5,
+        decimal_places=2,
+        min_value=Decimal('0.00'),
+        widget=forms.TextInput(attrs={'inputmode': 'decimal'}),
+    )
+    live_weight = PolishDecimalField(
+        label="Waga żywa (kg)",
+        required=False,
+        max_digits=10,
+        decimal_places=2,
+        min_value=Decimal('0.00'),
+        widget=forms.TextInput(attrs={'inputmode': 'decimal'}),
+    )
+    dressing_percentage = PolishDecimalField(
+        label="Wybój (%)",
+        required=False,
+        max_digits=5,
+        decimal_places=2,
+        min_value=Decimal('0.00'),
+        widget=forms.TextInput(attrs={'inputmode': 'decimal'}),
+    )
     settlement_pdf = forms.FileField(
         label="Import rozliczenia PDF",
         required=False,
@@ -92,16 +141,75 @@ class PigSaleForm(forms.ModelForm):
 
 
 class SaleClassRowForm(forms.Form):
-    line_no = forms.IntegerField(label="Lp", min_value=1, required=False)
+    line_no = PolishIntegerField(
+        label="Lp",
+        min_value=1,
+        required=False,
+        widget=forms.TextInput(attrs={'inputmode': 'numeric'}),
+    )
     meat_class = forms.CharField(label="Klasa", required=False, max_length=20)
-    quantity = forms.IntegerField(label="Ilość", min_value=0, required=False)
-    weight = forms.DecimalField(label="Waga", min_value=Decimal('0.00'), max_digits=10, decimal_places=2, required=False)
-    avg_weight = forms.DecimalField(label="Śr. waga", min_value=Decimal('0.00'), max_digits=8, decimal_places=2, required=False)
-    avg_meatiness = forms.DecimalField(label="Śr. mięsność", min_value=Decimal('0.00'), max_digits=5, decimal_places=2, required=False)
-    price_per_kg = forms.DecimalField(label="Cena", min_value=Decimal('0.00'), max_digits=8, decimal_places=2, required=False)
-    net_value = forms.DecimalField(label="Wartość", min_value=Decimal('0.00'), max_digits=12, decimal_places=2, required=False)
-    vat_value = forms.DecimalField(label="VAT", min_value=Decimal('0.00'), max_digits=12, decimal_places=2, required=False)
-    gross_value = forms.DecimalField(label="Wartość brutto", min_value=Decimal('0.00'), max_digits=12, decimal_places=2, required=False)
+    quantity = PolishIntegerField(
+        label="Ilość",
+        min_value=0,
+        required=False,
+        widget=forms.TextInput(attrs={'inputmode': 'numeric'}),
+    )
+    weight = PolishDecimalField(
+        label="Waga",
+        min_value=Decimal('0.00'),
+        max_digits=10,
+        decimal_places=2,
+        required=False,
+        widget=forms.TextInput(attrs={'inputmode': 'decimal'}),
+    )
+    avg_weight = PolishDecimalField(
+        label="Śr. waga",
+        min_value=Decimal('0.00'),
+        max_digits=8,
+        decimal_places=2,
+        required=False,
+        widget=forms.TextInput(attrs={'inputmode': 'decimal'}),
+    )
+    avg_meatiness = PolishDecimalField(
+        label="Śr. mięsność",
+        min_value=Decimal('0.00'),
+        max_digits=5,
+        decimal_places=2,
+        required=False,
+        widget=forms.TextInput(attrs={'inputmode': 'decimal'}),
+    )
+    price_per_kg = PolishDecimalField(
+        label="Cena",
+        min_value=Decimal('0.00'),
+        max_digits=8,
+        decimal_places=2,
+        required=False,
+        widget=forms.TextInput(attrs={'inputmode': 'decimal'}),
+    )
+    net_value = PolishDecimalField(
+        label="Wartość",
+        min_value=Decimal('0.00'),
+        max_digits=12,
+        decimal_places=2,
+        required=False,
+        widget=forms.TextInput(attrs={'inputmode': 'decimal'}),
+    )
+    vat_value = PolishDecimalField(
+        label="VAT",
+        min_value=Decimal('0.00'),
+        max_digits=12,
+        decimal_places=2,
+        required=False,
+        widget=forms.TextInput(attrs={'inputmode': 'decimal'}),
+    )
+    gross_value = PolishDecimalField(
+        label="Wartość brutto",
+        min_value=Decimal('0.00'),
+        max_digits=12,
+        decimal_places=2,
+        required=False,
+        widget=forms.TextInput(attrs={'inputmode': 'decimal'}),
+    )
 
     meaningful_fields = [
         'meat_class',

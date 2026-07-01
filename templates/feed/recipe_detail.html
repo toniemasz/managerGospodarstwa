@@ -48,7 +48,7 @@
         </div>
         <div class="stat-tile">
             <span>Łączny koszt FIFO</span>
-            <strong>{{ stats.completed_cost|floatformat:2 }} zł</strong>
+            <strong>{{ stats.completed_cost|feed_money }}</strong>
         </div>
         <div class="stat-tile">
             <span>Koszt poglądowy tony</span>
@@ -93,7 +93,7 @@
                         {% for item in cost.item_costs %}
                         <tr>
                             <td><strong>{{ item.ingredient_name }}</strong></td>
-                            <td class="text-right">{{ item.percentage|floatformat:2 }}%</td>
+                            <td class="text-right">{{ item.percentage|feed_percent }}</td>
                             <td class="text-right">{{ item.quantity_per_ton_kg|feed_quantity }}</td>
                             <td class="text-right">
                                 {% if item.has_price %}
@@ -146,7 +146,7 @@
                 </div>
                 <div>
                     <dt>Łączny koszt zakończonych</dt>
-                    <dd>{{ stats.completed_cost|floatformat:2 }} PLN</dd>
+                    <dd>{{ stats.completed_cost|feed_money }}</dd>
                 </div>
                 <div>
                     <dt>Wyprodukowano w {{ yearly_production.year|unlocalize }} roku</dt>
@@ -194,7 +194,7 @@
                         </td>
                         <td>
                             {% for item in version.items.all %}
-                                <span class="status-pill">{{ item.ingredient.name }} {{ item.percentage|floatformat:2 }}%</span>
+                                <span class="status-pill">{{ item.ingredient.name }} {{ item.percentage|feed_percent }}</span>
                             {% empty %}
                                 <span class="muted-small">Brak pozycji w wersji.</span>
                             {% endfor %}
@@ -257,7 +257,7 @@
                         <td class="text-right"><strong>{{ production.quantity_kg|feed_quantity }}</strong></td>
                         <td class="text-right">
                             {% if production.status == 'COMPLETED' %}
-                                <strong>{{ production.feed_cost_total|floatformat:2 }}</strong> zł
+                                <strong>{{ production.feed_cost_total|feed_money }}</strong>
                                 {% if production.feed_cost_is_partial %}
                                     <br><span class="status-pill status-amber">Częściowy</span>
                                 {% endif %}

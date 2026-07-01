@@ -56,3 +56,11 @@ def feed_price(value, unit="kg"):
     if unit == "ton":
         return f"{_format_decimal(amount * Decimal('1000'), 2)} PLN/t"
     return f"{_format_decimal(amount, 5)} PLN/kg"
+
+
+@register.filter
+def feed_percent(value):
+    amount = _to_decimal(value)
+    if amount is None:
+        return "-"
+    return f"{_format_decimal(amount, 2)}%"

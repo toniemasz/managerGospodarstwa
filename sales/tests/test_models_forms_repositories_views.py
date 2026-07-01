@@ -92,8 +92,10 @@ def test_sales_list_displays_net_values(auth_client):
     assert response.status_code == 200
     assert 'Przychód netto' in content
     assert '>Netto<' in content
-    assert '8\xa0000,00' in content
-    assert '8\xa0640,00' in content
+    assert '8 000' in content
+    assert '8 640' in content
+    assert '8\xa0000,00' not in content
+    assert '8\xa0640,00' not in content
 
 
 @pytest.mark.django_db

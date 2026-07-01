@@ -5,6 +5,7 @@
     width: 100%;
     overflow-x: auto;
     overscroll-behavior-x: contain;
+    scrollbar-gutter: stable;
 }
 
 table,
@@ -22,7 +23,12 @@ table,
 }
 
 .table-panel .table-scroll {
-    background: #fff;
+    background: var(--surface);
+}
+
+.table-panel .table-scroll,
+.table-card {
+    border-top: 1px solid var(--border);
 }
 
 .compact-table,
@@ -40,7 +46,7 @@ th {
     z-index: 1;
     white-space: nowrap;
     border-bottom: 1px solid var(--border);
-    padding: .85rem 1rem;
+    padding: var(--table-cell-padding-y) var(--table-cell-padding-x);
     color: var(--muted);
     font-size: .72rem;
     font-weight: 950;
@@ -50,13 +56,13 @@ th {
 }
 
 td {
-    border-bottom: 1px solid #edf2f7;
-    padding: .9rem 1rem;
+    border-bottom: 1px solid var(--border);
+    padding: var(--table-cell-padding-y) var(--table-cell-padding-x);
     vertical-align: middle;
 }
 
 tbody tr:nth-child(even) {
-    background: rgba(248, 250, 252, .72);
+    background: color-mix(in srgb, var(--surface-soft) 72%, transparent);
 }
 
 tbody tr:hover {
@@ -90,7 +96,7 @@ tbody tr:last-child td {
 }
 
 .table-link:hover {
-    background: #d8f1e6;
+    background: var(--success-soft);
 }
 
 .table-card {
@@ -149,7 +155,7 @@ tbody tr:last-child td {
 }
 
 .link-button-danger:hover {
-    background: #ffe2e2;
+    background: var(--danger-soft);
 }
 
 .muted-small {
@@ -212,13 +218,13 @@ tbody tr:last-child td {
 .settlement-table th:first-child,
 .bulk-event-table th:first-child {
     z-index: 3;
-    background: #f8fafc;
+    background: var(--surface-muted);
 }
 
 .wide-table td:first-child,
 .settlement-table td:first-child,
 .bulk-event-table td:first-child {
-    background: #fff;
+    background: var(--surface);
 }
 
 .settlement-table input,
@@ -226,9 +232,11 @@ tbody tr:last-child td {
 .bulk-event-table input,
 .bulk-event-table select,
 .bulk-event-table textarea {
-    width: auto;
+    width: 100%;
     min-width: 8ch;
     max-width: none;
+    min-height: calc(var(--control-height) - .05rem);
+    padding-inline: .6rem;
 }
 
 .settlement-table input[type="checkbox"],
@@ -238,21 +246,43 @@ tbody tr:last-child td {
 }
 
 .settlement-table input[name$="-line_no"] {
-    min-width: 4ch;
+    min-width: 5ch;
 }
 
 .settlement-table input[name$="-quantity"] {
-    min-width: 7ch;
+    min-width: 8ch;
 }
 
 .settlement-table input[name$="-weight"],
-.settlement-table input[name$="-avg_weight"],
+.settlement-table input[name$="-avg_weight"] {
+    min-width: 12ch;
+}
+
 .settlement-table input[name$="-avg_meatiness"],
-.settlement-table input[name$="-price_per_kg"],
+.settlement-table input[name$="-price_per_kg"] {
+    min-width: 10ch;
+}
+
 .settlement-table input[name$="-net_value"],
 .settlement-table input[name$="-vat_value"],
 .settlement-table input[name$="-gross_value"] {
-    min-width: 10ch;
+    min-width: 13ch;
+}
+
+.settlement-table .numeric-cell input {
+    text-align: right;
+}
+
+.settlement-table input[name$="-meat_class"] {
+    min-width: 7ch;
+}
+
+.settlement-table .import-warning-row {
+    background: var(--warning-soft);
+}
+
+.settlement-table .import-warning-row td:first-child {
+    background: var(--warning-soft);
 }
 
 .bulk-event-table input[name$="-sow_ear_tag"] {

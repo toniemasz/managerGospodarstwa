@@ -24,7 +24,9 @@ def ui_client(client):
 def _settings_payload(**overrides):
     data = {
         "farm_name": "Gospodarstwo UI",
-        "interface_scale": "compact",
+        "interface_scale": "standard",
+        "theme": "light",
+        "font_scale": "100",
         "pregnancy_check_after_days": 30,
         "gestation_days": 114,
         "farrowing_alert_days_ahead": 7,
@@ -140,7 +142,25 @@ def test_settings_visibility_section_is_grouped(ui_client):
     assert all(label in content for label in ["Widoczność modułów", "Produkcja", "Pasza i magazyn", "Finanse", "System"])
     assert "Ustawienia zawsze widoczne" in content
     assert "Pokaż na pasku nawigacji" in content
-    assert "Rozmiar interfejsu" in content
+    assert "Gęstość interfejsu" in content
+    assert "Motyw" in content
+    assert "Rozmiar tekstu" in content
+
+
+@pytest.mark.django_db
+def test_settings_appearance_choices_are_applied_to_page_shell(ui_client):
+    settings = get_farm_settings(ui_client.farm)
+    settings.interface_scale = "compact"
+    settings.theme = "dark"
+    settings.font_scale = "150"
+    settings.save(update_fields=["interface_scale", "theme", "font_scale"])
+
+    response = ui_client.get(reverse("farm_settings"))
+    content = response.content.decode()
+
+    assert response.status_code == 200
+    assert 'class="theme-dark ui-density-compact"' in content
+    assert "--user-font-scale: 1.5;" in content
 
 
 @pytest.mark.django_db
