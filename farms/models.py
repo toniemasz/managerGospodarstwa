@@ -1,9 +1,9 @@
 from django.conf import settings
 from django.db import models
 
-from feed.domain.rules import DEFAULT_PRODUCTION_QUANTITY_KG
 from farms.dashboard_registry import default_dashboard_stats
-from sows.domain.rules import (
+from farms.defaults import (
+    DEFAULT_PRODUCTION_QUANTITY_KG,
     FARROWING_ALERT_DAYS_AHEAD,
     GESTATION_DAYS,
     PREGNANCY_CHECK_AFTER_DAYS,

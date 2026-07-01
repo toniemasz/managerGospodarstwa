@@ -46,11 +46,17 @@ class FeedRepository:
         return ProductionModel.objects.filter(
             **self._related_filter_for_farm('recipe'),
             status=ProductionModel.Statuses.COMPLETED
-        ).prefetch_related('recipe__items__ingredient')
+        ).select_related('recipe_version').prefetch_related(
+            'recipe__items__ingredient',
+            'recipe_version__items__ingredient',
+        )
 
     def get_production_for_processing(self, production_id: int, lock_for_update: bool = False):
         """Pobiera produkcję wraz z recepturą. Może zablokować wiersz w transakcji."""
-        qs = ProductionModel.objects.select_related('recipe').prefetch_related('recipe__items__ingredient')
+        qs = ProductionModel.objects.select_related('recipe', 'recipe_version').prefetch_related(
+            'recipe__items__ingredient',
+            'recipe_version__items__ingredient',
+        )
         if self.farm is not None:
             qs = qs.filter(recipe__farm=self.farm)
         if lock_for_update:
@@ -68,16 +74,19 @@ class FeedRepository:
         return RecipeModel.objects.filter(**self._filter_for_farm(pk=recipe_id)).exists()
 
     def get_productions(self):
-        return ProductionModel.objects.select_related('recipe').filter(
+        return ProductionModel.objects.select_related('recipe', 'recipe_version').filter(
             **self._related_filter_for_farm('recipe')
         ).order_by('-date', '-time', '-id')
 
     def get_recipe_with_items(self, recipe_id: int):
-        queryset = RecipeModel.objects.prefetch_related('items__ingredient')
+        queryset = RecipeModel.objects.prefetch_related(
+            'items__ingredient',
+            'versions__items__ingredient',
+        )
         return get_object_or_404(queryset, **self._filter_for_farm(id=recipe_id))
 
     def get_productions_for_recipe(self, recipe_id: int):
-        return ProductionModel.objects.filter(
+        return ProductionModel.objects.select_related('recipe_version').filter(
             **self._related_filter_for_farm('recipe'),
             recipe_id=recipe_id,
         ).order_by('-date', '-time', '-id')

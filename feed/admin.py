@@ -7,6 +7,8 @@ from .models import (
     ProductionIngredientUsageModel,
     RecipeItemModel,
     RecipeModel,
+    RecipeVersionItemModel,
+    RecipeVersionModel,
     InventoryMovementModel,
 )
 
@@ -46,10 +48,24 @@ class RecipeItemAdmin(admin.ModelAdmin):
     search_fields = ('recipe__name', 'ingredient__name')
 
 
+@admin.register(RecipeVersionModel)
+class RecipeVersionAdmin(admin.ModelAdmin):
+    list_display = ('recipe', 'version_number', 'is_current', 'valid_from', 'valid_to', 'created_by')
+    list_filter = ('recipe__farm', 'is_current')
+    search_fields = ('recipe__name', 'recipe__farm__name')
+
+
+@admin.register(RecipeVersionItemModel)
+class RecipeVersionItemAdmin(admin.ModelAdmin):
+    list_display = ('recipe_version', 'ingredient', 'percentage')
+    list_filter = ('recipe_version__recipe__farm', 'recipe_version')
+    search_fields = ('recipe_version__recipe__name', 'ingredient__name')
+
+
 @admin.register(ProductionModel)
 class ProductionAdmin(admin.ModelAdmin):
-    list_display = ('date', 'time', 'recipe', 'quantity_kg', 'status', 'feed_cost_total', 'feed_cost_per_kg')
-    list_filter = ('recipe__farm', 'status')
+    list_display = ('date', 'time', 'recipe', 'recipe_version', 'quantity_kg', 'status', 'feed_cost_total', 'feed_cost_per_kg')
+    list_filter = ('recipe__farm', 'status', 'recipe_version')
     search_fields = ('recipe__name', 'recipe__farm__name')
 
 

@@ -21,6 +21,9 @@ urlpatterns = [
     path('receptury/dodaj/', views.add_recipe_view, name='add_recipe'),
     path('receptury/<int:pk>/', views.recipe_detail_view, name='recipe_detail'),
     path('receptury/<int:pk>/edytuj/', views.edit_recipe_view, name='edit_recipe'),
+    path('receptury/<int:pk>/wersje/<int:version_pk>/', views.recipe_version_detail_view, name='recipe_version_detail'),
+    path('receptury/<int:pk>/wersje/<int:version_pk>/edytuj/', views.edit_recipe_version_view, name='edit_recipe_version'),
+    path('receptury/<int:pk>/wersje/<int:version_pk>/nowa/', views.add_recipe_version_view, name='add_recipe_version'),
     path('receptury/<int:pk>/usun/', views.delete_recipe_view, name='delete_recipe'),
 
     # Śrutowanie (Produkcja) - Kolejka główna

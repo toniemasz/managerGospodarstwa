@@ -117,6 +117,81 @@ class RecipeItemModel(models.Model):
         return f"{self.recipe.name} - {self.ingredient.name} ({self.percentage}%)"
 
 
+class RecipeVersionModel(models.Model):
+    recipe = models.ForeignKey(
+        RecipeModel,
+        on_delete=models.CASCADE,
+        related_name='versions',
+        verbose_name="Receptura",
+    )
+    version_number = models.PositiveIntegerField(verbose_name="Numer wersji")
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='created_recipe_versions',
+        null=True,
+        blank=True,
+        verbose_name="Utworzona przez",
+    )
+    valid_from = models.DateTimeField(verbose_name="Obowiązuje od")
+    valid_to = models.DateTimeField(null=True, blank=True, verbose_name="Obowiązuje do")
+    change_note = models.CharField(max_length=255, blank=True, verbose_name="Opis zmiany")
+    is_current = models.BooleanField(default=True, verbose_name="Aktualna wersja")
+
+    class Meta:
+        ordering = ('recipe_id', '-version_number')
+        constraints = [
+            models.UniqueConstraint(
+                fields=['recipe', 'version_number'],
+                name='unique_recipe_version_number',
+            ),
+            models.UniqueConstraint(
+                fields=['recipe'],
+                condition=Q(is_current=True),
+                name='unique_current_recipe_version',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=('recipe', 'is_current'), name='recipe_version_current_idx'),
+        ]
+        verbose_name = "Wersja receptury"
+        verbose_name_plural = "Wersje receptur"
+
+    def __str__(self):
+        return f"{self.recipe.name} v{self.version_number}"
+
+
+class RecipeVersionItemModel(models.Model):
+    recipe_version = models.ForeignKey(
+        RecipeVersionModel,
+        on_delete=models.CASCADE,
+        related_name='items',
+        verbose_name="Wersja receptury",
+    )
+    ingredient = models.ForeignKey('IngredientModel', on_delete=models.RESTRICT, verbose_name="Składnik")
+    percentage = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        verbose_name="Procentowy udział (%)",
+        validators=[MinValueValidator(Decimal('0.01')), MaxValueValidator(Decimal('100.00'))],
+    )
+
+    class Meta:
+        ordering = ('ingredient__name', 'id')
+        constraints = [
+            models.UniqueConstraint(
+                fields=['recipe_version', 'ingredient'],
+                name='unique_ingredient_per_recipe_version',
+            ),
+        ]
+        verbose_name = "Pozycja wersji receptury"
+        verbose_name_plural = "Pozycje wersji receptur"
+
+    def __str__(self):
+        return f"{self.recipe_version} - {self.ingredient.name} ({self.percentage}%)"
+
+
 class ProductionModel(models.Model):
     class Statuses(models.TextChoices):
         QUEUED = 'QUEUED', 'W kolejce'
@@ -126,6 +201,14 @@ class ProductionModel(models.Model):
     date = models.DateField(verbose_name="Data zaplanowania/produkcji")
     time = models.TimeField(verbose_name="Godzina (Kolejność)", null=True, blank=True)
     recipe = models.ForeignKey(RecipeModel, on_delete=models.RESTRICT, verbose_name="Bazuje na recepturze")
+    recipe_version = models.ForeignKey(
+        RecipeVersionModel,
+        on_delete=models.SET_NULL,
+        related_name='productions',
+        null=True,
+        blank=True,
+        verbose_name="Wersja receptury",
+    )
     quantity_kg = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Ilość (kg)")
 
     custom_recipe_data = JSONField(

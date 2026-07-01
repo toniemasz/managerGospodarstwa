@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from feed.models import DeliveryModel, ProductionModel
 from feed.services.feed_calculators import ProductionCalculator
+from feed.services.recipe_requirements import recipe_item_dicts_for_production
 
 
 class ProductionCostService:
@@ -15,18 +16,9 @@ class ProductionCostService:
 
     @staticmethod
     def _requirements(production):
-        items = [
-            {
-                "ingredient_id": item.ingredient_id,
-                "name": item.ingredient.name,
-                "is_in_bin": item.ingredient.is_in_bin,
-                "percentage": item.percentage,
-            }
-            for item in production.recipe.items.all()
-        ]
         return ProductionCalculator(
             quantity_kg=production.quantity_kg,
-            base_recipe_items=items,
+            base_recipe_items=recipe_item_dicts_for_production(production),
             custom_recipe_data=production.custom_recipe_data,
         ).get_requirements()
 
@@ -95,8 +87,9 @@ class ProductionCostService:
         productions = ProductionModel.objects.filter(
             recipe__farm=self.farm,
             status=ProductionModel.Statuses.COMPLETED,
-        ).select_related("recipe").prefetch_related(
+        ).select_related("recipe", "recipe_version").prefetch_related(
             "recipe__items__ingredient",
+            "recipe_version__items__ingredient",
             "ingredient_usages__ingredient",
             "ingredient_usages__delivery",
         )
