@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 from farms.dashboard_registry import default_dashboard_stats
@@ -35,15 +36,6 @@ class FarmSettingsModel(models.Model):
         ("dark", "Ciemny"),
         ("system", "Systemowy"),
     ]
-    FONT_SCALE_CHOICES = [
-        ("100", "100%"),
-        ("110", "110%"),
-        ("125", "125%"),
-        ("150", "150%"),
-        ("175", "175%"),
-        ("200", "200%"),
-    ]
-
     farm = models.OneToOneField(
         "farms.FarmModel",
         on_delete=models.CASCADE,
@@ -75,10 +67,12 @@ class FarmSettingsModel(models.Model):
         choices=THEME_CHOICES,
         default="light",
     )
-    font_scale = models.CharField(
-        max_length=8,
-        choices=FONT_SCALE_CHOICES,
-        default="100",
+    font_scale = models.PositiveSmallIntegerField(
+        default=100,
+        validators=[
+            MinValueValidator(20, "Rozmiar tekstu nie może być mniejszy niż 20%%."),
+            MaxValueValidator(200, "Rozmiar tekstu nie może być większy niż 200%%."),
+        ],
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

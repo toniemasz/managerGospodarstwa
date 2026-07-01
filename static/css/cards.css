@@ -48,14 +48,14 @@
 .stat-tile strong {
     display: block;
     margin-top: .35rem;
-    font-size: 1.55rem;
+    font-size: var(--stat-value-size);
     font-weight: 950;
 }
 
 .stat-tile small {
     display: block;
     color: var(--muted);
-    font-size: .78rem;
+    font-size: var(--small-font-size);
     font-weight: 750;
     line-height: 1.35;
 }
@@ -369,7 +369,7 @@
     background: var(--surface-soft);
     padding: .32rem .6rem;
     color: var(--muted);
-    font-size: .72rem;
+    font-size: var(--status-font-size);
     font-weight: 950;
     line-height: 1.2;
 }
@@ -485,8 +485,8 @@
 }
 
 .module-icon svg {
-    width: 1.35rem;
-    height: 1.35rem;
+    width: var(--icon-size);
+    height: var(--icon-size);
 }
 
 .sidebar-nav-link .module-icon.compact {
@@ -509,7 +509,7 @@
 .recipe-card h2,
 .inventory-card h3 {
     margin: 0;
-    font-size: 1.05rem;
+    font-size: var(--card-title-size);
     font-weight: 950;
 }
 
@@ -578,8 +578,8 @@
 
 .dashboard-card-icon svg,
 .activity-icon svg {
-    width: 1.35rem;
-    height: 1.35rem;
+    width: var(--icon-size);
+    height: var(--icon-size);
 }
 
 .dashboard-card-label {

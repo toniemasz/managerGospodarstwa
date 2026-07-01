@@ -85,18 +85,22 @@
                             </div>
                         </div>
 
+                        <div class="settings-interface-stack">
                         <div class="settings-control-group">
                             <h3>{{ form.interface_scale.label }}</h3>
-                            <div class="settings-choice-grid">
+                            <div class="settings-choice-grid density-choice-list">
                                 {% for radio in form.interface_scale %}
-                                <label class="settings-choice-card">
+                                <label class="settings-choice-card density-choice density-{{ radio.data.value }}">
                                     {{ radio.tag }}
+                                    <span class="density-preview" aria-hidden="true">
+                                        <i></i><i></i><i></i><i></i>
+                                    </span>
                                     <span>
                                         <strong>{{ radio.choice_label }}</strong>
                                         <small>
-                                            {% if radio.data.value == 'compact' %}Najwięcej treści na ekranie, najlepszy na desktop.
-                                            {% elif radio.data.value == 'standard' %}Nowy domyślny balans między czytelnością i gęstością.
-                                            {% else %}Większe pola i odstępy, wygodne przy dłuższej pracy lub dotyku.{% endif %}
+                                            {% if radio.data.value == 'compact' %}Bardzo małe tabele, kafelki, pola, nagłówki i odstępy.
+                                            {% elif radio.data.value == 'standard' %}Zbalansowany widok codzienny z umiarkowanymi tabelami i kartami.
+                                            {% else %}Duże pola, kafelki, przyciski, tabele i wyraźne odstępy.{% endif %}
                                         </small>
                                     </span>
                                 </label>
@@ -105,39 +109,63 @@
                             {{ form.interface_scale.errors }}
                         </div>
 
-                        <div class="settings-control-grid">
-                            <div class="settings-control-group">
-                                <h3>{{ form.theme.label }}</h3>
-                                <div class="settings-choice-grid compact">
-                                    {% for radio in form.theme %}
-                                    <label class="settings-choice-card">
-                                        {{ radio.tag }}
-                                        <span>
-                                            <strong>{{ radio.choice_label }}</strong>
-                                            <small>
-                                                {% if radio.data.value == 'light' %}Jasne tło i klasyczny wygląd aplikacji.
-                                                {% elif radio.data.value == 'dark' %}Ciemne tło, karty i pola z mniejszą luminancją.
-                                                {% else %}Dopasowanie do ustawień systemowych urządzenia.{% endif %}
-                                            </small>
-                                        </span>
-                                    </label>
-                                    {% endfor %}
-                                </div>
-                                {{ form.theme.errors }}
+                        <div class="settings-control-group">
+                            <h3>{{ form.theme.label }}</h3>
+                            <div class="settings-choice-grid theme-choice-list">
+                                {% for radio in form.theme %}
+                                <label class="settings-choice-card theme-choice theme-{{ radio.data.value }}">
+                                    {{ radio.tag }}
+                                    <span class="theme-swatch" aria-hidden="true"></span>
+                                    <span>
+                                        <strong>{{ radio.choice_label }}</strong>
+                                        <small>
+                                            {% if radio.data.value == 'light' %}Jasne tło i klasyczny wygląd aplikacji.
+                                            {% elif radio.data.value == 'dark' %}Ciemne tło, karty i pola z mniejszą luminancją.
+                                            {% else %}Dopasowanie do ustawień systemowych urządzenia.{% endif %}
+                                        </small>
+                                    </span>
+                                </label>
+                                {% endfor %}
                             </div>
+                            {{ form.theme.errors }}
+                        </div>
 
-                            <div class="settings-control-group">
-                                <h3>{{ form.font_scale.label }}</h3>
-                                <div class="font-scale-grid">
-                                    {% for radio in form.font_scale %}
-                                    <label class="font-scale-choice">
-                                        {{ radio.tag }}
-                                        <span>{{ radio.choice_label }}</span>
-                                    </label>
-                                    {% endfor %}
+                        <div class="settings-control-group">
+                            <h3>{{ form.font_scale.label }}</h3>
+                            <div class="font-scale-panel">
+                                <div class="font-scale-current">
+                                    <span>Aktualnie</span>
+                                    <strong data-font-scale-output>{{ form.font_scale.value|default:"100" }}%</strong>
                                 </div>
-                                {{ form.font_scale.errors }}
+                                <div class="font-scale-control-row">
+                                    <label class="font-scale-slider-field" for="font-scale-slider">
+                                        <span>Suwak</span>
+                                        <input
+                                            type="range"
+                                            id="font-scale-slider"
+                                            class="font-scale-slider"
+                                            min="20"
+                                            max="200"
+                                            step="1"
+                                            value="{{ form.font_scale.value|default:'100' }}"
+                                            data-font-scale-slider
+                                        >
+                                    </label>
+                                    <div class="font-scale-number-field">
+                                        <label for="{{ form.font_scale.id_for_label }}">Własna wartość</label>
+                                        <div class="font-scale-number-input">
+                                            {{ form.font_scale }}
+                                            <span>%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="font-scale-limits" aria-hidden="true">
+                                    <span>20%</span>
+                                    <span>200%</span>
+                                </div>
                             </div>
+                            {{ form.font_scale.errors }}
+                        </div>
                         </div>
                     </div>
 
@@ -266,4 +294,45 @@
         </article>
     </section>
 </main>
+{% endblock %}
+
+{% block scripts %}
+{{ block.super }}
+<script>
+(function () {
+    const slider = document.querySelector("[data-font-scale-slider]");
+    const numberInput = document.querySelector("[data-font-scale-number]");
+    const output = document.querySelector("[data-font-scale-output]");
+    if (!slider || !numberInput) {
+        return;
+    }
+
+    const clamp = (value) => {
+        const parsed = Number.parseInt(value, 10);
+        if (Number.isNaN(parsed)) {
+            return 100;
+        }
+        return Math.min(200, Math.max(20, parsed));
+    };
+    const render = (value) => {
+        slider.value = value;
+        numberInput.value = value;
+        if (output) {
+            output.textContent = value + "%";
+        }
+    };
+
+    slider.addEventListener("input", () => render(clamp(slider.value)));
+    numberInput.addEventListener("input", () => {
+        if (numberInput.value !== "") {
+            slider.value = clamp(numberInput.value);
+            if (output) {
+                output.textContent = slider.value + "%";
+            }
+        }
+    });
+    numberInput.addEventListener("change", () => render(clamp(numberInput.value)));
+    render(clamp(numberInput.value || slider.value));
+}());
+</script>
 {% endblock %}

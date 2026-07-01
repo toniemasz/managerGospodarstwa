@@ -145,6 +145,10 @@ def test_settings_visibility_section_is_grouped(ui_client):
     assert "Gęstość interfejsu" in content
     assert "Motyw" in content
     assert "Rozmiar tekstu" in content
+    assert 'type="range"' in content
+    assert 'min="20"' in content
+    assert 'max="200"' in content
+    assert "Własna wartość" in content
 
 
 @pytest.mark.django_db
@@ -152,7 +156,7 @@ def test_settings_appearance_choices_are_applied_to_page_shell(ui_client):
     settings = get_farm_settings(ui_client.farm)
     settings.interface_scale = "compact"
     settings.theme = "dark"
-    settings.font_scale = "150"
+    settings.font_scale = 137
     settings.save(update_fields=["interface_scale", "theme", "font_scale"])
 
     response = ui_client.get(reverse("farm_settings"))
@@ -160,7 +164,16 @@ def test_settings_appearance_choices_are_applied_to_page_shell(ui_client):
 
     assert response.status_code == 200
     assert 'class="theme-dark ui-density-compact"' in content
-    assert "--user-font-scale: 1.5;" in content
+    assert "--user-font-scale: 1.37;" in content
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("font_scale", ["19", "201"])
+def test_settings_font_scale_is_limited_to_safe_range(ui_client, font_scale):
+    response = ui_client.post(reverse("farm_settings"), _settings_payload(font_scale=font_scale))
+
+    assert response.status_code == 200
+    assert "font_scale" in response.context["form"].errors
 
 
 @pytest.mark.django_db

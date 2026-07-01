@@ -144,8 +144,8 @@
 .account-menu-icon svg,
 .topbar-search-icon svg {
     display: block;
-    width: 1.35rem;
-    height: 1.35rem;
+    width: var(--icon-size);
+    height: var(--icon-size);
     fill: none;
     stroke: currentColor;
     stroke-width: 2;

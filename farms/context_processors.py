@@ -11,8 +11,11 @@ def _theme(settings):
 
 
 def _font_scale(settings):
-    scale = getattr(settings, "font_scale", "100") or "100"
-    return scale if scale in {"100", "110", "125", "150", "175", "200"} else "100"
+    try:
+        scale = int(getattr(settings, "font_scale", 100) or 100)
+    except (TypeError, ValueError):
+        scale = 100
+    return str(min(200, max(20, scale)))
 
 
 def _topbar_notifications(farm):

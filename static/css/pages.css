@@ -180,6 +180,11 @@
     gap: var(--grid-gap);
 }
 
+.settings-interface-stack {
+    display: grid;
+    gap: var(--section-gap);
+}
+
 .settings-control-group {
     display: grid;
     gap: var(--space-sm);
@@ -201,11 +206,11 @@
 }
 
 .settings-choice-grid {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+    grid-template-columns: 1fr;
 }
 
 .settings-choice-grid.compact {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+    grid-template-columns: 1fr;
 }
 
 .font-scale-grid {
@@ -229,6 +234,78 @@
     align-items: flex-start;
     gap: var(--space-sm);
     padding: var(--card-padding);
+}
+
+.density-choice,
+.theme-choice {
+    align-items: center;
+}
+
+.density-choice {
+    grid-template-columns: auto auto minmax(0, 1fr);
+}
+
+.theme-choice {
+    grid-template-columns: auto auto minmax(0, 1fr);
+}
+
+.density-preview {
+    display: grid;
+    width: clamp(3.8rem, 10vw, 5.8rem);
+    gap: .2rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    padding: .38rem;
+}
+
+.density-preview i {
+    display: block;
+    height: .28rem;
+    border-radius: 999px;
+    background: var(--primary);
+}
+
+.density-compact .density-preview {
+    gap: .12rem;
+    padding: .24rem;
+}
+
+.density-compact .density-preview i {
+    height: .16rem;
+}
+
+.density-standard .density-preview {
+    gap: .22rem;
+}
+
+.density-standard .density-preview i {
+    height: .28rem;
+}
+
+.density-comfortable .density-preview {
+    gap: .34rem;
+    padding: .5rem;
+}
+
+.density-comfortable .density-preview i {
+    height: .42rem;
+}
+
+.theme-swatch {
+    width: calc(var(--control-height) * .8);
+    height: calc(var(--control-height) * .8);
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    background: linear-gradient(135deg, #ffffff 0 50%, #dfe7ef 50% 100%);
+}
+
+.theme-choice.theme-dark .theme-swatch {
+    background: linear-gradient(135deg, #0e1412 0 50%, #2b3b35 50% 100%);
+}
+
+.theme-choice.theme-system .theme-swatch {
+    background: linear-gradient(135deg, #ffffff 0 33%, #151d1a 33% 66%, var(--primary) 66% 100%);
 }
 
 .font-scale-choice {
@@ -278,9 +355,98 @@
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent);
 }
 
+.font-scale-panel {
+    display: grid;
+    gap: var(--space-md);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: linear-gradient(180deg, var(--surface), var(--surface-soft));
+    padding: var(--panel-padding);
+}
+
+.font-scale-current {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-sm);
+}
+
+.font-scale-current span,
+.font-scale-slider-field > span,
+.font-scale-number-field label,
+.font-scale-limits {
+    color: var(--muted);
+    font-size: var(--small-font-size);
+    font-weight: 900;
+}
+
+.font-scale-current strong {
+    color: var(--primary);
+    font-size: clamp(1.35rem, 4vw, 2rem);
+    font-weight: 950;
+}
+
+.font-scale-control-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(7.5rem, 10rem);
+    gap: var(--grid-gap);
+    align-items: end;
+}
+
+.font-scale-slider-field,
+.font-scale-number-field {
+    display: grid;
+    gap: var(--space-xs);
+}
+
+.font-scale-slider {
+    width: 100%;
+    min-height: 1.6rem;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    accent-color: var(--primary);
+}
+
+.font-scale-number-input {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding-right: .75rem;
+}
+
+.font-scale-number-input input {
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    text-align: right;
+    font-weight: 950;
+}
+
+.font-scale-number-input span {
+    color: var(--muted);
+    font-weight: 950;
+}
+
+.font-scale-limits {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-sm);
+}
+
 .settings-toggle-list {
     display: grid;
     gap: var(--space-sm);
+}
+
+@media (max-width: 720px) {
+    .font-scale-control-row {
+        grid-template-columns: 1fr;
+    }
 }
 
 
