@@ -52,7 +52,7 @@
                         <td class="text-right"><strong>{{ prod.quantity_kg|feed_quantity }}</strong></td>
                         <td class="text-right">
                             {% if prod.status == 'COMPLETED' %}
-                                <strong>{{ prod.feed_cost_total|floatformat:2 }}</strong> zł
+                                <strong>{{ prod.feed_cost_total|feed_money }}</strong>
                                 {% if prod.feed_cost_is_partial %}
                                     <br><span class="status-pill status-amber">Częściowy</span>
                                 {% endif %}

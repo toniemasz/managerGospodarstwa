@@ -82,7 +82,10 @@ def test_current_farm_context_processor_exposes_request_farm():
         'current_farm': farm,
         'ui_modules': [],
         'ui_visible_module_keys': [],
-        'ui_interface_scale': 'compact',
+        'ui_interface_scale': 'standard',
+        'ui_theme': 'light',
+        'ui_font_scale': '100',
+        'ui_font_scale_ratio': '1',
         'ui_notifications': [],
         'ui_notification_count': 0,
         'ui_notification_more_count': 0,
@@ -111,7 +114,9 @@ def test_get_farm_settings_creates_default_settings():
     assert settings.pregnancy_check_after_days == 30
     assert settings.gestation_days == 114
     assert settings.nav_modules == ["tasks", "sows", "feed", "sales"]
-    assert settings.interface_scale == "compact"
+    assert settings.interface_scale == "standard"
+    assert settings.theme == "light"
+    assert settings.font_scale == "100"
     assert FarmSettingsModel.objects.filter(farm=farm).count() == 1
 
 
@@ -123,7 +128,9 @@ def test_farm_settings_view_updates_farm_and_rules(client):
 
     response = client.post(reverse('farm_settings'), {
         'farm_name': 'Nowa nazwa gospodarstwa',
-        'interface_scale': 'large',
+        'interface_scale': 'compact',
+        'theme': 'dark',
+        'font_scale': '150',
         'pregnancy_check_after_days': '28',
         'gestation_days': '115',
         'farrowing_alert_days_ahead': '5',
@@ -139,4 +146,6 @@ def test_farm_settings_view_updates_farm_and_rules(client):
     assert farm.name == 'Nowa nazwa gospodarstwa'
     assert settings.pregnancy_check_after_days == 28
     assert settings.farrowing_alert_days_ahead == 5
-    assert settings.interface_scale == 'large'
+    assert settings.interface_scale == 'compact'
+    assert settings.theme == 'dark'
+    assert settings.font_scale == '150'

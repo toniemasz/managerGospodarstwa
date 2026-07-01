@@ -14,6 +14,8 @@ class FarmSettingsForm(forms.ModelForm):
         fields = [
             'farm_name',
             'interface_scale',
+            'theme',
+            'font_scale',
             'pregnancy_check_after_days',
             'gestation_days',
             'farrowing_alert_days_ahead',
@@ -23,7 +25,9 @@ class FarmSettingsForm(forms.ModelForm):
             'ask_before_auto_pregnancy_check',
         ]
         labels = {
-            'interface_scale': 'Rozmiar interfejsu',
+            'interface_scale': 'Gęstość interfejsu',
+            'theme': 'Motyw',
+            'font_scale': 'Rozmiar tekstu',
             'pregnancy_check_after_days': 'Dni do badania USG',
             'gestation_days': 'Długość ciąży',
             'farrowing_alert_days_ahead': 'Dni alertu przed oproszeniem',
@@ -31,6 +35,11 @@ class FarmSettingsForm(forms.ModelForm):
             'default_production_quantity_kg': 'Domyślna ilość śrutowania',
             'allow_farrowing_without_pregnancy_check': 'Pozwalać na oproszenie bez badania',
             'ask_before_auto_pregnancy_check': 'Pytać o automatyczne badanie TAK',
+        }
+        widgets = {
+            'interface_scale': forms.RadioSelect(),
+            'theme': forms.RadioSelect(),
+            'font_scale': forms.RadioSelect(),
         }
 
     def __init__(self, *args, farm=None, **kwargs):

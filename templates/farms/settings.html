@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load ui_format %}
 
 {% block title %}Ustawienia{% endblock %}
 
@@ -30,7 +31,7 @@
         </div>
         <div class="stat-tile">
             <span>Domyślne śrutowanie</span>
-            <strong>{{ form.default_production_quantity_kg.value|floatformat:2 }} kg</strong>
+            <strong>{{ form.default_production_quantity_kg.value|smart_unit:"kg" }}</strong>
         </div>
     </section>
 
@@ -62,93 +63,147 @@
                     {% csrf_token %}
                     {% include 'components/form_errors.html' with form=form %}
 
-            <div class="form-section" id="settings-profile">
-                <div class="section-heading">
-                    <div>
-                        <h2>Dane gospodarstwa</h2>
+                    <div class="settings-card" id="settings-profile">
+                        <div class="settings-card-heading">
+                            <div>
+                                <h2>Dane gospodarstwa</h2>
+                                <p>Nazwa jest widoczna w nawigacji i eksportach danych.</p>
+                            </div>
+                        </div>
+                        <div class="form-field">
+                            <label for="{{ form.farm_name.id_for_label }}">{{ form.farm_name.label }}</label>
+                            {{ form.farm_name }}
+                            {{ form.farm_name.errors }}
+                        </div>
                     </div>
-                </div>
-                <div class="form-field">
-                    <label for="{{ form.farm_name.id_for_label }}">{{ form.farm_name.label }}</label>
-                    {{ form.farm_name }}
-                    {{ form.farm_name.errors }}
-                </div>
-            </div>
 
-            <div class="form-section" id="settings-interface">
-                <div class="form-section-heading">
-                    <h2>Wygląd</h2>
-                    <p>Dopasuj rozmiar tekstu, pól i kafelków do sposobu pracy.</p>
-                </div>
-                <div class="form-grid two-columns">
-                    <div class="form-field">
-                        <label for="{{ form.interface_scale.id_for_label }}">{{ form.interface_scale.label }}</label>
-                        {{ form.interface_scale }}
-                        {{ form.interface_scale.errors }}
-                    </div>
-                </div>
-            </div>
+                    <div class="settings-card" id="settings-interface">
+                        <div class="settings-card-heading">
+                            <div>
+                                <h2>Wygląd aplikacji</h2>
+                                <p>Dopasuj gęstość, motyw i tekst do sposobu pracy na komputerze, tablecie i telefonie.</p>
+                            </div>
+                        </div>
 
-            {% include 'farms/_module_visibility.html' %}
-            {% include 'farms/_dashboard_stats_visibility.html' %}
+                        <div class="settings-control-group">
+                            <h3>{{ form.interface_scale.label }}</h3>
+                            <div class="settings-choice-grid">
+                                {% for radio in form.interface_scale %}
+                                <label class="settings-choice-card">
+                                    {{ radio.tag }}
+                                    <span>
+                                        <strong>{{ radio.choice_label }}</strong>
+                                        <small>
+                                            {% if radio.data.value == 'compact' %}Najwięcej treści na ekranie, najlepszy na desktop.
+                                            {% elif radio.data.value == 'standard' %}Nowy domyślny balans między czytelnością i gęstością.
+                                            {% else %}Większe pola i odstępy, wygodne przy dłuższej pracy lub dotyku.{% endif %}
+                                        </small>
+                                    </span>
+                                </label>
+                                {% endfor %}
+                            </div>
+                            {{ form.interface_scale.errors }}
+                        </div>
 
-            <div class="form-section" id="settings-sows">
-                <div class="section-heading">
-                    <div>
-                        <h2>Maciory i alerty</h2>
-                    </div>
-                </div>
-                <div class="form-grid two-columns">
-                    <div class="form-field">
-                        <label for="{{ form.pregnancy_check_after_days.id_for_label }}">{{ form.pregnancy_check_after_days.label }}</label>
-                        {{ form.pregnancy_check_after_days }}
-                        {{ form.pregnancy_check_after_days.errors }}
-                    </div>
-                    <div class="form-field">
-                        <label for="{{ form.gestation_days.id_for_label }}">{{ form.gestation_days.label }}</label>
-                        {{ form.gestation_days }}
-                        {{ form.gestation_days.errors }}
-                    </div>
-                    <div class="form-field">
-                        <label for="{{ form.farrowing_alert_days_ahead.id_for_label }}">{{ form.farrowing_alert_days_ahead.label }}</label>
-                        {{ form.farrowing_alert_days_ahead }}
-                        {{ form.farrowing_alert_days_ahead.errors }}
-                    </div>
-                    <div class="form-field">
-                        <label for="{{ form.vaccination_alert_days_ahead.id_for_label }}">{{ form.vaccination_alert_days_ahead.label }}</label>
-                        {{ form.vaccination_alert_days_ahead }}
-                        {{ form.vaccination_alert_days_ahead.errors }}
-                    </div>
-                </div>
-                <label class="checkbox-row">
-                    {{ form.allow_farrowing_without_pregnancy_check }}
-                    <span>{{ form.allow_farrowing_without_pregnancy_check.label }}</span>
-                </label>
-                <label class="checkbox-row">
-                    {{ form.ask_before_auto_pregnancy_check }}
-                    <span>{{ form.ask_before_auto_pregnancy_check.label }}</span>
-                </label>
-            </div>
+                        <div class="settings-control-grid">
+                            <div class="settings-control-group">
+                                <h3>{{ form.theme.label }}</h3>
+                                <div class="settings-choice-grid compact">
+                                    {% for radio in form.theme %}
+                                    <label class="settings-choice-card">
+                                        {{ radio.tag }}
+                                        <span>
+                                            <strong>{{ radio.choice_label }}</strong>
+                                            <small>
+                                                {% if radio.data.value == 'light' %}Jasne tło i klasyczny wygląd aplikacji.
+                                                {% elif radio.data.value == 'dark' %}Ciemne tło, karty i pola z mniejszą luminancją.
+                                                {% else %}Dopasowanie do ustawień systemowych urządzenia.{% endif %}
+                                            </small>
+                                        </span>
+                                    </label>
+                                    {% endfor %}
+                                </div>
+                                {{ form.theme.errors }}
+                            </div>
 
-            <div class="form-section" id="settings-feed">
-                <div class="section-heading">
-                    <div>
-                        <h2>Pasze</h2>
-                        <p>Próg niskiego stanu ustawisz osobno podczas dodawania lub edycji składnika.</p>
+                            <div class="settings-control-group">
+                                <h3>{{ form.font_scale.label }}</h3>
+                                <div class="font-scale-grid">
+                                    {% for radio in form.font_scale %}
+                                    <label class="font-scale-choice">
+                                        {{ radio.tag }}
+                                        <span>{{ radio.choice_label }}</span>
+                                    </label>
+                                    {% endfor %}
+                                </div>
+                                {{ form.font_scale.errors }}
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div class="form-grid two-columns">
-                    <div class="form-field">
-                        <label for="{{ form.default_production_quantity_kg.id_for_label }}">{{ form.default_production_quantity_kg.label }}</label>
-                        {{ form.default_production_quantity_kg }}
-                        {{ form.default_production_quantity_kg.errors }}
-                    </div>
-                </div>
-            </div>
 
-            <div class="form-actions settings-save-bar">
-                <button type="submit" class="button button-primary">Zapisz ustawienia</button>
-            </div>
+                    {% include 'farms/_module_visibility.html' %}
+                    {% include 'farms/_dashboard_stats_visibility.html' %}
+
+                    <div class="settings-card" id="settings-sows">
+                        <div class="settings-card-heading">
+                            <div>
+                                <h2>Maciory i alerty</h2>
+                                <p>Reguły terminów i komunikatów używane w module macior.</p>
+                            </div>
+                        </div>
+                        <div class="form-grid two-columns">
+                            <div class="form-field">
+                                <label for="{{ form.pregnancy_check_after_days.id_for_label }}">{{ form.pregnancy_check_after_days.label }}</label>
+                                {{ form.pregnancy_check_after_days }}
+                                {{ form.pregnancy_check_after_days.errors }}
+                            </div>
+                            <div class="form-field">
+                                <label for="{{ form.gestation_days.id_for_label }}">{{ form.gestation_days.label }}</label>
+                                {{ form.gestation_days }}
+                                {{ form.gestation_days.errors }}
+                            </div>
+                            <div class="form-field">
+                                <label for="{{ form.farrowing_alert_days_ahead.id_for_label }}">{{ form.farrowing_alert_days_ahead.label }}</label>
+                                {{ form.farrowing_alert_days_ahead }}
+                                {{ form.farrowing_alert_days_ahead.errors }}
+                            </div>
+                            <div class="form-field">
+                                <label for="{{ form.vaccination_alert_days_ahead.id_for_label }}">{{ form.vaccination_alert_days_ahead.label }}</label>
+                                {{ form.vaccination_alert_days_ahead }}
+                                {{ form.vaccination_alert_days_ahead.errors }}
+                            </div>
+                        </div>
+                        <div class="settings-toggle-list">
+                            <label class="checkbox-row">
+                                {{ form.allow_farrowing_without_pregnancy_check }}
+                                <span>{{ form.allow_farrowing_without_pregnancy_check.label }}</span>
+                            </label>
+                            <label class="checkbox-row">
+                                {{ form.ask_before_auto_pregnancy_check }}
+                                <span>{{ form.ask_before_auto_pregnancy_check.label }}</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="settings-card" id="settings-feed">
+                        <div class="settings-card-heading">
+                            <div>
+                                <h2>Pasze</h2>
+                                <p>Próg niskiego stanu ustawisz osobno podczas dodawania lub edycji składnika.</p>
+                            </div>
+                        </div>
+                        <div class="form-grid two-columns">
+                            <div class="form-field">
+                                <label for="{{ form.default_production_quantity_kg.id_for_label }}">{{ form.default_production_quantity_kg.label }}</label>
+                                {{ form.default_production_quantity_kg }}
+                                {{ form.default_production_quantity_kg.errors }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions settings-save-bar">
+                        <button type="submit" class="button button-primary">Zapisz ustawienia</button>
+                    </div>
                 </form>
             </section>
         </div>

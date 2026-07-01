@@ -51,7 +51,7 @@
                     {% for item in version.items.all %}
                     <tr>
                         <td><strong>{{ item.ingredient.name }}</strong></td>
-                        <td class="text-right">{{ item.percentage|floatformat:2 }}%</td>
+                        <td class="text-right">{{ item.percentage|feed_percent }}</td>
                     </tr>
                     {% empty %}
                     <tr>
@@ -88,7 +88,7 @@
                         <td class="text-right"><strong>{{ production.quantity_kg|feed_quantity }}</strong></td>
                         <td class="text-right">
                             {% if production.status == 'COMPLETED' %}
-                                <strong>{{ production.feed_cost_total|floatformat:2 }}</strong> zł
+                                <strong>{{ production.feed_cost_total|feed_money }}</strong>
                                 {% if production.feed_cost_is_partial %}
                                     <br><span class="status-pill status-amber">Częściowy</span>
                                 {% endif %}

@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 {% load l10n %}
+{% load ui_format %}
 
 {% block title %}Sprzedaż{% endblock %}
 
@@ -16,25 +17,25 @@
     </section>
 
     <section class="dashboard-stat-grid sales-stat-grid">
-        {% include 'components/stat_card.html' with title='Przychód netto' value=stats.total_net_revenue|floatformat:2 unit='PLN' icon_name='finance' tone='green' note='Wybrany rok rozliczeniowy' %}
-        {% include 'components/stat_card.html' with title='Przychód brutto' value=stats.total_gross_revenue|floatformat:2 unit='PLN' icon_name='sales' tone='green' note='Netto razem z VAT' %}
-        {% include 'components/stat_card.html' with title='Średnia cena/kg' value=stats.avg_price_per_kg|floatformat:2 unit='PLN' icon_name='price' note='Dla widocznych dokumentów' %}
+        {% include 'components/stat_card.html' with title='Przychód netto' value=stats.total_net_revenue unit='PLN' icon_name='finance' tone='green' note='Wybrany rok rozliczeniowy' %}
+        {% include 'components/stat_card.html' with title='Przychód brutto' value=stats.total_gross_revenue unit='PLN' icon_name='sales' tone='green' note='Netto razem z VAT' %}
+        {% include 'components/stat_card.html' with title='Średnia cena/kg' value=stats.avg_price_per_kg unit='PLN' icon_name='price' note='Dla widocznych dokumentów' %}
         {% include 'components/stat_card.html' with title='Dokumenty' value=stats.sale_count icon_name='document' tone='warning' note='Po filtrach' %}
         {% include 'components/stat_card.html' with title='Sprzedane' value=stats.total_pigs unit='szt.' icon_name='sow' tone='green' %}
-        {% include 'components/stat_card.html' with title='Waga poubojowa' value=stats.total_weight|floatformat:0 unit='kg' icon_name='scale' %}
-        {% include 'components/stat_card.html' with title='Waga żywa' value=stats.total_live_weight|floatformat:0 unit='kg' icon_name='scale' %}
-        {% include 'components/stat_card.html' with title='VAT' value=stats.total_vat|floatformat:2 unit='PLN' icon_name='tax' %}
+        {% include 'components/stat_card.html' with title='Waga poubojowa' value=stats.total_weight unit='kg' icon_name='scale' %}
+        {% include 'components/stat_card.html' with title='Waga żywa' value=stats.total_live_weight unit='kg' icon_name='scale' %}
+        {% include 'components/stat_card.html' with title='VAT' value=stats.total_vat unit='PLN' icon_name='tax' %}
         {% if stats.avg_meatiness != None %}
-            {% include 'components/stat_card.html' with title='Średnia mięsność' value=stats.avg_meatiness|floatformat:2 unit='%' icon_name='quality' %}
+            {% include 'components/stat_card.html' with title='Średnia mięsność' value=stats.avg_meatiness unit='%' icon_name='quality' %}
         {% else %}
             {% include 'components/stat_card.html' with title='Średnia mięsność' value='Brak danych' icon_name='quality' %}
         {% endif %}
         {% if stats.feed_to_live_weight_ratio != None %}
-            {% include 'components/stat_card.html' with title='Pasza / waga żywa' value=stats.feed_to_live_weight_ratio|floatformat:2 unit='t/t' icon_name='ratio' note='Ton paszy na tonę wagi żywej' %}
+            {% include 'components/stat_card.html' with title='Pasza / waga żywa' value=stats.feed_to_live_weight_ratio unit='t/t' icon_name='ratio' note='Ton paszy na tonę wagi żywej' %}
         {% else %}
             {% include 'components/stat_card.html' with title='Pasza / waga żywa' value='Brak wagi' icon_name='ratio' note='Potrzebna waga żywa' %}
         {% endif %}
-        {% include 'components/stat_card.html' with title='Śr. waga sztuki' value=stats.avg_weight_per_pig|floatformat:2 unit='kg' icon_name='scale' %}
+        {% include 'components/stat_card.html' with title='Śr. waga sztuki' value=stats.avg_weight_per_pig unit='kg' icon_name='scale' %}
     </section>
 
     {% url 'sales_list' as sales_filter_url %}
@@ -79,8 +80,8 @@
                             {% endif %}
                         </td>
                         <td class="text-right">{{ sale.quantity }}</td>
-                        <td class="text-right">{{ sale.total_weight|floatformat:2 }} kg</td>
-                        <td class="text-right"><strong>{{ sale.net_price|floatformat:2 }}</strong> PLN</td>
+                        <td class="text-right">{{ sale.total_weight|smart_unit:"kg" }}</td>
+                        <td class="text-right"><strong>{{ sale.net_price|smart_number }}</strong> PLN</td>
                         <td class="text-right">
                             <a href="{% url 'edit_sale' sale.id %}" class="table-link">Edytuj</a>
                         </td>

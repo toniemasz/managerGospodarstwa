@@ -15,7 +15,18 @@ body {
         linear-gradient(180deg, rgba(255, 255, 255, .86), rgba(249, 249, 255, 0) 16rem),
         var(--bg);
     color: var(--text);
+    font-size: 1rem;
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+html.theme-dark body {
+    background: var(--bg);
+}
+
+@media (prefers-color-scheme: dark) {
+    html.theme-system body {
+        background: var(--bg);
+    }
 }
 
 body.ui-scale-comfortable {
@@ -80,7 +91,7 @@ input[type="radio"] {
 }
 
 :focus-visible {
-    outline: 3px solid rgba(35, 100, 170, .35);
+    outline: 3px solid var(--focus-ring);
     outline-offset: 2px;
 }
 
@@ -161,7 +172,7 @@ input[type="radio"] {
 .container {
     width: min(100% - 2rem, var(--content-max));
     margin-inline: auto;
-    padding-block: 1.5rem 2rem;
+    padding-block: var(--page-block-padding);
 }
 
 .app-page-narrow {
@@ -171,14 +182,14 @@ input[type="radio"] {
 .page-header {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
+    gap: var(--space-lg);
+    margin-bottom: var(--space-xl);
     padding: .35rem 0 .15rem;
 }
 
 .page-header h1 {
     margin: 0;
-    font-size: clamp(1.45rem, 3vw, 2.25rem);
+    font-size: var(--page-title-size);
     font-weight: 950;
     line-height: 1.08;
 }
@@ -193,7 +204,7 @@ input[type="radio"] {
 }
 
 .page-subtitle {
-    margin: .45rem 0 0;
+    margin: var(--space-xs) 0 0;
     color: var(--muted);
     font-weight: 650;
     line-height: 1.45;
@@ -219,7 +230,7 @@ input[type="radio"] {
 
 .compact-panel,
 .panel-body {
-    padding: 1.25rem;
+    padding: var(--panel-padding);
 }
 
 .table-panel,
@@ -234,16 +245,16 @@ input[type="radio"] {
 .sale-document-layout,
 .recipe-grid,
 .inventory-grid {
-    margin-bottom: 1.25rem;
+    margin-bottom: var(--section-gap);
 }
 
 .section-heading {
     display: flex;
     flex-direction: column;
-    gap: .35rem;
-    padding: 1rem 1.25rem;
+    gap: var(--space-xs);
+    padding: var(--card-padding) var(--panel-padding);
     border-bottom: 1px solid var(--border);
-    background: linear-gradient(180deg, #ffffff, var(--surface-soft));
+    background: linear-gradient(180deg, var(--surface), var(--surface-soft));
 }
 
 .section-heading h2,

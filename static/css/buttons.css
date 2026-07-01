@@ -2,13 +2,13 @@
 
 .button {
     display: inline-flex;
-    min-height: 2.75rem;
+    min-height: var(--button-height);
     align-items: center;
     justify-content: center;
     gap: .4rem;
     border: 1px solid transparent;
     border-radius: var(--radius);
-    padding: .65rem 1rem;
+    padding: .55rem .9rem;
     color: inherit;
     font-size: .875rem;
     font-weight: 850;
@@ -39,7 +39,7 @@
 
 .button-secondary {
     border-color: var(--border);
-    background: #fff;
+    background: var(--surface);
     color: var(--muted);
 }
 
@@ -60,12 +60,12 @@
 
 .button-ghost-danger {
     border-color: var(--border);
-    background: #fff;
-    color: #425466;
+    background: var(--surface);
+    color: var(--muted);
 }
 
 .button-ghost-danger:hover {
-    border-color: #f0b8b8;
+    border-color: var(--danger);
     background: var(--danger-soft);
     color: var(--danger);
 }
@@ -73,7 +73,7 @@
 
 .table-link {
     display: inline-flex;
-    min-height: 2.25rem;
+    min-height: calc(var(--button-height) - .35rem);
     align-items: center;
     justify-content: center;
     border-radius: var(--radius);
@@ -86,7 +86,7 @@
 }
 
 .table-link:hover {
-    background: #d8f1e6;
+    background: var(--secondary-soft);
 }
 
 .table-card {
@@ -132,7 +132,7 @@
 
 .link-button-danger {
     display: inline-flex;
-    min-height: 2.25rem;
+    min-height: calc(var(--button-height) - .35rem);
     align-items: center;
     justify-content: center;
     border: 0;
@@ -145,7 +145,7 @@
 }
 
 .link-button-danger:hover {
-    background: #ffe2e2;
+    background: var(--danger-soft);
 }
 
 
@@ -158,8 +158,8 @@
     justify-content: center;
     border: 1px solid var(--border-strong);
     border-radius: var(--radius);
-    background: #fff;
-    color: #425466;
+    background: var(--surface);
+    color: var(--muted);
     font-weight: 950;
     transition: background .18s ease, border-color .18s ease, color .18s ease;
 }
@@ -177,9 +177,9 @@
     align-items: center;
     justify-content: space-between;
     gap: .75rem;
-    padding: 1rem 1.25rem;
+    padding: var(--panel-padding);
     border-top: 1px solid var(--border);
-    background: #f8fafc;
+    background: var(--surface-soft);
 }
 
 .pagination-summary {
@@ -209,8 +209,8 @@
 
 .pagination-button {
     border: 1px solid var(--border-strong);
-    background: #fff;
-    color: #31465a;
+    background: var(--surface);
+    color: var(--text);
     transition: background .18s ease, border-color .18s ease, color .18s ease;
 }
 
@@ -233,7 +233,7 @@
 }
 
 .pagination-ellipsis {
-    color: #8594a6;
+    color: var(--muted);
 }
 
 

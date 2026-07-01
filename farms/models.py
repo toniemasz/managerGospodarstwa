@@ -27,8 +27,21 @@ class FarmModel(models.Model):
 class FarmSettingsModel(models.Model):
     INTERFACE_SCALE_CHOICES = [
         ("compact", "Kompaktowy"),
+        ("standard", "Standardowy"),
         ("comfortable", "Wygodny"),
-        ("large", "Powiększony"),
+    ]
+    THEME_CHOICES = [
+        ("light", "Jasny"),
+        ("dark", "Ciemny"),
+        ("system", "Systemowy"),
+    ]
+    FONT_SCALE_CHOICES = [
+        ("100", "100%"),
+        ("110", "110%"),
+        ("125", "125%"),
+        ("150", "150%"),
+        ("175", "175%"),
+        ("200", "200%"),
     ]
 
     farm = models.OneToOneField(
@@ -55,7 +68,17 @@ class FarmSettingsModel(models.Model):
     interface_scale = models.CharField(
         max_length=16,
         choices=INTERFACE_SCALE_CHOICES,
-        default="compact",
+        default="standard",
+    )
+    theme = models.CharField(
+        max_length=16,
+        choices=THEME_CHOICES,
+        default="light",
+    )
+    font_scale = models.CharField(
+        max_length=8,
+        choices=FONT_SCALE_CHOICES,
+        default="100",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

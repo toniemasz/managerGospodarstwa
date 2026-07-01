@@ -220,6 +220,8 @@ def _restore_user_records(payload, data, farm):
             'nav_modules',
             'dashboard_stats',
             'interface_scale',
+            'theme',
+            'font_scale',
         }
         for name in allowed_fields:
             if name in settings_records[0]['fields']:

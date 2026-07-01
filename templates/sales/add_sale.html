@@ -16,6 +16,25 @@
         {% csrf_token %}
         {% include 'components/form_errors.html' with form=form %}
 
+        {% if pdf_import_feedback %}
+            <section class="notice import-summary {% if pdf_import_feedback.has_warnings %}notice-warning{% else %}notice-success{% endif %}">
+                <div>
+                    <h2>{{ pdf_import_feedback.title }}</h2>
+                    <p>{{ pdf_import_feedback.summary }}</p>
+                </div>
+                {% if pdf_import_feedback.has_warnings %}
+                    <details class="import-details">
+                        <summary>Szczegóły importu ({{ pdf_import_feedback.warning_count }})</summary>
+                        <ul class="compact-warning-list">
+                            {% for warning in pdf_import_feedback.warnings %}
+                                <li>{{ warning }}</li>
+                            {% endfor %}
+                        </ul>
+                    </details>
+                {% endif %}
+            </section>
+        {% endif %}
+
         <section class="sale-document-layout">
             <div class="panel">
                 <div class="section-heading">
@@ -84,7 +103,9 @@
                     {{ form.settlement_pdf }}
                     {{ form.settlement_pdf.errors }}
                 </div>
-                <button type="submit" name="import_pdf" value="1" class="button button-secondary">Importuj PDF</button>
+                <div class="sale-import-actions">
+                    <button type="submit" name="import_pdf" value="1" class="button button-secondary">Importuj PDF</button>
+                </div>
 
                 <div class="sale-side-note">
                     <strong>Status dokumentu</strong>
@@ -112,32 +133,34 @@
                         <tr>
                             <th>Lp</th>
                             <th>Klasa</th>
-                            <th>Ilość</th>
-                            <th>Waga</th>
-                            <th>Śr. waga</th>
-                            <th>Śr. mięsność</th>
-                            <th>Cena</th>
-                            <th>Wartość</th>
-                            <th>VAT</th>
-                            <th>Wartość brutto</th>
+                            <th class="text-right">Ilość</th>
+                            <th class="text-right">Waga</th>
+                            <th class="text-right">Śr. waga</th>
+                            <th class="text-right">Śr. mięsność</th>
+                            <th class="text-right">Cena</th>
+                            <th class="text-right">Wartość</th>
+                            <th class="text-right">VAT</th>
+                            <th class="text-right">Wartość brutto</th>
                             <th>Usuń</th>
                         </tr>
                     </thead>
                     <tbody id="settlement-rows">
                         {% for row_form in row_formset %}
-                        <tr class="settlement-row{% if row_form.DELETE.value %} hidden{% endif %}">
-                            <td>{{ row_form.line_no }}</td>
-                            <td>{{ row_form.meat_class }}</td>
-                            <td>{{ row_form.quantity }}</td>
-                            <td>{{ row_form.weight }}</td>
-                            <td>{{ row_form.avg_weight }}</td>
-                            <td>{{ row_form.avg_meatiness }}</td>
-                            <td>{{ row_form.price_per_kg }}</td>
-                            <td>{{ row_form.net_value }}</td>
-                            <td>{{ row_form.vat_value }}</td>
-                            <td>{{ row_form.gross_value }}</td>
-                            <td class="delete-cell"><span class="hidden">{{ row_form.DELETE }}</span><button type="button" class="link-button-danger remove-settlement-row">Usuń</button></td>
-                        </tr>
+                            {% with line_no=row_form.line_no.value|stringformat:"s" %}
+                            <tr class="settlement-row{% if row_form.DELETE.value %} hidden{% endif %}{% if line_no in pdf_import_problem_line_numbers %} import-warning-row{% endif %}">
+                                <td>{{ row_form.line_no }}</td>
+                                <td>{{ row_form.meat_class }}</td>
+                                <td class="numeric-cell">{{ row_form.quantity }}</td>
+                                <td class="numeric-cell">{{ row_form.weight }}</td>
+                                <td class="numeric-cell">{{ row_form.avg_weight }}</td>
+                                <td class="numeric-cell">{{ row_form.avg_meatiness }}</td>
+                                <td class="numeric-cell">{{ row_form.price_per_kg }}</td>
+                                <td class="numeric-cell">{{ row_form.net_value }}</td>
+                                <td class="numeric-cell">{{ row_form.vat_value }}</td>
+                                <td class="numeric-cell">{{ row_form.gross_value }}</td>
+                                <td class="delete-cell"><span class="hidden">{{ row_form.DELETE }}</span><button type="button" class="link-button-danger remove-settlement-row">Usuń</button></td>
+                            </tr>
+                            {% endwith %}
                         {% endfor %}
                     </tbody>
                 </table>
@@ -149,14 +172,14 @@
             <tr class="settlement-row">
                 <td>{{ row_formset.empty_form.line_no }}</td>
                 <td>{{ row_formset.empty_form.meat_class }}</td>
-                <td>{{ row_formset.empty_form.quantity }}</td>
-                <td>{{ row_formset.empty_form.weight }}</td>
-                <td>{{ row_formset.empty_form.avg_weight }}</td>
-                <td>{{ row_formset.empty_form.avg_meatiness }}</td>
-                <td>{{ row_formset.empty_form.price_per_kg }}</td>
-                <td>{{ row_formset.empty_form.net_value }}</td>
-                <td>{{ row_formset.empty_form.vat_value }}</td>
-                <td>{{ row_formset.empty_form.gross_value }}</td>
+                <td class="numeric-cell">{{ row_formset.empty_form.quantity }}</td>
+                <td class="numeric-cell">{{ row_formset.empty_form.weight }}</td>
+                <td class="numeric-cell">{{ row_formset.empty_form.avg_weight }}</td>
+                <td class="numeric-cell">{{ row_formset.empty_form.avg_meatiness }}</td>
+                <td class="numeric-cell">{{ row_formset.empty_form.price_per_kg }}</td>
+                <td class="numeric-cell">{{ row_formset.empty_form.net_value }}</td>
+                <td class="numeric-cell">{{ row_formset.empty_form.vat_value }}</td>
+                <td class="numeric-cell">{{ row_formset.empty_form.gross_value }}</td>
                 <td class="delete-cell"><span class="hidden">{{ row_formset.empty_form.DELETE }}</span><button type="button" class="link-button-danger remove-settlement-row">Usuń</button></td>
             </tr>
         </template>

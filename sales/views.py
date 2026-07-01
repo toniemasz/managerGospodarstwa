@@ -115,6 +115,9 @@ def _sale_form_view(request, sale: PigSaleModel, template_context: dict):
 
 def _handle_pdf_import(request, sale: PigSaleModel, template_context: dict, service: SaleFormService):
     uploaded_pdf = request.FILES.get('settlement_pdf')
+    pdf_import_feedback = None
+    pdf_import_problem_line_numbers = []
+
     if not uploaded_pdf:
         messages.error(request, "Wybierz plik PDF do importu.")
         form = PigSaleForm(request.POST, request.FILES, instance=sale, farm=sale.farm)
@@ -138,11 +141,9 @@ def _handle_pdf_import(request, sale: PigSaleModel, template_context: dict, serv
             return render(request, 'sales/add_sale.html', context)
         form = PigSaleForm(instance=sale, initial=parsed.form_initial, farm=sale.farm)
         row_formset = SaleClassRowFormSet(prefix='rows', initial=parsed.row_initial)
+        pdf_import_feedback = parsed.as_feedback()
+        pdf_import_problem_line_numbers = parsed.problem_line_numbers
 
-        if parsed.has_rows:
-            messages.success(request, "Zaimportowano rozliczenie z PDF. Sprawdź tabelę przed zapisem.")
-        for warning in parsed.warnings:
-            messages.warning(request, warning)
         log_action(
             farm=sale.farm,
             user=request.user,
@@ -157,6 +158,8 @@ def _handle_pdf_import(request, sale: PigSaleModel, template_context: dict, serv
         'form': form,
         'row_formset': row_formset,
         'sale': sale,
+        'pdf_import_feedback': pdf_import_feedback,
+        'pdf_import_problem_line_numbers': pdf_import_problem_line_numbers,
         **template_context,
     }
     return render(request, 'sales/add_sale.html', context)

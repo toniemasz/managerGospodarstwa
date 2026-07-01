@@ -1,6 +1,18 @@
 def _interface_scale(settings):
-    scale = getattr(settings, "interface_scale", "compact") or "compact"
-    return scale if scale in {"compact", "comfortable", "large"} else "compact"
+    scale = getattr(settings, "interface_scale", "standard") or "standard"
+    if scale == "large":
+        return "comfortable"
+    return scale if scale in {"compact", "standard", "comfortable"} else "standard"
+
+
+def _theme(settings):
+    theme = getattr(settings, "theme", "light") or "light"
+    return theme if theme in {"light", "dark", "system"} else "light"
+
+
+def _font_scale(settings):
+    scale = getattr(settings, "font_scale", "100") or "100"
+    return scale if scale in {"100", "110", "125", "150", "175", "200"} else "100"
 
 
 def _topbar_notifications(farm):
@@ -34,7 +46,10 @@ def current_farm(request):
         'current_farm': farm,
         'ui_modules': [],
         'ui_visible_module_keys': [],
-        'ui_interface_scale': 'compact',
+        'ui_interface_scale': 'standard',
+        'ui_theme': 'light',
+        'ui_font_scale': '100',
+        'ui_font_scale_ratio': '1',
         'ui_notifications': [],
         'ui_notification_count': 0,
         'ui_notification_more_count': 0,
@@ -54,6 +69,9 @@ def current_farm(request):
         context['ui_mobile_modules'] = service.mobile_modules(modules)
         context['ui_visible_module_keys'] = service.visible_keys()
         context['ui_interface_scale'] = _interface_scale(settings)
+        context['ui_theme'] = _theme(settings)
+        context['ui_font_scale'] = _font_scale(settings)
+        context['ui_font_scale_ratio'] = str(int(context['ui_font_scale']) / 100).rstrip('0').rstrip('.')
         context['ui_notifications'] = notifications
         context['ui_notification_count'] = notification_count
         context['ui_notification_more_count'] = max(0, notification_count - len(notifications))

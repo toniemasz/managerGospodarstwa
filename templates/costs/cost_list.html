@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load l10n %}
+{% load ui_format %}
 {% block title %}Koszty{% endblock %}
 {% block content %}
 <main class="app-page">
@@ -19,9 +20,9 @@
     {% include 'components/filter_panel.html' with filter_action=cost_filter_url filter_clear_url=cost_filter_url filter_fields_template='costs/_filters.html' %}
 
     <section class="stats-grid">
-        <div class="stat-tile"><span>Łączne koszty</span><strong>{{ summary.total|floatformat:2 }} zł</strong></div>
-        <div class="stat-tile"><span>Opłacone</span><strong>{{ summary.paid|floatformat:2 }} zł</strong></div>
-        <div class="stat-tile"><span>Nieopłacone</span><strong>{{ summary.unpaid|floatformat:2 }} zł</strong></div>
+        <div class="stat-tile"><span>Łączne koszty</span><strong>{{ summary.total|smart_unit:"zł" }}</strong></div>
+        <div class="stat-tile"><span>Opłacone</span><strong>{{ summary.paid|smart_unit:"zł" }}</strong></div>
+        <div class="stat-tile"><span>Nieopłacone</span><strong>{{ summary.unpaid|smart_unit:"zł" }}</strong></div>
         <div class="stat-tile"><span>Liczba wpisów</span><strong>{{ summary.count }}</strong></div>
         <div class="stat-tile"><span>Największa kategoria</span><strong>{% if summary.largest_category %}{{ summary.largest_category.category__name|default:'Bez kategorii' }}{% else %}—{% endif %}</strong></div>
     </section>
@@ -41,7 +42,7 @@
                         <td data-label="Dokument">{{ cost.document_number|default:'—' }}</td>
                         <td data-label="Dostawca">{{ cost.supplier|default:'—' }}</td>
                         <td data-label="Status"><span class="status-pill {% if cost.is_paid %}status-green{% else %}status-amber{% endif %}">{% if cost.is_paid %}Opłacony{% else %}Nieopłacony{% endif %}</span></td>
-                        <td data-label="Kwota" class="text-right"><strong>{{ cost.amount|floatformat:2 }} zł</strong></td>
+                        <td data-label="Kwota" class="text-right"><strong>{{ cost.amount|smart_unit:"zł" }}</strong></td>
                         <td data-label="Akcje" class="text-right"><a href="{% url 'edit_cost' cost.id %}" class="table-link">Edytuj</a></td>
                     </tr>
                     {% endfor %}
