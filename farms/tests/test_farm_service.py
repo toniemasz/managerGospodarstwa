@@ -116,7 +116,7 @@ def test_get_farm_settings_creates_default_settings():
     assert settings.nav_modules == ["tasks", "sows", "feed", "sales"]
     assert settings.interface_scale == "standard"
     assert settings.theme == "light"
-    assert settings.font_scale == "100"
+    assert settings.font_scale == 100
     assert FarmSettingsModel.objects.filter(farm=farm).count() == 1
 
 
@@ -130,7 +130,7 @@ def test_farm_settings_view_updates_farm_and_rules(client):
         'farm_name': 'Nowa nazwa gospodarstwa',
         'interface_scale': 'compact',
         'theme': 'dark',
-        'font_scale': '150',
+        'font_scale': '137',
         'pregnancy_check_after_days': '28',
         'gestation_days': '115',
         'farrowing_alert_days_ahead': '5',
@@ -148,4 +148,4 @@ def test_farm_settings_view_updates_farm_and_rules(client):
     assert settings.farrowing_alert_days_ahead == 5
     assert settings.interface_scale == 'compact'
     assert settings.theme == 'dark'
-    assert settings.font_scale == '150'
+    assert settings.font_scale == 137

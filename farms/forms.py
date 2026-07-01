@@ -39,7 +39,13 @@ class FarmSettingsForm(forms.ModelForm):
         widgets = {
             'interface_scale': forms.RadioSelect(),
             'theme': forms.RadioSelect(),
-            'font_scale': forms.RadioSelect(),
+            'font_scale': forms.NumberInput(attrs={
+                'min': 20,
+                'max': 200,
+                'step': 1,
+                'inputmode': 'numeric',
+                'data-font-scale-number': 'true',
+            }),
         }
 
     def __init__(self, *args, farm=None, **kwargs):

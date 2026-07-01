@@ -15,7 +15,7 @@ table,
     border-collapse: separate;
     border-spacing: 0;
     color: var(--text);
-    font-size: .875rem;
+    font-size: var(--table-font-size);
 }
 
 .table-panel {
@@ -48,7 +48,7 @@ th {
     border-bottom: 1px solid var(--border);
     padding: var(--table-cell-padding-y) var(--table-cell-padding-x);
     color: var(--muted);
-    font-size: .72rem;
+    font-size: var(--status-font-size);
     font-weight: 950;
     letter-spacing: .08em;
     text-align: left;
@@ -83,7 +83,7 @@ tbody tr:last-child td {
 
 .table-link {
     display: inline-flex;
-    min-height: 2.25rem;
+    min-height: calc(var(--button-height) - .3rem);
     align-items: center;
     justify-content: center;
     border-radius: var(--radius);
@@ -91,7 +91,7 @@ tbody tr:last-child td {
     background: var(--primary-soft);
     padding: .45rem .65rem;
     color: var(--primary-dark);
-    font-size: .8rem;
+    font-size: var(--small-font-size);
     font-weight: 900;
 }
 
@@ -142,7 +142,7 @@ tbody tr:last-child td {
 
 .link-button-danger {
     display: inline-flex;
-    min-height: 2.25rem;
+    min-height: calc(var(--button-height) - .3rem);
     align-items: center;
     justify-content: center;
     border: 0;
@@ -150,7 +150,7 @@ tbody tr:last-child td {
     background: var(--danger-soft);
     padding: .45rem .65rem;
     color: var(--danger);
-    font-size: .8rem;
+    font-size: var(--small-font-size);
     font-weight: 900;
 }
 
@@ -160,7 +160,7 @@ tbody tr:last-child td {
 
 .muted-small {
     color: var(--muted);
-    font-size: .8rem;
+    font-size: var(--small-font-size);
     font-weight: 750;
 }
 

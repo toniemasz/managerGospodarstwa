@@ -74,7 +74,7 @@ textarea {
     background: var(--surface);
     color: var(--text);
     padding: .55rem .75rem;
-    font-size: .92rem;
+    font-size: var(--control-font-size);
     font-weight: 650;
     outline: none;
     transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
@@ -503,7 +503,7 @@ input[type="date"] {
 }
 
 .form-section-heading h2 {
-    font-size: 1rem;
+    font-size: var(--section-heading-size);
     font-weight: 950;
 }
 

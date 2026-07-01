@@ -10,7 +10,7 @@
     border-radius: var(--radius);
     padding: .55rem .9rem;
     color: inherit;
-    font-size: .875rem;
+    font-size: var(--button-font-size);
     font-weight: 850;
     line-height: 1;
     text-align: center;
@@ -22,9 +22,9 @@
 }
 
 .button-small {
-    min-height: 2.35rem;
+    min-height: calc(var(--button-height) - .35rem);
     padding: .5rem .75rem;
-    font-size: .8rem;
+    font-size: var(--small-font-size);
 }
 
 .button-primary {
