@@ -167,6 +167,65 @@
     <section class="panel table-panel">
         <div class="section-heading">
             <div>
+                <h2>Historia zmian receptury</h2>
+                <p>Wersje zapisują skład używany przez konkretne śrutowania. Zwykła edycja nie zmienia historii FIFO.</p>
+            </div>
+        </div>
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Wersja</th>
+                        <th>Okres</th>
+                        <th>Skład</th>
+                        <th class="text-right">Śrutowania</th>
+                        <th>Status</th>
+                        <th class="text-right">Akcje</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for version in recipe_versions %}
+                    <tr>
+                        <td><strong>v{{ version.version_number }}</strong></td>
+                        <td>
+                            {{ version.valid_from|date:"d.m.Y H:i" }}
+                            -
+                            {% if version.valid_to %}{{ version.valid_to|date:"d.m.Y H:i" }}{% else %}teraz{% endif %}
+                        </td>
+                        <td>
+                            {% for item in version.items.all %}
+                                <span class="status-pill">{{ item.ingredient.name }} {{ item.percentage|floatformat:2 }}%</span>
+                            {% empty %}
+                                <span class="muted-small">Brak pozycji w wersji.</span>
+                            {% endfor %}
+                        </td>
+                        <td class="text-right">{{ version.production_count }}</td>
+                        <td>
+                            {% if version.is_current %}
+                                <span class="status-pill status-green">Aktualna</span>
+                            {% else %}
+                                <span class="status-pill">Historyczna</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-right">
+                            <a href="{% url 'recipe_version_detail' recipe.id version.id %}" class="table-link">Podgląd</a>
+                            <a href="{% url 'edit_recipe_version' recipe.id version.id %}" class="table-link">Edytuj wersję</a>
+                            <a href="{% url 'add_recipe_version' recipe.id version.id %}" class="table-link">Utwórz nową wersję</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="empty-table">Brak zapisanych wersji receptury.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="panel table-panel">
+        <div class="section-heading">
+            <div>
                 <h2>Ostatnie śrutowania</h2>
                 <p>Historia operacji dla tej receptury.</p>
             </div>
@@ -176,6 +235,7 @@
                 <thead>
                     <tr>
                         <th>Data</th>
+                        <th>Wersja</th>
                         <th class="text-right">Ilość</th>
                         <th class="text-right">Koszt FIFO</th>
                         <th>Status</th>
@@ -187,6 +247,13 @@
                     {% for production in productions %}
                     <tr>
                         <td>{{ production.date|date:"d.m.Y" }}{% if production.time %}, {{ production.time|time:"H:i" }}{% endif %}</td>
+                        <td>
+                            {% if production.recipe_version %}
+                                v{{ production.recipe_version.version_number }}
+                            {% else %}
+                                <span class="muted-small">--</span>
+                            {% endif %}
+                        </td>
                         <td class="text-right"><strong>{{ production.quantity_kg|feed_quantity }}</strong></td>
                         <td class="text-right">
                             {% if production.status == 'COMPLETED' %}
@@ -206,7 +273,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="empty-table">Brak śrutowań dla tej receptury.</td>
+                        <td colspan="7" class="empty-table">Brak śrutowań dla tej receptury.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

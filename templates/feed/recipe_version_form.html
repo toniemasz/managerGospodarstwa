@@ -1,0 +1,131 @@
+{% extends 'base.html' %}
+{% block title %}{% if is_edit %}Edycja wersji receptury{% else %}Nowa wersja receptury{% endif %}{% endblock %}
+
+{% block content %}
+<main class="app-page app-page-narrow">
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Receptura</p>
+            <h1>
+                {% if is_edit %}
+                    Edycja {{ recipe.name }} v{{ version.version_number }}
+                {% else %}
+                    Nowa wersja {{ recipe.name }}
+                {% endif %}
+            </h1>
+            <p class="page-subtitle">
+                {% if is_edit %}
+                    Zmieniasz istniejącą wersję receptury.
+                {% else %}
+                    Tworzysz nową wersję na przyszłość na podstawie v{{ source_version.version_number }}.
+                {% endif %}
+            </p>
+        </div>
+        <a href="{% url 'recipe_detail' recipe.id %}" class="button button-secondary">Wróć do receptury</a>
+    </section>
+
+    <section class="panel">
+        {% if formset.non_form_errors %}
+        <div class="alert alert-error">
+            <strong>Błąd weryfikacji wersji:</strong>
+            {{ formset.non_form_errors }}
+        </div>
+        {% endif %}
+
+        {% if is_edit %}
+        <div class="message warning">
+            Uwaga: edytujesz istniejącą wersję receptury. Po zapisaniu zmian wszystkie zakończone śrutowania przypisane do tej wersji zostaną przeliczone według nowych danych tej wersji. Jeśli chcesz zmienić recepturę tylko na przyszłość, utwórz nową wersję zamiast edytować istniejącą.
+        </div>
+        {% endif %}
+
+        {% if custom_recipe_count %}
+        <div class="notice">
+            {{ custom_recipe_count }} zakończonych śrutowań tej wersji ma jednorazowe zmiany składu. Zostaną zachowane i uwzględnione przy przeliczeniu.
+        </div>
+        {% endif %}
+
+        <form method="post" class="responsive-form" id="recipe-form">
+            {% csrf_token %}
+
+            <div class="section-divider">
+                <div>
+                    <h2>Skład wersji</h2>
+                    <p>Składniki muszą sumować się do 100%.</p>
+                </div>
+                <button type="button" id="add-ingredient-btn" class="button button-secondary">Dodaj składnik</button>
+            </div>
+
+            <div id="recipe-percentage-summary" class="notice recipe-percentage-summary" role="status" aria-live="polite">
+                <span>Suma udziałów</span>
+                <strong><span id="recipe-percentage-total">0,00</span>% / 100%</strong>
+            </div>
+
+            {{ formset.management_form }}
+
+            <div id="ingredient-forms-container" class="ingredient-form-list">
+                {% for f in formset %}
+                <div class="ingredient-row-card{% if f.DELETE.value %} hidden{% endif %}">
+                    {{ f.id }}
+                    <div class="ingredient-row-fields">
+                        <div class="form-field">
+                            <label for="{{ f.ingredient.id_for_label }}">Składnik</label>
+                            {{ f.ingredient }}
+                            {{ f.ingredient.errors }}
+                        </div>
+                        <div class="form-field">
+                            <label for="{{ f.percentage.id_for_label }}">Udział (%)</label>
+                            {{ f.percentage }}
+                            {{ f.percentage.errors }}
+                        </div>
+                        <div class="form-actions">
+                            <span class="hidden">{{ f.DELETE }}</span>
+                            <button type="button" class="link-button-danger remove-row-btn">Usuń</button>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <p id="ingredient-forms-empty" class="empty-inline" hidden>Brak składników. Dodaj pierwszą pozycję wersji.</p>
+
+            <template id="empty-form-template">
+                <div class="ingredient-row-card">
+                    {{ formset.empty_form.id }}
+                    <div class="ingredient-row-fields">
+                        <div class="form-field">
+                            <label for="{{ formset.empty_form.ingredient.id_for_label }}">Składnik</label>
+                            {{ formset.empty_form.ingredient }}
+                        </div>
+                        <div class="form-field">
+                            <label for="{{ formset.empty_form.percentage.id_for_label }}">Udział (%)</label>
+                            {{ formset.empty_form.percentage }}
+                        </div>
+                        <div class="form-actions">
+                            <span class="hidden">{{ formset.empty_form.DELETE }}</span>
+                            <button type="button" class="link-button-danger remove-row-btn">Usuń</button>
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+            {% if requires_confirmation %}
+            <div class="form-field">
+                <label>
+                    <input type="checkbox" name="confirm_recalculate" value="on">
+                    Rozumiem, że zapis przeliczy śrutowania przypisane do tej wersji.
+                </label>
+                <p class="field-hint">
+                    Do wersji przypisano {{ assigned_production_count }} śrutowań, w tym {{ completed_production_count }} zakończonych.
+                </p>
+            </div>
+            {% endif %}
+
+            <div class="form-actions">
+                <a href="{% url 'recipe_detail' recipe.id %}" class="button button-secondary">Anuluj</a>
+                <button type="submit" class="button button-primary">
+                    {% if is_edit %}Zapisz wersję{% else %}Utwórz nową wersję{% endif %}
+                </button>
+            </div>
+        </form>
+    </section>
+</main>
+{% endblock %}

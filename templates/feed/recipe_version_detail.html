@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% load feed_format %}
+{% block title %}Podgląd wersji receptury{% endblock %}
+
+{% block content %}
+<main class="app-page">
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Wersja receptury</p>
+            <h1>{{ recipe.name }} v{{ version.version_number }}</h1>
+            <p class="page-subtitle">Skład wersji i śrutowania przypisane do tej konkretnej wersji.</p>
+        </div>
+        <div class="header-actions">
+            <a href="{% url 'edit_recipe_version' recipe.id version.id %}" class="button button-primary">Edytuj wersję</a>
+            <a href="{% url 'add_recipe_version' recipe.id version.id %}" class="button button-secondary">Utwórz nową wersję</a>
+            <a href="{% url 'recipe_detail' recipe.id %}" class="button button-secondary">Wróć</a>
+        </div>
+    </section>
+
+    <section class="stats-grid">
+        <div class="stat-tile">
+            <span>Status</span>
+            <strong>{% if version.is_current %}Aktualna{% else %}Historyczna{% endif %}</strong>
+        </div>
+        <div class="stat-tile">
+            <span>Śrutowania</span>
+            <strong>{{ production_count }}</strong>
+        </div>
+        <div class="stat-tile">
+            <span>Zakończone</span>
+            <strong>{{ completed_count }}</strong>
+        </div>
+    </section>
+
+    <section class="panel table-panel">
+        <div class="section-heading">
+            <div>
+                <h2>Skład wersji</h2>
+                <p>Procentowy skład zapisany w tej wersji receptury.</p>
+            </div>
+        </div>
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Składnik</th>
+                        <th class="text-right">Udział</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in version.items.all %}
+                    <tr>
+                        <td><strong>{{ item.ingredient.name }}</strong></td>
+                        <td class="text-right">{{ item.percentage|floatformat:2 }}%</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="2" class="empty-table">Brak składników w tej wersji.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="panel table-panel">
+        <div class="section-heading">
+            <div>
+                <h2>Śrutowania tej wersji</h2>
+                <p>Lista produkcji przypisanych do {{ recipe.name }} v{{ version.version_number }}.</p>
+            </div>
+        </div>
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th class="text-right">Ilość</th>
+                        <th class="text-right">Koszt FIFO</th>
+                        <th>Status</th>
+                        <th class="text-right">Akcje</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for production in productions %}
+                    <tr>
+                        <td>{{ production.date|date:"d.m.Y" }}{% if production.time %}, {{ production.time|time:"H:i" }}{% endif %}</td>
+                        <td class="text-right"><strong>{{ production.quantity_kg|feed_quantity }}</strong></td>
+                        <td class="text-right">
+                            {% if production.status == 'COMPLETED' %}
+                                <strong>{{ production.feed_cost_total|floatformat:2 }}</strong> zł
+                                {% if production.feed_cost_is_partial %}
+                                    <br><span class="status-pill status-amber">Częściowy</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="muted-small">--</span>
+                            {% endif %}
+                        </td>
+                        <td><span class="status-pill">{{ production.status_label }}</span></td>
+                        <td class="text-right">
+                            <a href="{% url 'edit_production' production.id %}" class="table-link">Edytuj</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="empty-table">Brak śrutowań przypisanych do tej wersji.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+{% endblock %}

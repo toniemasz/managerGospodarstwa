@@ -16,6 +16,7 @@ from feed.models import (
     ProductionModel,
 )
 from feed.services.feed_calculators import IngredientRequirement, ProductionCalculator
+from feed.services.recipe_requirements import recipe_item_dicts_for_production
 
 
 KG_QUANT = Decimal("0.01")
@@ -127,18 +128,9 @@ class InventoryMovementService:
 
     @staticmethod
     def _production_requirements(production: ProductionModel):
-        items = [
-            {
-                "ingredient_id": item.ingredient_id,
-                "name": item.ingredient.name,
-                "is_in_bin": item.ingredient.is_in_bin,
-                "percentage": item.percentage,
-            }
-            for item in production.recipe.items.select_related("ingredient")
-        ]
         return ProductionCalculator(
             quantity_kg=production.quantity_kg,
-            base_recipe_items=items,
+            base_recipe_items=recipe_item_dicts_for_production(production),
             custom_recipe_data=production.custom_recipe_data,
         ).get_requirements()
 
@@ -218,8 +210,8 @@ class InventoryMovementService:
     ) -> int:
         production = (
             ProductionModel.objects.select_for_update()
-            .select_related("recipe")
-            .prefetch_related("recipe__items__ingredient")
+            .select_related("recipe", "recipe_version")
+            .prefetch_related("recipe__items__ingredient", "recipe_version__items__ingredient")
             .get(pk=production.pk)
         )
         farm = self.farm or production.recipe.farm
@@ -395,7 +387,10 @@ class InventoryMovementService:
         productions = ProductionModel.objects.filter(
             recipe__farm=self.farm,
             status=ProductionModel.Statuses.COMPLETED,
-        ).select_related("recipe").prefetch_related("recipe__items__ingredient").order_by("date", "time", "id")
+        ).select_related("recipe", "recipe_version").prefetch_related(
+            "recipe__items__ingredient",
+            "recipe_version__items__ingredient",
+        ).order_by("date", "time", "id")
         production_ids = [str(pk) for pk in productions.values_list("pk", flat=True)]
         for production in productions:
             try:

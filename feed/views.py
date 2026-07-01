@@ -15,6 +15,7 @@ from .forms import (
     ProductionForm,
     RecipeForm,
     RecipeItemFormSet,
+    recipe_version_item_formset_factory,
 )
 from .services.feed_management_service import FeedManagementService
 from .services.feed_repository import FeedRepository
@@ -23,7 +24,8 @@ from farms.services.date_range import PERIOD_OPTIONS, parse_date_range
 from farms.services.filter_ui import filter_ui_state, parse_filter_date
 from farms.services.audit_log_service import log_action
 from feed.services.inventory_service import InventoryMovementService
-from feed.models import InventoryMovementModel
+from feed.models import InventoryMovementModel, RecipeVersionModel
+from feed.use_cases.edit_recipe_create_version import RecipeVersionService
 
 
 # --- SKŁADNIKI ---
@@ -230,11 +232,16 @@ def add_recipe_view(request):
         recipe.farm = farm
         formset = RecipeItemFormSet(request.POST, instance=recipe, form_kwargs={'farm': farm})
         if form.is_valid() and formset.is_valid():
-            recipe = form.save(commit=False)
-            recipe.farm = farm
-            recipe.save()
-            formset.instance = recipe
-            formset.save()
+            with transaction.atomic():
+                recipe = form.save(commit=False)
+                recipe.farm = farm
+                recipe.save()
+                formset.instance = recipe
+                formset.save()
+                RecipeVersionService(farm=farm, user=request.user).ensure_current_version(
+                    recipe,
+                    change_note='Utworzenie receptury',
+                )
             log_action(farm=farm, user=request.user, action="CREATE", obj=recipe)
             messages.success(request, "Receptura została utworzona.")
             return redirect('feed_recipes')
@@ -252,10 +259,21 @@ def edit_recipe_view(request, pk):
         form = RecipeForm(request.POST, instance=recipe, farm=farm)
         formset = RecipeItemFormSet(request.POST, instance=recipe, form_kwargs={'farm': farm})
         if form.is_valid() and formset.is_valid():
-            form.save()
-            formset.save()
+            with transaction.atomic():
+                recipe = form.save()
+                formset.save()
+                _, version_created = RecipeVersionService(farm=farm, user=request.user).ensure_current_version(
+                    recipe,
+                    change_note='Edycja receptury',
+                )
             log_action(farm=farm, user=request.user, action="UPDATE", obj=recipe)
-            messages.success(request, "Receptura zaktualizowana.")
+            if version_created:
+                messages.success(
+                    request,
+                    "Zapisano nową wersję receptury. Wcześniejsze śrutowania nie zostały zmienione.",
+                )
+            else:
+                messages.success(request, "Receptura zaktualizowana.")
             return redirect('feed_recipes')
     else:
         form = RecipeForm(instance=recipe, farm=farm)
@@ -277,6 +295,158 @@ def delete_recipe_view(request, pk):
         except (ProtectedError, RestrictedError):
             messages.error(request, "Nie można usunąć receptury, ponieważ zrealizowano z jej użyciem śrutowanie.")
     return redirect('feed_recipes')
+
+
+def _recipe_version_items_from_formset(formset):
+    items = []
+    for form in formset.forms:
+        if not form.cleaned_data:
+            continue
+        if formset.can_delete and form.cleaned_data.get('DELETE'):
+            continue
+        ingredient = form.cleaned_data.get('ingredient')
+        percentage = form.cleaned_data.get('percentage')
+        if ingredient is None or percentage is None:
+            continue
+        items.append({
+            'ingredient': ingredient,
+            'percentage': percentage,
+        })
+    return items
+
+
+def _get_recipe_version_for_farm(farm, recipe_pk, version_pk):
+    return get_object_or_404(
+        RecipeVersionModel.objects
+        .select_related('recipe')
+        .prefetch_related('items__ingredient'),
+        pk=version_pk,
+        recipe_id=recipe_pk,
+        recipe__farm=farm,
+    )
+
+
+@login_required
+def recipe_version_detail_view(request, pk, version_pk):
+    farm = get_current_farm(request)
+    version = _get_recipe_version_for_farm(farm, pk, version_pk)
+    productions = (
+        ProductionModel.objects
+        .filter(recipe_version=version, recipe__farm=farm)
+        .order_by('-date', '-time', '-id')
+    )
+    return render(request, 'feed/recipe_version_detail.html', {
+        'recipe': version.recipe,
+        'version': version,
+        'productions': productions[:50],
+        'production_count': productions.count(),
+        'completed_count': productions.filter(status=ProductionModel.Statuses.COMPLETED).count(),
+    })
+
+
+@login_required
+def add_recipe_version_view(request, pk, version_pk):
+    farm = get_current_farm(request)
+    source_version = _get_recipe_version_for_farm(farm, pk, version_pk)
+    recipe = source_version.recipe
+    initial_items = [
+        {'ingredient': item.ingredient, 'percentage': item.percentage}
+        for item in source_version.items.select_related('ingredient').order_by('ingredient__name', 'id')
+    ]
+    extra = max(len(initial_items), 1)
+    VersionItemFormSet = recipe_version_item_formset_factory(extra=extra if request.method != 'POST' else 0)
+    version = RecipeVersionModel(recipe=recipe)
+
+    if request.method == 'POST':
+        formset = VersionItemFormSet(request.POST, instance=version, form_kwargs={'farm': farm})
+        if formset.is_valid():
+            try:
+                new_version = RecipeVersionService(farm=farm, user=request.user).create_new_version(
+                    recipe=recipe,
+                    source_version=source_version,
+                    items=_recipe_version_items_from_formset(formset),
+                    change_note=f"Nowa wersja na podstawie v{source_version.version_number}",
+                )
+            except ValidationError as error:
+                messages.error(request, error.messages[0])
+            else:
+                messages.success(
+                    request,
+                    f"Utworzono nową wersję v{new_version.version_number}. Wcześniejsze śrutowania nie zostały zmienione.",
+                )
+                return redirect('recipe_detail', pk=recipe.pk)
+    else:
+        formset = VersionItemFormSet(
+            instance=version,
+            initial=initial_items,
+            form_kwargs={'farm': farm},
+        )
+
+    return render(request, 'feed/recipe_version_form.html', {
+        'recipe': recipe,
+        'version': None,
+        'source_version': source_version,
+        'formset': formset,
+        'is_edit': False,
+        'requires_confirmation': False,
+        'assigned_production_count': 0,
+        'completed_production_count': 0,
+        'custom_recipe_count': 0,
+    })
+
+
+@login_required
+def edit_recipe_version_view(request, pk, version_pk):
+    farm = get_current_farm(request)
+    version = _get_recipe_version_for_farm(farm, pk, version_pk)
+    assigned_productions = ProductionModel.objects.filter(recipe_version=version, recipe__farm=farm)
+    assigned_production_count = assigned_productions.count()
+    completed_production_count = assigned_productions.filter(status=ProductionModel.Statuses.COMPLETED).count()
+    custom_recipe_count = assigned_productions.filter(
+        status=ProductionModel.Statuses.COMPLETED,
+        custom_recipe_data__isnull=False,
+    ).count()
+    VersionItemFormSet = recipe_version_item_formset_factory(extra=0)
+
+    if request.method == 'POST':
+        formset = VersionItemFormSet(request.POST, instance=version, form_kwargs={'farm': farm})
+        if formset.is_valid():
+            try:
+                result = RecipeVersionService(farm=farm, user=request.user).update_existing_version(
+                    version=version,
+                    items=_recipe_version_items_from_formset(formset),
+                    confirm_recalculate=request.POST.get('confirm_recalculate') == 'on',
+                )
+            except ValidationError as error:
+                messages.error(request, error.messages[0])
+            else:
+                messages.success(
+                    request,
+                    (
+                        f"Zapisano wersję v{version.version_number}. "
+                        f"Przeliczono {result.completed_count} zakończonych śrutowań tej wersji."
+                    ),
+                )
+                if result.custom_recipe_count:
+                    messages.warning(
+                        request,
+                        "Część przeliczonych produkcji ma jednorazowe zmiany składu. Zostały zachowane i uwzględnione.",
+                    )
+                return redirect('recipe_detail', pk=version.recipe_id)
+    else:
+        formset = VersionItemFormSet(instance=version, form_kwargs={'farm': farm})
+
+    return render(request, 'feed/recipe_version_form.html', {
+        'recipe': version.recipe,
+        'version': version,
+        'source_version': None,
+        'formset': formset,
+        'is_edit': True,
+        'requires_confirmation': assigned_production_count > 0,
+        'assigned_production_count': assigned_production_count,
+        'completed_production_count': completed_production_count,
+        'custom_recipe_count': custom_recipe_count,
+    })
 
 
 @login_required

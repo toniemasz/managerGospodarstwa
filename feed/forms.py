@@ -4,8 +4,9 @@ from django.db.models import Sum
 from django.forms import inlineformset_factory
 from django.forms.formsets import DELETION_FIELD_NAME
 from .models import IngredientModel, RecipeModel, RecipeItemModel, DeliveryModel, ProductionModel, \
-    IngredientPriceConfigModel, ProductionIngredientUsageModel
+    IngredientPriceConfigModel, ProductionIngredientUsageModel, RecipeVersionModel, RecipeVersionItemModel
 from feed.domain.rules import LOW_STOCK_THRESHOLD_KG
+from feed.use_cases.edit_recipe_create_version import RecipeVersionService
 
 
 FORM_FIELD_CLASS = 'form-control'
@@ -128,6 +129,64 @@ RecipeItemFormSet = inlineformset_factory(
 )
 
 
+class RecipeVersionItemForm(forms.ModelForm):
+    class Meta:
+        model = RecipeVersionItemModel
+        fields = ['ingredient', 'percentage']
+
+    def __init__(self, *args, farm=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if farm is not None:
+            self.fields['ingredient'].queryset = IngredientModel.objects.filter(farm=farm).order_by('name')
+
+
+class BaseRecipeVersionItemFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+
+        if any(self.errors):
+            return
+
+        total_percentage = Decimal('0.00')
+        ingredient_ids = set()
+
+        for form in self.forms:
+            if self.can_delete and form.cleaned_data.get(DELETION_FIELD_NAME, False):
+                continue
+
+            if not form.has_changed() and not form.cleaned_data:
+                continue
+
+            percentage = form.cleaned_data.get('percentage')
+            if percentage:
+                total_percentage += percentage
+
+            ingredient = form.cleaned_data.get('ingredient')
+            if ingredient:
+                if ingredient.pk in ingredient_ids:
+                    raise forms.ValidationError(
+                        f"Składnik {ingredient.name} został dodany do wersji więcej niż raz."
+                    )
+                ingredient_ids.add(ingredient.pk)
+
+        if total_percentage != Decimal('100.00'):
+            raise forms.ValidationError(
+                f"Suma procentowych udziałów składników musi wynosić równe 100%. "
+                f"Obecnie wynosi: {total_percentage}%."
+            )
+
+
+def recipe_version_item_formset_factory(*, extra=0):
+    return inlineformset_factory(
+        RecipeVersionModel,
+        RecipeVersionItemModel,
+        form=RecipeVersionItemForm,
+        formset=BaseRecipeVersionItemFormSet,
+        extra=extra,
+        can_delete=True,
+    )
+
+
 class DeliveryForm(forms.ModelForm):
     class Meta:
         model = DeliveryModel
@@ -225,6 +284,7 @@ class ProductionForm(forms.ModelForm):
         self.recipe_item_fields = []
         self._custom_recipe_data = None
         super().__init__(*args, **kwargs)
+        self._original_recipe_id = self.instance.recipe_id if self.instance and self.instance.pk else None
 
         if self.farm is not None:
             self.fields['recipe'].queryset = RecipeModel.objects.filter(farm=self.farm).order_by('name')
@@ -256,7 +316,7 @@ class ProductionForm(forms.ModelForm):
 
     def _add_recipe_percentage_fields(self, recipe):
         custom_data = self.instance.custom_recipe_data or {}
-        self.recipe_items = list(recipe.items.select_related('ingredient').order_by('ingredient__name'))
+        self.recipe_items = self._recipe_items_for_form(recipe)
 
         for item in self.recipe_items:
             field_name = self._field_name_for_item(item)
@@ -277,6 +337,32 @@ class ProductionForm(forms.ModelForm):
                 'base_percentage': item.percentage,
                 'field': self[field_name],
             })
+
+    def _recipe_items_for_form(self, recipe):
+        if (
+            self.instance
+            and self.instance.pk
+            and self.instance.recipe_version_id
+            and self.instance.recipe_id == recipe.pk
+        ):
+            items = list(
+                self.instance.recipe_version.items.select_related('ingredient').order_by('ingredient__name', 'id')
+            )
+            if items:
+                return items
+
+        current_version = (
+            recipe.versions
+            .filter(is_current=True)
+            .prefetch_related('items__ingredient')
+            .first()
+        )
+        if current_version is not None:
+            items = list(current_version.items.select_related('ingredient').order_by('ingredient__name', 'id'))
+            if items:
+                return items
+
+        return list(recipe.items.select_related('ingredient').order_by('ingredient__name', 'id'))
 
     def _field_name_for_item(self, item):
         return f'{self.custom_field_prefix}{item.ingredient_id}'
@@ -316,6 +402,10 @@ class ProductionForm(forms.ModelForm):
     def save(self, commit=True):
         instance = super().save(commit=False)
         instance.custom_recipe_data = self._custom_recipe_data
+        recipe_changed = self._original_recipe_id is not None and self._original_recipe_id != instance.recipe_id
+        if instance.recipe_id and (instance.pk is None or recipe_changed or instance.recipe_version_id is None):
+            version, _ = RecipeVersionService(farm=self.farm).ensure_current_version(instance.recipe)
+            instance.recipe_version = version
         if commit:
             instance.save()
         return instance

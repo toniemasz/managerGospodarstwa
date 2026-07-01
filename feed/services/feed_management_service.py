@@ -10,6 +10,7 @@ from feed.services.feed_calculators import InventoryItem, ProductionCalculator, 
 from feed.services.feed_repository import FeedRepository
 from feed.models import ProductionModel
 from feed.services.inventory_service import InventoryMovementService
+from feed.services.recipe_requirements import recipe_item_dicts_for_production
 
 
 class FeedManagementService:
@@ -20,15 +21,7 @@ class FeedManagementService:
 
     @staticmethod
     def _recipe_items_from_production(production) -> list[dict]:
-        return [
-            {
-                'ingredient_id': item.ingredient.id,
-                'name': item.ingredient.name,
-                'is_in_bin': item.ingredient.is_in_bin,
-                'percentage': item.percentage,
-            }
-            for item in production.recipe.items.all()
-        ]
+        return recipe_item_dicts_for_production(production)
 
     def _calculator_for_production(self, production) -> ProductionCalculator:
         return ProductionCalculator(
@@ -253,6 +246,12 @@ class FeedManagementService:
         ).calculate_cost()
 
         all_productions = self.repository.get_productions_for_recipe(recipe_id)
+        recipe_versions = list(
+            recipe.versions
+            .prefetch_related('items__ingredient')
+            .annotate(production_count=Count('productions'))
+            .order_by('-version_number')
+        )
         year = production_year or timezone.localdate().year
         available_years = [
             row.year for row in all_productions.filter(
@@ -312,4 +311,5 @@ class FeedManagementService:
                 'quantity_kg': yearly_quantity_kg,
                 'quantity_t': yearly_quantity_kg / Decimal('1000.00'),
             },
+            'recipe_versions': recipe_versions,
         }
