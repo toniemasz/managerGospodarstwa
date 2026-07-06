@@ -44,7 +44,7 @@ def remember_previous_production_status(sender, instance, **kwargs):
 
 
 @receiver(post_save, sender=ProductionModel)
-def sync_production_movement(sender, instance, **kwargs):
+def sync_production_movement(sender, instance, created=False, **kwargs):
     if getattr(instance, "_skip_inventory_sync", False):
         return
     service = InventoryMovementService(instance.recipe.farm)
@@ -56,7 +56,7 @@ def sync_production_movement(sender, instance, **kwargs):
             service.book_production(instance)
     elif previous_status == ProductionModel.Statuses.COMPLETED:
         service.rebuild()
-    else:
+    elif not created:
         service.release_production(instance)
 
 

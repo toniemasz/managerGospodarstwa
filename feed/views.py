@@ -1,3 +1,5 @@
+import logging
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -19,13 +21,16 @@ from .forms import (
 )
 from .services.feed_management_service import FeedManagementService
 from .services.feed_repository import FeedRepository
+from core.date_range import PERIOD_OPTIONS, parse_date_range
+from core.filter_ui import filter_ui_state, parse_filter_date
 from farms.services.current_farm import get_current_farm
-from farms.services.date_range import PERIOD_OPTIONS, parse_date_range
-from farms.services.filter_ui import filter_ui_state, parse_filter_date
 from farms.services.audit_log_service import log_action
 from feed.services.inventory_service import InventoryMovementService
 from feed.models import InventoryMovementModel, RecipeVersionModel
 from feed.use_cases.edit_recipe_create_version import RecipeVersionService
+
+
+logger = logging.getLogger(__name__)
 
 
 # --- SKŁADNIKI ---
@@ -476,12 +481,20 @@ def add_production_view(request):
         form = ProductionForm(request.POST, farm=farm)
         if form.is_valid():
             production = form.save()
-            log_action(farm=farm, user=request.user, action="CREATE", obj=production)
+            try:
+                log_action(farm=farm, user=request.user, action="CREATE", obj=production)
+            except Exception:
+                logger.exception("Nie udało się zapisać wpisu historii dla śrutowania %s", production.pk)
             if request.POST.get('instant_complete') == 'on':
                 force_inventory = request.POST.get('force_inventory') == 'on'
 
-                success, message = service.complete_production(production.id, skip_stages=True,
-                                                               force_inventory=force_inventory, user=request.user)
+                try:
+                    success, message = service.complete_production(production.id, skip_stages=True,
+                                                                   force_inventory=force_inventory, user=request.user)
+                except Exception:
+                    logger.exception("Nie udało się automatycznie zatwierdzić śrutowania %s", production.pk)
+                    success = False
+                    message = "wystąpił błąd podczas automatycznego zatwierdzania"
                 if success:
                     messages.success(request, "Śrutowanie zostało od razu zatwierdzone.")
                 else:

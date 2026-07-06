@@ -545,9 +545,19 @@ input[type="date"] {
 
 .form-disclosure > .field-hint,
 .form-disclosure > .form-grid,
+.form-disclosure > .stats-grid,
+.form-disclosure > .dashboard-stat-grid,
+.form-disclosure > .summary-list,
 .form-disclosure > .ingredient-editor {
     margin: 0;
     padding: var(--panel-padding);
+}
+
+.form-disclosure > .finance-section,
+.form-disclosure > .finance-grid,
+.form-disclosure > .chart-panel,
+.form-disclosure > .table-panel {
+    margin: var(--panel-padding);
 }
 
 .module-visibility-groups {

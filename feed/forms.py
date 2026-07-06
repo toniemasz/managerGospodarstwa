@@ -84,7 +84,9 @@ class RecipeItemForm(forms.ModelForm):
             self.fields['ingredient'].queryset = IngredientModel.objects.filter(farm=farm).order_by('name')
 
 
-class BaseRecipeItemFormSet(forms.BaseInlineFormSet):
+class BaseIngredientPercentageFormSet(forms.BaseInlineFormSet):
+    duplicate_context = "receptury"
+
     def clean(self):
         super().clean()
 
@@ -95,7 +97,6 @@ class BaseRecipeItemFormSet(forms.BaseInlineFormSet):
         ingredient_ids = set()
 
         for form in self.forms:
-            # Weryfikacja usunięcia oparta o stałą frameworka
             if self.can_delete and form.cleaned_data.get(DELETION_FIELD_NAME, False):
                 continue
 
@@ -110,7 +111,7 @@ class BaseRecipeItemFormSet(forms.BaseInlineFormSet):
             if ingredient:
                 if ingredient.pk in ingredient_ids:
                     raise forms.ValidationError(
-                        f"Składnik {ingredient.name} został dodany do receptury więcej niż raz."
+                        f"Składnik {ingredient.name} został dodany do {self.duplicate_context} więcej niż raz."
                     )
                 ingredient_ids.add(ingredient.pk)
 
@@ -119,6 +120,10 @@ class BaseRecipeItemFormSet(forms.BaseInlineFormSet):
                 f"Suma procentowych udziałów składników musi wynosić równe 100%. "
                 f"Obecnie wynosi: {total_percentage}%."
             )
+
+
+class BaseRecipeItemFormSet(BaseIngredientPercentageFormSet):
+    duplicate_context = "receptury"
 
 
 RecipeItemFormSet = inlineformset_factory(
@@ -140,40 +145,8 @@ class RecipeVersionItemForm(forms.ModelForm):
             self.fields['ingredient'].queryset = IngredientModel.objects.filter(farm=farm).order_by('name')
 
 
-class BaseRecipeVersionItemFormSet(forms.BaseInlineFormSet):
-    def clean(self):
-        super().clean()
-
-        if any(self.errors):
-            return
-
-        total_percentage = Decimal('0.00')
-        ingredient_ids = set()
-
-        for form in self.forms:
-            if self.can_delete and form.cleaned_data.get(DELETION_FIELD_NAME, False):
-                continue
-
-            if not form.has_changed() and not form.cleaned_data:
-                continue
-
-            percentage = form.cleaned_data.get('percentage')
-            if percentage:
-                total_percentage += percentage
-
-            ingredient = form.cleaned_data.get('ingredient')
-            if ingredient:
-                if ingredient.pk in ingredient_ids:
-                    raise forms.ValidationError(
-                        f"Składnik {ingredient.name} został dodany do wersji więcej niż raz."
-                    )
-                ingredient_ids.add(ingredient.pk)
-
-        if total_percentage != Decimal('100.00'):
-            raise forms.ValidationError(
-                f"Suma procentowych udziałów składników musi wynosić równe 100%. "
-                f"Obecnie wynosi: {total_percentage}%."
-            )
+class BaseRecipeVersionItemFormSet(BaseIngredientPercentageFormSet):
+    duplicate_context = "wersji"
 
 
 def recipe_version_item_formset_factory(*, extra=0):

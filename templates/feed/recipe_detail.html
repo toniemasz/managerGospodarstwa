@@ -13,6 +13,7 @@
         </div>
         <div class="header-actions">
             <a href="{% url 'add_production' %}?recipe={{ recipe.id }}" class="button button-primary">Zleć śrutowanie</a>
+            <a href="{% url 'farm_statistics' %}?year={{ yearly_production.year|unlocalize }}" class="button button-secondary">Statystyki</a>
             <a href="{% url 'edit_recipe' recipe.id %}" class="button button-secondary">Edytuj</a>
             <a href="{% url 'feed_recipes' %}" class="button button-secondary">Wróć</a>
         </div>
@@ -124,13 +125,8 @@
         </div>
         </div>
 
-        <aside class="panel panel-tint recipe-detail-side">
-            <div class="section-heading">
-                <div>
-                    <h2>Statystyki</h2>
-                    <p>Podsumowanie wszystkich śrutowań tej receptury.</p>
-                </div>
-            </div>
+        <details class="form-disclosure panel-tint recipe-detail-side">
+            <summary>Statystyki receptury <small>podsumowanie wszystkich śrutowań tej receptury</small></summary>
             <dl class="summary-list is-carded">
                 <div>
                     <dt>Wszystkie zlecenia</dt>
@@ -161,7 +157,7 @@
                     <dd>{{ stats.in_progress_count }} / {{ stats.in_progress_kg|feed_quantity }}</dd>
                 </div>
             </dl>
-        </aside>
+        </details>
     </section>
 
     <section class="panel table-panel">

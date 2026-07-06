@@ -10,10 +10,10 @@ from .forms import PigSaleForm, SaleClassRowFormSet
 from .models import PigSaleModel
 from .services.sale_dashboard_service import SaleDashboardService
 from .services.sale_form_service import SaleFormService
+from core.filter_ui import filter_ui_state
 from farms.services.current_farm import get_current_farm
 from farms.services.accounting_year import get_available_years, parse_accounting_year
 from farms.services.audit_log_service import log_action
-from farms.services.filter_ui import filter_ui_state
 
 logger = logging.getLogger(__name__)
 

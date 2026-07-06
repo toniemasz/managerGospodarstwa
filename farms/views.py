@@ -12,11 +12,11 @@ from farms.services.data_backup import BackupImportError, build_user_backup, imp
 from farms.services.settings_service import get_farm_settings
 from farms.services.task_center import TaskCenterService
 from farms.services.profitability import ProfitabilityAnalyticsService
-from farms.services.date_range import PERIOD_OPTIONS, parse_date_range
+from farms.services.statistics import FarmStatisticsService
 from farms.services.accounting_year import get_available_years, parse_accounting_year
 from farms.services.module_navigation import module_visibility_groups
 from farms.services.farm_dashboard import dashboard_stat_groups
-from farms.services.filter_ui import filter_ui_state, parse_filter_date
+from core.filter_ui import filter_ui_state, parse_filter_date
 from farms.services.global_search import build_global_search_context
 
 
@@ -142,6 +142,23 @@ def profitability_view(request):
     })
     context.update(filter_ui_state(request.GET, {'year': 'Rok'}))
     return render(request, "farms/profitability.html", context)
+
+
+@login_required
+def statistics_view(request):
+    farm = get_current_farm(request)
+    accounting_year = parse_accounting_year(request.GET)
+    context = FarmStatisticsService(farm).calculate(
+        date_from=accounting_year.date_from,
+        date_to=accounting_year.date_to,
+    )
+    context.update({
+        "selected_year": accounting_year.year,
+        "available_years": get_available_years(farm),
+        "statistic_links": FarmStatisticsService.statistic_links(),
+    })
+    context.update(filter_ui_state(request.GET, {'year': 'Rok'}))
+    return render(request, "farms/statistics.html", context)
 
 
 @login_required

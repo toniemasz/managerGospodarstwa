@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+{% load l10n %}
+{% load ui_format %}
+{% block title %}Statystyki gospodarstwa{% endblock %}
+{% block content %}
+<main class="app-page">
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Statystyki</p>
+            <h1>Statystyki — {{ selected_year|unlocalize }}</h1>
+            <p class="page-subtitle">Wspólne miejsce dla wyliczeń paszowych, sprzedażowych, magazynowych i finansowych.</p>
+        </div>
+        <div class="header-actions">
+            {% for link in statistic_links %}
+                <a href="{{ link.url }}" class="button button-secondary">{{ link.label }}</a>
+            {% endfor %}
+        </div>
+    </section>
+
+    {% url 'farm_statistics' as statistics_filter_url %}
+    {% include 'components/filter_panel.html' with filter_action=statistics_filter_url filter_clear_url=statistics_filter_url filter_fields_template='farms/_statistics_filters.html' %}
+
+    <section class="stats-grid featured-stats compact-stats">
+        {% for card in summary_cards %}
+            <div class="stat-tile {{ card.tone }}">
+                <span>{{ card.title }}</span>
+                <strong>{% if card.value != None %}{{ card.value|smart_unit:card.unit }}{% else %}Brak danych{% endif %}</strong>
+                <small>{{ card.note }}</small>
+            </div>
+        {% endfor %}
+    </section>
+
+    <section class="finance-section">
+        <div class="section-heading">
+            <div>
+                <h2>Pasza i efektywność</h2>
+                <p>Wskaźniki liczone z zakończonych śrutowań oraz wagi ze sprzedaży.</p>
+            </div>
+        </div>
+        <div class="stats-grid">
+            <div class="stat-tile"><span>Uśrutowana pasza</span><strong>{{ feed_efficiency.feed_quantity_kg|smart_unit:"kg" }}</strong></div>
+            <div class="stat-tile"><span>Średni koszt tony</span><strong>{{ feed_efficiency.average_feed_cost_per_ton|smart_unit:"zł/t" }}</strong></div>
+            <div class="stat-tile">
+                <span>Pasza / waga żywa</span>
+                <strong>{% if feed_efficiency.feed_to_live_weight_ratio != None %}{{ feed_efficiency.feed_to_live_weight_ratio|smart_unit:"t/t" }}{% else %}Brak danych{% endif %}</strong>
+            </div>
+            <div class="stat-tile">
+                <span>Pasza / waga poubojowa</span>
+                <strong>{% if feed_efficiency.feed_to_slaughter_weight_ratio != None %}{{ feed_efficiency.feed_to_slaughter_weight_ratio|smart_unit:"t/t" }}{% else %}Brak danych{% endif %}</strong>
+            </div>
+            <div class="stat-tile">
+                <span>Koszt paszy/kg żywej</span>
+                <strong>{% if feed_efficiency.feed_cost_per_live_kg != None %}{{ feed_efficiency.feed_cost_per_live_kg|smart_unit:"zł/kg" }}{% else %}Brak danych{% endif %}</strong>
+            </div>
+            <div class="stat-tile">
+                <span>Udział paszy w sprzedaży</span>
+                <strong>{% if feed_efficiency.feed_cost_share_of_net_sales_percent != None %}{{ feed_efficiency.feed_cost_share_of_net_sales_percent|smart_unit:"%" }}{% else %}Brak danych{% endif %}</strong>
+            </div>
+        </div>
+    </section>
+
+    <section class="finance-grid">
+        <div class="panel">
+            <div class="section-heading">
+                <div><h2>Produkcja paszy</h2><p>Kolejka, zakończone partie i receptura o największej produkcji.</p></div>
+            </div>
+            <div class="panel-list">
+                <div class="summary-row"><span>Zakończone śrutowania<small>{{ production.completed_count }} zleceń</small></span><strong>{{ production.completed_kg|smart_unit:"kg" }}</strong></div>
+                <div class="summary-row"><span>Średnia partia zakończona</span><strong>{{ production.average_completed_batch_kg|smart_unit:"kg" }}</strong></div>
+                <div class="summary-row"><span>W kolejce<small>{{ production.queued_count }} zleceń</small></span><strong>{{ production.queued_kg|smart_unit:"kg" }}</strong></div>
+                <div class="summary-row"><span>Po etapie binów<small>{{ production.in_progress_count }} zleceń</small></span><strong>{{ production.in_progress_kg|smart_unit:"kg" }}</strong></div>
+                <div class="summary-row">
+                    <span>Najczęściej produkowana receptura</span>
+                    <strong>{% if production.top_recipe_by_quantity %}{{ production.top_recipe_by_quantity.recipe_name }}{% else %}—{% endif %}</strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="section-heading">
+                <div><h2>Magazyn</h2><p>Stan surowców i sygnały ostrzegawcze.</p></div>
+            </div>
+            <div class="panel-list">
+                <div class="summary-row"><span>Łączny stan</span><strong>{{ inventory.total_inventory_kg|smart_unit:"kg" }}</strong></div>
+                <div class="summary-row"><span>Składniki poniżej progu</span><strong>{{ inventory.low_stock_count }}</strong></div>
+                <div class="summary-row"><span>Silosy</span><strong>{{ inventory.bin_stock_kg|smart_unit:"kg" }}</strong></div>
+                <div class="summary-row"><span>Workowane / pozostałe</span><strong>{{ inventory.bag_stock_kg|smart_unit:"kg" }}</strong></div>
+                <div class="summary-row">
+                    <span>Ostatnia dostawa</span>
+                    <strong>{% if inventory.latest_delivery %}{{ inventory.latest_delivery.ingredient.name }}{% else %}—{% endif %}</strong>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="finance-grid">
+        <div class="panel">
+            <div class="section-heading">
+                <div><h2>Sprzedaż i wynik</h2><p>Podsumowanie finansowe wybranego roku.</p></div>
+            </div>
+            <div class="panel-list">
+                <div class="summary-row"><span>Sprzedane sztuki</span><strong>{{ sales.sold_quantity }}</strong></div>
+                <div class="summary-row"><span>Waga żywa</span><strong>{{ sales.live_weight_kg|smart_unit:"kg" }}</strong></div>
+                <div class="summary-row"><span>Sprzedaż netto</span><strong>{{ profitability.net_sales|smart_unit:"zł" }}</strong></div>
+                <div class="summary-row"><span>Koszty razem</span><strong>{{ profitability.total_cost|smart_unit:"zł" }}</strong></div>
+                <div class="summary-row"><span>Wynik netto</span><strong>{{ profitability.net_result|smart_unit:"zł" }}</strong></div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="section-heading">
+                <div><h2>Najdroższe receptury</h2><p>Koszt rzeczywisty FIFO na tonę zakończonej paszy.</p></div>
+            </div>
+            <div class="panel-list">
+                {% for item in recipe_ranking %}
+                    <div class="summary-row"><span>{{ item.recipe_name }}<small>{{ item.quantity_kg|smart_unit:"kg" }}</small></span><strong>{{ item.cost_per_ton|smart_unit:"zł/t" }}</strong></div>
+                {% empty %}
+                    {% include 'components/empty_state.html' with empty_message='Brak zakończonych śrutowań w wybranym roku.' %}
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <section class="panel chart-panel">
+        <div class="section-heading"><div><h2>Przebieg miesięczny</h2><p>Sprzedaż netto, koszty i wynik netto.</p></div></div>
+        <div class="chart-box">
+            {{ chart_labels|json_script:"statistics-chart-labels" }}
+            {{ chart_datasets|json_script:"statistics-chart-datasets" }}
+            <canvas data-chart-type="line" data-chart-labels-id="statistics-chart-labels" data-chart-datasets-id="statistics-chart-datasets" role="img" aria-label="Miesięczny wykres statystyk gospodarstwa"></canvas>
+            <p class="chart-empty" data-chart-message hidden></p>
+        </div>
+    </section>
+
+    <section class="panel table-panel">
+        <div class="section-heading"><div><h2>Miesięczne zestawienie</h2><p>Podstawowe wartości miesiąc po miesiącu.</p></div></div>
+        {% if timeline %}
+        <div class="table-scroll">
+            <table class="data-table mobile-card-table">
+                <thead><tr><th>Miesiąc</th><th class="text-right">Sprzedaż netto</th><th class="text-right">Koszt paszy</th><th class="text-right">Inne koszty</th><th class="text-right">Wynik netto</th></tr></thead>
+                <tbody>
+                    {% for row in timeline %}
+                    <tr>
+                        <td data-label="Miesiąc">{{ row.month }}</td>
+                        <td data-label="Sprzedaż netto" class="text-right">{{ row.sales_net|smart_unit:"zł" }}</td>
+                        <td data-label="Koszt paszy" class="text-right">{{ row.feed_cost|smart_unit:"zł" }}</td>
+                        <td data-label="Inne koszty" class="text-right">{{ row.additional_cost|smart_unit:"zł" }}</td>
+                        <td data-label="Wynik netto" class="text-right {% if row.result_net < 0 %}value-negative{% else %}value-positive{% endif %}"><strong>{{ row.result_net|smart_unit:"zł" }}</strong></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            {% include 'components/empty_state.html' with empty_message='Brak danych dla wybranego roku.' %}
+        {% endif %}
+    </section>
+
+    <section class="panel table-panel">
+        <div class="section-heading"><div><h2>Wskaźniki do uzupełnienia</h2><p>Te statystyki są ważne w hodowli świń, ale wymagają dodatkowych danych wejściowych.</p></div></div>
+        <div class="table-scroll">
+            <table class="data-table mobile-card-table">
+                <thead><tr><th>Wskaźnik</th><th>Co jest potrzebne</th></tr></thead>
+                <tbody>
+                    {% for item in unavailable_indicators %}
+                    <tr>
+                        <td data-label="Wskaźnik"><strong>{{ item.title }}</strong></td>
+                        <td data-label="Co jest potrzebne">{{ item.reason }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+{% endblock %}
+{% block scripts %}<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>{% endblock %}

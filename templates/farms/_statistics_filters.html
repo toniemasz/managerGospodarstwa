@@ -1,0 +1,9 @@
+{% load l10n %}
+<div class="filter-field">
+    <label for="year">Rok</label>
+    <select id="year" name="year">
+        {% for year in available_years %}
+            <option value="{{ year|unlocalize }}" {% if year == selected_year %}selected{% endif %}>{{ year|unlocalize }}</option>
+        {% endfor %}
+    </select>
+</div>

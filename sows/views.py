@@ -23,10 +23,11 @@ from .forms import (
     empty_bulk_event_initials,
 )
 from .models import SowModel, SowEventModel
+from core.date_range import PERIOD_OPTIONS, parse_date_range
+from core.filter_ui import filter_ui_state
 from farms.services.current_farm import get_current_farm
 from farms.services.farm_dashboard import FarmDashboardService
 from farms.services.module_navigation import ModuleNavigationService
-from farms.services.date_range import PERIOD_OPTIONS, parse_date_range
 from farms.services.audit_log_service import log_action
 from sows.domain.event_details import initial_data_from_event_details
 
@@ -422,7 +423,6 @@ def general_statistics_view(request):
         )
         context['date_filter'] = date_range
         context['period_options'] = PERIOD_OPTIONS
-        from farms.services.filter_ui import filter_ui_state
         context.update(filter_ui_state(request.GET, {
             'metric': 'Metryka', 'period': 'Okres', 'date_from': 'Od',
             'date_to': 'Do', 'order': 'Ranking',
