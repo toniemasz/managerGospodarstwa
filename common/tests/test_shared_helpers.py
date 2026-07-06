@@ -1,7 +1,7 @@
 from datetime import date
 
-from core.date_range import parse_date_range
-from core.filter_ui import filter_ui_state, parse_filter_date
+from common.date_range import parse_date_range
+from common.filter_ui import filter_ui_state, parse_filter_date
 
 
 def test_filter_ui_state_builds_chips_only_for_present_values():

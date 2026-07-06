@@ -22,8 +22,8 @@ from feed.models import (
     RecipeVersionItemModel,
     RecipeVersionModel,
 )
-from feed.services.feed_management_service import FeedManagementService
-from feed.use_cases.edit_recipe_create_version import RecipeVersionService
+from feed.actions.productions import complete_production
+from feed.actions.recipe_versions import RecipeVersionActions
 
 
 @pytest.fixture
@@ -50,7 +50,7 @@ def versioned_feed():
         ingredient=barley,
         percentage=Decimal("100.00"),
     )
-    version, created = RecipeVersionService(farm=farm, user=user).ensure_current_version(
+    version, created = RecipeVersionActions(farm=farm, user=user).ensure_current_version(
         recipe,
         change_note="Start",
     )
@@ -67,7 +67,7 @@ def versioned_feed():
 
 
 def _create_second_version(data, *, barley_percentage="50.00", soy_percentage="50.00"):
-    version = RecipeVersionService(
+    version = RecipeVersionActions(
         farm=data["farm"],
         user=data["user"],
     ).create_new_version(
@@ -91,7 +91,7 @@ def _complete_production(farm, recipe, version, quantity, production_date, user,
         custom_recipe_data=custom_recipe_data,
         status=ProductionModel.Statuses.STAGE_1_DONE,
     )
-    success, message = FeedManagementService(farm).complete_production(production.pk, user=user)
+    success, message = complete_production(farm, production.pk, user=user)
     assert success is True, message
     production.refresh_from_db()
     return production
@@ -144,7 +144,7 @@ def test_recipe_edit_creates_version_only_when_composition_changes(versioned_fee
 
     recipe.name = "Grower renamed"
     recipe.save(update_fields=["name"])
-    _, created = RecipeVersionService(
+    _, created = RecipeVersionActions(
         farm=versioned_feed["farm"],
         user=versioned_feed["user"],
     ).ensure_current_version(recipe, change_note="Zmiana nazwy")
@@ -188,7 +188,7 @@ def test_completed_production_uses_assigned_version_not_current_recipe_items(ver
     )
     _create_second_version(versioned_feed)
 
-    success, message = FeedManagementService(versioned_feed["farm"]).complete_production(
+    success, message = complete_production(versioned_feed["farm"], 
         production.pk,
         user=versioned_feed["user"],
     )
@@ -211,7 +211,7 @@ def test_production_requirements_fallback_to_current_recipe_items_when_version_i
         status=ProductionModel.Statuses.STAGE_1_DONE,
     )
 
-    success, message = FeedManagementService(versioned_feed["farm"]).complete_production(
+    success, message = complete_production(versioned_feed["farm"], 
         production.pk,
         user=versioned_feed["user"],
     )
@@ -249,7 +249,7 @@ def test_editing_existing_version_recalculates_only_productions_assigned_to_that
         versioned_feed["user"],
     )
 
-    result = RecipeVersionService(
+    result = RecipeVersionActions(
         farm=versioned_feed["farm"],
         user=versioned_feed["user"],
     ).update_existing_version(
@@ -297,7 +297,7 @@ def test_editing_version_with_productions_requires_confirmation(versioned_feed):
     )
 
     with pytest.raises(ValidationError):
-        RecipeVersionService(farm=versioned_feed["farm"], user=versioned_feed["user"]).update_existing_version(
+        RecipeVersionActions(farm=versioned_feed["farm"], user=versioned_feed["user"]).update_existing_version(
             version=version_1,
             confirm_recalculate=False,
             items=[{"ingredient": versioned_feed["barley"], "percentage": Decimal("100.00")}],
@@ -343,7 +343,7 @@ def test_editing_version_preserves_custom_recipe_data_as_override(versioned_feed
         custom_recipe_data={str(versioned_feed["barley"].id): "100.00"},
     )
 
-    result = RecipeVersionService(farm=versioned_feed["farm"], user=versioned_feed["user"]).update_existing_version(
+    result = RecipeVersionActions(farm=versioned_feed["farm"], user=versioned_feed["user"]).update_existing_version(
         version=version_1,
         confirm_recalculate=True,
         items=[{"ingredient": versioned_feed["barley"], "percentage": Decimal("100.00")}],
@@ -462,7 +462,7 @@ def test_recipe_version_detail_view_shows_only_current_farm_version(client, vers
     other_ingredient = IngredientModel.objects.create(farm=other_farm, name="Cudza pszenica")
     other_recipe = RecipeModel.objects.create(farm=other_farm, name="Cudza")
     RecipeItemModel.objects.create(recipe=other_recipe, ingredient=other_ingredient, percentage=Decimal("100.00"))
-    other_version, _ = RecipeVersionService(farm=other_farm, user=other_user).ensure_current_version(other_recipe)
+    other_version, _ = RecipeVersionActions(farm=other_farm, user=other_user).ensure_current_version(other_recipe)
 
     response = client.get(reverse("recipe_version_detail", args=[other_recipe.id, other_version.id]))
 

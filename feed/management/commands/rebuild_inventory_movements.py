@@ -1,7 +1,7 @@
 from django.core.management import BaseCommand
 
 from farms.models import FarmModel
-from feed.services.inventory_service import InventoryMovementService
+from feed.actions.inventory import InventoryActions
 
 
 class Command(BaseCommand):
@@ -15,5 +15,5 @@ class Command(BaseCommand):
         if options["farm_id"]:
             farms = farms.filter(pk=options["farm_id"])
         for farm in farms:
-            counts = InventoryMovementService(farm).rebuild()
+            counts = InventoryActions(farm).rebuild()
             self.stdout.write(f"{farm}: {counts}")

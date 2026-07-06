@@ -9,8 +9,8 @@ from django.urls import reverse
 from costs.models import CostModel
 from costs.services import CostService
 from feed.models import DeliveryModel, ProductionModel
-from feed.services.feed_management_service import FeedManagementService
-from feed.services.production_cost_service import ProductionCostService
+from feed.selectors.inventory import inventory_dashboard
+from feed.selectors.production_costs import ProductionCostSelector
 from sales.models import PigSaleModel
 
 
@@ -34,7 +34,7 @@ class FarmStatisticsService:
     def calculate(self, *, date_from=None, date_to=None) -> dict:
         sales = self._sales_queryset(date_from=date_from, date_to=date_to)
         costs = self._cost_queryset(date_from=date_from, date_to=date_to)
-        feed = ProductionCostService(self.farm).calculate(date_from=date_from, date_to=date_to)
+        feed = ProductionCostSelector(self.farm).calculate(date_from=date_from, date_to=date_to)
         sales_summary = self._sales_summary(sales)
         cost_summary = CostService.summarize(costs)
         timeline = self._timeline(sales=sales, costs=costs, feed=feed)
@@ -214,7 +214,7 @@ class FarmStatisticsService:
         }
 
     def _inventory_summary(self) -> dict:
-        dashboard = FeedManagementService(farm=self.farm).get_inventory_dashboard()
+        dashboard = inventory_dashboard(self.farm)
         inventory_rows = dashboard["inventory"]
         bin_stock = sum((item.current_stock for item in inventory_rows if item.is_in_bin), ZERO)
         bag_stock = sum((item.current_stock for item in inventory_rows if not item.is_in_bin), ZERO)

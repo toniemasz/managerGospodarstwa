@@ -243,7 +243,7 @@ def test_feed_production_post_actions(auth_client, feed_objects):
 
 @pytest.mark.django_db
 def test_add_queued_production_does_not_touch_inventory_release(auth_client, feed_objects):
-    with patch("feed.signals.InventoryMovementService.release_production") as release_production:
+    with patch("feed.signals.InventoryActions.release_production") as release_production:
         response = auth_client.post(reverse('add_production'), {
             'date': timezone.now().date(),
             'time': '08:30',

@@ -6,7 +6,7 @@ from django.utils import timezone
 from costs.forms import CostCategoryForm, CostFilterForm, CostForm
 from costs.models import CostCategoryModel, CostModel
 from costs.services import CostService
-from core.filter_ui import filter_ui_state
+from common.filter_ui import filter_ui_state
 from farms.services.accounting_year import get_available_years
 from farms.services.audit_log_service import log_action
 from farms.services.current_farm import get_current_farm

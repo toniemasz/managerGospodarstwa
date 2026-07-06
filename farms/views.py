@@ -16,7 +16,7 @@ from farms.services.statistics import FarmStatisticsService
 from farms.services.accounting_year import get_available_years, parse_accounting_year
 from farms.services.module_navigation import module_visibility_groups
 from farms.services.farm_dashboard import dashboard_stat_groups
-from core.filter_ui import filter_ui_state, parse_filter_date
+from common.filter_ui import filter_ui_state, parse_filter_date
 from farms.services.global_search import build_global_search_context
 
 

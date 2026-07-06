@@ -23,8 +23,8 @@ from .forms import (
     empty_bulk_event_initials,
 )
 from .models import SowModel, SowEventModel
-from core.date_range import PERIOD_OPTIONS, parse_date_range
-from core.filter_ui import filter_ui_state
+from common.date_range import PERIOD_OPTIONS, parse_date_range
+from common.filter_ui import filter_ui_state
 from farms.services.current_farm import get_current_farm
 from farms.services.farm_dashboard import FarmDashboardService
 from farms.services.module_navigation import ModuleNavigationService

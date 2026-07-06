@@ -15,7 +15,7 @@ from farms.services.profitability import ProfitabilityAnalyticsService
 from farms.services.settings_service import get_farm_settings
 from farms.services.task_center import TaskCenterService
 from feed.models import ProductionModel
-from feed.services.feed_management_service import FeedManagementService
+from feed.selectors.inventory import inventory_dashboard
 from sales.models import PigSaleModel
 from sows.services.sow_dashboard_service import SowDashboardService
 
@@ -100,7 +100,7 @@ class FarmDashboardService:
 
     def _inventory_summary(self) -> dict:
         if self._inventory is None:
-            self._inventory = FeedManagementService(farm=self.farm).get_inventory_dashboard()
+            self._inventory = inventory_dashboard(self.farm)
         return self._inventory
 
     def _task_summary(self) -> dict:

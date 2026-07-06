@@ -13,7 +13,7 @@ from django.utils import timezone
 from costs.models import CostCategoryModel, CostModel
 from farms.services.data_backup import BackupImportError, user_business_data_counts
 from feed.models import DeliveryModel, IngredientModel, ProductionModel, RecipeItemModel, RecipeModel
-from feed.services.inventory_service import InventoryMovementService
+from feed.actions.inventory import InventoryActions
 from sales.models import PigSaleModel, SaleClassRowModel
 from sows.models import SowEventModel, SowModel, VaccinationPlanModel
 
@@ -322,6 +322,6 @@ def import_csv_archive(uploaded_file, farm) -> dict[str, int]:
             supplier=row["supplier"],
             is_paid=_bool(row["is_paid"]),
         )
-    InventoryMovementService(farm).rebuild()
+    InventoryActions(farm).rebuild()
     counts.update({"składniki": len(ingredient_map), "receptury": len(recipe_map), "dostawy": len(rows["deliveries.csv"]), "produkcje": len(rows["productions.csv"]), "sprzedaże": len(sale_map), "wiersze sprzedaży": len(rows["sale_rows.csv"]), "kategorie kosztów": len(category_map), "koszty": len(rows["costs.csv"])})
     return counts

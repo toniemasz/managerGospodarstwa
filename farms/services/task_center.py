@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from costs.models import CostModel
 from feed.models import ProductionModel
-from feed.services.feed_management_service import FeedManagementService
+from feed.selectors.inventory import inventory_dashboard
 from sales.models import PigSaleModel
 from sows.services.sow_dashboard_service import SowDashboardService
 
@@ -158,7 +158,7 @@ class TaskCenterService:
         )
 
     def _feed_tab(self) -> dict:
-        inventory = FeedManagementService(farm=self.farm).get_inventory_dashboard()
+        inventory = inventory_dashboard(self.farm)
         self._low_stock = inventory["low_stock_alerts"]
         low_stock_items = [
             self._task(

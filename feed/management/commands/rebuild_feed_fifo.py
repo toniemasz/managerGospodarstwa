@@ -3,7 +3,7 @@ from django.db import transaction
 
 from farms.models import FarmModel
 from feed.models import ProductionModel
-from feed.services.inventory_service import InventoryMovementService, InventoryRebuildError
+from feed.actions.inventory import InventoryActions, InventoryRebuildError
 
 
 class Command(BaseCommand):
@@ -43,7 +43,7 @@ class Command(BaseCommand):
         for farm in farms:
             try:
                 with transaction.atomic():
-                    result = InventoryMovementService(farm).rebuild()
+                    result = InventoryActions(farm).rebuild()
                     partial_count = ProductionModel.objects.filter(
                         recipe__farm=farm,
                         status=ProductionModel.Statuses.COMPLETED,

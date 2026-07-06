@@ -12,8 +12,8 @@ from django.urls import reverse
 
 from farms.services.farm_service import get_or_create_user_farm
 from feed.models import DeliveryModel, IngredientModel, InventoryMovementModel, ProductionIngredientUsageModel, ProductionModel, RecipeItemModel, RecipeModel
-from feed.services.feed_management_service import FeedManagementService
-from feed.services.inventory_service import InventoryMovementService
+from feed.actions.productions import complete_production
+from feed.actions.inventory import InventoryActions
 from feed.forms import InventoryAdjustmentForm
 
 
@@ -52,7 +52,7 @@ def _complete_production(farm, recipe, quantity_kg, production_date, user):
         quantity_kg=Decimal(quantity_kg),
         status=ProductionModel.Statuses.STAGE_1_DONE,
     )
-    success, message = FeedManagementService(farm).complete_production(production.pk, user=user)
+    success, message = complete_production(farm, production.pk, user=user)
     assert success is True, message
     production.refresh_from_db()
     return production
@@ -61,13 +61,12 @@ def _complete_production(farm, recipe, quantity_kg, production_date, user):
 @pytest.mark.django_db
 def test_delivery_production_and_repeated_completion_movements(inventory_data):
     user, farm, ingredient, recipe = inventory_data
-    assert InventoryMovementService(farm).balances()[ingredient.pk] == Decimal("1000")
+    assert InventoryActions(farm).balances()[ingredient.pk] == Decimal("1000")
     production = ProductionModel.objects.create(recipe=recipe, date=date.today(), quantity_kg=400, status=ProductionModel.Statuses.STAGE_1_DONE)
-    service = FeedManagementService(farm)
-    assert service.complete_production(production.pk, user=user)[0] is True
-    assert service.complete_production(production.pk, user=user)[0] is False
+    assert complete_production(farm, production.pk, user=user)[0] is True
+    assert complete_production(farm, production.pk, user=user)[0] is False
     assert InventoryMovementModel.objects.filter(farm=farm, movement_type="PRODUCTION_USAGE").count() == 1
-    assert InventoryMovementService(farm).balances()[ingredient.pk] == Decimal("600")
+    assert InventoryActions(farm).balances()[ingredient.pk] == Decimal("600")
 
 
 @pytest.mark.django_db
@@ -121,7 +120,7 @@ def test_release_production_does_not_join_nullable_delivery_while_locking(invent
     )
 
     with CaptureQueriesContext(connection) as captured:
-        InventoryMovementService(farm).release_production(production)
+        InventoryActions(farm).release_production(production)
 
     usage_selects = [
         query["sql"]
@@ -195,7 +194,7 @@ def test_rebuild_processes_completed_productions_chronologically(inventory_data)
         status=ProductionModel.Statuses.COMPLETED,
     )
 
-    InventoryMovementService(farm).rebuild()
+    InventoryActions(farm).rebuild()
 
     earlier_production.refresh_from_db()
     later_production.refresh_from_db()
@@ -237,7 +236,7 @@ def test_rebuild_prefers_legacy_production_usage_movements(inventory_data):
         note="Dane sprzed FIFO - ilość zachowana z ruchu magazynowego",
     )
 
-    InventoryMovementService(farm).rebuild()
+    InventoryActions(farm).rebuild()
 
     production.refresh_from_db()
     delivery.refresh_from_db()
@@ -272,14 +271,14 @@ def test_future_delivery_is_not_used_and_forced_completion_is_partial(inventory_
         status=ProductionModel.Statuses.STAGE_1_DONE,
     )
 
-    success, message = FeedManagementService(farm).complete_production(production.pk, user=user)
+    success, message = complete_production(farm, production.pk, user=user)
 
     assert success is False
     assert "Brakuje rozliczalnych dostaw FIFO" in message
     production.refresh_from_db()
     assert production.status == ProductionModel.Statuses.STAGE_1_DONE
 
-    success, message = FeedManagementService(farm).complete_production(
+    success, message = complete_production(farm, 
         production.pk,
         force_inventory=True,
         user=user,
@@ -311,7 +310,7 @@ def test_zero_price_delivery_is_not_used_as_free_fifo_cost(inventory_data):
         status=ProductionModel.Statuses.STAGE_1_DONE,
     )
 
-    success, message = FeedManagementService(farm).complete_production(production.pk, user=user)
+    success, message = complete_production(farm, production.pk, user=user)
 
     assert success is False
     assert "Brakuje rozliczalnych dostaw FIFO" in message
@@ -345,7 +344,7 @@ def test_rebuild_feed_fifo_command_rolls_back_by_default_and_applies_when_reques
 @pytest.mark.django_db
 def test_positive_negative_adjustments_and_cross_farm_isolation(inventory_data):
     user, farm, ingredient, _ = inventory_data
-    service = InventoryMovementService(farm)
+    service = InventoryActions(farm)
     service.adjust(ingredient=ingredient, quantity_kg=100, direction="plus", movement_date=date.today(), reason="remanent", user=user)
     service.adjust(ingredient=ingredient, quantity_kg=50, direction="minus", movement_date=date.today(), reason="ubytek", user=user)
     assert service.balances()[ingredient.pk] == Decimal("1050")
