@@ -7,6 +7,11 @@ from feed.models import ProductionModel
 from feed.selectors.productions import production_for_processing, validate_production_capacity
 
 
+def create_production(form):
+    with transaction.atomic():
+        return form.save()
+
+
 @transaction.atomic
 def mark_stage_1_done(farm, production_id: int) -> tuple[bool, str]:
     production = production_for_processing(farm, production_id, lock_for_update=True)

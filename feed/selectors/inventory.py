@@ -95,3 +95,19 @@ def inventory_movements(farm, *, movement_type="", date_from=None, date_to=None)
     if date_to:
         movements = movements.filter(movement_date__lte=date_to)
     return movements
+
+
+def inventory_page_context(farm, *, movement_type="", date_from=None, date_to=None) -> dict:
+    context = inventory_dashboard(farm)
+    movements = inventory_movements(
+        farm,
+        movement_type=movement_type,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    context.update({
+        "deliveries": deliveries_for_farm(farm),
+        "movements": movements[:50],
+        "movement_types": InventoryMovementModel.Types.choices,
+    })
+    return context

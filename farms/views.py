@@ -25,54 +25,96 @@ def farm_settings_view(request):
     farm = get_current_farm(request)
     settings = get_farm_settings(farm)
 
-    if request.method == 'POST' and 'import_backup' in request.POST:
-        import_form = UserBackupImportForm(request.POST, request.FILES)
-        if import_form.is_valid():
-            try:
-                counts = import_user_backup(import_form.cleaned_data['backup_file'], farm)
-            except BackupImportError as error:
-                messages.error(request, str(error))
-            else:
-                total = sum(counts.values())
-                log_action(farm=farm, user=request.user, action="USER_BACKUP_IMPORT", model_label="farms.FarmModel", object_id=farm.pk, object_repr=str(farm), metadata={"counts": counts})
-                messages.success(request, f'Przywrócono dane gospodarstwa ({total} rekordów).')
-            return redirect('farm_settings')
-        form = FarmSettingsForm(instance=settings, farm=farm)
-        csv_import_form = CsvImportForm()
-    elif request.method == 'POST' and 'import_csv' in request.POST:
-        csv_import_form = CsvImportForm(request.POST, request.FILES)
-        if csv_import_form.is_valid():
-            try:
-                counts = import_csv_archive(csv_import_form.cleaned_data['csv_archive'], farm)
-            except BackupImportError as error:
-                messages.error(request, str(error))
-            else:
-                log_action(farm=farm, user=request.user, action="CSV_IMPORT", model_label="farms.FarmModel", object_id=farm.pk, object_repr=str(farm), metadata={"counts": counts})
-                messages.success(request, f"Zaimportowano dane CSV ({sum(counts.values())} rekordów).")
-                return redirect('farm_settings')
-        form = FarmSettingsForm(instance=settings, farm=farm)
-        import_form = UserBackupImportForm()
-    elif request.method == 'POST':
-        form = FarmSettingsForm(request.POST, instance=settings, farm=farm)
-        import_form = UserBackupImportForm()
-        csv_import_form = CsvImportForm()
-        if form.is_valid():
-            form.save()
-            log_action(farm=farm, user=request.user, action="SETTINGS_UPDATE", obj=settings)
-            messages.success(request, "Ustawienia gospodarstwa zostały zapisane.")
-            return redirect('farm_settings')
-    else:
-        form = FarmSettingsForm(instance=settings, farm=farm)
-        import_form = UserBackupImportForm()
-        csv_import_form = CsvImportForm()
+    if request.method == 'POST':
+        return _handle_settings_post(request, farm, settings)
 
-    return render(request, 'farms/settings.html', {
+    return _render_settings(request, farm, settings)
+
+
+def _handle_settings_post(request, farm, settings):
+    if 'import_backup' in request.POST:
+        return _handle_user_backup_import(request, farm, settings)
+    if 'import_csv' in request.POST:
+        return _handle_csv_import(request, farm, settings)
+    return _handle_settings_update(request, farm, settings)
+
+
+def _handle_user_backup_import(request, farm, settings):
+    import_form = UserBackupImportForm(request.POST, request.FILES)
+    if not import_form.is_valid():
+        return _render_settings(request, farm, settings, import_form=import_form)
+
+    try:
+        counts = import_user_backup(import_form.cleaned_data['backup_file'], farm)
+    except BackupImportError as error:
+        messages.error(request, str(error))
+    else:
+        total = sum(counts.values())
+        log_action(
+            farm=farm,
+            user=request.user,
+            action="USER_BACKUP_IMPORT",
+            model_label="farms.FarmModel",
+            object_id=farm.pk,
+            object_repr=str(farm),
+            metadata={"counts": counts},
+        )
+        messages.success(request, f'Przywrócono dane gospodarstwa ({total} rekordów).')
+    return redirect('farm_settings')
+
+
+def _handle_csv_import(request, farm, settings):
+    csv_import_form = CsvImportForm(request.POST, request.FILES)
+    if not csv_import_form.is_valid():
+        return _render_settings(request, farm, settings, csv_import_form=csv_import_form)
+
+    try:
+        counts = import_csv_archive(csv_import_form.cleaned_data['csv_archive'], farm)
+    except BackupImportError as error:
+        messages.error(request, str(error))
+    else:
+        log_action(
+            farm=farm,
+            user=request.user,
+            action="CSV_IMPORT",
+            model_label="farms.FarmModel",
+            object_id=farm.pk,
+            object_repr=str(farm),
+            metadata={"counts": counts},
+        )
+        messages.success(request, f"Zaimportowano dane CSV ({sum(counts.values())} rekordów).")
+    return redirect('farm_settings')
+
+
+def _handle_settings_update(request, farm, settings):
+    form = FarmSettingsForm(request.POST, instance=settings, farm=farm)
+    if form.is_valid():
+        saved_settings = form.save()
+        log_action(farm=farm, user=request.user, action="SETTINGS_UPDATE", obj=saved_settings)
+        messages.success(request, "Ustawienia gospodarstwa zostały zapisane.")
+        return redirect('farm_settings')
+    return _render_settings(request, farm, settings, form=form)
+
+
+def _render_settings(request, farm, settings, *, form=None, import_form=None, csv_import_form=None):
+    form = form or FarmSettingsForm(instance=settings, farm=farm)
+    import_form = import_form or UserBackupImportForm()
+    csv_import_form = csv_import_form or CsvImportForm()
+    return render(request, 'farms/settings.html', _settings_context(
+        form=form,
+        import_form=import_form,
+        csv_import_form=csv_import_form,
+    ))
+
+
+def _settings_context(*, form, import_form, csv_import_form):
+    return {
         'form': form,
         'import_form': import_form,
         'csv_import_form': csv_import_form,
         'module_visibility_groups': module_visibility_groups(form),
         'dashboard_stat_groups': dashboard_stat_groups(form),
-    })
+    }
 
 
 @login_required

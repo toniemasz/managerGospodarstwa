@@ -11,10 +11,7 @@ from django.core.exceptions import ValidationError
 from .services.sow_dashboard_service import SowDashboardService
 from .services.sow_repository import SowRepository, VaccinationPlanRepository
 from .services.bulk_event_service import BulkSowEventService
-from .services.sow_event_service import (
-    FARROWING_DECISION_CANCEL,
-    SowEventService,
-)
+from .services.sow_event_service import FARROWING_DECISION_CANCEL
 from .forms import (
     BulkSowEventFormSet,
     SowForm,
@@ -29,7 +26,7 @@ from farms.services.current_farm import get_current_farm
 from farms.services.farm_dashboard import FarmDashboardService
 from farms.services.module_navigation import ModuleNavigationService
 from farms.services.audit_log_service import log_action
-from sows.actions.events import record_bulk_pregnancy_checks, record_bulk_vaccinations
+from sows.actions.events import SowEventActions
 from sows.domain.event_details import initial_data_from_event_details
 
 logger = logging.getLogger(__name__)
@@ -183,14 +180,14 @@ def add_event_view(request, sow_id):
     repo = SowRepository(farm=farm)
     sow = repo.get_sow_by_id(sow_id)
     sow.update_state_for_date(date.today())
-    service = SowEventService(farm=farm, repository=repo)
+    actions = SowEventActions(farm=farm, user=request.user, repository=repo)
 
     if request.method == 'POST':
         form = SowEventForm(request.POST, sow_status=sow.status, farm=farm)
         if form.is_valid():
             decision = request.POST.get('farrowing_decision')
             try:
-                result = service.create_event(
+                result = actions.create_event(
                     sow=db_sow,
                     sow_status=sow.status,
                     data=form.cleaned_data,
@@ -293,8 +290,7 @@ def bulk_pregnancy_check_view(request):
             sow.id: request.POST.get(f'result_{sow.id}')
             for sow in sows_to_check
         }
-        events = record_bulk_pregnancy_checks(
-            farm=farm,
+        events = SowEventActions(farm=farm, user=request.user).bulk_create_pregnancy_checks(
             sows=sows_to_check,
             results_by_sow_id=results_by_sow_id,
         )
@@ -324,8 +320,7 @@ def bulk_vaccinate_view(request):
         cycle_id = request.POST.get('cycle_id')
 
         if request.POST.get('confirm') == 'yes':
-            events = record_bulk_vaccinations(
-                farm=farm,
+            events = SowEventActions(farm=farm, user=request.user).bulk_create_vaccinations(
                 sow_ids=sow_ids,
                 vaccine_name=vaccine_name,
                 cycle_id=cycle_id,
@@ -359,7 +354,10 @@ def edit_event_view(request, event_id):
     if request.method == 'POST':
         form = SowEventForm(request.POST, instance=db_event, farm=farm)
         if form.is_valid():
-            event = form.save()
+            event = SowEventActions(farm=farm, user=request.user).update_event(
+                event_id=event_id,
+                data=form.cleaned_data,
+            )
             log_action(farm=farm, user=request.user, action="UPDATE", obj=event)
             return redirect('sow_detail', sow_id=sow_id)
     else:
@@ -442,13 +440,16 @@ def general_statistics_view(request):
 def delete_event_view(request, event_id):
     if request.method == 'POST':
         farm = get_current_farm(request)
-        db_event = get_object_or_404(SowEventModel, id=event_id, sow__farm=farm)
-        sow_id = db_event.sow.id
-        representation = str(db_event)
-        object_id = db_event.pk
-        db_event.delete()
-        log_action(farm=farm, user=request.user, action="DELETE", model_label="sows.SowEventModel", object_id=object_id, object_repr=representation)
-        return redirect('sow_detail', sow_id=sow_id)
+        deleted_event = SowEventActions(farm=farm, user=request.user).delete_event(event_id)
+        log_action(
+            farm=farm,
+            user=request.user,
+            action="DELETE",
+            model_label=deleted_event.model_label,
+            object_id=deleted_event.object_id,
+            object_repr=deleted_event.object_repr,
+        )
+        return redirect('sow_detail', sow_id=deleted_event.sow_id)
     return redirect('dashboard')
 
 

@@ -2,11 +2,12 @@ from decimal import Decimal
 
 from django.db.models import Count, Sum
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 
 from farms.services.settings_service import get_farm_settings
 from feed.calculators.feed_cost import ProductionCalculator
 from feed.domain.rules import DEFAULT_PRODUCTION_QUANTITY_KG
-from feed.models import ProductionModel
+from feed.models import ProductionModel, RecipeModel
 from feed.selectors.inventory import inventory_dashboard, latest_delivery_prices_map
 from feed.selectors.recipe_requirements import recipe_item_dicts_for_production
 
@@ -16,6 +17,20 @@ def productions_for_farm(farm=None):
     if farm is not None:
         queryset = queryset.filter(recipe__farm=farm)
     return queryset.order_by("-date", "-time", "-id")
+
+
+def production_list_context(farm, *, status="", date_from=None, date_to=None) -> dict:
+    productions = productions_for_farm(farm)
+    if status:
+        productions = productions.filter(status=status)
+    if date_from:
+        productions = productions.filter(date__gte=date_from)
+    if date_to:
+        productions = productions.filter(date__lte=date_to)
+    return {
+        "productions": productions,
+        "production_statuses": ProductionModel.Statuses.choices,
+    }
 
 
 def production_for_processing(farm, production_id: int, *, lock_for_update: bool = False):
@@ -38,6 +53,25 @@ def default_production_quantity(farm=None) -> Decimal:
     if farm is None:
         return DEFAULT_PRODUCTION_QUANTITY_KG
     return get_farm_settings(farm).default_production_quantity_kg
+
+
+def default_production_initial(farm, *, selected_recipe=None, current_datetime=None) -> dict:
+    current_datetime = current_datetime or timezone.now()
+    initial = {
+        "quantity_kg": default_production_quantity(farm),
+        "date": current_datetime.date(),
+        "time": current_datetime.strftime("%H:%M"),
+    }
+    if selected_recipe and _recipe_exists_for_farm(farm, selected_recipe):
+        initial["recipe"] = selected_recipe
+    return initial
+
+
+def _recipe_exists_for_farm(farm, recipe_id) -> bool:
+    filters = {"pk": recipe_id}
+    if farm is not None:
+        filters["farm"] = farm
+    return RecipeModel.objects.filter(**filters).exists()
 
 
 def _calculator_for_production(production) -> ProductionCalculator:

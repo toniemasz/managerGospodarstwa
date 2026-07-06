@@ -19,6 +19,15 @@ def recipes_with_items(farm=None):
     return RecipeModel.objects.filter(**filters).prefetch_related("items__ingredient").order_by("name")
 
 
+def recipe_list_context(farm) -> dict:
+    costs = {cost.recipe_id: cost for cost in recipe_costs(farm)}
+    recipe_cards = [
+        {"recipe": recipe, "cost": costs.get(recipe.id)}
+        for recipe in recipes_with_items(farm)
+    ]
+    return {"recipe_cards": recipe_cards}
+
+
 def recipe_exists(farm, recipe_id: int) -> bool:
     filters = {"pk": recipe_id}
     if farm is not None:
@@ -50,6 +59,18 @@ def recipe_version_for_farm_or_404(farm, recipe_pk, version_pk):
         recipe_id=recipe_pk,
         recipe__farm=farm,
     )
+
+
+def recipe_version_detail_context(farm, recipe_pk, version_pk) -> dict:
+    version = recipe_version_for_farm_or_404(farm, recipe_pk, version_pk)
+    productions = productions_for_farm(farm).filter(recipe_version=version)
+    return {
+        "recipe": version.recipe,
+        "version": version,
+        "productions": productions[:50],
+        "production_count": productions.count(),
+        "completed_count": productions.filter(status=ProductionModel.Statuses.COMPLETED).count(),
+    }
 
 
 def recipe_costs(farm=None, price_overrides: dict[int, Decimal] | None = None):

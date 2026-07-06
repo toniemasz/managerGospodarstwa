@@ -8,6 +8,7 @@ from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 
+from farms.models import AuditLogModel
 from farms.services.farm_service import get_or_create_user_farm
 from sales.models import PigSaleModel
 from sales.number_parsing import parse_polish_decimal, parse_polish_int
@@ -59,6 +60,9 @@ def test_pdf_parser_warnings_are_shown_and_preview_does_not_save(sales_client):
     assert response.status_code == 200
     assert "Format wymaga ręcznego sprawdzenia" in response.content.decode()
     assert not PigSaleModel.objects.exists()
+    audit = AuditLogModel.objects.get(action="PDF_IMPORT_PREVIEW")
+    assert audit.metadata["filename"] == "settlement.pdf"
+    assert audit.metadata["warnings"] == ["Format wymaga ręcznego sprawdzenia."]
 
 
 def test_pdf_parser_warns_about_invalid_date_and_numbers(monkeypatch):

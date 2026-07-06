@@ -8,6 +8,7 @@ from django.contrib.auth.models import User
 from django.test import Client
 from django.urls import reverse
 
+from farms.models import AuditLogModel
 from sales.forms import PigSaleForm, SaleClassRowFormSet
 from sales.models import PigSaleModel, SaleClassRowModel
 from sales.services.sale_form_service import SaleFormService
@@ -72,6 +73,8 @@ def test_sales_views_require_login_and_handle_create(auth_client, client):
 
     assert post_response.status_code == 302
     assert PigSaleModel.objects.filter(quantity=8, meat_class='R', farm=auth_client.farm).exists()
+    sale = PigSaleModel.objects.get(quantity=8, meat_class='R', farm=auth_client.farm)
+    assert AuditLogModel.objects.filter(farm=auth_client.farm, action="CREATE", object_id=str(sale.pk)).exists()
 
 
 @pytest.mark.django_db
@@ -113,6 +116,27 @@ def test_delete_sale_view_removes_sale(auth_client):
 
     assert response.status_code == 302
     assert not PigSaleModel.objects.filter(id=sale.id).exists()
+    assert AuditLogModel.objects.filter(farm=auth_client.farm, action="DELETE", object_id=str(sale.id)).exists()
+
+
+@pytest.mark.django_db
+def test_delete_sale_view_is_scoped_to_current_farm(auth_client):
+    other_user = User.objects.create_user(username='sales-delete-other')
+    other_farm = get_or_create_user_farm(other_user)
+    foreign_sale = PigSaleModel.objects.create(
+        farm=other_farm,
+        sale_date=date(2026, 6, 4),
+        quantity=3,
+        total_weight=Decimal('300.00'),
+        meat_class='E',
+        price_per_kg=Decimal('8.00'),
+    )
+
+    response = auth_client.post(reverse('delete_sale', args=[foreign_sale.id]))
+
+    assert response.status_code == 404
+    assert PigSaleModel.objects.filter(id=foreign_sale.id, farm=other_farm).exists()
+    assert not AuditLogModel.objects.filter(farm=auth_client.farm, action="DELETE").exists()
 
 
 @pytest.mark.django_db
@@ -208,6 +232,71 @@ def test_sales_year_filter_and_document_number_uniqueness_per_year(auth_client):
     )
     assert not same_year.is_valid()
     assert other_year.is_valid()
+
+
+@pytest.mark.django_db
+def test_sales_list_filters_by_explicit_date_range(auth_client):
+    PigSaleModel.objects.create(
+        farm=auth_client.farm,
+        sale_date=date(2026, 5, 1),
+        document_number="MAY",
+        quantity=5,
+        net_value=Decimal("5000"),
+    )
+    PigSaleModel.objects.create(
+        farm=auth_client.farm,
+        sale_date=date(2026, 6, 1),
+        document_number="JUNE",
+        quantity=6,
+        net_value=Decimal("6000"),
+    )
+    PigSaleModel.objects.create(
+        farm=auth_client.farm,
+        sale_date=date(2026, 7, 1),
+        document_number="JULY",
+        quantity=7,
+        net_value=Decimal("7000"),
+    )
+
+    response = auth_client.get(reverse("sales_list"), {
+        "year": "2026",
+        "date_from": "2026-06-01",
+        "date_to": "2026-06-30",
+    })
+
+    assert response.status_code == 200
+    assert [sale.document_number for sale in response.context["sales"]] == ["JUNE"]
+    assert response.context["date_from"] == date(2026, 6, 1)
+    assert response.context["date_to"] == date(2026, 6, 30)
+
+
+@pytest.mark.django_db
+def test_sales_list_swaps_reversed_date_range(auth_client):
+    PigSaleModel.objects.create(
+        farm=auth_client.farm,
+        sale_date=date(2026, 6, 1),
+        document_number="JUNE",
+        quantity=6,
+        net_value=Decimal("6000"),
+    )
+    PigSaleModel.objects.create(
+        farm=auth_client.farm,
+        sale_date=date(2026, 8, 1),
+        document_number="AUGUST",
+        quantity=8,
+        net_value=Decimal("8000"),
+    )
+
+    response = auth_client.get(reverse("sales_list"), {
+        "year": "2026",
+        "date_from": "2026-07-31",
+        "date_to": "2026-06-01",
+    })
+
+    assert response.status_code == 200
+    assert [sale.document_number for sale in response.context["sales"]] == ["JUNE"]
+    assert response.context["date_from"] == date(2026, 6, 1)
+    assert response.context["date_to"] == date(2026, 7, 31)
 
 
 @pytest.mark.django_db

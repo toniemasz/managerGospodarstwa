@@ -23,36 +23,39 @@ from common.filter_ui import filter_ui_state, parse_filter_date
 from farms.services.current_farm import get_current_farm
 from farms.services.audit_log_service import log_action
 from feed.actions.deliveries import create_delivery, delete_delivery, update_delivery
+from feed.actions.ingredients import create_ingredient, delete_ingredient, update_ingredient
 from feed.actions.inventory import InventoryActions
 from feed.actions.productions import (
     complete_production,
+    create_production,
     delete_production_with_inventory,
     mark_stage_1_done,
     update_production,
 )
-from feed.models import InventoryMovementModel, RecipeVersionModel
-from feed.actions.recipes import create_recipe, update_recipe
+from feed.models import RecipeVersionModel
+from feed.actions.recipes import create_recipe, delete_recipe as delete_recipe_action, update_recipe
 from feed.actions.recipe_versions import (
     RecipeVersionActions,
     recipe_version_items_from_formset,
 )
 from feed.selectors.inventory import (
-    deliveries_for_farm,
     ingredients_for_farm,
     inventory_dashboard,
-    inventory_movements,
+    inventory_page_context,
     latest_delivery_prices_map,
 )
 from feed.selectors.productions import (
-    default_production_quantity,
+    default_production_initial,
+    production_counts_for_version,
     production_details_for_stages,
-    productions_for_farm,
+    production_list_context,
 )
 from feed.selectors.recipes import (
     calculator_price_rows,
     recipe_costs,
     recipe_detail as recipe_detail_context,
-    recipe_exists,
+    recipe_list_context,
+    recipe_version_detail_context,
     recipe_version_for_farm_or_404,
     recipes_with_items,
 )
@@ -75,9 +78,7 @@ def add_ingredient_view(request):
     if request.method == 'POST':
         form = IngredientForm(request.POST, farm=farm)
         if form.is_valid():
-            ingredient = form.save(commit=False)
-            ingredient.farm = farm
-            ingredient.save()
+            ingredient = create_ingredient(form, farm=farm)
             log_action(farm=farm, user=request.user, action="CREATE", obj=ingredient)
             messages.success(request, "Składnik został dodany.")
             return redirect('ingredient_list')
@@ -94,7 +95,7 @@ def edit_ingredient_view(request, pk):
     if request.method == 'POST':
         form = IngredientForm(request.POST, instance=ingredient, farm=farm)
         if form.is_valid():
-            ingredient = form.save()
+            ingredient = update_ingredient(form)
             log_action(farm=farm, user=request.user, action="UPDATE", obj=ingredient)
             messages.success(request, "Zaktualizowano pomyślnie.")
             return redirect('ingredient_list')
@@ -118,10 +119,15 @@ def delete_ingredient_view(request, pk):
     ingredient = get_object_or_404(IngredientModel, pk=pk, farm=farm)
     if request.method == 'POST':
         try:
-            representation = str(ingredient)
-            object_id = ingredient.pk
-            ingredient.delete()
-            log_action(farm=farm, user=request.user, action="DELETE", model_label="feed.IngredientModel", object_id=object_id, object_repr=representation)
+            deleted_ingredient = delete_ingredient(ingredient)
+            log_action(
+                farm=farm,
+                user=request.user,
+                action="DELETE",
+                model_label=deleted_ingredient.model_label,
+                object_id=deleted_ingredient.object_id,
+                object_repr=deleted_ingredient.object_repr,
+            )
             messages.success(request, "Składnik usunięty.")
         except (ProtectedError, RestrictedError):
             messages.error(request,
@@ -136,11 +142,12 @@ def feed_inventory_view(request):
     movement_type = request.GET.get('movement_type', '')
     date_from = parse_filter_date(request.GET.get('date_from'))
     date_to = parse_filter_date(request.GET.get('date_to'))
-    context = inventory_dashboard(farm)
-    context['deliveries'] = deliveries_for_farm(farm)
-    movements = inventory_movements(farm, movement_type=movement_type, date_from=date_from, date_to=date_to)
-    context['movements'] = movements[:50]
-    context['movement_types'] = InventoryMovementModel.Types.choices
+    context = inventory_page_context(
+        farm,
+        movement_type=movement_type,
+        date_from=date_from,
+        date_to=date_to,
+    )
     context.update(filter_ui_state(request.GET, {'movement_type': 'Typ', 'date_from': 'Od', 'date_to': 'Do'}))
     return render(request, 'feed/inventory.html', context)
 
@@ -210,10 +217,7 @@ def delete_delivery_view(request, pk):
 @login_required
 def feed_recipes_view(request):
     farm = get_current_farm(request)
-    recipes = recipes_with_items(farm)
-    costs = {cost.recipe_id: cost for cost in recipe_costs(farm)}
-    recipe_cards = [{'recipe': recipe, 'cost': costs.get(recipe.id)} for recipe in recipes]
-    return render(request, 'feed/recipes.html', {'recipe_cards': recipe_cards})
+    return render(request, 'feed/recipes.html', recipe_list_context(farm))
 
 
 @login_required
@@ -289,10 +293,15 @@ def delete_recipe_view(request, pk):
     recipe = get_object_or_404(RecipeModel, pk=pk, farm=farm)
     if request.method == 'POST':
         try:
-            representation = str(recipe)
-            object_id = recipe.pk
-            recipe.delete()
-            log_action(farm=farm, user=request.user, action="DELETE", model_label="feed.RecipeModel", object_id=object_id, object_repr=representation)
+            deleted_recipe = delete_recipe_action(recipe)
+            log_action(
+                farm=farm,
+                user=request.user,
+                action="DELETE",
+                model_label=deleted_recipe["model_label"],
+                object_id=deleted_recipe["object_id"],
+                object_repr=deleted_recipe["object_repr"],
+            )
             messages.success(request, "Receptura usunięta.")
         except (ProtectedError, RestrictedError):
             messages.error(request, "Nie można usunąć receptury, ponieważ zrealizowano z jej użyciem śrutowanie.")
@@ -302,19 +311,7 @@ def delete_recipe_view(request, pk):
 @login_required
 def recipe_version_detail_view(request, pk, version_pk):
     farm = get_current_farm(request)
-    version = recipe_version_for_farm_or_404(farm, pk, version_pk)
-    productions = (
-        ProductionModel.objects
-        .filter(recipe_version=version, recipe__farm=farm)
-        .order_by('-date', '-time', '-id')
-    )
-    return render(request, 'feed/recipe_version_detail.html', {
-        'recipe': version.recipe,
-        'version': version,
-        'productions': productions[:50],
-        'production_count': productions.count(),
-        'completed_count': productions.filter(status=ProductionModel.Statuses.COMPLETED).count(),
-    })
+    return render(request, 'feed/recipe_version_detail.html', recipe_version_detail_context(farm, pk, version_pk))
 
 
 @login_required
@@ -372,13 +369,7 @@ def add_recipe_version_view(request, pk, version_pk):
 def edit_recipe_version_view(request, pk, version_pk):
     farm = get_current_farm(request)
     version = recipe_version_for_farm_or_404(farm, pk, version_pk)
-    assigned_productions = ProductionModel.objects.filter(recipe_version=version, recipe__farm=farm)
-    assigned_production_count = assigned_productions.count()
-    completed_production_count = assigned_productions.filter(status=ProductionModel.Statuses.COMPLETED).count()
-    custom_recipe_count = assigned_productions.filter(
-        status=ProductionModel.Statuses.COMPLETED,
-        custom_recipe_data__isnull=False,
-    ).count()
+    production_counts = production_counts_for_version(farm, version)
     VersionItemFormSet = recipe_version_item_formset_factory(extra=0)
 
     if request.method == 'POST':
@@ -415,27 +406,25 @@ def edit_recipe_version_view(request, pk, version_pk):
         'source_version': None,
         'formset': formset,
         'is_edit': True,
-        'requires_confirmation': assigned_production_count > 0,
-        'assigned_production_count': assigned_production_count,
-        'completed_production_count': completed_production_count,
-        'custom_recipe_count': custom_recipe_count,
+        'requires_confirmation': production_counts["assigned"] > 0,
+        'assigned_production_count': production_counts["assigned"],
+        'completed_production_count': production_counts["completed"],
+        'custom_recipe_count': production_counts["custom"],
     })
 
 
 @login_required
 def feed_production_view(request):
     farm = get_current_farm(request)
-    productions = productions_for_farm(farm)
     status = request.GET.get('status', '')
     date_from = parse_filter_date(request.GET.get('date_from'))
     date_to = parse_filter_date(request.GET.get('date_to'))
-    if status:
-        productions = productions.filter(status=status)
-    if date_from:
-        productions = productions.filter(date__gte=date_from)
-    if date_to:
-        productions = productions.filter(date__lte=date_to)
-    context = {'productions': productions, 'production_statuses': ProductionModel.Statuses.choices}
+    context = production_list_context(
+        farm,
+        status=status,
+        date_from=date_from,
+        date_to=date_to,
+    )
     context.update(filter_ui_state(request.GET, {'status': 'Status', 'date_from': 'Od', 'date_to': 'Do'}))
     return render(request, 'feed/productions.html', context)
 
@@ -446,7 +435,7 @@ def add_production_view(request):
     if request.method == 'POST':
         form = ProductionForm(request.POST, farm=farm)
         if form.is_valid():
-            production = form.save()
+            production = create_production(form)
             try:
                 log_action(farm=farm, user=request.user, action="CREATE", obj=production)
             except Exception:
@@ -474,15 +463,7 @@ def add_production_view(request):
                 messages.success(request, "Śrutowanie zostało dodane do kolejki.")
             return redirect('feed_productions')
     else:
-        now = timezone.now()
-        initial = {
-            'quantity_kg': default_production_quantity(farm),
-            'date': now.date(),
-            'time': now.strftime('%H:%M')
-        }
-        selected_recipe = request.GET.get('recipe')
-        if selected_recipe and recipe_exists(farm, selected_recipe):
-            initial['recipe'] = selected_recipe
+        initial = default_production_initial(farm, selected_recipe=request.GET.get('recipe'))
         form = ProductionForm(farm=farm, initial=initial)
 
     recipes = recipes_with_items(farm)
