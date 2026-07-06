@@ -29,6 +29,7 @@ from farms.services.current_farm import get_current_farm
 from farms.services.farm_dashboard import FarmDashboardService
 from farms.services.module_navigation import ModuleNavigationService
 from farms.services.audit_log_service import log_action
+from sows.actions.events import record_bulk_pregnancy_checks, record_bulk_vaccinations
 from sows.domain.event_details import initial_data_from_event_details
 
 logger = logging.getLogger(__name__)
@@ -288,18 +289,17 @@ def bulk_pregnancy_check_view(request):
     sows_to_check = context['sows_to_check_usg']
 
     if request.method == 'POST':
-        for sow in sows_to_check:
-            result = request.POST.get(f'result_{sow.id}')
-
-            if result in ['TAK', 'NIE', '?']:
-                db_sow = get_object_or_404(SowModel, id=sow.id, farm=farm)
-                event = SowEventModel.objects.create(
-                    sow=db_sow,
-                    event_type='PREGNANCY_CHECK',
-                    event_date=date.today(),
-                    details={'result': result}
-                )
-                log_action(farm=farm, user=request.user, action="CREATE", obj=event)
+        results_by_sow_id = {
+            sow.id: request.POST.get(f'result_{sow.id}')
+            for sow in sows_to_check
+        }
+        events = record_bulk_pregnancy_checks(
+            farm=farm,
+            sows=sows_to_check,
+            results_by_sow_id=results_by_sow_id,
+        )
+        for event in events:
+            log_action(farm=farm, user=request.user, action="CREATE", obj=event)
         return redirect('dashboard')
 
     return render(request, 'sows/bulk_pregnancy.html', {'sows': sows_to_check})
@@ -324,10 +324,15 @@ def bulk_vaccinate_view(request):
         cycle_id = request.POST.get('cycle_id')
 
         if request.POST.get('confirm') == 'yes':
-            events = _create_vaccination_events(sow_ids, vaccine_name, cycle_id, farm)
+            events = record_bulk_vaccinations(
+                farm=farm,
+                sow_ids=sow_ids,
+                vaccine_name=vaccine_name,
+                cycle_id=cycle_id,
+            )
             for event in events:
                 log_action(farm=farm, user=request.user, action="CREATE", obj=event)
-            messages.success(request, f"Zapisano szczepienie dla {len(sow_ids)} macior.")
+            messages.success(request, f"Zapisano szczepienie dla {len(events)} macior.")
             return redirect('dashboard')
         else:
             sows = SowModel.objects.filter(id__in=sow_ids, farm=farm)
@@ -445,23 +450,6 @@ def delete_event_view(request, event_id):
         log_action(farm=farm, user=request.user, action="DELETE", model_label="sows.SowEventModel", object_id=object_id, object_repr=representation)
         return redirect('sow_detail', sow_id=sow_id)
     return redirect('dashboard')
-
-
-def _create_vaccination_events(sow_ids: list, vaccine_name: str, cycle_id: str, farm) -> list:
-    """Tworzy zdarzenia szczepienia dla wskazanych macior."""
-    events = []
-    for s_id in sow_ids:
-        db_sow = get_object_or_404(SowModel, id=s_id, farm=farm)
-        events.append(SowEventModel.objects.create(
-            sow=db_sow,
-            event_type='VACCINATION',
-            event_date=date.today(),
-            details={
-                'vaccine_name': vaccine_name,
-                'cycle_id': cycle_id
-            }
-        ))
-    return events
 
 
 def _get_event_initial_data(db_event: SowEventModel) -> dict:
