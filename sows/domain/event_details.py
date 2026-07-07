@@ -27,6 +27,8 @@ def build_event_details(data: Mapping[str, Any]) -> dict:
         }
     if event_type == SowStateMachine.WEANING:
         return {'count': _value(data, 'count', 0)}
+    if event_type == SowStateMachine.MISCARRIAGE:
+        return {}
     if event_type == SowStateMachine.VACCINATION:
         return {'vaccine_name': _value(data, 'vaccine_name', '')}
 
@@ -47,6 +49,8 @@ def initial_data_from_event_details(event_type: str, details: Mapping[str, Any] 
         }
     if event_type == SowStateMachine.WEANING:
         return {'count': details.get('count', 0)}
+    if event_type == SowStateMachine.MISCARRIAGE:
+        return {}
     if event_type == SowStateMachine.VACCINATION:
         return {'vaccine_name': details.get('vaccine_name', '')}
 

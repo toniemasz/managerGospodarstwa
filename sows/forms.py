@@ -1,9 +1,10 @@
 # sows/forms.py
 from django import forms
+from django.utils import timezone
 from django.forms import formset_factory
 
 from .services.sow_repository import VaccinationPlanRepository
-from .models import SowModel, SowEventModel, VaccinationPlanModel
+from .models import MortalityReportModel, SowModel, SowEventModel, VaccinationPlanModel
 from django.core.exceptions import ValidationError
 from sows.domain.event_details import build_event_details
 from sows.domain.sow_state_machine import SowStateMachine
@@ -234,3 +235,61 @@ BulkSowEventFormSet = formset_factory(BulkSowEventRowForm, extra=0, can_delete=T
 
 def empty_bulk_event_initials(count: int = 8) -> list[dict]:
     return [{'event_date': None} for _ in range(count)]
+
+
+class MortalityReportForm(forms.ModelForm):
+    quantity = forms.IntegerField(label="Liczba sztuk", min_value=1, required=False)
+
+    class Meta:
+        model = MortalityReportModel
+        fields = ['mortality_type', 'sow', 'quantity', 'mortality_date', 'reason', 'note']
+        labels = {
+            'mortality_type': 'Typ upadku',
+            'sow': 'Maciora',
+            'mortality_date': 'Data upadku',
+            'reason': 'Przyczyna',
+            'note': 'Notatka',
+        }
+        widgets = {
+            'mortality_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
+            'note': forms.Textarea(attrs={'rows': 3}),
+        }
+
+    def __init__(self, *args, farm=None, **kwargs):
+        self.farm = farm
+        super().__init__(*args, **kwargs)
+        self.fields['sow'].queryset = SowModel.objects.none()
+        if self.farm is not None:
+            self.fields['sow'].queryset = SowModel.objects.filter(
+                farm=self.farm,
+                is_archived=False,
+            ).order_by('ear_tag')
+            self.instance.farm = self.farm
+        self.fields['sow'].required = False
+        self.fields['quantity'].help_text = "Dla maciory system zapisuje 1 sztukę automatycznie."
+
+    def clean(self):
+        cleaned_data = super().clean()
+        mortality_type = cleaned_data.get('mortality_type')
+        mortality_date = cleaned_data.get('mortality_date')
+        sow = cleaned_data.get('sow')
+        quantity = cleaned_data.get('quantity')
+
+        if mortality_date and mortality_date > timezone.localdate():
+            self.add_error('mortality_date', "Data upadku nie może być z przyszłości.")
+
+        if mortality_type == MortalityReportModel.TYPE_SOW:
+            if sow is None:
+                self.add_error('sow', "Wybierz aktywną maciorę.")
+            elif self.farm is not None and sow.farm_id != self.farm.id:
+                self.add_error('sow', "Wybrana maciora nie należy do bieżącego gospodarstwa.")
+            elif sow.is_archived:
+                self.add_error('sow', "Nie można zgłosić upadku już zarchiwizowanej maciory.")
+            cleaned_data['quantity'] = 1
+
+        elif mortality_type == MortalityReportModel.TYPE_POST_WEANING:
+            if quantity is None:
+                self.add_error('quantity', "Podaj liczbę sztuk.")
+            cleaned_data['sow'] = None
+
+        return cleaned_data

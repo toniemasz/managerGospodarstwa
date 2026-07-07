@@ -14,20 +14,23 @@ from .services.bulk_event_service import BulkSowEventService
 from .services.sow_event_service import FARROWING_DECISION_CANCEL
 from .forms import (
     BulkSowEventFormSet,
+    MortalityReportForm,
     SowForm,
     SowEventForm,
     VaccinationPlanForm,
     empty_bulk_event_initials,
 )
-from .models import SowModel, SowEventModel
+from .models import MortalityReportModel, SowModel, SowEventModel
 from common.date_range import PERIOD_OPTIONS, parse_date_range
 from common.filter_ui import filter_ui_state
 from farms.services.current_farm import get_current_farm
 from farms.services.farm_dashboard import FarmDashboardService
 from farms.services.module_navigation import ModuleNavigationService
 from farms.services.audit_log_service import log_action
+from sows.actions.mortality import create_mortality_report
 from sows.actions.events import SowEventActions
 from sows.domain.event_details import initial_data_from_event_details
+from sows.selectors.mortality import mortality_list_context
 
 logger = logging.getLogger(__name__)
 
@@ -384,6 +387,9 @@ def delete_sow_view(request, sow_id):
         if request.POST.get('archive') == 'on':
             db_sow.is_archived = True
             db_sow.archived_at = timezone.now()
+            db_sow.archive_reason = SowModel.ARCHIVE_REASON_MANUAL
+            db_sow.death_date = None
+            db_sow.death_note = ""
             db_sow.save()
             log_action(farm=farm, user=request.user, action="ARCHIVE", obj=db_sow)
         else:
@@ -404,6 +410,49 @@ def archived_sows_view(request):
     except Exception:
         logger.exception("Błąd w archiwum macior")
         return HttpResponse("Wystąpił błąd w archiwum. Szczegóły zapisano w logach aplikacji.", status=500)
+
+
+@login_required
+def mortality_list_view(request):
+    farm = get_current_farm(request)
+    context = mortality_list_context(farm, request.GET)
+    return render(request, 'sows/mortality_list.html', context)
+
+
+@login_required
+def report_mortality_view(request):
+    farm = get_current_farm(request)
+    if request.method == 'POST':
+        form = MortalityReportForm(request.POST, farm=farm)
+        if form.is_valid():
+            try:
+                result = create_mortality_report(
+                    farm=farm,
+                    user=request.user,
+                    data=form.cleaned_data,
+                )
+            except ValidationError as error:
+                form.add_error(None, error)
+            else:
+                _log_mortality_report(farm=farm, user=request.user, result=result)
+                if result.report.mortality_type == MortalityReportModel.TYPE_SOW:
+                    messages.success(
+                        request,
+                        "Zgłoszono upadek maciory. Maciora została zarchiwizowana z powodu upadku.",
+                    )
+                else:
+                    messages.success(request, "Zgłoszono upadek zwierząt po odsadzeniu.")
+                return redirect('mortality_list')
+    else:
+        form = MortalityReportForm(
+            farm=farm,
+            initial={
+                'mortality_date': date.today(),
+                'mortality_type': request.GET.get('mortality_type', ''),
+            },
+        )
+
+    return render(request, 'sows/mortality_form.html', {'form': form})
 
 
 @login_required
@@ -456,3 +505,28 @@ def delete_event_view(request, event_id):
 def _get_event_initial_data(db_event: SowEventModel) -> dict:
     """Przygotowuje dane początkowe formularza na podstawie typu zdarzenia."""
     return initial_data_from_event_details(db_event.event_type, db_event.details)
+
+
+def _log_mortality_report(*, farm, user, result) -> None:
+    report = result.report
+    metadata = {
+        "mortality_type": report.mortality_type,
+        "mortality_date": report.mortality_date.isoformat(),
+        "quantity": report.quantity,
+        "sow_id": report.sow_id,
+        "reason": report.reason,
+        "note": report.note,
+    }
+    log_action(farm=farm, user=user, action="CREATE", obj=report, metadata=metadata)
+    if result.archived_sow and report.sow_id:
+        log_action(
+            farm=farm,
+            user=user,
+            action="ARCHIVE",
+            obj=report.sow,
+            metadata={
+                "archive_reason": SowModel.ARCHIVE_REASON_DEATH,
+                "death_date": report.mortality_date.isoformat(),
+                "mortality_report_id": report.id,
+            },
+        )

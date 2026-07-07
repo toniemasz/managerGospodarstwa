@@ -10,6 +10,7 @@ from sows.domain.sow_state_machine import SowStateMachine
     ('TO_CHECK', 'PREGNANCY_CHECK'),
     ('TO_RECHECK', 'INSEMINATION'),
     ('PREGNANT', 'FARROWING'),
+    ('PREGNANT', 'MISCARRIAGE'),
     ('LACTATING', 'WEANING'),
 ])
 def test_state_machine_allows_valid_transitions(status, event_type):
@@ -18,6 +19,7 @@ def test_state_machine_allows_valid_transitions(status, event_type):
 
 @pytest.mark.parametrize("status,event_type", [
     ('IDLE', 'FARROWING'),
+    ('IDLE', 'MISCARRIAGE'),
     ('LACTATING', 'INSEMINATION'),
     ('PREGNANT', 'WEANING'),
 ])

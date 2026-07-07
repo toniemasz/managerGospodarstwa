@@ -13,6 +13,7 @@ class SowStateMachine:
     PREGNANCY_CHECK = 'PREGNANCY_CHECK'
     FARROWING = 'FARROWING'
     WEANING = 'WEANING'
+    MISCARRIAGE = 'MISCARRIAGE'
     VACCINATION = 'VACCINATION'
 
     STATUSES = (
@@ -29,6 +30,7 @@ class SowStateMachine:
         PREGNANCY_CHECK,
         FARROWING,
         WEANING,
+        MISCARRIAGE,
         VACCINATION,
     )
 
@@ -37,7 +39,7 @@ class SowStateMachine:
         INSEMINATED: {PREGNANCY_CHECK, INSEMINATION},
         TO_CHECK: {PREGNANCY_CHECK, INSEMINATION},
         TO_RECHECK: {PREGNANCY_CHECK, INSEMINATION},
-        PREGNANT: {FARROWING, INSEMINATION},
+        PREGNANT: {FARROWING, MISCARRIAGE, INSEMINATION},
         LACTATING: {WEANING},
     }
 
@@ -47,7 +49,7 @@ class SowStateMachine:
         INSEMINATED: "Po inseminacji można dodać badanie USG albo ponowną inseminację.",
         TO_CHECK: "Maciora oczekuje na badanie USG. Dodaj badanie albo ponowną inseminację.",
         TO_RECHECK: "Maciora jest do rebadania. Dodaj badanie USG albo nową inseminację.",
-        PREGNANT: "Maciora jest prośna. Następnym naturalnym zdarzeniem jest oproszenie.",
+        PREGNANT: "Maciora jest prośna. Następnym naturalnym zdarzeniem jest oproszenie albo poronienie.",
     }
 
     FARROWING_WITHOUT_CHECK_STATUSES = {

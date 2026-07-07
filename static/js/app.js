@@ -136,6 +136,7 @@
             PREGNANCY_CHECK: document.getElementById('sec_pregnancy_check'),
             FARROWING: document.getElementById('sec_farrowing'),
             WEANING: document.getElementById('sec_weaning'),
+            MISCARRIAGE: document.getElementById('sec_miscarriage'),
             VACCINATION: document.getElementById('sec_vaccination')
         };
 
@@ -144,6 +145,7 @@
             PREGNANCY_CHECK: ['id_pregnancy_result'],
             FARROWING: ['id_born_alive', 'id_born_dead'],
             WEANING: ['id_count'],
+            MISCARRIAGE: [],
             VACCINATION: ['id_vaccine_name']
         };
 
@@ -191,6 +193,7 @@
             PREGNANCY_CHECK: ['pregnancy_result'],
             FARROWING: ['born_alive', 'born_dead'],
             WEANING: ['count'],
+            MISCARRIAGE: [],
             VACCINATION: ['vaccine_name']
         };
 
@@ -285,6 +288,32 @@
                 });
             });
         }
+    }
+
+    function initMortalityForm(root = document) {
+        const form = root.getElementById?.('mortality-form') || document.getElementById('mortality-form');
+        if (!form || form.dataset.mortalityBound === 'true') return;
+
+        const typeSelect = form.querySelector('#id_mortality_type');
+        const sowSection = document.getElementById('sec_mortality_sow');
+        const quantitySection = document.getElementById('sec_mortality_quantity');
+        const sowField = form.querySelector('#id_sow');
+        const quantityField = form.querySelector('#id_quantity');
+        if (!typeSelect) return;
+
+        const syncMortalityFields = (shouldClear = false) => {
+            const isSow = typeSelect.value === 'sow';
+            const isPostWeaning = typeSelect.value === 'post_weaning';
+
+            sowSection?.classList.toggle('hidden', !isSow);
+            quantitySection?.classList.toggle('hidden', !isPostWeaning);
+            setFieldState(sowField, isSow, shouldClear);
+            setFieldState(quantityField, isPostWeaning, shouldClear);
+        };
+
+        form.dataset.mortalityBound = 'true';
+        typeSelect.addEventListener('change', () => syncMortalityFields(true));
+        syncMortalityFields(false);
     }
 
     function initSaleFormset(root = document) {
@@ -527,6 +556,7 @@
         initDateRangeFilters();
         initSingleSowEventForm();
         initBulkEventForm();
+        initMortalityForm();
         initSaleFormset();
         initRecipeFormset();
         initProductionStageChecklist();

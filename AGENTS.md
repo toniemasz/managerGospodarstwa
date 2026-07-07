@@ -1,233 +1,575 @@
 # AGENTS.md — managerGospodarstwa
 
-## Project context
+## Kontekst projektu
 
-This is a Django web application for managing farm-related data, including ingredients, feed recipes, inventory, costs, sales, documents, and user-specific farm records.
+To repozytorium zawiera aplikację Django `managerGospodarstwa` służącą do zarządzania gospodarstwem trzody chlewnej. Aplikacja obejmuje między innymi:
 
-The main goal is to keep the project stable, readable, maintainable, and safe for real user data. Prefer practical, production-oriented fixes over large rewrites.
+* maciory, zdarzenia produkcyjne, szczepienia i statusy stada,
+* sprzedaż tuczników i import rozliczeń PDF,
+* składniki paszowe, dostawy, magazyn, FIFO, receptury i śrutowanie,
+* koszty, kategorie kosztów, statystyki i opłacalność,
+* ustawienia gospodarstwa, widoczność modułów, eksport/import danych i historię zmian.
 
-Communicate with the user in Polish unless the user explicitly asks for English.
-
----
-
-## Branch and Git rules
-
-* Work only on the `develop` branch unless the user explicitly says otherwise.
-* Do not modify `main`.
-* Do not create risky or destructive changes without explaining them first.
-* Keep commits and changes focused on the requested task.
-* Do not remove existing features unless the task explicitly requires it.
-* Do not delete migrations, settings files, environment examples, or production-related configuration without a clear reason.
+Projekt jest działającą aplikacją z realnymi danymi, dlatego priorytetem jest stabilność, czytelność, bezpieczeństwo danych i możliwość bezpiecznego dodawania nowych funkcji bez psucia istniejącej logiki.
 
 ---
 
-## General coding rules
+## Zasady pracy z repozytorium
 
-* Prefer simple, readable, maintainable code.
-* Do not rewrite the whole project if a targeted fix is enough.
-* Preserve the existing architecture, naming style, and app structure where possible.
-* Avoid unnecessary dependencies.
-* Ask before adding any new production dependency.
-* Keep business logic out of templates when possible.
-* Avoid duplicating logic across views, forms, templates, and services.
-* Prefer reusable helpers, services, model methods, or template includes when the same logic appears in many places.
-* Keep changes small enough to review.
-
----
-
-## Django conventions
-
-* Follow standard Django patterns.
-* Use Django forms for validation.
-* Use views for request handling, not for complex business calculations.
-* Put repeated business calculations in services/helpers.
-* Put repeated UI fragments in template includes.
-* Use model methods only when the logic naturally belongs to the model.
-* Create migrations whenever models change.
-* Do not edit old migrations unless there is a very strong reason.
-* Be careful with authentication, permissions, and user-specific data.
+* Pracuj wyłącznie na branchu `develop`, chyba że użytkownik wyraźnie poleci inaczej.
+* Nigdy nie modyfikuj brancha `main`.
+* Nie wykonuj commitów, chyba że użytkownik wyraźnie o to poprosi.
+* Nie usuwaj istniejących funkcji bez wyraźnej zgody użytkownika.
+* Nie wykonuj dużych refaktorów, jeśli wystarczy mała, bezpieczna zmiana.
+* Przed zmianą zawsze sprawdź aktualną strukturę plików i sposób działania danego modułu.
+* Zachowuj istniejący styl projektu, nazewnictwo, wzorce formularzy, widoków, serwisów i testów.
+* Jeżeli widzisz problem architektoniczny niezwiązany bezpośrednio z zadaniem, opisz go w podsumowaniu, ale nie poprawiaj go przy okazji bez potrzeby.
 
 ---
 
-## Data safety and user isolation
+## Główna zasada architektoniczna
 
-* Never expose data from one user to another user.
-* When adding queries, filters, exports, backups, reports, or dashboards, ensure they are scoped to the correct user/farm.
-* Do not assume a global dataset unless the existing code clearly uses one.
-* Be careful with admin-only features.
-* Backup, export, and delete operations must be safe and clearly scoped.
-* Do not log secrets, passwords, tokens, API keys, private email data, or production database credentials.
+Projekt ma pozostać modułowym monolitem Django. Nie należy rozbijać go na mikroserwisy ani przebudowywać całej struktury bez wyraźnego polecenia.
 
----
+Podstawowe aplikacje domenowe:
 
-## Inventory, costs, and accounting logic
-
-Inventory and cost calculations are business-critical.
-
-When changing anything related to ingredients, feed, purchases, stock levels, production, sales, costs, or profit:
-
-* Understand the current flow before editing.
-* Do not change the accounting meaning accidentally.
-* Be careful with unit conversions.
-* Be careful with FIFO / purchase batches / historical prices if they exist.
-* Do not average costs unless the task explicitly asks for it.
-* Do not let buying ingredients on stock incorrectly inflate production cost or profit.
-* Explain the business consequence of any calculation change.
-* Add or update tests for cost and inventory logic where possible.
-
----
-
-## Forms and validation
-
-* Keep forms user-friendly and strict enough to prevent invalid data.
-* Preserve existing required/optional field behavior unless the task says otherwise.
-* If a form test fails, inspect whether the failure is caused by changed required fields, widgets, choices, or validation.
-* Keep validation messages understandable.
-
----
-
-## UI and UX rules
-
-The user prefers a clean, modern, consistent interface.
-
-When changing frontend code:
-
-* Improve desktop, tablet, and mobile behavior.
-* Keep layout consistent across pages.
-* Keep UI patterns consistent across modules: forms, cards, page headers, tables, alerts, buttons, and action layouts should feel like one application.
-* Use reusable template includes instead of duplicated HTML.
-* Do not create one-off local styles when the same UI problem appears in several places. Prefer shared CSS classes, reusable Django template includes, and component-like template structure.
-* Keep tables readable and responsive.
-* Settings should be placed near the logout/user area if the task concerns navigation.
-* Do not mix unrelated visual changes into one huge edit.
-* Keep CSS modular where possible:
-
-  * layout CSS,
-  * table CSS,
-  * form CSS,
-  * navigation CSS,
-  * theme/colors CSS,
-  * responsive CSS.
-
-Prefer improving existing templates and CSS instead of introducing a completely new frontend framework.
-
-Forms must adapt to the content of their fields. Text, number, and date inputs should not look cramped; labels need readable line-height and spacing and must not overlap inputs or nearby text.
-
-When working with numeric fields, account for Polish user formats: decimal comma, spaces or non-breaking spaces as thousand separators, and units such as kg, zł/kg, szt., %, gross/net values.
-
-For UX changes, check desktop, tablet, and phone layouts.
-
----
-
-## Tables
-
-For tables:
-
-* Make them readable on desktop.
-* Make them usable on mobile.
-* Avoid horizontal overflow where possible, but allow it when tables are too complex.
-* Keep actions visually clear.
-* Keep numeric values aligned and formatted consistently when possible.
-* Do not hide important business data just to make the table smaller.
-
----
-
-## PDF, import, export, and documents
-
-When changing PDF parsing, imports, exports, backups, or document handling:
-
-* Preserve existing parsed fields unless the task says otherwise.
-* Do not break existing imports.
-* Handle missing or malformed data safely.
-* Validate dates and numbers carefully.
-* Do not reject correctly visible PDF values only because they use decimal commas, spaces, non-breaking spaces, units, or non-standard separators.
-* For sales PDFs, handle common units such as kg, zł, zł/kg, szt., and % without producing warnings when the cleaned value is valid.
-* For sales PDFs, preserve document number parsing and parse sale/slaughter dates only when reliable.
-* Explain what happens when a field cannot be parsed.
-* Keep PDF import messages practical and compact. Prefer a short summary, smaller detailed list or disclosure, and row/field indicators where possible over many large repeated alerts.
-* Do not expose files belonging to other users.
-
-When changing PDF parsers, add or update tests using representative PDF text or fixtures. Include cases for Polish numeric formats and real invalid values that should still produce warnings.
-
----
-
-## Tests and verification
-
-After backend changes, run relevant tests.
-
-Preferred commands:
-
-```bash
-python manage.py test
+```text
+farms/   - gospodarstwo, ustawienia, użytkownik, historia zmian, raporty przekrojowe
+sows/    - maciory, zdarzenia, statusy, szczepienia, dashboard stada
+feed/    - pasza, magazyn, dostawy, FIFO, receptury, śrutowanie
+sales/   - sprzedaż tuczników, rozliczenia, import PDF
+costs/   - koszty, kategorie, płatności
+common/  - współdzielone helpery niezależne od domeny
 ```
 
-If the project uses a different command, inspect the repo and use the correct one.
+Nowe funkcje dodawaj do modułu, do którego domenowo należą. Nie wrzucaj wszystkiego do `farms`, `views.py` albo przypadkowych helperów.
 
-For targeted changes, run the most relevant tests first, for example:
+---
 
-```bash
-python manage.py test farms
+## Warstwy kodu
+
+Stosuj konsekwentny podział odpowiedzialności.
+
+### `models.py`
+
+Modele powinny zawierać:
+
+* strukturę danych,
+* relacje,
+* constraints,
+* indeksy,
+* proste właściwości modelu,
+* proste metody naturalnie należące do modelu.
+
+Modele nie powinny zawierać ciężkiej logiki procesów, rozbudowanych operacji biznesowych ani logiki widoków.
+
+### `forms.py`
+
+Formularze odpowiadają za:
+
+* walidację danych wejściowych użytkownika,
+* ograniczenie querysetów do bieżącego gospodarstwa,
+* wymagane i opcjonalne pola,
+* komunikaty walidacyjne,
+* format pól formularza.
+
+Formularze nie powinny księgować magazynu, przeliczać FIFO, tworzyć raportów ani wykonywać złożonych skutków ubocznych.
+
+### `views.py`
+
+Widoki powinny być możliwie cienkie. Ich rola to:
+
+* pobranie `farm` przez `get_current_farm(request)`,
+* obsługa GET/POST,
+* utworzenie formularza,
+* sprawdzenie `form.is_valid()`,
+* wywołanie odpowiedniego `action`, `service` albo `selector`,
+* dodanie komunikatu `messages`,
+* wykonanie `redirect()` albo `render()`.
+
+Nie umieszczaj w widokach ciężkiej logiki biznesowej, rozbudowanych obliczeń, księgowania, FIFO, parserów PDF ani skomplikowanych agregacji.
+
+### `actions/`
+
+Folder `actions/` służy do operacji zmieniających dane.
+
+Umieszczaj tu:
+
+* tworzenie rekordów,
+* edycję rekordów,
+* usuwanie rekordów,
+* księgowanie,
+* operacje transakcyjne,
+* operacje mające skutki uboczne,
+* przebudowę danych po zmianach.
+
+Akcje powinny używać `transaction.atomic()` tam, gdzie zmiana dotyczy kilku modeli lub może częściowo się nie udać.
+
+### `selectors/`
+
+Folder `selectors/` służy do odczytu danych.
+
+Umieszczaj tu:
+
+* query sety,
+* filtrowanie list,
+* konteksty dla widoków,
+* dane do dashboardów,
+* dane do szczegółów obiektu,
+* agregacje do wyświetlenia.
+
+Selector nie powinien zapisywać danych.
+
+### `services/`
+
+Folder `services/` służy do większych procesów biznesowych.
+
+Umieszczaj tu:
+
+* dashboardy,
+* raporty,
+* import/export,
+* statystyki,
+* opłacalność,
+* centrum zadań,
+* parsery i obsługę procesów, które łączą kilka kroków.
+
+Serwis może korzystać z modeli, selectorów, kalkulatorów i prostych helperów, ale powinien mieć czytelny zakres odpowiedzialności.
+
+### `calculators/`
+
+Folder `calculators/` służy do czystych obliczeń.
+
+Umieszczaj tu:
+
+* kalkulacje kosztów,
+* przeliczenia ilości,
+* obliczenia receptur,
+* obliczenia magazynowe niezapisujące danych.
+
+Kalkulatory powinny być możliwie niezależne od requesta, widoków i szablonów.
+
+### `domain/`
+
+Folder `domain/` służy do reguł domenowych.
+
+Umieszczaj tu:
+
+* maszyny stanów,
+* stałe domenowe,
+* reguły przejść,
+* proste walidatory biznesowe,
+* logikę niezależną od HTTP.
+
+Przykład: statusy i przejścia macior powinny pozostać w domenie, a nie w widoku.
+
+---
+
+## Najważniejsza zasada: farm isolation
+
+Każde dane użytkownika muszą być filtrowane po bieżącym gospodarstwie.
+
+Zawsze upewnij się, że zapytania są ograniczone przez:
+
+```python
+farm = get_current_farm(request)
 ```
 
-If tests fail:
+albo przez `request.farm`, jeśli jest już dostępne.
 
-* Report which tests failed.
-* Explain whether the failure appears related to the change.
-* Fix related failures if possible.
-* Do not hide failing tests.
+Dotyczy to szczególnie:
 
-When changing forms, models, services, or views, check whether tests need to be updated or added.
+* list,
+* dashboardów,
+* formularzy,
+* eksportów,
+* importów,
+* backupów użytkownika,
+* raportów,
+* statystyk,
+* operacji edycji i usuwania,
+* zapytań `get_object_or_404()`.
 
----
-
-## Authentication and redirects
-
-Be careful with login, logout, authentication decorators, middleware, redirects, and permissions.
-
-If debugging login loops:
-
-* Check redirects.
-* Check login URL settings.
-* Check middleware.
-* Check user authentication state.
-* Check permission checks.
-* Check whether views redirect authenticated users back to login incorrectly.
-
-Do not apply random fixes without identifying the cause.
+Nie wolno dopuścić do sytuacji, w której użytkownik może odczytać, edytować, usunąć lub wyeksportować dane innego gospodarstwa.
 
 ---
 
-## Deployment and production awareness
+## Zasady czystego kodu
 
-This project may be deployed with a production database.
+Stosuj proste, czytelne i przewidywalne rozwiązania.
 
-* Do not assume local-only behavior.
-* Be careful with migrations.
-* Be careful with static files.
-* Be careful with environment variables.
-* Do not hardcode production secrets.
-* Do not hardcode local paths.
-* Keep deployment compatibility in mind.
+* Używaj nazw, które jasno pokazują intencję.
+* Funkcje powinny robić jedną rzecz.
+* Unikaj wielkich funkcji i wielkich widoków.
+* Unikaj duplikacji logiki.
+* Jeżeli ten sam kod pojawia się kilka razy, rozważ helper, selector, service, action albo template include.
+* Nie dodawaj niepotrzebnych abstrakcji.
+* Nie twórz wielu małych modułów tylko po to, żeby kod wyglądał „bardziej architektonicznie”.
+* Nie komplikuj prostego przepływu bez realnej potrzeby.
+* Nie ukrywaj logiki biznesowej w template.
+* Nie mieszaj zmian backendowych, frontendowych i refaktoru w jednym zadaniu, jeśli nie jest to konieczne.
+* Zachowuj zgodność z istniejącymi testami i stylem projektu.
 
 ---
 
-## Preferred task workflow
+## Standard dodawania nowej funkcji
 
-For each task:
+Przed implementacją określ typ funkcji:
 
-1. Inspect the relevant files first.
-2. Identify the smallest safe change.
-3. Make the change.
-4. Run relevant tests or checks.
-5. Summarize the result clearly.
+```text
+zapis danych             -> actions/
+odczyt/lista/dashboard   -> selectors/
+większy proces           -> services/
+czyste obliczenia        -> calculators/
+reguły domenowe          -> domain/
+obsługa formularza       -> forms.py
+obsługa HTTP             -> views.py
+```
 
-Do not start with a large refactor unless the user explicitly asks for one.
+Typowy przepływ pracy:
+
+1. Sprawdź istniejące modele, formularze, widoki, akcje, serwisy i testy.
+2. Znajdź najmniejsze miejsce, w którym zmiana powinna powstać.
+3. Dodaj logikę w odpowiedniej warstwie.
+4. Utrzymaj widok jako cienką warstwę HTTP.
+5. Dopilnuj filtrowania po `farm`.
+6. Dodaj albo zaktualizuj testy.
+7. Uruchom odpowiednie testy.
+8. Opisz zmiany i ryzyka.
+
+---
+
+## Moduł `feed` — szczególna ostrożność
+
+Moduł `feed` jest biznesowo krytyczny. Dotyczy magazynu, FIFO, kosztów paszy, receptur i opłacalności.
+
+Przy zmianach w tym module zachowaj szczególną ostrożność.
+
+Nie zmieniaj przypadkowo znaczenia:
+
+* dostaw,
+* pozostałej ilości dostawy,
+* ruchów magazynowych,
+* FIFO,
+* kosztu produkcji,
+* kosztu za kg,
+* kosztu za tonę,
+* statusów śrutowania,
+* wersji receptur,
+* historycznych śrutowań.
+
+Stan magazynu powinien wynikać z ruchów magazynowych, a nie z ręcznie utrzymywanej liczby.
+
+Produkcja paszy powinna być księgowana przez istniejące akcje i mechanizmy magazynowe. Nie dopisuj alternatywnego księgowania w widoku.
+
+Zakończone śrutowania i ich koszty są podstawą opłacalności, dlatego każda zmiana w FIFO, recepturach, dostawach lub produkcjach wymaga testów.
+
+---
+
+## Receptury i wersje receptur
+
+Receptury są historycznie wrażliwe.
+
+Zasady:
+
+* `RecipeModel` reprezentuje recepturę jako główny byt.
+* `RecipeVersionModel` reprezentuje konkretną wersję składu.
+* Nowe śrutowania powinny używać aktualnej wersji receptury.
+* Historyczne śrutowania nie powinny zmieniać się automatycznie po edycji aktualnej receptury.
+* Edycja istniejącej wersji receptury powinna być świadomą operacją.
+* Jeżeli edycja wersji wpływa na zakończone śrutowania, użytkownik musi to potwierdzić.
+* Przeliczanie zakończonych śrutowań powinno używać istniejącej logiki przebudowy FIFO.
+* `custom_recipe_data` dla konkretnego śrutowania musi być respektowane i nie może zostać przypadkowo utracone.
+
+Nie twórz nowego mechanizmu wersjonowania obok istniejącego. Korzystaj z obecnych modeli i akcji.
+
+---
+
+## Magazyn i FIFO
+
+Dostawy, ruchy magazynowe i zużycie składników muszą pozostać spójne.
+
+Zasady:
+
+* dostawa tworzy ruch magazynowy,
+* produkcja zużywa składniki przez FIFO,
+* produkcja zakończona tworzy ruch zużycia,
+* usunięcie albo edycja danych powiązanych z FIFO musi zachować spójność,
+* nie pozwalaj na ujemne stany, chyba że istniejący przepływ świadomie obsługuje wymuszone zatwierdzenie,
+* nie licz kosztu produkcji średnią ceną, jeśli istniejące FIFO ma być źródłem prawdy,
+* nie usuwaj rozliczonych dostaw bez bezpiecznej obsługi konsekwencji.
+
+Każda zmiana w FIFO powinna mieć test integracyjny.
+
+---
+
+## Moduł `sows`
+
+Logika cyklu maciory powinna pozostać w domenie i serwisach, nie w widokach.
+
+Zasady:
+
+* statusy maciory wynikają z historii zdarzeń,
+* reguły przejść powinny być trzymane w `domain/`,
+* dodawanie, edycja i usuwanie zdarzeń powinno przechodzić przez `actions/` albo istniejące serwisy,
+* szczepienia mogą mieć osobne reguły od statusu produkcyjnego,
+* dashboardy i powiadomienia powinny korzystać z istniejących serwisów.
+
+Nie dopisuj nowych reguł cyklu bez sprawdzenia aktualnej maszyny stanów i testów.
+
+---
+
+## Moduł `sales`
+
+Sprzedaż może być ręczna albo importowana z PDF.
+
+Zasady:
+
+* logika importu PDF powinna pozostać w `sales/services/parsers/` i serwisach sprzedaży,
+* widok nie powinien sam parsować PDF,
+* dane główne sprzedaży mogą być przeliczane z wierszy klas,
+* średnia cena za kg powinna być liczona jako średnia ważona wagą,
+* parsery muszą obsługiwać polskie formaty liczb: przecinek dziesiętny, spacje, jednostki, zł, kg, %, szt.,
+* brakujące albo niepewne dane powinny generować zrozumiałe ostrzeżenia, a nie psuć całego importu, jeśli da się bezpiecznie pokazać podgląd.
+
+Przy zmianach importu PDF dodaj testy dla reprezentatywnego tekstu dokumentu.
+
+---
+
+## Moduł `costs`
+
+Koszty są częścią opłacalności.
+
+Zasady:
+
+* każdy koszt musi być przypisany do gospodarstwa,
+* kategorie kosztów są per gospodarstwo,
+* nie mieszaj kosztów ręcznych z kosztem paszy liczonym z produkcji,
+* koszt paszy powinien pochodzić z zakończonych śrutowań i FIFO,
+* koszty ręczne powinny pozostać osobną kategorią danych,
+* lista kosztów i podsumowania powinny korzystać z serwisu albo selectorów.
+
+Jeżeli moduł kosztów będzie rozbudowywany, preferuj dodanie `costs/actions.py` dla operacji zapisu zamiast rozbudowywania widoków.
+
+---
+
+## Moduł `farms`
+
+`farms` jest modułem systemowym i przekrojowym.
+
+Odpowiada za:
+
+* gospodarstwo użytkownika,
+* ustawienia,
+* widoczność modułów,
+* nawigację,
+* historię zmian,
+* eksport/import,
+* centrum zadań,
+* statystyki,
+* opłacalność.
+
+`farms` może agregować dane z innych modułów, ale nie powinien przejmować ich szczegółowej logiki biznesowej.
+
+Przykład:
+
+* `farms` może pokazać koszt paszy w statystykach,
+* ale nie powinien samodzielnie księgować produkcji paszy.
+
+---
+
+## Nawigacja i moduły
+
+Lista modułów, ich widoczność, adresy i aktywne URL-e powinny być utrzymywane centralnie w rejestrze modułów.
+
+Przy dodawaniu nowej sekcji aplikacji sprawdź:
+
+* czy trzeba dodać wpis do rejestru modułów,
+* czy moduł powinien być widoczny w ustawieniach,
+* czy powinien być dostępny w nawigacji głównej,
+* czy powinien mieć ikonę,
+* czy powinien mieć opis,
+* czy aktywne URL-e są poprawnie oznaczone.
+
+Nie duplikuj logiki nawigacji w template.
+
+---
+
+## UI i template
+
+Frontend jest oparty o Django Templates i CSS.
+
+Zasady:
+
+* używaj istniejących komponentów z `templates/components/`,
+* nie duplikuj dużych fragmentów HTML,
+* wspólne układy formularzy, tabel, filtrów i komunikatów powinny być komponentami albo include,
+* nie dodawaj lokalnych styli inline bez potrzeby,
+* zachowaj spójność desktop/tablet/mobile,
+* tabele muszą być czytelne i responsywne,
+* filtry powinny korzystać z istniejącego wzorca,
+* komunikaty błędów powinny być krótkie i zrozumiałe.
+
+Nie wprowadzaj nowego frameworka frontendowego bez wyraźnej zgody użytkownika.
+
+---
+
+## UX, HTML i template
+
+Przy każdej zmianie widoku najpierw sprawdź istniejące template, komponenty, include, klasy CSS i układ aplikacji. Nie twórz nowego stylu od zera, jeśli projekt ma już gotowy wzorzec.
+
+Widoki mają być czytelne, spokojne wizualnie, responsywne, spójne z resztą aplikacji i możliwe do obsługi na desktopie oraz telefonie. Nie przeładowuj ich informacjami.
+
+Formularze powinny mieć jasny tytuł, krótki opis celu, logiczną kolejność pól, krótkie teksty pomocnicze tam, gdzie użytkownik może się pomylić, widoczne błędy walidacji, czytelne przyciski główne i drugorzędne oraz link powrotu albo anulowania.
+
+Tabele i listy powinny pokazywać najważniejsze informacje jako pierwsze, mieć czytelne nagłówki, unikać zbyt szerokich kolumn, działać na mniejszych ekranach oraz korzystać z istniejących komponentów tabel, kart i filtrów, jeśli są dostępne.
+
+Nie umieszczaj logiki biznesowej w template. Template ma tylko prezentować dane przygotowane przez view, selector albo service.
+
+Nie duplikuj dużych fragmentów HTML. Jeśli podobny układ pojawia się kilka razy, użyj include albo istniejącego komponentu.
+
+Nie dodawaj inline CSS bez potrzeby. Preferuj istniejące klasy i wspólne pliki stylów.
+
+Przy dodawaniu nowej funkcji zadbaj, aby użytkownik rozumiał, co robi dana akcja, jakie będą jej skutki, czy zmiana jest odwracalna i czy wpływa na dane historyczne.
+
+Dla operacji ryzykownych, takich jak usunięcie, archiwizacja, przeliczenie danych, import, restore albo zmiana historii, pokaż jasne ostrzeżenie albo wymagaj świadomego potwierdzenia, jeśli obecny UX projektu tak robi.
+
+---
+
+## Formatowanie liczb i polskie dane
+
+Aplikacja jest używana po polsku i operuje na danych gospodarskich.
+
+Uwzględniaj:
+
+* przecinek dziesiętny,
+* spacje i twarde spacje jako separatory tysięcy,
+* jednostki: kg, t, zł, zł/kg, szt., %, netto, brutto,
+* daty w polskim kontekście,
+* czytelne komunikaty walidacyjne.
+
+Nie psuj obsługi polskich formatów przez zbyt agresywne parsowanie.
+
+---
+
+## Historia zmian i audyt
+
+Najważniejsze operacje powinny zapisywać historię zmian.
+
+Dotyczy to szczególnie:
+
+* tworzenia,
+* edycji,
+* usuwania,
+* archiwizacji,
+* importu,
+* eksportu,
+* backupu,
+* restore,
+* zmian ustawień,
+* operacji magazynowych,
+* przeliczania receptur i śrutowań.
+
+Jeżeli operacja usuwa obiekt, zapisz jego reprezentację przed usunięciem, aby można było poprawnie utworzyć wpis audytu.
+
+---
+
+## Backup, eksport, import i produkcja
+
+Projekt może działać z produkcyjną bazą danych.
+
+Zasady:
+
+* nie zakładaj, że aplikacja działa tylko lokalnie,
+* nie hardcoduj ścieżek lokalnych,
+* nie hardcoduj sekretów,
+* nie loguj haseł, tokenów ani danych wrażliwych,
+* nie usuwaj migracji,
+* nie zmieniaj starych migracji bez bardzo mocnego powodu,
+* importy powinny być atomowe,
+* eksporty muszą być ograniczone do właściwego gospodarstwa/użytkownika,
+* restore całej bazy musi pozostać operacją administracyjną i bezpieczną.
+
+---
+
+## Testy
+
+Po zmianach backendowych uruchamiaj testy.
+
+Preferowane polecenie:
+
+```bash
+pytest
+```
+
+Dla zmian lokalnych uruchamiaj najpierw testy danego modułu, np.:
+
+```bash
+pytest feed
+pytest sows
+pytest sales
+pytest costs
+pytest farms
+```
+
+Jeżeli zmiana dotyczy krytycznej logiki, dodaj albo zaktualizuj testy.
+
+Szczególnie wymagane testy dla zmian w:
+
+* FIFO,
+* ruchach magazynowych,
+* kosztach paszy,
+* recepturach i wersjach receptur,
+* śrutowaniach,
+* sprzedaży i importach PDF,
+* izolacji po gospodarstwie,
+* eksportach/importach,
+* usuwaniu danych,
+* statusach macior.
+
+Jeżeli testów nie da się uruchomić, napisz dlaczego.
+
+Jeżeli testy nie przechodzą, nie ukrywaj tego. Podaj, które testy padły i czy wygląda to na skutek Twojej zmiany.
+
+---
+
+## Kiedy nie refaktorować
+
+Nie refaktoruj tylko dlatego, że kod mógłby wyglądać lepiej.
+
+Refaktor jest uzasadniony, gdy:
+
+* usuwa realną duplikację,
+* zmniejsza ryzyko błędów,
+* upraszcza dodanie konkretnej funkcji,
+* wydziela logikę z widoku do właściwej warstwy,
+* poprawia testowalność,
+* naprawia istniejący problem architektoniczny.
+
+Nie rób dużych zmian struktury przy małym zadaniu. Jeśli widzisz większy problem, zaproponuj go użytkownikowi jako osobny etap.
+
+---
+
+## Bezpieczny workflow dla każdego zadania
+
+Dla każdego zadania wykonaj kolejno:
+
+1. Przeczytaj polecenie użytkownika.
+2. Sprawdź branch i pracuj na `develop`.
+3. Znajdź pliki związane z funkcją.
+4. Zrozum obecny przepływ danych.
+5. Określ najmniejszą bezpieczną zmianę.
+6. Wybierz właściwą warstwę: model, form, action, selector, service, calculator, domain, view, template.
+7. Wprowadź zmianę.
+8. Dodaj lub zaktualizuj testy, jeżeli zmiana dotyczy logiki.
+9. Uruchom odpowiednie testy.
+10. Podsumuj zmiany, pliki, testy i ryzyka.
 
 ---
 
 ## Final response format
 
-At the end of every coding task, provide a concise summary in Polish:
+Na końcu każdej pracy programistycznej odpowiedz po polsku w takim formacie:
 
 ```text
 Zmieniono:
@@ -246,6 +588,16 @@ Ryzyka / uwagi:
 - ...
 ```
 
-If tests were not run, say why.
+Jeżeli czegoś nie udało się zrobić, napisz to wprost.
 
-If something could not be completed, say it directly and explain what remains.
+Jeżeli testy nie były uruchomione, napisz dlaczego.
+
+Jeżeli znaleziono problem niezwiązany bezpośrednio z zadaniem, opisz go krótko w sekcji „Ryzyka / uwagi”, ale nie naprawiaj go bez potrzeby.
+
+---
+
+## Najważniejsza zasada końcowa
+
+Dodawaj nowe funkcje tak, aby nie psuć istniejącej logiki.
+
+Najpierw zrozum aktualny przepływ, potem wykonaj małą zmianę w odpowiedniej warstwie, dopilnuj izolacji po gospodarstwie i zabezpiecz zmianę testem.
