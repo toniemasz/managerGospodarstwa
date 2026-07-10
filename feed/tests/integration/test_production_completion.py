@@ -4,6 +4,7 @@ from decimal import Decimal
 import pytest
 from django.contrib.auth.models import User
 from django.urls import reverse
+from django.utils import timezone
 
 from farms.services.farm_service import get_or_create_user_farm
 from feed.actions.productions import complete_production
@@ -57,6 +58,10 @@ def create_production(recipe, *, production_date=date(2026, 7, 8), status=Produc
     )
 
 
+def completed_local_date(production):
+    return timezone.localdate(production.completed_at)
+
+
 @pytest.mark.django_db
 def test_instant_completion_is_atomic_and_uses_planned_date(authenticated_farm):
     client, user, farm = authenticated_farm
@@ -74,7 +79,7 @@ def test_instant_completion_is_atomic_and_uses_planned_date(authenticated_farm):
     assert response.status_code == 302
     production = ProductionModel.objects.get(recipe=recipe)
     assert production.status == ProductionModel.Statuses.COMPLETED
-    assert production.completed_at.date() == planned_date
+    assert completed_local_date(production) == planned_date
     assert ProductionIngredientUsageModel.objects.filter(production=production).count() == 1
     movement_count = InventoryMovementModel.objects.filter(
         movement_type=InventoryMovementModel.Types.PRODUCTION_USAGE,
@@ -194,8 +199,8 @@ def test_bulk_completion_handles_queued_stage_one_and_duplicate_ids(authenticate
     stage_one.refresh_from_db()
     assert queued.status == ProductionModel.Statuses.COMPLETED
     assert stage_one.status == ProductionModel.Statuses.COMPLETED
-    assert queued.completed_at.date() == queued.date
-    assert stage_one.completed_at.date() == stage_one.date
+    assert completed_local_date(queued) == queued.date
+    assert completed_local_date(stage_one) == stage_one.date
     assert ProductionIngredientUsageModel.objects.filter(production=queued).count() == 1
     assert ProductionIngredientUsageModel.objects.filter(production=stage_one).count() == 1
 
@@ -250,7 +255,7 @@ def test_bulk_completion_continues_after_one_production_fails(authenticated_farm
     assert missing.status == ProductionModel.Statuses.QUEUED
     assert missing.completed_at is None
     assert available.status == ProductionModel.Statuses.COMPLETED
-    assert available.completed_at.date() == available.date
+    assert completed_local_date(available) == available.date
 
 
 @pytest.mark.django_db
