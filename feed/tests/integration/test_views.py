@@ -87,7 +87,6 @@ def feed_objects(auth_client):
     ('add_production', None, 'feed/production_form.html'),
     ('edit_production', 'production', 'feed/production_form.html'),
     ('process_stage1', 'production', 'feed/stage1.html'),
-    ('process_stage2', 'production', 'feed/stage2.html'),
     ('feed_calculator', None, 'feed/calculator.html'),
     ('feed_full_inventory', None, 'feed/full_inventory.html'),
 ])
