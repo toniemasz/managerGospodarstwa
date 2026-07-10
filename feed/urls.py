@@ -1,6 +1,6 @@
 # feed/urls.py
 from django.urls import path
-from . import views
+from . import production_views, views
 
 urlpatterns = [
     # Składniki
@@ -29,12 +29,13 @@ urlpatterns = [
     # Śrutowanie (Produkcja) - Kolejka główna
     path('srutowanie/', views.feed_production_view, name='feed_productions'),
     path('srutowanie/dodaj/', views.add_production_view, name='add_production'),
+    path('srutowanie/zakoncz-zaznaczone/', production_views.bulk_complete_productions_view, name='bulk_complete_productions'),
     path('srutowanie/<int:pk>/edytuj/', views.edit_production_view, name='edit_production'),
     path('srutowanie/<int:pk>/usun/', views.delete_production_view, name='delete_production'),
 
     # Etapy śrutowania
-    path('srutowanie/<int:pk>/etap1/', views.process_stage1_view, name='process_stage1'),
-    path('srutowanie/<int:pk>/etap2/', views.process_stage2_view, name='process_stage2'),
+    path('srutowanie/<int:pk>/etap1/', production_views.process_stage1_view, name='process_stage1'),
+    path('srutowanie/<int:pk>/etap2/', production_views.process_stage2_view, name='process_stage2'),
 
     # Kalkulator
     path('kalkulator/', views.feed_calculator_view, name='feed_calculator'),
