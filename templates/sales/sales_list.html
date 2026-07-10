@@ -13,30 +13,39 @@
             <h1>Zarządzanie sprzedażą</h1>
             <p class="page-subtitle">Rejestr sprzedaży i statystyki roku rozliczeniowego {{ selected_year|unlocalize }}.</p>
         </div>
-        <a href="{% url 'add_sale' %}" class="button button-primary">Nowa sprzedaż</a>
+        <div class="header-actions">
+            <a href="{% url 'farm_statistics' %}?year={{ selected_year|unlocalize }}" class="button button-secondary">Szczegółowe statystyki</a>
+            <a href="{% url 'add_sale' %}" class="button button-primary">Nowa sprzedaż</a>
+        </div>
     </section>
 
     <section class="dashboard-stat-grid sales-stat-grid">
         {% include 'components/stat_card.html' with title='Przychód netto' value=stats.total_net_revenue unit='PLN' icon_name='finance' tone='green' note='Wybrany rok rozliczeniowy' %}
-        {% include 'components/stat_card.html' with title='Przychód brutto' value=stats.total_gross_revenue unit='PLN' icon_name='sales' tone='green' note='Netto razem z VAT' %}
-        {% include 'components/stat_card.html' with title='Średnia cena/kg' value=stats.avg_price_per_kg unit='PLN' icon_name='price' note='Dla widocznych dokumentów' %}
-        {% include 'components/stat_card.html' with title='Dokumenty' value=stats.sale_count icon_name='document' tone='warning' note='Po filtrach' %}
         {% include 'components/stat_card.html' with title='Sprzedane' value=stats.total_pigs unit='szt.' icon_name='sow' tone='green' %}
         {% include 'components/stat_card.html' with title='Waga poubojowa' value=stats.total_weight unit='kg' icon_name='scale' %}
-        {% include 'components/stat_card.html' with title='Waga żywa' value=stats.total_live_weight unit='kg' icon_name='scale' %}
-        {% include 'components/stat_card.html' with title='VAT' value=stats.total_vat unit='PLN' icon_name='tax' %}
-        {% if stats.avg_meatiness != None %}
-            {% include 'components/stat_card.html' with title='Średnia mięsność' value=stats.avg_meatiness unit='%' icon_name='quality' %}
-        {% else %}
-            {% include 'components/stat_card.html' with title='Średnia mięsność' value='Brak danych' icon_name='quality' %}
-        {% endif %}
-        {% if stats.feed_to_live_weight_ratio != None %}
-            {% include 'components/stat_card.html' with title='Pasza / waga żywa' value=stats.feed_to_live_weight_ratio unit='t/t' icon_name='ratio' note='Ton paszy na tonę wagi żywej' %}
-        {% else %}
-            {% include 'components/stat_card.html' with title='Pasza / waga żywa' value='Brak wagi' icon_name='ratio' note='Potrzebna waga żywa' %}
-        {% endif %}
-        {% include 'components/stat_card.html' with title='Śr. waga sztuki' value=stats.avg_weight_per_pig unit='kg' icon_name='scale' %}
+        {% include 'components/stat_card.html' with title='Średnia cena/kg' value=stats.avg_price_per_kg unit='PLN' icon_name='price' note='Dla widocznych dokumentów' %}
     </section>
+
+    <details class="form-disclosure">
+        <summary>Szczegóły sprzedaży <small>pozostałe wskaźniki są też w module Statystyki</small></summary>
+        <section class="dashboard-stat-grid sales-stat-grid">
+            {% include 'components/stat_card.html' with title='Przychód brutto' value=stats.total_gross_revenue unit='PLN' icon_name='sales' tone='green' note='Netto razem z VAT' %}
+            {% include 'components/stat_card.html' with title='Dokumenty' value=stats.sale_count icon_name='document' tone='warning' note='Po filtrach' %}
+            {% include 'components/stat_card.html' with title='Waga żywa' value=stats.total_live_weight unit='kg' icon_name='scale' %}
+            {% include 'components/stat_card.html' with title='VAT' value=stats.total_vat unit='PLN' icon_name='tax' %}
+            {% if stats.avg_meatiness != None %}
+                {% include 'components/stat_card.html' with title='Średnia mięsność' value=stats.avg_meatiness unit='%' icon_name='quality' %}
+            {% else %}
+                {% include 'components/stat_card.html' with title='Średnia mięsność' value='Brak danych' icon_name='quality' %}
+            {% endif %}
+            {% if stats.feed_to_live_weight_ratio != None %}
+                {% include 'components/stat_card.html' with title='Pasza / waga żywa' value=stats.feed_to_live_weight_ratio unit='t/t' icon_name='ratio' note='Ton paszy na tonę wagi żywej' %}
+            {% else %}
+                {% include 'components/stat_card.html' with title='Pasza / waga żywa' value='Brak wagi' icon_name='ratio' note='Potrzebna waga żywa' %}
+            {% endif %}
+            {% include 'components/stat_card.html' with title='Śr. waga sztuki' value=stats.avg_weight_per_pig unit='kg' icon_name='scale' %}
+        </section>
+    </details>
 
     {% url 'sales_list' as sales_filter_url %}
     {% include 'components/filter_panel.html' with filter_action=sales_filter_url filter_clear_url=sales_filter_url filter_fields_template='sales/_filters.html' %}

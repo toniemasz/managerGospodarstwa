@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 
 from farms.services.farm_service import get_or_create_user_farm
 from feed.models import DeliveryModel, IngredientModel, ProductionIngredientUsageModel, ProductionModel, RecipeItemModel, RecipeModel
-from feed.services.production_cost_service import ProductionCostService
+from feed.selectors.production_costs import ProductionCostSelector
 
 
 @pytest.mark.django_db
@@ -42,7 +42,7 @@ def test_actual_feed_cost_uses_fifo_delivery_batches():
     )
     ProductionModel.objects.create(recipe=recipe, date=date(2026, 7, 2), quantity_kg=9000, status=ProductionModel.Statuses.QUEUED)
 
-    result = ProductionCostService(farm).calculate(date_from=date(2026, 1, 1), date_to=date(2026, 12, 31))
+    result = ProductionCostSelector(farm).calculate(date_from=date(2026, 1, 1), date_to=date(2026, 12, 31))
     assert result["quantity_kg"] == Decimal("1200.00")
     assert result["total_cost"] == Decimal("1500.00")
     assert result["average_cost_per_kg"] == Decimal("1.25")
@@ -77,7 +77,7 @@ def test_legacy_feed_cost_marks_missing_price_as_partial_instead_of_zero():
     production._skip_inventory_sync = True
     production.save()
 
-    result = ProductionCostService(farm).calculate()
+    result = ProductionCostSelector(farm).calculate()
     detail = result["details"][0]
 
     assert detail["production"] == production

@@ -1,0 +1,49 @@
+{% if group.can_quick_complete %}
+<dialog class="today-task-dialog" id="{{ group.dialog_id }}" aria-labelledby="{{ group.dialog_id }}-title">
+    <form method="post" action="{% url 'complete_today_tasks' %}" class="today-task-form today-task-dialog-form">
+        {% csrf_token %}
+        <div class="today-task-dialog-header">
+            <div>
+                <span class="eyebrow">Dzisiaj</span>
+                <h2 id="{{ group.dialog_id }}-title">{{ group.title }}</h2>
+                <p>Zaznacz wykonane pozycje i zatwierdź zapis zdarzeń z dzisiejszą datą.</p>
+            </div>
+            <button type="button" class="dialog-close-button" data-dialog-close aria-label="Zamknij okno">&times;</button>
+        </div>
+
+        <div class="today-task-dialog-list">
+            {% for task in group.tasks %}
+            <article class="today-task-dialog-item priority-{{ task.priority }}">
+                <label class="today-task-dialog-check" for="task-{{ group.key }}-{{ task.task_id }}">
+                    <input id="task-{{ group.key }}-{{ task.task_id }}" type="checkbox" name="task_ids" value="{{ task.task_id }}" class="today-task-checkbox" aria-label="Zaznacz zadanie: {{ task.title }}">
+                    <span>
+                        <strong>{{ task.title }}</strong>
+                        <small>{{ task.status_label }}{% if task.due_date %} · {{ task.due_date|date:"d.m.Y" }}{% endif %}</small>
+                    </span>
+                </label>
+                {% if task.quick_complete_kind == "ultrasound" %}
+                <select name="pregnancy_result_{{ task.task_id }}" class="today-task-result" aria-label="Wynik USG dla zadania {{ task.title }}">
+                    <option value="">Wybierz wynik</option>
+                    <option value="TAK">Prośna</option>
+                    <option value="NIE">Jałowa</option>
+                    <option value="?">Do rebadania</option>
+                </select>
+                {% endif %}
+            </article>
+            {% endfor %}
+        </div>
+
+        {% if group.quick_complete_kind == "vaccination" %}
+        <div class="today-task-submit">
+            <label for="{{ group.dialog_id }}-note">Notatka do szczepień</label>
+            <textarea id="{{ group.dialog_id }}-note" name="completion_note" rows="2" placeholder="Opcjonalnie, np. seria, reakcja po szczepieniu, uwagi techniczne"></textarea>
+        </div>
+        {% endif %}
+
+        <div class="today-task-dialog-actions">
+            <button type="button" class="button button-secondary" data-dialog-close>Anuluj</button>
+            <button type="submit" class="button button-primary today-task-submit-button" disabled>Zatwierdź zaznaczone</button>
+        </div>
+    </form>
+</dialog>
+{% endif %}

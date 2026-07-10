@@ -2,12 +2,12 @@ from django.db.models.signals import post_delete, post_save, pre_delete, pre_sav
 from django.dispatch import receiver
 
 from feed.models import DeliveryModel, InventoryMovementModel, ProductionModel
-from feed.services.inventory_service import InventoryMovementService
+from feed.actions.inventory import InventoryActions
 
 
 @receiver(post_save, sender=DeliveryModel)
 def sync_delivery_movement(sender, instance, **kwargs):
-    InventoryMovementService(instance.ingredient.farm).sync_delivery(instance)
+    InventoryActions(instance.ingredient.farm).sync_delivery(instance)
 
 
 @receiver(pre_save, sender=DeliveryModel)
@@ -44,10 +44,10 @@ def remember_previous_production_status(sender, instance, **kwargs):
 
 
 @receiver(post_save, sender=ProductionModel)
-def sync_production_movement(sender, instance, **kwargs):
+def sync_production_movement(sender, instance, created=False, **kwargs):
     if getattr(instance, "_skip_inventory_sync", False):
         return
-    service = InventoryMovementService(instance.recipe.farm)
+    service = InventoryActions(instance.recipe.farm)
     previous_status = getattr(instance, "_previous_inventory_status", None)
     if instance.status == ProductionModel.Statuses.COMPLETED:
         if previous_status == ProductionModel.Statuses.COMPLETED:
@@ -56,13 +56,13 @@ def sync_production_movement(sender, instance, **kwargs):
             service.book_production(instance)
     elif previous_status == ProductionModel.Statuses.COMPLETED:
         service.rebuild()
-    else:
+    elif not created:
         service.release_production(instance)
 
 
 @receiver(pre_delete, sender=ProductionModel)
 def release_production_inventory(sender, instance, **kwargs):
-    InventoryMovementService(instance.recipe.farm).release_production(instance)
+    InventoryActions(instance.recipe.farm).release_production(instance)
 
 
 @receiver(post_delete, sender=ProductionModel)
@@ -74,4 +74,4 @@ def delete_production_movements(sender, instance, **kwargs):
         source_id=str(instance.pk),
     ).delete()
     if instance.status == ProductionModel.Statuses.COMPLETED:
-        InventoryMovementService(instance.recipe.farm).rebuild()
+        InventoryActions(instance.recipe.farm).rebuild()

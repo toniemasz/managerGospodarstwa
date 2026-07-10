@@ -7,10 +7,24 @@
         <div>
             <p class="eyebrow">Maciory</p>
             <h1>{% if event %}Szczegóły zdarzenia{% else %}Nowe zdarzenie{% endif %}</h1>
-            <p class="page-subtitle">Maciora {{ sow.ear_tag }}</p>
+            <p class="page-subtitle">Maciora {{ sow.ear_tag }}. Wybór typu zdarzenia pokaże tylko pola potrzebne do zapisu.</p>
         </div>
-        <a href="{% url 'sow_detail' sow.id %}" class="button button-secondary">Wróć</a>
+        <div class="header-actions">
+            {% if not event %}
+            <a href="{% url 'bulk_sow_events' %}?rows=1" class="button button-secondary">Szybki wpis</a>
+            {% endif %}
+            <a href="{% url 'sow_detail' sow.id %}" class="button button-secondary">Wróć</a>
+        </div>
     </section>
+
+    {% if event %}
+    <section class="notice notice-warning">
+        <div>
+            <h2>Edycja zmienia historię maciory</h2>
+            <p>Zmiana typu, daty albo wyniku może przeliczyć bieżący status i kolejne alerty tej maciory.</p>
+        </div>
+    </section>
+    {% endif %}
 
     <section class="panel">
         <form method="post" class="responsive-form">
@@ -31,7 +45,7 @@
             </div>
 
             <div id="sec_insemination" class="form-section dynamic-form-section hidden">
-                <div class="form-section-heading"><h2>Dane inseminacji</h2><p>Pole pojawia się dla zdarzenia inseminacji.</p></div>
+                <div class="form-section-heading"><h2>Dane inseminacji</h2><p>Po zapisie maciora przejdzie do cyklu po inseminacji i pojawi się termin USG.</p></div>
                 <div class="form-field">
                     <label for="{{ form.technician.id_for_label }}">{{ form.technician.label }}</label>
                     {{ form.technician }}
@@ -48,7 +62,7 @@
             </div>
 
             <div id="sec_farrowing" class="form-section dynamic-form-section hidden">
-                <div class="form-section-heading"><h2>Wynik oproszenia</h2><p>Podaj liczbę prosiąt żywych i martwych.</p></div>
+                <div class="form-section-heading"><h2>Wynik oproszenia</h2><p>Podaj liczbę prosiąt żywych i martwych. Po zapisie maciora będzie traktowana jako karmiąca.</p></div>
                 <div class="form-grid three-columns">
                     <div class="form-field">
                         <label for="{{ form.born_alive.id_for_label }}">{{ form.born_alive.label }}</label>
@@ -62,15 +76,19 @@
             </div>
 
             <div id="sec_weaning" class="form-section dynamic-form-section hidden">
-                <div class="form-section-heading"><h2>Dane odsadzenia</h2><p>Podaj liczbę odsadzonych prosiąt.</p></div>
+                <div class="form-section-heading"><h2>Dane odsadzenia</h2><p>Podaj liczbę odsadzonych prosiąt. Po zapisie maciora wróci do statusu jałowa.</p></div>
                 <div class="form-field">
                     <label for="{{ form.count.id_for_label }}">{{ form.count.label }}</label>
                     {{ form.count }}
                 </div>
             </div>
 
+            <div id="sec_miscarriage" class="form-section dynamic-form-section hidden">
+                <div class="form-section-heading"><h2>Poronienie</h2><p>Poronienie można zapisać tylko dla maciory prośnej. Po zapisie maciora wróci do statusu jałowa.</p></div>
+            </div>
+
             <div id="sec_vaccination" class="form-section dynamic-form-section hidden">
-                <div class="form-section-heading"><h2>Dane szczepienia</h2><p>Wybierz preparat z planów gospodarstwa.</p></div>
+                <div class="form-section-heading"><h2>Dane szczepienia</h2><p>Wybierz preparat z planów gospodarstwa. Zapis potwierdzi wykonanie szczepienia w tym cyklu.</p></div>
                 <div class="form-field">
                     <label for="{{ form.vaccine_name.id_for_label }}">{{ form.vaccine_name.label }}</label>
                     {{ form.vaccine_name }}
@@ -116,7 +134,13 @@
                 <p>Usunięcie zmieni historię i przeliczenia tej maciory.</p>
             </div>
         </div>
-        <form method="post" action="{% url 'delete_event' event.id %}" class="responsive-form" data-confirm="Czy na pewno usunąć to zdarzenie z historii maciory?">
+        <div class="notice notice-warning">
+            <div>
+                <h2>Skutek usunięcia</h2>
+                <p>Usunięcie zdarzenia może zmienić status maciory, terminy USG, oproszeń i szczepień.</p>
+            </div>
+        </div>
+        <form method="post" action="{% url 'delete_event' event.id %}" class="responsive-form" data-confirm="Usunąć zdarzenie z historii maciory? To może zmienić jej status i alerty.">
             {% csrf_token %}
             <div class="form-actions">
                 <button type="submit" class="button button-danger">Usuń zdarzenie</button>

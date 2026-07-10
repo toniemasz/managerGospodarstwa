@@ -11,6 +11,7 @@
             <p class="page-subtitle">Przychody ze sprzedaży minus rzeczywisty koszt zakończonych śrutowań i dodatkowe koszty.</p>
         </div>
         <div class="header-actions">
+            <a href="{% url 'farm_statistics' %}?year={{ selected_year|unlocalize }}" class="button button-secondary">Statystyki</a>
             <a href="{% url 'cost_list' %}?year={{ selected_year|unlocalize }}" class="button button-secondary">Koszty</a>
         </div>
     </section>
@@ -35,6 +36,9 @@
             </div>
         </div>
     </section>
+
+    <details class="form-disclosure">
+        <summary>Szczegóły opłacalności <small>pełny zestaw wskaźników jest w module Statystyki</small></summary>
 
     <section class="finance-section">
         <div class="section-heading">
@@ -140,6 +144,7 @@
             {% include 'components/empty_state.html' with empty_message='Brak zakończonych śrutowań w wybranym roku.' %}
         {% endif %}
     </section>
+    </details>
 </main>
 {% endblock %}
 {% block scripts %}<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>{% endblock %}

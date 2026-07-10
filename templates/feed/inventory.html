@@ -11,6 +11,7 @@
             <p class="page-subtitle">Dostawy, stan surowców i ostrzeżenia niskiego poziomu.</p>
         </div>
         <div class="page-actions">
+            <a href="{% url 'farm_statistics' %}" class="button button-secondary">Statystyki</a>
             <a href="{% url 'inventory_adjustment' %}" class="button button-secondary">Korekta stanu</a>
             <a href="{% url 'add_delivery' %}" class="button button-primary">Przyjmij dostawę</a>
         </div>
@@ -64,16 +65,16 @@
     <section class="panel table-panel">
         <div class="section-heading"><div><h2>Ruchy magazynowe</h2><p>Dostawy, zużycia produkcyjne i ręczne korekty.</p></div></div>
         <div class="table-scroll">
-            <table class="data-table">
+            <table class="data-table mobile-card-table" data-mobile-cards="true">
                 <thead><tr><th>Data</th><th>Składnik</th><th>Typ</th><th class="text-right">Zmiana</th><th>Powód</th></tr></thead>
                 <tbody>
                 {% for movement in movements %}
                     <tr>
-                        <td>{{ movement.movement_date|date:"d.m.Y" }}</td>
-                        <td>{{ movement.ingredient.name }}</td>
-                        <td>{{ movement.get_movement_type_display }}</td>
-                        <td class="text-right">{{ movement.quantity_kg|feed_quantity }}</td>
-                        <td>{{ movement.note|default:"-" }}</td>
+                        <td data-label="Data">{{ movement.movement_date|date:"d.m.Y" }}</td>
+                        <td data-label="Składnik">{{ movement.ingredient.name }}</td>
+                        <td data-label="Typ">{{ movement.get_movement_type_display }}</td>
+                        <td data-label="Zmiana" class="text-right">{{ movement.quantity_kg|feed_quantity }}</td>
+                        <td data-label="Powód">{{ movement.note|default:"-" }}</td>
                     </tr>
                 {% empty %}<tr><td colspan="5" class="empty-table">Brak ruchów magazynowych.</td></tr>{% endfor %}
                 </tbody>
@@ -93,7 +94,7 @@
             </div>
         </div>
         <div class="table-scroll">
-            <table class="data-table">
+            <table class="data-table mobile-card-table" data-mobile-cards="true">
                 <thead>
                     <tr>
                         <th>Data</th>
@@ -107,18 +108,18 @@
                 <tbody>
                     {% for delivery in deliveries %}
                     <tr>
-                        <td>{{ delivery.date|date:"d.m.Y" }}</td>
-                        <td><strong>{{ delivery.ingredient.name }}</strong></td>
-                        <td class="text-right"><strong>{{ delivery.quantity_kg|feed_quantity }}</strong></td>
-                        <td class="text-right">{{ delivery.remaining_quantity_kg|feed_quantity }}</td>
-                        <td class="text-right">
+                        <td data-label="Data">{{ delivery.date|date:"d.m.Y" }}</td>
+                        <td data-label="Składnik"><strong>{{ delivery.ingredient.name }}</strong></td>
+                        <td data-label="Ilość" class="text-right"><strong>{{ delivery.quantity_kg|feed_quantity }}</strong></td>
+                        <td data-label="Pozostało FIFO" class="text-right">{{ delivery.remaining_quantity_kg|feed_quantity }}</td>
+                        <td data-label="Cena" class="text-right">
                             {% if delivery.price_per_kg %}
                                 <span data-price-kg="{{ delivery.price_per_kg|feed_price:'kg' }}" data-price-ton="{{ delivery.price_per_kg|feed_price:'ton' }}">{{ delivery.price_per_kg|feed_price:'ton' }}</span>
                             {% else %}
                                 <span class="status-pill status-red">Brak ceny</span>
                             {% endif %}
                         </td>
-                        <td class="text-right">
+                        <td data-label="Akcje" class="text-right">
                             <div class="row-actions">
                                 <a href="{% url 'edit_delivery' delivery.id %}" class="table-link">Edytuj</a>
                             </div>

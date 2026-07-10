@@ -26,10 +26,19 @@ class SowRepository:
             ear_tag=db_sow.ear_tag,
             entry_date=db_sow.entry_date,
             created_at=db_sow.created_at,
-            is_archived=db_sow.is_archived
+            is_archived=db_sow.is_archived,
+            archive_reason=db_sow.archive_reason,
+            death_date=db_sow.death_date,
+            death_note=db_sow.death_note,
         )
         events = [
-            SowEvent(event_type=e.event_type, event_date=e.event_date, details=e.details, id=e.id)
+            SowEvent(
+                event_type=e.event_type,
+                event_date=e.event_date,
+                details=e.details,
+                id=e.id,
+                created_at=e.created_at,
+            )
             for e in db_sow.events.all()
         ]
         sow.load_history(events, gestation_days=self.gestation_days)

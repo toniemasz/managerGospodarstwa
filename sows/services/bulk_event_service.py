@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 from django.db import transaction
 
-from sows.models import SowEventModel
+from sows.actions.events import SowEventActions
 from sows.domain.sow_state_machine import SowStateMachine
 from sows.services.sow_lifecycle import SowEvent
 from sows.services.sow_repository import SowRepository
@@ -95,16 +95,10 @@ class BulkSowEventService:
 
     @transaction.atomic
     def create_events(self, rows: list[BulkEventRow]) -> int:
-        events = [
-            SowEventModel(
-                sow=row.sow,
-                event_type=row.event_type,
-                event_date=row.event_date,
-                details=row.details,
-            )
-            for row in rows
-        ]
-        self.repository.bulk_create_events(events)
+        events = SowEventActions(
+            farm=self.farm,
+            repository=self.repository,
+        ).bulk_create_events(rows)
         return len(events)
 
     @staticmethod

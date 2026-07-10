@@ -11,6 +11,7 @@ from django.contrib.messages import get_messages
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 
+from farms.models import AuditLogModel
 from farms.services.data_backup import (
     BackupImportError,
     build_database_backup,
@@ -235,12 +236,75 @@ def test_settings_import_view_reports_duplicate_block(client):
 
 
 @pytest.mark.django_db
+def test_settings_import_view_restores_user_backup_into_empty_farm(client):
+    source_user = User.objects.create_user(username='view-empty-source')
+    source_farm = get_or_create_user_farm(source_user)
+    source_farm.name = 'Importowane gospodarstwo'
+    source_farm.save(update_fields=['name'])
+    _create_complete_farm_data(source_farm)
+    backup_file = _user_backup_fixture(source_user, source_farm)
+
+    target_user = User.objects.create_user(username='view-empty-target', password='password')
+    target_farm = get_or_create_user_farm(target_user)
+    client.login(username='view-empty-target', password='password')
+
+    response = client.post(reverse('farm_settings'), {
+        'import_backup': '1',
+        'confirm_empty_import': 'on',
+        'backup_file': backup_file,
+    })
+
+    assert response.status_code == 302
+    target_farm.refresh_from_db()
+    assert target_farm.name == 'Importowane gospodarstwo'
+    assert SowModel.objects.filter(farm=target_farm, ear_tag='SOW-BACKUP').exists()
+    assert AuditLogModel.objects.filter(farm=target_farm, action='USER_BACKUP_IMPORT').exists()
+
+
+@pytest.mark.django_db
+def test_export_user_data_view_contains_only_current_farm_data(client):
+    user = User.objects.create_user(username='export-owner', password='password')
+    farm = get_or_create_user_farm(user)
+    own_sow = SowModel.objects.create(farm=farm, ear_tag='OWN-EXPORT')
+    other_user = User.objects.create_user(username='export-other')
+    other_farm = get_or_create_user_farm(other_user)
+    SowModel.objects.create(farm=other_farm, ear_tag='OTHER-EXPORT')
+    client.login(username='export-owner', password='password')
+
+    response = client.get(reverse('export_user_data'))
+
+    assert response.status_code == 200
+    assert response['Content-Type'] == 'application/zip'
+    payload = _payload_from_archive(response.content)
+    exported_sows = payload['data']['sows.SowModel']
+    assert [record['fields']['ear_tag'] for record in exported_sows] == [own_sow.ear_tag]
+    assert AuditLogModel.objects.filter(farm=farm, action='USER_BACKUP_EXPORT').exists()
+
+
+@pytest.mark.django_db
 def test_admin_backup_restore_endpoints_require_superuser(client):
     staff = User.objects.create_user(username='staff-only', password='password', is_staff=True)
     client.login(username='staff-only', password='password')
 
     assert client.get(reverse('admin_database_backup')).status_code == 403
     assert client.post(reverse('admin_database_restore')).status_code == 403
+
+
+@pytest.mark.django_db
+def test_admin_restore_view_requires_explicit_empty_restore_confirmation(client):
+    admin = User.objects.create_superuser(username='restore-confirm-admin', password='password', email='admin@example.com')
+    farm = get_or_create_user_farm(admin)
+    SowModel.objects.create(farm=farm, ear_tag='RESTORE-CONFIRM')
+    client.login(username='restore-confirm-admin', password='password')
+
+    response = client.post(reverse('admin_database_restore'), {
+        'backup_file': SimpleUploadedFile('database.zip', b'not-used'),
+    })
+
+    assert response.status_code == 302
+    messages = [str(message) for message in get_messages(response.wsgi_request)]
+    assert any('Potwierdź' in message for message in messages)
+    assert SowModel.objects.filter(farm=farm, ear_tag='RESTORE-CONFIRM').exists()
 
 
 @pytest.mark.django_db

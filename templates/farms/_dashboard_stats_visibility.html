@@ -1,6 +1,6 @@
 <section class="settings-card" id="settings-dashboard">
     <div class="settings-card-heading">
-        <h2>Centrala</h2>
+        <h2>Widoczność centrali / dashboardu</h2>
         <p>Wybierz statystyki widoczne na głównym pulpicie gospodarstwa.</p>
     </div>
     <div class="module-visibility-groups">
@@ -10,12 +10,11 @@
             {% for item in group.stats %}
             <div class="module-settings-card">
                 <label class="module-toggle">
-                    {{ item.field }}
-                    <span class="module-icon compact {{ item.tone }}">{% include 'components/app_icon.html' with name=item.icon_name %}</span>
                     <span class="module-toggle-copy">
                         <strong>{{ item.field.label }}</strong>
                         <small>{{ item.description }}</small>
                     </span>
+                    {{ item.field }}
                 </label>
             </div>
             {% endfor %}

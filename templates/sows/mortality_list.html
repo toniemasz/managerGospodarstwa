@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+
+{% block title %}Upadki{% endblock %}
+
+{% block content %}
+<main class="app-page">
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Maciory</p>
+            <h1>Upadki</h1>
+            <p class="page-subtitle">Zgłoszenia upadków macior i zwierząt po odsadzeniu w bieżącym gospodarstwie.</p>
+        </div>
+        <div class="header-actions">
+            <a href="{% url 'dashboard' %}" class="button button-secondary">Wróć do stada</a>
+            <a href="{% url 'report_mortality' %}" class="button button-primary">Zgłoś upadek</a>
+        </div>
+    </section>
+
+    {% url 'mortality_list' as mortality_filter_url %}
+    {% include 'components/filter_panel.html' with filter_action=mortality_filter_url filter_clear_url=filter_clear_url filter_fields_template='sows/_mortality_filters.html' %}
+
+    <section class="stats-grid compact-stats">
+        <div class="stat-tile">
+            <span>Odsadzone łącznie</span>
+            <strong>{{ post_weaning_stock.weaned_total }} szt.</strong>
+            <small>Suma zapisanych odsadzeń w historii macior.</small>
+        </div>
+        <div class="stat-tile{% if post_weaning_stock.mortality_total %} is-warning{% endif %}">
+            <span>Upadki po odsadzeniu</span>
+            <strong>{{ post_weaning_stock.mortality_total }} szt.</strong>
+            <small>Zgłoszone przez formularz upadków.</small>
+        </div>
+        <div class="stat-tile is-success">
+            <span>Stan po odsadzeniu</span>
+            <strong>{{ post_weaning_stock.current_stock }} szt.</strong>
+            <small>Odsadzone minus zgłoszone upadki po odsadzeniu.</small>
+        </div>
+    </section>
+
+    <section class="panel table-panel">
+        <div class="section-heading">
+            <div>
+                <h2>Lista zgłoszeń</h2>
+                <p>Rejestr jest filtrowany wyłącznie do bieżącego gospodarstwa.</p>
+            </div>
+        </div>
+
+        {% if mortality_reports %}
+        <div class="table-scroll">
+            <table class="data-table mobile-card-table" data-mobile-cards="true">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Typ</th>
+                        <th>Maciora</th>
+                        <th class="text-right">Liczba</th>
+                        <th>Przyczyna</th>
+                        <th>Notatka</th>
+                        <th>Utworzył</th>
+                        <th>Utworzono</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for report in mortality_reports %}
+                    <tr>
+                        <td data-label="Data"><strong>{{ report.mortality_date|date:"d.m.Y" }}</strong></td>
+                        <td data-label="Typ">
+                            <span class="status-pill{% if report.mortality_type == 'sow' %} status-red{% else %} status-amber{% endif %}">
+                                {{ report.get_mortality_type_display }}
+                            </span>
+                        </td>
+                        <td data-label="Maciora">
+                            {% if report.sow %}
+                                <a href="{% url 'sow_detail' report.sow.id %}" class="table-link">{{ report.sow.ear_tag }}</a>
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td data-label="Liczba" class="text-right"><strong>{{ report.quantity }}</strong> szt.</td>
+                        <td data-label="Przyczyna">{{ report.reason|default:"—" }}</td>
+                        <td data-label="Notatka">{{ report.note|default:"—" }}</td>
+                        <td data-label="Utworzył">{{ report.created_by.username|default:"—" }}</td>
+                        <td data-label="Utworzono">{{ report.created_at|date:"d.m.Y H:i" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            {% url 'report_mortality' as report_mortality_url %}
+            {% include 'components/empty_state.html' with empty_title='Brak zgłoszeń' empty_message='Nie zarejestrowano upadków dla wybranych filtrów.' empty_action_url=report_mortality_url empty_action_label='Zgłoś upadek' %}
+        {% endif %}
+    </section>
+</main>
+{% endblock %}

@@ -5,8 +5,9 @@ import pytest
 
 from feed.forms import CalculatorPriceForm
 from feed.models import DeliveryModel, IngredientModel, RecipeItemModel, RecipeModel
-from feed.services.feed_calculators import RecipeCostCalculator
-from feed.services.feed_management_service import FeedManagementService
+from feed.calculators.feed_cost import RecipeCostCalculator
+from feed.selectors.inventory import latest_delivery_prices_map
+from feed.selectors.recipes import recipe_costs
 
 
 def test_recipe_cost_calculates_percentage_of_one_tonne():
@@ -72,9 +73,8 @@ def test_service_does_not_convert_null_delivery_price_to_zero():
         percentage=Decimal("100.00"),
     )
 
-    service = FeedManagementService()
-    prices = service.repository.get_latest_delivery_prices_map()
-    costs = service.get_recipe_costs()
+    prices = latest_delivery_prices_map()
+    costs = recipe_costs()
 
     assert ingredient.id not in prices
     assert costs[0].is_complete is False
@@ -98,8 +98,7 @@ def test_service_treats_zero_delivery_price_as_missing_price():
         percentage=Decimal("100.00"),
     )
 
-    service = FeedManagementService()
-    costs = service.get_recipe_costs()
+    costs = recipe_costs()
 
     assert costs[0].is_complete is False
     assert costs[0].missing_price_ingredients == ["Kukurydza"]

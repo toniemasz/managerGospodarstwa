@@ -21,6 +21,8 @@ from .views import (
     edit_vaccination_plan_view,
     delete_vaccination_plan_view,
     archived_sows_view,
+    mortality_list_view,
+    report_mortality_view,
     general_statistics_view,
     farrowing_panel_view,
 )
@@ -36,6 +38,8 @@ urlpatterns = [
     path('zdarzenie/<int:event_id>/usun/', delete_event_view, name='delete_event'),
 
     path('maciory/archiwum/', archived_sows_view, name='archived_sows'),
+    path('maciory/upadki/', mortality_list_view, name='mortality_list'),
+    path('maciory/upadki/zglos/', report_mortality_view, name='report_mortality'),
     path('maciory/<int:sow_id>/', sow_detail_view, name='sow_detail'),
     path('maciory/szczepienie-grupowe/', bulk_vaccinate_view, name='bulk_vaccinate'),
     path('maciory/badania-grupowe/', bulk_pregnancy_check_view, name='bulk_pregnancy_check'),

@@ -5,7 +5,7 @@ from typing import Dict, List, Optional
 
 @dataclass
 class InventoryItem:
-    """Encja reprezentująca stan magazynowy pojedynczego składnika."""
+    """Calculated stock state for one ingredient."""
     ingredient_id: int
     name: str
     total_delivered: Decimal
@@ -27,7 +27,7 @@ class InventoryItem:
 
 @dataclass
 class RecipeCostInfo:
-    """Encja reprezentująca wyliczony koszt produkcji z danej receptury."""
+    """Calculated cost for one feed recipe."""
     recipe_name: str
     cost_per_kg: Decimal
     recipe_id: int | None = None
@@ -45,7 +45,7 @@ class RecipeCostInfo:
 
 @dataclass
 class IngredientRequirement:
-    """Reprezentuje fizyczne zapotrzebowanie na dany surowiec w kg."""
+    """Ingredient quantity required for one production batch."""
     ingredient_id: int
     name: str
     is_in_bin: bool
@@ -54,10 +54,7 @@ class IngredientRequirement:
 
 
 class ProductionCalculator:
-    """
-    Czysta encja domenowa.
-    Odpowiada za reguły biznesowe: sumowanie do 100% i przeliczanie masy składników.
-    """
+    """Pure calculations for recipe percentages and ingredient quantities."""
 
     def __init__(self, quantity_kg: Decimal, base_recipe_items: List[Dict], custom_recipe_data: Optional[Dict] = None):
         self.quantity_kg = Decimal(str(quantity_kg))
@@ -99,10 +96,7 @@ class ProductionCalculator:
 
 
 class RecipeCostCalculator:
-    """
-    Czysta encja domenowa do wyliczania kosztów receptury.
-    Oczekuje czystych słowników Pythona, bez modeli Django.
-    """
+    """Pure recipe cost calculation from plain dictionaries and price maps."""
 
     def __init__(self, recipe_name: str, recipe_items: List[Dict], price_map: Dict[int, Decimal | None], recipe_id: int | None = None):
         self.recipe_name = recipe_name
@@ -137,7 +131,6 @@ class RecipeCostCalculator:
                 })
                 continue
 
-            # Obliczamy koszt z proporcji
             cost_part = price * (percentage / Decimal('100.00'))
             total_cost += cost_part
             item_costs.append({

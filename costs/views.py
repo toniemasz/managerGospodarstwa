@@ -6,10 +6,11 @@ from django.utils import timezone
 from costs.forms import CostCategoryForm, CostFilterForm, CostForm
 from costs.models import CostCategoryModel, CostModel
 from costs.services import CostService
+from common.filter_ui import filter_ui_state
 from farms.services.accounting_year import get_available_years
 from farms.services.audit_log_service import log_action
+from farms.services.cache import invalidate_farm_cache_on_commit
 from farms.services.current_farm import get_current_farm
-from farms.services.filter_ui import filter_ui_state
 
 
 @login_required
@@ -46,6 +47,7 @@ def _cost_form_view(request, *, cost, is_edit):
                 saved.created_by = request.user
             saved.full_clean()
             saved.save()
+            invalidate_farm_cache_on_commit(farm, groups=("costs",))
             log_action(farm=farm, user=request.user, action="UPDATE" if is_edit else "CREATE", obj=saved)
             messages.success(request, "Koszt został zapisany.")
             return redirect("cost_list")
@@ -72,6 +74,7 @@ def delete_cost_view(request, pk):
     if request.method == "POST":
         representation, object_id = str(cost), cost.pk
         cost.delete()
+        invalidate_farm_cache_on_commit(farm, groups=("costs",))
         log_action(farm=farm, user=request.user, action="DELETE", model_label="costs.CostModel", object_id=object_id, object_repr=representation)
         messages.success(request, "Koszt został usunięty.")
     return redirect("cost_list")
@@ -91,6 +94,7 @@ def _category_form_view(request, *, category, is_edit):
             saved = form.save(commit=False)
             saved.farm = farm
             saved.save()
+            invalidate_farm_cache_on_commit(farm, groups=("costs",))
             log_action(farm=farm, user=request.user, action="UPDATE" if is_edit else "CREATE", obj=saved)
             messages.success(request, "Kategoria kosztów została zapisana.")
             return redirect("cost_categories")
@@ -117,6 +121,7 @@ def deactivate_cost_category_view(request, pk):
     if request.method == "POST":
         category.is_active = False
         category.save(update_fields=("is_active", "updated_at"))
+        invalidate_farm_cache_on_commit(farm, groups=("costs",))
         log_action(farm=farm, user=request.user, action="DEACTIVATE", obj=category)
         messages.success(request, "Kategoria została dezaktywowana.")
     return redirect("cost_categories")

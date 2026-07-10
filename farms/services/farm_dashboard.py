@@ -10,12 +10,13 @@ from costs.models import CostModel
 from farms.dashboard_registry import DASHBOARD_STAT_DEFINITIONS, normalize_dashboard_stats
 from farms.models import AuditLogModel
 from farms.module_registry import MODULE_DEFINITIONS
+from farms.services.cache import DASHBOARD_TTL, cached_farm_value
 from farms.services.module_navigation import ModuleNavigationService, normalize_visible_modules
 from farms.services.profitability import ProfitabilityAnalyticsService
 from farms.services.settings_service import get_farm_settings
 from farms.services.task_center import TaskCenterService
 from feed.models import ProductionModel
-from feed.services.feed_management_service import FeedManagementService
+from feed.selectors.inventory import inventory_dashboard
 from sales.models import PigSaleModel
 from sows.services.sow_dashboard_service import SowDashboardService
 
@@ -31,6 +32,15 @@ class FarmDashboardService:
         self._profitability = None
 
     def get_context(self) -> dict:
+        return cached_farm_value(
+            self.farm,
+            "dashboard",
+            (),
+            timeout=DASHBOARD_TTL,
+            builder=self._build_context,
+        )
+
+    def _build_context(self) -> dict:
         navigation = ModuleNavigationService(self.farm)
         modules = navigation.modules()
         return {
@@ -100,7 +110,7 @@ class FarmDashboardService:
 
     def _inventory_summary(self) -> dict:
         if self._inventory is None:
-            self._inventory = FeedManagementService(farm=self.farm).get_inventory_dashboard()
+            self._inventory = inventory_dashboard(self.farm)
         return self._inventory
 
     def _task_summary(self) -> dict:

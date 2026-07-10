@@ -48,6 +48,9 @@ def test_task_center_and_audit_log_are_isolated(client, two_farms):
     response = client.get(reverse("audit_log"))
     assert response.status_code == 200
     assert b"SECRET" not in response.content
+    filtered = client.get(reverse("audit_log"), {"action": "SECRET"})
+    assert filtered.status_code == 200
+    assert list(filtered.context["logs"]) == []
 
 
 @pytest.mark.django_db
@@ -78,6 +81,47 @@ def test_csv_export_and_atomic_import_round_trip(two_farms):
     assert IngredientModel.objects.filter(farm=target, name="Pszenica").exists()
     assert CostModel.objects.filter(farm=target, description="Koszt z CSV", amount=Decimal("123.45")).exists()
     assert not SowModel.objects.filter(farm=source).exclude(pk=sow.pk).exists()
+
+
+@pytest.mark.django_db
+def test_settings_view_imports_csv_archive_into_empty_farm(client, two_farms):
+    _, source, target_user, target = two_farms
+    sow = SowModel.objects.create(farm=source, ear_tag="CSV-VIEW-1")
+    ingredient = IngredientModel.objects.create(farm=source, name="CSV view składnik")
+    recipe = RecipeModel.objects.create(farm=source, name="CSV view recipe")
+    RecipeItemModel.objects.create(recipe=recipe, ingredient=ingredient, percentage=100)
+    payload, _ = build_csv_export(source)
+    client.force_login(target_user)
+
+    response = client.post(reverse("farm_settings"), {
+        "import_csv": "1",
+        "confirm_empty_import": "on",
+        "csv_archive": SimpleUploadedFile("export.zip", payload, content_type="application/zip"),
+    })
+
+    assert response.status_code == 302
+    assert SowModel.objects.filter(farm=target, ear_tag=sow.ear_tag).exists()
+    assert RecipeModel.objects.filter(farm=target, name=recipe.name).exists()
+    assert AuditLogModel.objects.filter(farm=target, action="CSV_IMPORT").exists()
+
+
+@pytest.mark.django_db
+def test_settings_view_blocks_csv_import_into_non_empty_farm(client, two_farms):
+    _, source, target_user, target = two_farms
+    SowModel.objects.create(farm=source, ear_tag="CSV-SOURCE")
+    SowModel.objects.create(farm=target, ear_tag="CSV-EXISTING")
+    payload, _ = build_csv_export(source)
+    client.force_login(target_user)
+
+    response = client.post(reverse("farm_settings"), {
+        "import_csv": "1",
+        "confirm_empty_import": "on",
+        "csv_archive": SimpleUploadedFile("export.zip", payload, content_type="application/zip"),
+    })
+
+    assert response.status_code == 302
+    assert list(SowModel.objects.filter(farm=target).values_list("ear_tag", flat=True)) == ["CSV-EXISTING"]
+    assert not AuditLogModel.objects.filter(farm=target, action="CSV_IMPORT").exists()
 
 
 @pytest.mark.django_db

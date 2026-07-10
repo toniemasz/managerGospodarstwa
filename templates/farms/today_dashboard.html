@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+{% load ui_format %}
+
+{% block title %}Dzisiaj{% endblock %}
+
+{% block content %}
+<main class="app-page farm-dashboard-page">
+    <section class="dashboard-heading">
+        <div>
+            <p class="eyebrow">Centrala</p>
+            <h1>Dzisiaj</h1>
+            <p class="page-subtitle">Najważniejsze zadania i szybkie akcje w gospodarstwie.</p>
+        </div>
+        <div class="header-actions">
+            <a href="{% url 'task_center' %}" class="button button-secondary">Panel zadań</a>
+            <a href="{% url 'modules_catalog' %}" class="button button-secondary">Wszystkie moduły</a>
+        </div>
+    </section>
+
+    <section class="mobile-quick-dashboard" aria-label="Tryb szybki">
+        <section class="panel mobile-quick-panel">
+            <div class="section-heading compact-heading">
+                <div>
+                    <h2>Dzisiaj</h2>
+                </div>
+                <a href="{% url 'task_center' %}" class="table-link">Pełny panel</a>
+            </div>
+            <div class="today-task-group-grid today-task-group-grid--quick">
+                {% for group in today_task_groups %}
+                    {% include 'components/today_task_group_card.html' with group=group compact=True %}
+                {% empty %}
+                <div class="quick-list-empty">Brak zadań zaplanowanych na dziś.</div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="panel mobile-quick-panel">
+            <div class="section-heading compact-heading">
+                <div>
+                    <h2>Szybkie akcje</h2>
+                </div>
+            </div>
+            <div class="quick-actions-grid mobile-quick-actions">
+                {% for action in today_quick_actions %}
+                    {% include 'components/quick_action_card.html' with action=action show_description=False class_name='quick-action-large' %}
+                {% empty %}
+                    {% include 'components/empty_state.html' with empty_title='Brak szybkich akcji' empty_message='Włącz moduły w ustawieniach.' %}
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="panel mobile-quick-panel">
+            <div class="section-heading compact-heading">
+                <div>
+                    <h2>Ostatnie wpisy</h2>
+                </div>
+            </div>
+            <div class="quick-list">
+                {% for item in today_quick_recent_events %}
+                <a href="{{ item.url }}" class="quick-list-item">
+                    <span class="activity-icon">{% include 'components/app_icon.html' with name=item.icon_name %}</span>
+                    <span>
+                        <strong>{{ item.type_label }} — {{ item.title }}</strong>
+                        <small>{{ item.date|date:"d.m.Y" }}</small>
+                    </span>
+                </a>
+                {% empty %}
+                <div class="quick-list-empty">Brak ostatnich wpisów.</div>
+                {% endfor %}
+            </div>
+        </section>
+    </section>
+
+    <div class="wide-dashboard">
+    <section class="panel today-task-panel">
+        <div class="section-heading">
+            <div>
+                <h2>Zadania zaplanowane na dziś</h2>
+                <p>Wybierz grupę, aby szybko zatwierdzić wykonane zdarzenia albo przejść do właściwego panelu.</p>
+            </div>
+            <a href="{% url 'task_center' %}" class="table-link">Pełny panel</a>
+        </div>
+        <div class="today-task-group-grid">
+            {% for group in today_task_groups %}
+                {% include 'components/today_task_group_card.html' with group=group %}
+            {% empty %}
+            <div class="quick-list-empty">Brak zadań zaplanowanych na dziś. Możesz dodać nowe wpisy albo przejrzeć ostatnią aktywność.</div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="section-heading">
+            <div>
+                <h2>Szybkie akcje</h2>
+                <p>Najczęściej używane zapisy z jednego miejsca.</p>
+            </div>
+        </div>
+        <div class="quick-actions-grid today-quick-actions">
+            {% for action in today_quick_actions %}
+                {% include 'components/quick_action_card.html' with action=action show_description=True %}
+            {% empty %}
+            {% include 'components/empty_state.html' with empty_title='Brak szybkich akcji' empty_message='Włącz moduły w ustawieniach, aby pokazać skróty operacyjne.' %}
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="dashboard-stat-grid">
+        {% for kpi in today_kpis %}
+        <a href="{{ kpi.url }}" class="dashboard-stat-card dashboard-stat-card--{{ kpi.tone|default:'neutral' }}">
+            <span class="dashboard-card-icon {{ kpi.tone|default:'' }}">{% include 'components/app_icon.html' with name=kpi.icon_name %}</span>
+            <span class="dashboard-card-label">{{ kpi.title }}</span>
+            <strong>{{ kpi.value|smart_number }}{% if kpi.unit %} <small>{{ kpi.unit }}</small>{% endif %}</strong>
+            <small>{{ kpi.note }}</small>
+        </a>
+        {% empty %}
+        <article class="dashboard-stat-card">
+            <span class="dashboard-card-icon">{% include 'components/app_icon.html' with name='statistics' %}</span>
+            <span class="dashboard-card-label">KPI</span>
+            <strong>0</strong>
+            <small>Brak aktywnych wskaźników.</small>
+        </article>
+        {% endfor %}
+    </section>
+
+    <section class="dashboard-grid">
+        <div class="dashboard-main">
+            <section class="panel activity-panel">
+                <div class="section-heading">
+                    <div>
+                        <h2>Ostatnie zdarzenia</h2>
+                        <p>Najnowsze wpisy z aktywnych modułów.</p>
+                    </div>
+                </div>
+                <div class="activity-timeline">
+                    {% for item in today_recent_events %}
+                    <a href="{{ item.url }}" class="activity-item">
+                        <span class="activity-icon">{% include 'components/app_icon.html' with name=item.icon_name %}</span>
+                        <div>
+                            <time>{{ item.date|date:"d.m.Y" }}</time>
+                            <strong>{{ item.type_label }} — {{ item.title }}</strong>
+                            <small>{{ item.description }}</small>
+                        </div>
+                    </a>
+                    {% empty %}
+                    <article class="activity-item">
+                        <span class="activity-icon">{% include 'components/app_icon.html' with name='history' %}</span>
+                        <div>
+                            <strong>Brak ostatnich zdarzeń</strong>
+                            <small>Pojawią się po pierwszych zapisach w modułach.</small>
+                        </div>
+                    </article>
+                    {% endfor %}
+                </div>
+            </section>
+        </div>
+
+        <aside class="dashboard-side">
+            <section class="panel management-panel">
+                <div class="section-heading">
+                    <div>
+                        <h2>Pełne widoki</h2>
+                        <p>Przejdź do modułów, gdy potrzebujesz szczegółów.</p>
+                    </div>
+                </div>
+                <div class="management-module-grid">
+                    {% for link in today_full_links %}
+                    <a href="{{ link.url }}" class="management-module-tile">
+                        <span class="module-icon">{% include 'components/app_icon.html' with name=link.icon_name %}</span>
+                        <strong>{{ link.title }}</strong>
+                        <small>{{ link.description }}</small>
+                    </a>
+                    {% empty %}
+                    <p class="empty-table">Brak aktywnych pełnych widoków.</p>
+                    {% endfor %}
+                </div>
+            </section>
+        </aside>
+    </section>
+    </div>
+    {% for group in today_task_groups %}
+        {% include 'components/today_task_dialog.html' with group=group %}
+    {% endfor %}
+</main>
+{% endblock %}

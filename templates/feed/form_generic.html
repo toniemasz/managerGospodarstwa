@@ -9,17 +9,26 @@
         <div>
             <p class="eyebrow">Pasze</p>
             <h1>{{ title }}</h1>
-            <p class="page-subtitle">Uzupełnij dane i zapisz zmiany w bieżącym gospodarstwie.</p>
+            <p class="page-subtitle">Uzupełnij dane i zapisz zmiany w bieżącym gospodarstwie. Ilości podawaj w kg, a ceny w zł/kg, jeśli formularz nie mówi inaczej.</p>
         </div>
         <a href="{% url back_url %}" class="button button-secondary">Anuluj</a>
     </section>
+
+    {% if title == "Korekta stanu magazynowego" %}
+    <section class="notice notice-warning">
+        <div>
+            <h2>Korekta zmienia stan magazynu</h2>
+            <p>Używaj jej tylko do realnych różnic w magazynie. Produkcja paszy i dostawy powinny być księgowane przez swoje formularze.</p>
+        </div>
+    </section>
+    {% endif %}
 
     <section class="panel">
         <form method="post" class="responsive-form" id="generic-form">
             {% csrf_token %}
 
             {% include 'components/form_errors.html' with form=form %}
-            <div class="form-section-heading"><h2>Dane rekordu</h2><p>Pola oznaczone błędem wymagają poprawy przed zapisem.</p></div>
+            <div class="form-section-heading"><h2>Dane rekordu</h2><p>Pola oznaczone błędem wymagają poprawy przed zapisem. Sprawdź jednostki i datę przed zatwierdzeniem.</p></div>
 
             {% for field in form %}
                 {% include 'components/form_field.html' with field=field %}
@@ -37,7 +46,13 @@
         <div class="section-heading">
             <div>
                 <h2>Usuwanie rekordu</h2>
-                <p>Ta operacja wymaga potwierdzenia.</p>
+                <p>Ta operacja wymaga potwierdzenia i może wpłynąć na historię magazynu, receptury albo późniejsze rozliczenia.</p>
+            </div>
+        </div>
+        <div class="notice notice-warning">
+            <div>
+                <h2>Sprawdź skutek usunięcia</h2>
+                <p>{{ delete_confirm }}</p>
             </div>
         </div>
         <form method="post" action="{% url delete_url delete_id %}" class="responsive-form" data-confirm="{{ delete_confirm|escapejs }}">

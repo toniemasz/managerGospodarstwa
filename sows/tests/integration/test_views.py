@@ -7,8 +7,10 @@ from django.contrib.auth.models import User
 from django.test import override_settings
 from datetime import date, timedelta
 
-from sows.models import SowEventModel, SowModel, VaccinationPlanModel
+from farms.models import AuditLogModel
+from sows.models import MortalityReportModel, SowEventModel, SowModel, VaccinationPlanModel
 from farms.services.farm_service import get_or_create_user_farm
+from sows.services.sow_repository import SowRepository
 
 @pytest.mark.django_db
 class TestSowViews:
@@ -140,8 +142,8 @@ class TestSowViews:
         dashboard = setup_client.get(reverse('dashboard'))
         dashboard_content = dashboard.content.decode()
         assert dashboard.status_code == 200
-        assert "Oczekujące szczepienia" in dashboard_content
-        assert "Liczba szczepień do potwierdzenia" in dashboard_content
+        assert "Do obsługi" in dashboard_content
+        assert "Szczepienie maciory VAC-1" in dashboard_content
 
         confirm_page = setup_client.get(reverse('bulk_vaccinate'))
         assert confirm_page.status_code == 200
@@ -305,3 +307,203 @@ class TestSowViews:
         assert response.status_code == 200
         assert "chronologicznie od góry do dołu" in response.content.decode()
         assert not SowEventModel.objects.filter(sow=sow).exists()
+
+    def test_add_miscarriage_event_only_for_pregnant_sow(self, setup_client):
+        pregnant_sow = SowModel.objects.create(ear_tag="MISC-PREG", farm=setup_client.farm)
+        SowEventModel.objects.create(
+            sow=pregnant_sow,
+            event_type='INSEMINATION',
+            event_date=date.today() - timedelta(days=40),
+            details={'technician': 'Jan'},
+        )
+        SowEventModel.objects.create(
+            sow=pregnant_sow,
+            event_type='PREGNANCY_CHECK',
+            event_date=date.today() - timedelta(days=10),
+            details={'result': 'TAK'},
+        )
+
+        response = setup_client.post(reverse('add_event', args=[pregnant_sow.id]), {
+            'event_type': 'MISCARRIAGE',
+            'event_date': date.today().isoformat(),
+        })
+
+        assert response.status_code == 302
+        miscarriage = SowEventModel.objects.get(sow=pregnant_sow, event_type='MISCARRIAGE')
+        assert miscarriage.details == {}
+        assert miscarriage.created_at is not None
+        assert SowRepository(farm=setup_client.farm).get_sow_by_id(pregnant_sow.id).status == 'IDLE'
+
+        idle_sow = SowModel.objects.create(ear_tag="MISC-IDLE", farm=setup_client.farm)
+        blocked_response = setup_client.post(reverse('add_event', args=[idle_sow.id]), {
+            'event_type': 'MISCARRIAGE',
+            'event_date': date.today().isoformat(),
+        })
+
+        assert blocked_response.status_code == 200
+        assert not SowEventModel.objects.filter(sow=idle_sow, event_type='MISCARRIAGE').exists()
+
+    def test_report_sow_mortality_archives_sow_and_keeps_history(self, setup_client):
+        sow = SowModel.objects.create(ear_tag="DEAD-SOW", farm=setup_client.farm)
+        event = SowEventModel.objects.create(
+            sow=sow,
+            event_type='INSEMINATION',
+            event_date=date.today() - timedelta(days=20),
+            details={'technician': 'Jan'},
+        )
+
+        response = setup_client.post(reverse('report_mortality'), {
+            'mortality_type': 'sow',
+            'sow': str(sow.id),
+            'mortality_date': date.today().isoformat(),
+            'quantity': '99',
+            'reason': 'Nagły upadek',
+            'note': 'Notatka testowa',
+        })
+
+        assert response.status_code == 302
+        report = MortalityReportModel.objects.get(farm=setup_client.farm)
+        assert report.sow == sow
+        assert report.quantity == 1
+        sow.refresh_from_db()
+        assert sow.is_archived is True
+        assert sow.archive_reason == SowModel.ARCHIVE_REASON_DEATH
+        assert sow.death_date == date.today()
+        assert sow.death_note == 'Notatka testowa'
+        assert SowEventModel.objects.filter(id=event.id, sow=sow).exists()
+        assert AuditLogModel.objects.filter(
+            farm=setup_client.farm,
+            action='CREATE',
+            model_label='sows.MortalityReportModel',
+        ).exists()
+        assert AuditLogModel.objects.filter(
+            farm=setup_client.farm,
+            action='ARCHIVE',
+            object_id=str(sow.id),
+            metadata__archive_reason=SowModel.ARCHIVE_REASON_DEATH,
+        ).exists()
+
+    def test_report_mortality_form_uses_sow_number_suggestions_and_visible_quantity(self, setup_client):
+        sow = SowModel.objects.create(ear_tag="1234", farm=setup_client.farm)
+        SowModel.objects.create(ear_tag="1290", farm=setup_client.farm)
+        other_user = User.objects.create_user(username='mortality-suggest-other', password='password')
+        other_farm = get_or_create_user_farm(other_user)
+        SowModel.objects.create(ear_tag="1255", farm=other_farm)
+
+        response = setup_client.get(reverse('report_mortality'), {'mortality_type': 'sow'})
+        content = response.content.decode()
+
+        assert response.status_code == 200
+        assert 'list="mortality-sow-options"' in content
+        assert 'value="1234"' in content
+        assert 'value="1290"' in content
+        assert 'value="1255"' not in content
+        assert 'id="sec_mortality_quantity" class="form-section dynamic-form-section"' in content
+        assert 'id="id_quantity"' in content
+
+        save_response = setup_client.post(reverse('report_mortality'), {
+            'mortality_type': 'sow',
+            'sow': '1234',
+            'mortality_date': date.today().isoformat(),
+            'reason': 'Nagły upadek',
+        })
+
+        assert save_response.status_code == 302
+        report = MortalityReportModel.objects.get(farm=setup_client.farm)
+        assert report.sow == sow
+        assert report.quantity == 1
+
+    def test_report_sow_mortality_blocks_archived_and_foreign_sows(self, setup_client):
+        archived_sow = SowModel.objects.create(
+            ear_tag="DEAD-ARCHIVED",
+            farm=setup_client.farm,
+            is_archived=True,
+        )
+        other_user = User.objects.create_user(username='mortality-other', password='password')
+        other_farm = get_or_create_user_farm(other_user)
+        foreign_sow = SowModel.objects.create(ear_tag="DEAD-FOREIGN", farm=other_farm)
+
+        archived_response = setup_client.post(reverse('report_mortality'), {
+            'mortality_type': 'sow',
+            'sow': str(archived_sow.id),
+            'mortality_date': date.today().isoformat(),
+        })
+        foreign_response = setup_client.post(reverse('report_mortality'), {
+            'mortality_type': 'sow',
+            'sow': str(foreign_sow.id),
+            'mortality_date': date.today().isoformat(),
+        })
+
+        assert archived_response.status_code == 200
+        assert foreign_response.status_code == 200
+        assert not MortalityReportModel.objects.filter(farm=setup_client.farm).exists()
+        foreign_sow.refresh_from_db()
+        assert foreign_sow.is_archived is False
+
+    def test_report_post_weaning_mortality_validates_quantity_and_future_date(self, setup_client):
+        valid_response = setup_client.post(reverse('report_mortality'), {
+            'mortality_type': 'post_weaning',
+            'mortality_date': date.today().isoformat(),
+            'quantity': '3',
+            'reason': 'Choroba',
+        })
+
+        assert valid_response.status_code == 302
+        report = MortalityReportModel.objects.get(farm=setup_client.farm)
+        assert report.mortality_type == MortalityReportModel.TYPE_POST_WEANING
+        assert report.sow is None
+        assert report.quantity == 3
+
+        invalid_response = setup_client.post(reverse('report_mortality'), {
+            'mortality_type': 'post_weaning',
+            'mortality_date': (date.today() + timedelta(days=1)).isoformat(),
+            'quantity': '0',
+        })
+
+        assert invalid_response.status_code == 200
+        assert MortalityReportModel.objects.filter(farm=setup_client.farm).count() == 1
+
+    def test_mortality_list_is_farm_scoped_and_shows_post_weaning_stock(self, setup_client):
+        own_sow = SowModel.objects.create(ear_tag="OWN-WEAN", farm=setup_client.farm)
+        SowEventModel.objects.create(
+            sow=own_sow,
+            event_type='WEANING',
+            event_date=date.today(),
+            details={'count': 10},
+        )
+        MortalityReportModel.objects.create(
+            farm=setup_client.farm,
+            mortality_type=MortalityReportModel.TYPE_POST_WEANING,
+            mortality_date=date.today(),
+            quantity=2,
+            reason='Widoczne',
+        )
+
+        other_user = User.objects.create_user(username='mortality-list-other', password='password')
+        other_farm = get_or_create_user_farm(other_user)
+        other_sow = SowModel.objects.create(ear_tag="OTHER-WEAN", farm=other_farm)
+        SowEventModel.objects.create(
+            sow=other_sow,
+            event_type='WEANING',
+            event_date=date.today(),
+            details={'count': 20},
+        )
+        MortalityReportModel.objects.create(
+            farm=other_farm,
+            mortality_type=MortalityReportModel.TYPE_POST_WEANING,
+            mortality_date=date.today(),
+            quantity=5,
+            reason='Ukryte',
+        )
+
+        response = setup_client.get(reverse('mortality_list'))
+        content = response.content.decode()
+
+        assert response.status_code == 200
+        assert "Widoczne" in content
+        assert "Ukryte" not in content
+        assert response.context['post_weaning_stock'] == {
+            'weaned_total': 10,
+            'mortality_total': 2,
+            'current_stock': 8,
+        }

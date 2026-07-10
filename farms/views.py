@@ -1,23 +1,31 @@
+from types import SimpleNamespace
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
+from django.utils import timezone
 
 from farms.forms import CsvImportForm, FarmSettingsForm, UserBackupImportForm
 from farms.models import AuditLogModel
 from farms.services.audit_log_service import log_action
+from farms.services.cache import invalidate_farm_cache_on_commit
 from farms.services.csv_transfer import build_csv_export, import_csv_archive
 from farms.services.current_farm import get_current_farm
 from farms.services.data_backup import BackupImportError, build_user_backup, import_user_backup
 from farms.services.settings_service import get_farm_settings
 from farms.services.task_center import TaskCenterService
+from farms.services.today_dashboard import TodayDashboardService
 from farms.services.profitability import ProfitabilityAnalyticsService
-from farms.services.date_range import PERIOD_OPTIONS, parse_date_range
+from farms.services.statistics import FarmStatisticsService
 from farms.services.accounting_year import get_available_years, parse_accounting_year
 from farms.services.module_navigation import module_visibility_groups
 from farms.services.farm_dashboard import dashboard_stat_groups
-from farms.services.filter_ui import filter_ui_state, parse_filter_date
+from common.filter_ui import filter_ui_state, parse_filter_date
 from farms.services.global_search import build_global_search_context
+from sows.actions.events import PREGNANCY_CHECK_RESULTS, SowEventActions
 
 
 @login_required
@@ -25,54 +33,99 @@ def farm_settings_view(request):
     farm = get_current_farm(request)
     settings = get_farm_settings(farm)
 
-    if request.method == 'POST' and 'import_backup' in request.POST:
-        import_form = UserBackupImportForm(request.POST, request.FILES)
-        if import_form.is_valid():
-            try:
-                counts = import_user_backup(import_form.cleaned_data['backup_file'], farm)
-            except BackupImportError as error:
-                messages.error(request, str(error))
-            else:
-                total = sum(counts.values())
-                log_action(farm=farm, user=request.user, action="USER_BACKUP_IMPORT", model_label="farms.FarmModel", object_id=farm.pk, object_repr=str(farm), metadata={"counts": counts})
-                messages.success(request, f'Przywrócono dane gospodarstwa ({total} rekordów).')
-            return redirect('farm_settings')
-        form = FarmSettingsForm(instance=settings, farm=farm)
-        csv_import_form = CsvImportForm()
-    elif request.method == 'POST' and 'import_csv' in request.POST:
-        csv_import_form = CsvImportForm(request.POST, request.FILES)
-        if csv_import_form.is_valid():
-            try:
-                counts = import_csv_archive(csv_import_form.cleaned_data['csv_archive'], farm)
-            except BackupImportError as error:
-                messages.error(request, str(error))
-            else:
-                log_action(farm=farm, user=request.user, action="CSV_IMPORT", model_label="farms.FarmModel", object_id=farm.pk, object_repr=str(farm), metadata={"counts": counts})
-                messages.success(request, f"Zaimportowano dane CSV ({sum(counts.values())} rekordów).")
-                return redirect('farm_settings')
-        form = FarmSettingsForm(instance=settings, farm=farm)
-        import_form = UserBackupImportForm()
-    elif request.method == 'POST':
-        form = FarmSettingsForm(request.POST, instance=settings, farm=farm)
-        import_form = UserBackupImportForm()
-        csv_import_form = CsvImportForm()
-        if form.is_valid():
-            form.save()
-            log_action(farm=farm, user=request.user, action="SETTINGS_UPDATE", obj=settings)
-            messages.success(request, "Ustawienia gospodarstwa zostały zapisane.")
-            return redirect('farm_settings')
-    else:
-        form = FarmSettingsForm(instance=settings, farm=farm)
-        import_form = UserBackupImportForm()
-        csv_import_form = CsvImportForm()
+    if request.method == 'POST':
+        return _handle_settings_post(request, farm, settings)
 
-    return render(request, 'farms/settings.html', {
+    return _render_settings(request, farm, settings)
+
+
+def _handle_settings_post(request, farm, settings):
+    if 'import_backup' in request.POST:
+        return _handle_user_backup_import(request, farm, settings)
+    if 'import_csv' in request.POST:
+        return _handle_csv_import(request, farm, settings)
+    return _handle_settings_update(request, farm, settings)
+
+
+def _handle_user_backup_import(request, farm, settings):
+    import_form = UserBackupImportForm(request.POST, request.FILES)
+    if not import_form.is_valid():
+        return _render_settings(request, farm, settings, import_form=import_form)
+
+    try:
+        counts = import_user_backup(import_form.cleaned_data['backup_file'], farm)
+    except BackupImportError as error:
+        messages.error(request, str(error))
+    else:
+        total = sum(counts.values())
+        log_action(
+            farm=farm,
+            user=request.user,
+            action="USER_BACKUP_IMPORT",
+            model_label="farms.FarmModel",
+            object_id=farm.pk,
+            object_repr=str(farm),
+            metadata={"counts": counts},
+        )
+        invalidate_farm_cache_on_commit(farm)
+        messages.success(request, f'Przywrócono dane gospodarstwa ({total} rekordów).')
+    return redirect('farm_settings')
+
+
+def _handle_csv_import(request, farm, settings):
+    csv_import_form = CsvImportForm(request.POST, request.FILES)
+    if not csv_import_form.is_valid():
+        return _render_settings(request, farm, settings, csv_import_form=csv_import_form)
+
+    try:
+        counts = import_csv_archive(csv_import_form.cleaned_data['csv_archive'], farm)
+    except BackupImportError as error:
+        messages.error(request, str(error))
+    else:
+        log_action(
+            farm=farm,
+            user=request.user,
+            action="CSV_IMPORT",
+            model_label="farms.FarmModel",
+            object_id=farm.pk,
+            object_repr=str(farm),
+            metadata={"counts": counts},
+        )
+        invalidate_farm_cache_on_commit(farm)
+        messages.success(request, f"Zaimportowano dane CSV ({sum(counts.values())} rekordów).")
+    return redirect('farm_settings')
+
+
+def _handle_settings_update(request, farm, settings):
+    form = FarmSettingsForm(request.POST, instance=settings, farm=farm)
+    if form.is_valid():
+        saved_settings = form.save()
+        invalidate_farm_cache_on_commit(farm, groups=("settings",))
+        log_action(farm=farm, user=request.user, action="SETTINGS_UPDATE", obj=saved_settings)
+        messages.success(request, "Ustawienia gospodarstwa zostały zapisane.")
+        return redirect('farm_settings')
+    return _render_settings(request, farm, settings, form=form)
+
+
+def _render_settings(request, farm, settings, *, form=None, import_form=None, csv_import_form=None):
+    form = form or FarmSettingsForm(instance=settings, farm=farm)
+    import_form = import_form or UserBackupImportForm()
+    csv_import_form = csv_import_form or CsvImportForm()
+    return render(request, 'farms/settings.html', _settings_context(
+        form=form,
+        import_form=import_form,
+        csv_import_form=csv_import_form,
+    ))
+
+
+def _settings_context(*, form, import_form, csv_import_form):
+    return {
         'form': form,
         'import_form': import_form,
         'csv_import_form': csv_import_form,
         'module_visibility_groups': module_visibility_groups(form),
         'dashboard_stat_groups': dashboard_stat_groups(form),
-    })
+    }
 
 
 @login_required
@@ -129,6 +182,92 @@ def task_center_view(request):
 
 
 @login_required
+def complete_today_tasks_view(request):
+    if request.method != 'POST':
+        return redirect('modules_home')
+
+    farm = get_current_farm(request)
+    selected_task_ids = list(dict.fromkeys(task_id for task_id in request.POST.getlist('task_ids') if task_id))
+    if not selected_task_ids:
+        messages.error(request, "Zaznacz przynajmniej jedno zadanie do zatwierdzenia.")
+        return redirect('modules_home')
+
+    tasks_by_id = TodayDashboardService(farm).completable_tasks_by_id()
+    selected_tasks = [tasks_by_id[task_id] for task_id in selected_task_ids if task_id in tasks_by_id]
+    if not selected_tasks:
+        messages.error(request, "Nie znaleziono zadań możliwych do szybkiego zatwierdzenia.")
+        return redirect('modules_home')
+
+    note = (request.POST.get('completion_note') or '').strip()[:500]
+    try:
+        created_events = _complete_today_tasks(
+            farm=farm,
+            user=request.user,
+            tasks=selected_tasks,
+            post_data=request.POST,
+            note=note,
+        )
+    except ValidationError as error:
+        messages.error(request, error.messages[0] if error.messages else str(error))
+        return redirect('modules_home')
+
+    for event in created_events:
+        log_action(farm=farm, user=request.user, action="CREATE", obj=event)
+
+    messages.success(request, f"Zatwierdzono {len(created_events)} zadań z listy na dziś.")
+    return redirect('modules_home')
+
+
+def _complete_today_tasks(*, farm, user, tasks, post_data, note):
+    _validate_today_tasks(tasks=tasks, post_data=post_data)
+
+    actions = SowEventActions(farm=farm, user=user)
+    created_events = []
+    event_date = timezone.localdate()
+
+    with transaction.atomic():
+        for task in tasks:
+            metadata = task["metadata"]
+            kind = metadata.get("kind")
+            sow_id = metadata.get("sow_id")
+
+            if kind == "vaccination":
+                created_events.extend(actions.bulk_create_vaccinations(
+                    sow_ids=[sow_id],
+                    vaccine_name=metadata.get("vaccine_name") or "",
+                    cycle_id=metadata.get("cycle_id") or "",
+                    event_date=event_date,
+                    note=note,
+                ))
+            elif kind == "ultrasound":
+                result = post_data.get(f"pregnancy_result_{task['task_id']}")
+                created_events.extend(actions.bulk_create_pregnancy_checks(
+                    sows=[SimpleNamespace(id=sow_id)],
+                    results_by_sow_id={sow_id: result},
+                    event_date=event_date,
+                ))
+
+    return created_events
+
+
+def _validate_today_tasks(*, tasks, post_data):
+    for task in tasks:
+        metadata = task["metadata"]
+        kind = metadata.get("kind")
+        if not metadata.get("sow_id"):
+            raise ValidationError("Nie można zatwierdzić zadania bez przypisanej maciory.")
+        if kind == "vaccination":
+            if not metadata.get("vaccine_name") or not metadata.get("cycle_id"):
+                raise ValidationError("Nie można zatwierdzić szczepienia bez nazwy szczepionki albo cyklu.")
+        elif kind == "ultrasound":
+            result = post_data.get(f"pregnancy_result_{task['task_id']}")
+            if result not in PREGNANCY_CHECK_RESULTS:
+                raise ValidationError("Wybierz wynik USG dla każdego zaznaczonego badania.")
+        else:
+            raise ValidationError("To zadanie wymaga uzupełnienia w dedykowanym formularzu.")
+
+
+@login_required
 def profitability_view(request):
     farm = get_current_farm(request)
     accounting_year = parse_accounting_year(request.GET)
@@ -142,6 +281,23 @@ def profitability_view(request):
     })
     context.update(filter_ui_state(request.GET, {'year': 'Rok'}))
     return render(request, "farms/profitability.html", context)
+
+
+@login_required
+def statistics_view(request):
+    farm = get_current_farm(request)
+    accounting_year = parse_accounting_year(request.GET)
+    context = FarmStatisticsService(farm).calculate(
+        date_from=accounting_year.date_from,
+        date_to=accounting_year.date_to,
+    )
+    context.update({
+        "selected_year": accounting_year.year,
+        "available_years": get_available_years(farm),
+        "statistic_links": FarmStatisticsService.statistic_links(),
+    })
+    context.update(filter_ui_state(request.GET, {'year': 'Rok'}))
+    return render(request, "farms/statistics.html", context)
 
 
 @login_required

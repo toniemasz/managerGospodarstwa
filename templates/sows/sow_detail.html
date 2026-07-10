@@ -7,8 +7,11 @@
     {% if sow.is_archived %}
     <section class="notice notice-warning">
         <div>
-            <h2>Maciora zarchiwizowana</h2>
-            <p>Historia i dane pozostają dostępne do korekty.</p>
+            <h2>{% if sow.archive_reason == 'death' %}Maciora zarchiwizowana z powodu upadku{% else %}Maciora zarchiwizowana{% endif %}</h2>
+            <p>
+                Historia i dane pozostają dostępne do korekty.
+                {% if sow.death_date %}Data upadku: <strong>{{ sow.death_date|date:"d.m.Y" }}</strong>.{% endif %}
+            </p>
         </div>
     </section>
     {% endif %}
@@ -68,6 +71,7 @@
                             <option value="PREGNANCY_CHECK">Badania USG</option>
                             <option value="FARROWING">Oproszenia</option>
                             <option value="WEANING">Odsadzenia</option>
+                            <option value="MISCARRIAGE">Poronienia</option>
                             <option value="VACCINATION">Szczepienia</option>
                         </select>
                     </div>
@@ -96,6 +100,8 @@
                                         <span class="status-pill status-violet">Oproszenie</span>
                                     {% elif event.event_type == 'WEANING' %}
                                         <span class="status-pill status-blue">Odsadzenie</span>
+                                    {% elif event.event_type == 'MISCARRIAGE' %}
+                                        <span class="status-pill status-red">Poronienie</span>
                                     {% elif event.event_type == 'VACCINATION' %}
                                         <span class="status-pill status-green">Szczepienie</span>
                                     {% else %}
@@ -123,8 +129,12 @@
                                             <span>Urodzone martwe: <strong>{{ event.details.born_dead|default:"0" }}</strong></span>
                                         {% elif event.event_type == 'WEANING' %}
                                             <span>Odsadzone prosięta: <strong>{{ event.details.count|default:"0" }} szt.</strong></span>
+                                        {% elif event.event_type == 'MISCARRIAGE' %}
+                                            <span>Maciora wróciła do statusu jałowa.</span>
+                                            <span>Utworzono: <strong>{{ event.created_at|date:"d.m.Y H:i" }}</strong></span>
                                         {% elif event.event_type == 'VACCINATION' %}
                                             <span>Szczepionka: <strong>{{ event.details.vaccine_name|default:"Brak nazwy" }}</strong></span>
+                                            {% if event.details.note %}<span>Notatka: <strong>{{ event.details.note }}</strong></span>{% endif %}
                                         {% endif %}
                                     </div>
                                 </td>
@@ -203,8 +213,11 @@
                                 <span>Żywe: <strong>{{ event.details.born_alive|default:"0" }}</strong>, martwe: <strong>{{ event.details.born_dead|default:"0" }}</strong></span>
                             {% elif event.event_type == 'WEANING' %}
                                 <span>Odsadzone: <strong>{{ event.details.count|default:"0" }} szt.</strong></span>
+                            {% elif event.event_type == 'MISCARRIAGE' %}
+                                <span>Poronienie · utworzono {{ event.created_at|date:"d.m.Y H:i" }}</span>
                             {% elif event.event_type == 'VACCINATION' %}
                                 <span>Szczepionka: <strong>{{ event.details.vaccine_name|default:"Brak nazwy" }}</strong></span>
+                                {% if event.details.note %}<span>Notatka: <strong>{{ event.details.note }}</strong></span>{% endif %}
                             {% else %}
                                 <span>{{ event.get_event_type_display }}</span>
                             {% endif %}

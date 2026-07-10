@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 
 from django.db import transaction
 
+from farms.services.cache import invalidate_farm_cache_on_commit
 from sales.forms import SaleClassRowFormSet, empty_sale_row_initials
 from sales.models import PigSaleModel, SaleClassRowModel
 from sales.services.parsers.factory import SaleSettlementParserFactory
@@ -65,6 +66,7 @@ class SaleFormService:
         saved_sale.farm = sale.farm or self.farm
         saved_sale.save()
         self.replace_sale_rows(saved_sale, row_formset)
+        invalidate_farm_cache_on_commit(saved_sale.farm, groups=("sales",))
         return saved_sale
 
     def replace_sale_rows(self, sale: PigSaleModel, row_formset) -> None:

@@ -26,7 +26,9 @@
                     <tr>
                         <th>Nr kolczyka</th>
                         <th>Ostatni status</th>
+                        <th>Powód</th>
                         <th>W stadzie od</th>
+                        <th>Data upadku</th>
                         <th class="text-right">Urodzone żywe</th>
                         <th class="text-right">Akcje</th>
                     </tr>
@@ -36,7 +38,13 @@
                     <tr>
                         <td><a href="{% url 'sow_detail' sow.id %}" class="table-link">{{ sow.ear_tag }}</a></td>
                         <td><span class="status-pill">{{ sow.dynamic_status_display }}</span></td>
+                        <td>
+                            <span class="status-pill{% if sow.archive_reason == 'death' %} status-red{% endif %}">
+                                {{ sow.archive_reason_display }}
+                            </span>
+                        </td>
                         <td>{{ sow.entry_date|date:"d.m.Y" }}</td>
+                        <td>{{ sow.death_date|date:"d.m.Y"|default:"—" }}</td>
                         <td class="text-right"><strong>{{ sow.total_born_alive }}</strong> szt.</td>
                         <td class="text-right">
                             <div class="row-actions">
@@ -46,7 +54,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="empty-table">Archiwum jest puste.</td>
+                        <td colspan="7" class="empty-table">Archiwum jest puste.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

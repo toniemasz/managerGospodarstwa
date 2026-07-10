@@ -1,12 +1,32 @@
 <article class="task-summary-card{% if section.urgent_count %} has-urgent{% endif %}">
     <div class="task-summary-heading">
-        <div><h2>{{ section.title }}</h2><p>{{ section.count }} aktywnych{% if section.urgent_count %}, {{ section.urgent_count }} pilnych{% endif %}</p></div>
-        <span class="count-badge{% if section.urgent_count %} is-urgent{% endif %}">{{ section.count }}</span>
+        <div>
+            <span class="task-area-label">Obszar pracy</span>
+            <h2>{{ section.title }}</h2>
+            <p>
+                <strong>{{ section.count }}</strong> aktywnych
+                {% if section.urgent_count %}
+                    · <strong>{{ section.urgent_count }}</strong> pilnych lub na dziś
+                {% else %}
+                    · bez pilnych spraw
+                {% endif %}
+            </p>
+        </div>
+        <span class="count-badge{% if section.urgent_count %} is-urgent{% endif %}" aria-label="{{ section.count }} aktywnych zadań">{{ section.count }}</span>
     </div>
     {% if section.preview_items %}
     <ul class="task-preview-list">
         {% for task in section.preview_items %}
-        <li><span>{{ task.title }}</span><small>{{ task.status_label }}</small></li>
+        <li class="priority-{{ task.priority }}">
+            <span>
+                <strong>{{ task.title }}</strong>
+                <small>{{ task.description }}</small>
+            </span>
+            <em>
+                {% if task.priority == 'urgent' %}Pilne{% elif task.priority == 'today' %}Dzisiaj{% else %}W kolejce{% endif %}
+                · {{ task.status_label }}
+            </em>
+        </li>
         {% endfor %}
     </ul>
     {% if section.more_count %}<p class="task-more-count">+ {{ section.more_count }} więcej</p>{% endif %}

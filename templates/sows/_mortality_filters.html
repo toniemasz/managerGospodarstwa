@@ -1,0 +1,17 @@
+<div class="table-control">
+    <label for="mortality_type">Typ upadku</label>
+    <select name="mortality_type" id="mortality_type">
+        <option value="">Wszystkie typy</option>
+        {% for value, label in mortality_type_choices %}
+            <option value="{{ value }}"{% if selected_mortality_type == value %} selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+</div>
+<div class="table-control">
+    <label for="date_from">Od</label>
+    <input type="date" name="date_from" id="date_from" value="{{ date_from|date:'Y-m-d' }}">
+</div>
+<div class="table-control">
+    <label for="date_to">Do</label>
+    <input type="date" name="date_to" id="date_to" value="{{ date_to|date:'Y-m-d' }}">
+</div>

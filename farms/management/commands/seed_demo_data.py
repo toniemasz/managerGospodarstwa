@@ -12,7 +12,7 @@ from costs.models import CostCategoryModel, CostModel
 from farms.services.farm_service import get_or_create_user_farm
 from farms.services.settings_service import get_farm_settings
 from feed.models import DeliveryModel, IngredientModel, ProductionModel, RecipeItemModel, RecipeModel
-from feed.services.inventory_service import InventoryMovementService
+from feed.actions.inventory import InventoryActions
 from sales.models import PigSaleModel, SaleClassRowModel
 from sows.models import SowEventModel, SowModel, VaccinationPlanModel
 
@@ -216,7 +216,7 @@ class Command(BaseCommand):
                     "created_by": user,
                 },
             )
-        InventoryMovementService(farm).rebuild()
+        InventoryActions(farm).rebuild()
         return {"maciory": len(sows), "składniki": len(ingredients), "receptury": len(recipes), "produkcje": len(statuses), "sprzedaże": 12, "kategorie kosztów": len(categories), "koszty": 18}
 
     @staticmethod

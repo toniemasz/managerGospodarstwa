@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block title %}Zgłoś upadek{% endblock %}
+
+{% block content %}
+<main class="app-page app-page-narrow">
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Maciory</p>
+            <h1>Zgłoś upadek</h1>
+            <p class="page-subtitle">Rejestruj upadek maciory albo zwierząt po odsadzeniu.</p>
+        </div>
+        <a href="{% url 'mortality_list' %}" class="button button-secondary">Lista upadków</a>
+    </section>
+
+    <section class="notice notice-warning">
+        <div>
+            <h2>Zakres zgłoszenia</h2>
+            <p>Prosiąt przed odsadzeniem nie zgłaszamy tutaj osobno. Ich straty wynikają z liczby żywo urodzonych i odsadzonych. Ten formularz służy do upadku maciory albo zwierząt po odsadzeniu.</p>
+        </div>
+    </section>
+
+    <section class="panel">
+        <form method="post" class="responsive-form" id="mortality-form">
+            {% csrf_token %}
+            {% include 'components/form_errors.html' with form=form %}
+
+            <div class="form-section-heading">
+                <h2>Dane zgłoszenia</h2>
+                <p>Wybierz typ upadku, datę i uzupełnij pola właściwe dla wybranego typu.</p>
+            </div>
+
+            <div class="form-grid two-columns">
+                {% include 'components/form_field.html' with field=form.mortality_type %}
+                {% include 'components/form_field.html' with field=form.mortality_date %}
+            </div>
+
+            <div id="sec_mortality_sow" class="form-section dynamic-form-section hidden">
+                <div class="form-section-heading">
+                    <h2>Maciora</h2>
+                    <p>Wpisz początek numeru kolczyka i wybierz właściwą maciorę z podpowiedzi.</p>
+                </div>
+                {% include 'components/form_field.html' with field=form.sow %}
+                <datalist id="mortality-sow-options">
+                    {% for sow in form.sow_suggestions %}
+                        <option value="{{ sow.ear_tag }}">Maciora {{ sow.ear_tag }}</option>
+                    {% endfor %}
+                </datalist>
+                <p class="field-hint">Po zapisie wybrana maciora zostanie zarchiwizowana z powodu upadku.</p>
+            </div>
+
+            <div id="sec_mortality_quantity" class="form-section dynamic-form-section">
+                <div class="form-section-heading">
+                    <h2>Liczba sztuk</h2>
+                    <p>Dla zwierząt po odsadzeniu podaj liczbę, która pomniejszy bieżący stan. Dla maciory zapis zostanie ustawiony na 1 sztukę.</p>
+                </div>
+                {% include 'components/form_field.html' with field=form.quantity %}
+            </div>
+
+            {% include 'components/form_field.html' with field=form.reason %}
+            {% include 'components/form_field.html' with field=form.note wide=True %}
+
+            <div class="form-actions">
+                <a href="{% url 'mortality_list' %}" class="button button-secondary">Anuluj</a>
+                <button type="submit" class="button button-primary">Zapisz zgłoszenie</button>
+            </div>
+        </form>
+    </section>
+</main>
+{% endblock %}

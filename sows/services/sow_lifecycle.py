@@ -5,10 +5,18 @@ from sows.domain.rules import GESTATION_DAYS, PREGNANCY_CHECK_AFTER_DAYS
 
 
 class SowEvent:
-    def __init__(self, event_type: str, event_date: date, details: Dict[str, Any], id: int = None):
+    def __init__(
+        self,
+        event_type: str,
+        event_date: date,
+        details: Dict[str, Any],
+        id: int = None,
+        created_at=None,
+    ):
         self.id = id
         self.event_type = event_type
         self.event_date = event_date
+        self.created_at = created_at
         if isinstance(details, dict):
             self.details = details
         else:
@@ -16,12 +24,25 @@ class SowEvent:
 
 
 class Sow:
-    def __init__(self, id: int, ear_tag: str, entry_date: date, created_at: date, is_archived: bool = False):
+    def __init__(
+        self,
+        id: int,
+        ear_tag: str,
+        entry_date: date,
+        created_at: date,
+        is_archived: bool = False,
+        archive_reason: str = "manual",
+        death_date: date | None = None,
+        death_note: str = "",
+    ):
         self.id = id
         self.ear_tag = ear_tag
         self.entry_date = entry_date
         self.created_at = created_at
         self.is_archived = is_archived
+        self.archive_reason = archive_reason
+        self.death_date = death_date
+        self.death_note = death_note
 
         # Podstawowy status produkcyjny maciory
         self.status = "IDLE"  # Dostępne: IDLE (Jałowa), INSEMINATION (Inseminowana), PREGNANT (Prośna), TO_RECHECK (Do rebadania), LACTATING (Karmiąca)
@@ -44,6 +65,7 @@ class Sow:
         self.pregnancy_checks: List[SowEvent] = []
         self.farrowings: List[SowEvent] = []
         self.weanings: List[SowEvent] = []
+        self.miscarriages: List[SowEvent] = []
         self.vaccinations: List[SowEvent] = []
 
         # Pełna historia (chronologicznie od najnowszego)
@@ -68,6 +90,7 @@ class Sow:
         self.pregnancy_checks = []
         self.farrowings = []
         self.weanings = []
+        self.miscarriages = []
         self.vaccinations = []
 
         for event in sorted_events:
@@ -106,6 +129,11 @@ class Sow:
                 self.total_weaned += int(weaned) if weaned is not None else 0
                 self.weaning_count += 1
                 self.weanings.append(event)
+
+            elif event.event_type == "MISCARRIAGE":
+                self.status = "IDLE"
+                self.expected_farrowing_date = None
+                self.miscarriages.append(event)
 
             elif event.event_type == "VACCINATION":
                 self.vaccinations.append(event)
@@ -221,6 +249,12 @@ class Sow:
         elif self.status == "LACTATING":
             return "Karmiąca"
         return "Jałowa"
+
+    @property
+    def archive_reason_display(self) -> str:
+        if self.archive_reason == "death":
+            return "Upadek"
+        return "Ręczna archiwizacja"
 
     @property
     def avg_born_alive(self) -> float:

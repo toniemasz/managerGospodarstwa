@@ -1,297 +1,234 @@
 {% extends 'base.html' %}
-{% load ui_format %}
 
 {% block title %}Ustawienia{% endblock %}
 
 {% block content %}
 <main class="app-page settings-page">
-    <section class="page-header">
+    <section class="page-header settings-page-header">
         <div>
             <p class="eyebrow">Gospodarstwo</p>
             <h1>Ustawienia</h1>
-            <p class="page-subtitle">Domyślne reguły alertów, widoczność modułów, pasze oraz eksport danych.</p>
+            <p class="page-subtitle">Konfiguracja systemu, modułów, alertów i danych gospodarstwa.</p>
         </div>
         <div class="header-actions">
             <a href="{% url 'audit_log' %}" class="button button-secondary">Historia zmian</a>
+            <button type="submit" form="farm-settings-form" class="button button-primary">Zapisz</button>
         </div>
     </section>
 
-    <section class="settings-summary-grid">
-        <div class="stat-tile">
-            <span>Gospodarstwo</span>
-            <strong>{{ current_farm.name|default:"Brak nazwy" }}</strong>
-        </div>
-        <div class="stat-tile">
-            <span>Widoczne moduły</span>
-            <strong>{{ ui_visible_module_keys|length }}</strong>
-        </div>
-        <div class="stat-tile">
-            <span>Kontrola ciąży po</span>
-            <strong>{{ form.pregnancy_check_after_days.value|default:"-" }} dni</strong>
-        </div>
-        <div class="stat-tile">
-            <span>Domyślne śrutowanie</span>
-            <strong>{{ form.default_production_quantity_kg.value|smart_unit:"kg" }}</strong>
-        </div>
-    </section>
+    <form method="post" id="farm-settings-form" class="settings-admin-form">
+        {% csrf_token %}
+        {% include 'components/form_errors.html' with form=form %}
 
-    <section class="settings-layout">
-        <aside class="settings-side">
-            <section class="panel">
-                <nav class="settings-index" aria-label="Sekcje ustawień">
-                    <a href="#settings-profile">Profil <span>›</span></a>
-                    <a href="#settings-interface">Wygląd <span>›</span></a>
-                    <a href="#settings-modules">Moduły <span>›</span></a>
-                    <a href="#settings-dashboard">Centrala <span>›</span></a>
-                    <a href="#settings-sows">Maciory i alerty <span>›</span></a>
-                    <a href="#settings-feed">Pasze <span>›</span></a>
-                    <a href="#settings-data">Dane <span>›</span></a>
-                </nav>
-            </section>
-            <section class="panel settings-profile-card">
-                <span class="settings-avatar">{{ request.user.username|slice:":2"|upper }}</span>
-                <div>
-                    <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
-                    <span>Użytkownik gospodarstwa</span>
-                </div>
-            </section>
-        </aside>
-
-        <div class="settings-main">
-            <section class="panel">
-                <form method="post" class="responsive-form">
-                    {% csrf_token %}
-                    {% include 'components/form_errors.html' with form=form %}
-
-                    <div class="settings-card" id="settings-profile">
-                        <div class="settings-card-heading">
-                            <div>
-                                <h2>Dane gospodarstwa</h2>
-                                <p>Nazwa jest widoczna w nawigacji i eksportach danych.</p>
-                            </div>
-                        </div>
-                        <div class="form-field">
-                            <label for="{{ form.farm_name.id_for_label }}">{{ form.farm_name.label }}</label>
-                            {{ form.farm_name }}
-                            {{ form.farm_name.errors }}
-                        </div>
-                    </div>
-
-                    <div class="settings-card" id="settings-interface">
-                        <div class="settings-card-heading">
-                            <div>
-                                <h2>Wygląd aplikacji</h2>
-                                <p>Dopasuj gęstość, motyw i tekst do sposobu pracy na komputerze, tablecie i telefonie.</p>
-                            </div>
-                        </div>
-
-                        <div class="settings-interface-stack">
-                        <div class="settings-control-group">
-                            <h3>{{ form.interface_scale.label }}</h3>
-                            <div class="settings-choice-grid density-choice-list">
-                                {% for radio in form.interface_scale %}
-                                <label class="settings-choice-card density-choice density-{{ radio.data.value }}">
-                                    {{ radio.tag }}
-                                    <span class="density-preview" aria-hidden="true">
-                                        <i></i><i></i><i></i><i></i>
-                                    </span>
-                                    <span>
-                                        <strong>{{ radio.choice_label }}</strong>
-                                        <small>
-                                            {% if radio.data.value == 'compact' %}Bardzo małe tabele, kafelki, pola, nagłówki i odstępy.
-                                            {% elif radio.data.value == 'standard' %}Zbalansowany widok codzienny z umiarkowanymi tabelami i kartami.
-                                            {% else %}Duże pola, kafelki, przyciski, tabele i wyraźne odstępy.{% endif %}
-                                        </small>
-                                    </span>
-                                </label>
-                                {% endfor %}
-                            </div>
-                            {{ form.interface_scale.errors }}
-                        </div>
-
-                        <div class="settings-control-group">
-                            <h3>{{ form.theme.label }}</h3>
-                            <div class="settings-choice-grid theme-choice-list">
-                                {% for radio in form.theme %}
-                                <label class="settings-choice-card theme-choice theme-{{ radio.data.value }}">
-                                    {{ radio.tag }}
-                                    <span class="theme-swatch" aria-hidden="true"></span>
-                                    <span>
-                                        <strong>{{ radio.choice_label }}</strong>
-                                        <small>
-                                            {% if radio.data.value == 'light' %}Jasne tło i klasyczny wygląd aplikacji.
-                                            {% elif radio.data.value == 'dark' %}Ciemne tło, karty i pola z mniejszą luminancją.
-                                            {% else %}Dopasowanie do ustawień systemowych urządzenia.{% endif %}
-                                        </small>
-                                    </span>
-                                </label>
-                                {% endfor %}
-                            </div>
-                            {{ form.theme.errors }}
-                        </div>
-
-                        <div class="settings-control-group">
-                            <h3>{{ form.font_scale.label }}</h3>
-                            <div class="font-scale-panel">
-                                <div class="font-scale-current">
-                                    <span>Aktualnie</span>
-                                    <strong data-font-scale-output>{{ form.font_scale.value|default:"100" }}%</strong>
-                                </div>
-                                <div class="font-scale-control-row">
-                                    <label class="font-scale-slider-field" for="font-scale-slider">
-                                        <span>Suwak</span>
-                                        <input
-                                            type="range"
-                                            id="font-scale-slider"
-                                            class="font-scale-slider"
-                                            min="20"
-                                            max="200"
-                                            step="1"
-                                            value="{{ form.font_scale.value|default:'100' }}"
-                                            data-font-scale-slider
-                                        >
-                                    </label>
-                                    <div class="font-scale-number-field">
-                                        <label for="{{ form.font_scale.id_for_label }}">Własna wartość</label>
-                                        <div class="font-scale-number-input">
-                                            {{ form.font_scale }}
-                                            <span>%</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="font-scale-limits" aria-hidden="true">
-                                    <span>20%</span>
-                                    <span>200%</span>
-                                </div>
-                            </div>
-                            {{ form.font_scale.errors }}
-                        </div>
-                        </div>
-                    </div>
-
-                    {% include 'farms/_module_visibility.html' %}
-                    {% include 'farms/_dashboard_stats_visibility.html' %}
-
-                    <div class="settings-card" id="settings-sows">
-                        <div class="settings-card-heading">
-                            <div>
-                                <h2>Maciory i alerty</h2>
-                                <p>Reguły terminów i komunikatów używane w module macior.</p>
-                            </div>
-                        </div>
-                        <div class="form-grid two-columns">
-                            <div class="form-field">
-                                <label for="{{ form.pregnancy_check_after_days.id_for_label }}">{{ form.pregnancy_check_after_days.label }}</label>
-                                {{ form.pregnancy_check_after_days }}
-                                {{ form.pregnancy_check_after_days.errors }}
-                            </div>
-                            <div class="form-field">
-                                <label for="{{ form.gestation_days.id_for_label }}">{{ form.gestation_days.label }}</label>
-                                {{ form.gestation_days }}
-                                {{ form.gestation_days.errors }}
-                            </div>
-                            <div class="form-field">
-                                <label for="{{ form.farrowing_alert_days_ahead.id_for_label }}">{{ form.farrowing_alert_days_ahead.label }}</label>
-                                {{ form.farrowing_alert_days_ahead }}
-                                {{ form.farrowing_alert_days_ahead.errors }}
-                            </div>
-                            <div class="form-field">
-                                <label for="{{ form.vaccination_alert_days_ahead.id_for_label }}">{{ form.vaccination_alert_days_ahead.label }}</label>
-                                {{ form.vaccination_alert_days_ahead }}
-                                {{ form.vaccination_alert_days_ahead.errors }}
-                            </div>
-                        </div>
-                        <div class="settings-toggle-list">
-                            <label class="checkbox-row">
-                                {{ form.allow_farrowing_without_pregnancy_check }}
-                                <span>{{ form.allow_farrowing_without_pregnancy_check.label }}</span>
-                            </label>
-                            <label class="checkbox-row">
-                                {{ form.ask_before_auto_pregnancy_check }}
-                                <span>{{ form.ask_before_auto_pregnancy_check.label }}</span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <div class="settings-card" id="settings-feed">
-                        <div class="settings-card-heading">
-                            <div>
-                                <h2>Pasze</h2>
-                                <p>Próg niskiego stanu ustawisz osobno podczas dodawania lub edycji składnika.</p>
-                            </div>
-                        </div>
-                        <div class="form-grid two-columns">
-                            <div class="form-field">
-                                <label for="{{ form.default_production_quantity_kg.id_for_label }}">{{ form.default_production_quantity_kg.label }}</label>
-                                {{ form.default_production_quantity_kg }}
-                                {{ form.default_production_quantity_kg.errors }}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-actions settings-save-bar">
-                        <button type="submit" class="button button-primary">Zapisz ustawienia</button>
-                    </div>
-                </form>
-            </section>
-        </div>
-    </section>
-
-    <section class="settings-admin-grid" id="settings-data">
-        <article class="panel compact-panel">
-            <div class="section-heading">
-                <div>
-                    <h2>Eksport danych</h2>
-                    <p>Pobierz archiwum lub pliki CSV przypisane do gospodarstwa.</p>
+        <section class="settings-card" id="settings-profile">
+            <div class="settings-card-heading">
+                <h2>Dane gospodarstwa</h2>
+                <p>Nazwa jest widoczna w nawigacji, raportach i eksportach.</p>
+            </div>
+            <div class="settings-row settings-row-field">
+                <div class="form-field settings-farm-name-field">
+                    <label for="{{ form.farm_name.id_for_label }}">{{ form.farm_name.label }}</label>
+                    {{ form.farm_name }}
+                    {{ form.farm_name.errors }}
                 </div>
             </div>
-            <div class="settings-action-list">
-                <a href="{% url 'export_user_data' %}" class="button button-secondary">Eksport ZIP</a>
-                <a href="{% url 'export_csv' %}" class="button button-secondary">Eksport CSV</a>
+        </section>
+
+        <section class="settings-card" id="settings-interface">
+            <div class="settings-card-heading">
+                <h2>Wygląd aplikacji</h2>
+                <p>Dopasuj gęstość, motyw i rozmiar tekstu do codziennej pracy.</p>
             </div>
-        </article>
 
-        <article class="panel compact-panel">
-            <div class="section-heading"><div><h2>Import CSV</h2><p>Komplet plików CSV z archiwum eksportu. Gospodarstwo musi być puste.</p></div></div>
-            <form method="post" enctype="multipart/form-data" class="responsive-form">
-                {% csrf_token %}
-                {{ csv_import_form.non_field_errors }}
-                <div class="form-field">{{ csv_import_form.csv_archive.label_tag }}{{ csv_import_form.csv_archive }}{{ csv_import_form.csv_archive.errors }}</div>
-                <label class="checkbox-row">{{ csv_import_form.confirm_empty_import }}<span>{{ csv_import_form.confirm_empty_import.label }}</span></label>
-                {{ csv_import_form.confirm_empty_import.errors }}
-                <div class="form-actions"><button type="submit" name="import_csv" value="1" class="button button-secondary">Importuj CSV</button></div>
-            </form>
-        </article>
+            <div class="settings-control-grid">
+                <div class="settings-control-group">
+                    <h3>{{ form.interface_scale.label }}</h3>
+                    <div class="settings-segmented-control" role="radiogroup" aria-label="{{ form.interface_scale.label }}">
+                        {% for radio in form.interface_scale %}
+                        <label class="settings-segment">
+                            {{ radio.tag }}
+                            <span>{{ radio.choice_label }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                    {{ form.interface_scale.errors }}
+                </div>
 
-        <article class="panel compact-panel settings-danger-panel">
-            <div class="section-heading">
-                <div>
-                    <h2>Awaryjne przywracanie danych</h2>
-                    <p>Import jest dostępny wyłącznie dla pustego gospodarstwa.</p>
+                <div class="settings-control-group">
+                    <h3>{{ form.theme.label }}</h3>
+                    <div class="settings-segmented-control" role="radiogroup" aria-label="{{ form.theme.label }}">
+                        {% for radio in form.theme %}
+                        <label class="settings-segment">
+                            {{ radio.tag }}
+                            <span>{{ radio.choice_label }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                    {{ form.theme.errors }}
                 </div>
             </div>
-            <div class="notice-warning" role="note">
-                Jeżeli system wykryje istniejące dane lub duplikaty w pliku, cały import zostanie przerwany bez zapisywania zmian.
+
+            <div class="settings-control-group">
+                <div class="settings-scale-label">
+                    <h3>{{ form.font_scale.label }}</h3>
+                    <strong data-font-scale-output>{{ form.font_scale.value|default:"100" }}%</strong>
+                </div>
+                <div class="font-scale-panel">
+                    <input
+                        type="range"
+                        id="font-scale-slider"
+                        class="font-scale-slider"
+                        min="20"
+                        max="200"
+                        step="1"
+                        value="{{ form.font_scale.value|default:'100' }}"
+                        data-font-scale-slider
+                    >
+                    <div class="font-scale-control-row">
+                        <div class="font-scale-limits" aria-hidden="true">
+                            <span>20%</span>
+                            <span>200%</span>
+                        </div>
+                        <div class="font-scale-number-field">
+                            <label for="{{ form.font_scale.id_for_label }}">Własna wartość</label>
+                            <div class="font-scale-number-input">
+                                {{ form.font_scale }}
+                                <span>%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {{ form.font_scale.errors }}
             </div>
-            <form method="post" enctype="multipart/form-data" class="responsive-form">
-                {% csrf_token %}
-                {{ import_form.non_field_errors }}
+        </section>
+
+        {% include 'farms/_module_visibility.html' %}
+        {% include 'farms/_dashboard_stats_visibility.html' %}
+
+        <section class="settings-card" id="settings-sows">
+            <div class="settings-card-heading">
+                <h2>Maciory i alerty</h2>
+                <p>Terminy używane w cyklu macior, powiadomieniach i szybkich akcjach.</p>
+            </div>
+            <div class="form-grid two-columns settings-number-grid">
                 <div class="form-field">
-                    <label for="{{ import_form.backup_file.id_for_label }}">{{ import_form.backup_file.label }}</label>
-                    {{ import_form.backup_file }}
-                    {% if import_form.backup_file.help_text %}<p class="help-text">{{ import_form.backup_file.help_text }}</p>{% endif %}
-                    {{ import_form.backup_file.errors }}
+                    <label for="{{ form.pregnancy_check_after_days.id_for_label }}">{{ form.pregnancy_check_after_days.label }}</label>
+                    {{ form.pregnancy_check_after_days }}
+                    {{ form.pregnancy_check_after_days.errors }}
                 </div>
-                <label class="checkbox-row">
-                    {{ import_form.confirm_empty_import }}
-                    <span>{{ import_form.confirm_empty_import.label }}</span>
+                <div class="form-field">
+                    <label for="{{ form.gestation_days.id_for_label }}">{{ form.gestation_days.label }}</label>
+                    {{ form.gestation_days }}
+                    {{ form.gestation_days.errors }}
+                </div>
+                <div class="form-field">
+                    <label for="{{ form.farrowing_alert_days_ahead.id_for_label }}">{{ form.farrowing_alert_days_ahead.label }}</label>
+                    {{ form.farrowing_alert_days_ahead }}
+                    {{ form.farrowing_alert_days_ahead.errors }}
+                </div>
+                <div class="form-field">
+                    <label for="{{ form.vaccination_alert_days_ahead.id_for_label }}">{{ form.vaccination_alert_days_ahead.label }}</label>
+                    {{ form.vaccination_alert_days_ahead }}
+                    {{ form.vaccination_alert_days_ahead.errors }}
+                </div>
+            </div>
+            <div class="settings-row-list">
+                <label class="settings-switch-row">
+                    <span>{{ form.allow_farrowing_without_pregnancy_check.label }}</span>
+                    {{ form.allow_farrowing_without_pregnancy_check }}
                 </label>
-                {{ import_form.confirm_empty_import.errors }}
-                <div class="form-actions">
+                <label class="settings-switch-row">
+                    <span>{{ form.ask_before_auto_pregnancy_check.label }}</span>
+                    {{ form.ask_before_auto_pregnancy_check }}
+                </label>
+            </div>
+        </section>
+
+        <section class="settings-card" id="settings-feed">
+            <div class="settings-card-heading">
+                <h2>Pasze</h2>
+                <p>Próg niskiego stanu ustawisz osobno podczas dodawania lub edycji składnika.</p>
+            </div>
+            <div class="settings-row settings-row-field">
+                <div class="form-field settings-compact-field">
+                    <label for="{{ form.default_production_quantity_kg.id_for_label }}">{{ form.default_production_quantity_kg.label }}</label>
+                    {{ form.default_production_quantity_kg }}
+                    {{ form.default_production_quantity_kg.errors }}
+                </div>
+            </div>
+        </section>
+
+        <div class="form-actions settings-save-bar">
+            <button type="submit" class="button button-primary">Zapisz zmiany</button>
+        </div>
+    </form>
+
+    <section class="settings-card settings-data-section" id="settings-data">
+        <div class="settings-card-heading">
+            <h2>Dane i import</h2>
+            <p>Eksportuj dane gospodarstwa albo zaimportuj archiwum do pustego gospodarstwa.</p>
+        </div>
+
+        <div class="settings-row-list">
+            <div class="settings-action-row">
+                <div>
+                    <strong>Eksport danych</strong>
+                    <span>Pobierz archiwum ZIP lub pliki CSV przypisane do tego gospodarstwa.</span>
+                </div>
+                <div class="settings-row-actions">
+                    <a href="{% url 'export_user_data' %}" class="button button-secondary">Eksport ZIP</a>
+                    <a href="{% url 'export_csv' %}" class="button button-secondary">Eksport CSV</a>
+                </div>
+            </div>
+
+            <form method="post" enctype="multipart/form-data" class="settings-action-row">
+                {% csrf_token %}
+                <div class="settings-import-copy">
+                    <strong>Import CSV</strong>
+                    <span>Komplet plików CSV z archiwum eksportu. Gospodarstwo musi być puste.</span>
+                    {{ csv_import_form.non_field_errors }}
+                    <label class="settings-check-row">
+                        {{ csv_import_form.confirm_empty_import }}
+                        <span>{{ csv_import_form.confirm_empty_import.label }}</span>
+                    </label>
+                    {{ csv_import_form.confirm_empty_import.errors }}
+                </div>
+                <div class="settings-import-controls">
+                    <div class="form-field">
+                        <label for="{{ csv_import_form.csv_archive.id_for_label }}">{{ csv_import_form.csv_archive.label }}</label>
+                        {{ csv_import_form.csv_archive }}
+                        {{ csv_import_form.csv_archive.errors }}
+                    </div>
+                    <button type="submit" name="import_csv" value="1" class="button button-secondary">Importuj CSV</button>
+                </div>
+            </form>
+
+            <form method="post" enctype="multipart/form-data" class="settings-action-row settings-warning-row">
+                {% csrf_token %}
+                <div class="settings-import-copy">
+                    <strong>Awaryjne przywracanie danych</strong>
+                    <span>Import jest dostępny wyłącznie dla pustego gospodarstwa.</span>
+                    <p class="settings-warning-text" role="note">
+                        Jeżeli system wykryje istniejące dane lub duplikaty w pliku, cały import zostanie przerwany bez zapisywania zmian.
+                    </p>
+                    {{ import_form.non_field_errors }}
+                    <label class="settings-check-row">
+                        {{ import_form.confirm_empty_import }}
+                        <span>{{ import_form.confirm_empty_import.label }}</span>
+                    </label>
+                    {{ import_form.confirm_empty_import.errors }}
+                </div>
+                <div class="settings-import-controls">
+                    <div class="form-field">
+                        <label for="{{ import_form.backup_file.id_for_label }}">{{ import_form.backup_file.label }}</label>
+                        {{ import_form.backup_file }}
+                        {% if import_form.backup_file.help_text %}<p class="help-text">{{ import_form.backup_file.help_text }}</p>{% endif %}
+                        {{ import_form.backup_file.errors }}
+                    </div>
                     <button type="submit" name="import_backup" value="1" class="button button-secondary">Przywróć moje dane</button>
                 </div>
             </form>
-        </article>
+        </div>
     </section>
 </main>
 {% endblock %}

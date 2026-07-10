@@ -3,6 +3,7 @@ from django.urls import reverse
 from django.contrib.auth.models import User
 from decimal import Decimal
 from django.utils import timezone
+from unittest.mock import patch
 
 from farms.services.farm_service import get_or_create_user_farm
 from feed.models import DeliveryModel, IngredientModel, ProductionModel, RecipeItemModel, RecipeModel
@@ -238,6 +239,25 @@ def test_feed_production_post_actions(auth_client, feed_objects):
     delete = auth_client.post(reverse('delete_production', args=[queued.id]))
     assert delete.status_code == 302
     assert not ProductionModel.objects.filter(id=queued.id).exists()
+
+
+@pytest.mark.django_db
+def test_add_queued_production_does_not_touch_inventory_release(auth_client, feed_objects):
+    with patch("feed.signals.InventoryActions.release_production") as release_production:
+        response = auth_client.post(reverse('add_production'), {
+            'date': timezone.now().date(),
+            'time': '08:30',
+            'recipe': feed_objects['recipe'].id,
+            'quantity_kg': '25.00',
+        })
+
+    assert response.status_code == 302
+    release_production.assert_not_called()
+    assert ProductionModel.objects.filter(
+        recipe=feed_objects['recipe'],
+        quantity_kg=Decimal('25.00'),
+        status=ProductionModel.Statuses.QUEUED,
+    ).exists()
 
 
 @pytest.mark.django_db

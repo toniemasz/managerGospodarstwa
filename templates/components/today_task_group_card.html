@@ -1,0 +1,34 @@
+<article class="today-task-group-card today-task-group-card--{{ group.tone }}{% if compact %} is-compact{% endif %}">
+    <div class="today-task-group-head">
+        <span class="dashboard-card-icon {{ group.tone }}">{% include 'components/app_icon.html' with name=group.icon_name %}</span>
+        <div>
+            <h3>{{ group.title }}</h3>
+            <strong>{{ group.count }} do zrobienia</strong>
+        </div>
+    </div>
+    <p>{{ group.description }}</p>
+    {% if not compact %}
+    <div class="today-task-preview-list">
+        {% for task in group.preview_items %}
+        <a href="{{ task.action_url|default:task.object_url }}" class="today-task-preview priority-{{ task.priority }}">
+            <span class="quick-list-marker"></span>
+            <span>
+                <strong>{{ task.title }}</strong>
+                <small>{{ task.status_label }}</small>
+            </span>
+        </a>
+        {% endfor %}
+        {% if group.more_count %}
+        <small class="today-task-more">+{{ group.more_count }} więcej</small>
+        {% endif %}
+    </div>
+    {% endif %}
+    <div class="today-task-group-actions">
+        {% if group.can_quick_complete %}
+        <button type="button" class="button button-primary" data-dialog-open="{{ group.dialog_id }}">{{ group.action_label }}</button>
+        {% else %}
+        <a href="{{ group.panel_url }}" class="button button-secondary">{{ group.action_label }}</a>
+        {% endif %}
+        <a href="{{ group.panel_url }}" class="table-link">Panel</a>
+    </div>
+</article>

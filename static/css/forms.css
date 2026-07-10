@@ -5,18 +5,18 @@
 .global-search-panel {
     display: flex;
     flex-direction: column;
-    gap: var(--space-md);
+    gap: var(--space-sm);
     padding: var(--panel-padding);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: color-mix(in srgb, var(--surface) 92%, transparent);
-    box-shadow: 0 1px 2px rgba(21, 28, 39, .04);
+    box-shadow: none;
 }
 
 .global-search-panel {
     position: relative;
-    margin-bottom: 1.25rem;
-    padding-left: 3.25rem;
+    margin-bottom: var(--section-gap);
+    padding-left: 2.75rem;
 }
 
 .global-search-panel input {
@@ -26,7 +26,7 @@
 .global-search-icon {
     position: absolute;
     top: 50%;
-    left: 1.25rem;
+    left: .95rem;
     display: inline-flex;
     color: var(--muted);
     transform: translateY(-50%);
@@ -73,7 +73,7 @@ textarea {
     border-radius: var(--radius);
     background: var(--surface);
     color: var(--text);
-    padding: .55rem .75rem;
+    padding: .45rem .62rem;
     font-size: var(--control-font-size);
     font-weight: 650;
     outline: none;
@@ -87,7 +87,7 @@ textarea:hover {
 }
 
 textarea {
-    min-height: 7rem;
+    min-height: 5.8rem;
     resize: vertical;
 }
 
@@ -96,7 +96,7 @@ select:focus,
 textarea:focus {
     border-color: var(--primary);
     background: var(--surface);
-    box-shadow: 0 0 0 4px rgba(0, 108, 73, .14);
+    box-shadow: 0 0 0 3px rgba(0, 108, 73, .12);
 }
 
 input[readonly],
@@ -136,7 +136,7 @@ input[type="date"] {
 .filter-grid,
 .accounting-filter {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
 }
 
 .filter-field,
@@ -168,7 +168,7 @@ input[type="date"] {
 }
 
 .form-grid.three-columns {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
 }
 
 .form-field-wide {
@@ -180,14 +180,14 @@ input[type="date"] {
 }
 
 .form-grid.two-columns {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
 }
 
 .form-section,
 .option-box {
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    background: linear-gradient(180deg, var(--surface), var(--surface-soft));
+    background: var(--surface);
     padding: var(--panel-padding);
 }
 
@@ -196,7 +196,7 @@ input[type="date"] {
 .panel > .form-section,
 .panel > .option-box {
     margin: 0;
-    padding: 1.25rem;
+    padding: var(--panel-padding);
 }
 
 .form-actions {
@@ -259,8 +259,8 @@ input[type="date"] {
 .ingredient-editor,
 .group-grid {
     display: grid;
-    gap: .75rem;
-    padding: 1rem 0;
+    gap: .55rem;
+    padding: .65rem 0;
 }
 
 .ingredient-form-list {
@@ -281,18 +281,18 @@ input[type="date"] {
 .ingredient-row-card,
 .ingredient-line {
     display: grid;
-    gap: .75rem;
+    gap: .55rem;
     align-items: end;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--surface-soft);
-    padding: .85rem;
+    padding: .62rem;
 }
 
 .ingredient-row-fields {
     display: grid;
     grid-template-columns: minmax(12rem, 1fr) minmax(7rem, 9rem) auto;
-    gap: .75rem;
+    gap: .55rem;
     align-items: end;
 }
 
@@ -319,10 +319,10 @@ input[type="date"] {
 
 .section-divider {
     display: flex;
-    gap: .75rem;
+    gap: .55rem;
     align-items: center;
     border-top: 1px solid var(--border);
-    padding-top: 1rem;
+    padding-top: .72rem;
 }
 
 .section-divider h2 {
@@ -340,8 +340,8 @@ input[type="date"] {
 .checkbox-row {
     display: flex;
     align-items: center;
-    gap: .75rem;
-    padding: .9rem;
+    gap: .55rem;
+    padding: .62rem .68rem;
     cursor: pointer;
 }
 
@@ -357,8 +357,8 @@ input[type="date"] {
 
 .stage-confirm-panel {
     display: grid;
-    gap: 1rem;
-    padding: 1rem;
+    gap: var(--grid-gap);
+    padding: var(--panel-padding);
 }
 
 .ingredient-row.is-complete,
@@ -390,6 +390,27 @@ input[type="date"] {
     opacity: .58;
 }
 
+.single-event-rows,
+.single-event-card {
+    display: grid;
+    gap: var(--section-gap);
+}
+
+.single-event-rows {
+    padding: var(--card-padding);
+}
+
+.single-event-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: var(--panel-padding);
+}
+
+.single-event-details .form-field.is-muted {
+    display: none;
+}
+
 .disabled-cell {
     background: var(--surface-muted);
 }
@@ -413,21 +434,21 @@ input[type="date"] {
 
 .filter-disclosure,
 .form-disclosure {
-    margin-bottom: 1.25rem;
+    margin-bottom: var(--section-gap);
     overflow: hidden;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: color-mix(in srgb, var(--surface) 90%, transparent);
-    box-shadow: 0 1px 2px rgba(21, 28, 39, .04);
+    box-shadow: none;
 }
 
 .filter-disclosure > summary,
 .form-disclosure > summary {
     display: flex;
-    min-height: 3.25rem;
+    min-height: var(--control-height);
     align-items: center;
     gap: .65rem;
-    padding: .8rem 1rem;
+    padding: .62rem var(--panel-padding);
     background: var(--surface-soft);
     color: var(--text);
     font-weight: 950;
@@ -472,7 +493,7 @@ input[type="date"] {
     display: flex;
     flex-wrap: wrap;
     gap: .4rem;
-    padding: .75rem 1rem;
+    padding: .55rem var(--panel-padding);
     border-top: 1px solid var(--border);
 }
 
@@ -494,7 +515,7 @@ input[type="date"] {
 .form-section-heading {
     margin-bottom: .25rem;
     border-bottom: 1px solid var(--border);
-    padding-bottom: .75rem;
+    padding-bottom: .55rem;
 }
 
 .form-section-heading h2,
@@ -528,10 +549,10 @@ input[type="date"] {
 }
 
 .empty-inline {
-    margin: .85rem 0 0;
+    margin: .65rem 0 0;
     border: 1px dashed var(--border);
     border-radius: var(--radius);
-    padding: .85rem;
+    padding: .65rem;
     color: var(--muted);
     text-align: center;
     font-weight: 750;
@@ -545,14 +566,24 @@ input[type="date"] {
 
 .form-disclosure > .field-hint,
 .form-disclosure > .form-grid,
+.form-disclosure > .stats-grid,
+.form-disclosure > .dashboard-stat-grid,
+.form-disclosure > .summary-list,
 .form-disclosure > .ingredient-editor {
     margin: 0;
     padding: var(--panel-padding);
 }
 
+.form-disclosure > .finance-section,
+.form-disclosure > .finance-grid,
+.form-disclosure > .chart-panel,
+.form-disclosure > .table-panel {
+    margin: var(--panel-padding);
+}
+
 .module-visibility-groups {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
     gap: var(--grid-gap);
 }
 
@@ -578,7 +609,7 @@ input[type="date"] {
     gap: var(--space-sm);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    background: linear-gradient(180deg, var(--surface), var(--surface-soft));
+    background: var(--surface);
     padding: var(--card-padding);
 }
 
@@ -593,7 +624,7 @@ input[type="date"] {
 }
 
 .module-settings-card:hover {
-    background: var(--surface-soft);
+    background: var(--primary-soft);
 }
 
 .module-toggle span,

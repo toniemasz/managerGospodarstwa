@@ -2,7 +2,7 @@ from django.urls import reverse
 
 from farms.module_registry import MODULE_DEFINITIONS, MODULE_GROUPS, MODULE_KEYS, default_nav_modules
 
-MOBILE_NAV_KEYS = ("sows", "inventory", "sales")
+MOBILE_NAV_KEYS = ("tasks", "sows", "inventory")
 
 
 def normalize_visible_modules(value) -> list[str]:

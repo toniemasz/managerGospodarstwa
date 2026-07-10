@@ -5,12 +5,14 @@ from django.utils import timezone
 from farms.services.farm_service import get_or_create_user_farm
 from farms.services.settings_service import get_farm_settings
 from feed.models import IngredientModel, DeliveryModel, RecipeModel, RecipeItemModel, ProductionModel
-from feed.services.feed_management_service import FeedManagementService
-
-
-@pytest.fixture
-def service():
-    return FeedManagementService()
+from feed.actions.productions import complete_production, mark_stage_1_done
+from feed.selectors.inventory import inventory_dashboard
+from feed.selectors.productions import (
+    default_production_quantity,
+    production_details_for_stages,
+    validate_production_capacity,
+)
+from feed.selectors.recipes import recipe_costs
 
 
 @pytest.fixture
@@ -32,11 +34,10 @@ def setup_data():
 
 
 @pytest.mark.django_db
-class TestFeedManagementService:
+class TestFeedActionsAndSelectors:
 
-    def test_inventory_dashboard_calculation(self, service, setup_data):
-        # Na start magazyn powinien mieć to, co z dostawy
-        dashboard = service.get_inventory_dashboard()['inventory']
+    def test_inventory_dashboard_calculation(self, setup_data):
+        dashboard = inventory_dashboard()['inventory']
 
         bin_stock = next(i for i in dashboard if i.ingredient_id == setup_data['ing_bin'].id).current_stock
         bag_stock = next(i for i in dashboard if i.ingredient_id == setup_data['ing_bag'].id).current_stock
@@ -44,7 +45,7 @@ class TestFeedManagementService:
         assert bin_stock == Decimal('1000.00')
         assert bag_stock == Decimal('500.00')
 
-    def test_validate_production_capacity_success(self, service, setup_data):
+    def test_validate_production_capacity_success(self, setup_data):
         production = ProductionModel.objects.create(
             date=timezone.now().date(),
             recipe=setup_data['recipe'],
@@ -52,11 +53,11 @@ class TestFeedManagementService:
             status=ProductionModel.Statuses.QUEUED
         )
 
-        is_possible, errors = service.validate_production_capacity(production.id)
+        is_possible, errors = validate_production_capacity(None, production.id)
         assert is_possible is True
         assert len(errors) == 0
 
-    def test_validate_production_capacity_failure(self, service, setup_data):
+    def test_validate_production_capacity_failure(self, setup_data):
         production = ProductionModel.objects.create(
             date=timezone.now().date(),
             recipe=setup_data['recipe'],
@@ -64,12 +65,12 @@ class TestFeedManagementService:
             status=ProductionModel.Statuses.QUEUED
         )
 
-        is_possible, errors = service.validate_production_capacity(production.id)
+        is_possible, errors = validate_production_capacity(None, production.id)
         assert is_possible is False
         assert len(errors) > 0
         assert "Brakuje" in errors[0]
 
-    def test_process_production_stage_1(self, service, setup_data):
+    def test_process_production_stage_1(self, setup_data):
         production = ProductionModel.objects.create(
             date=timezone.now().date(),
             recipe=setup_data['recipe'],
@@ -77,13 +78,13 @@ class TestFeedManagementService:
             status=ProductionModel.Statuses.QUEUED
         )
 
-        success, msg = service.process_production_stage_1(production.id)
+        success, msg = mark_stage_1_done(None, production.id)
         assert success is True
 
         production.refresh_from_db()
         assert production.status == ProductionModel.Statuses.STAGE_1_DONE
 
-    def test_complete_production_standard_flow(self, service, setup_data):
+    def test_complete_production_standard_flow(self, setup_data):
         # Tworzymy produkcję już po Etapie 1
         production = ProductionModel.objects.create(
             date=timezone.now().date(),
@@ -92,7 +93,7 @@ class TestFeedManagementService:
             status=ProductionModel.Statuses.STAGE_1_DONE
         )
 
-        success, msg = service.complete_production(production.id)
+        success, msg = complete_production(None, production.id)
         assert success is True
 
         production.refresh_from_db()
@@ -100,12 +101,12 @@ class TestFeedManagementService:
         assert production.completed_at is not None
 
         # SPRAWDZAMY CZY MAGAZYN FAKTYCZNIE SPADŁ
-        dashboard = service.get_inventory_dashboard()['inventory']
+        dashboard = inventory_dashboard()['inventory']
         bin_stock = next(i for i in dashboard if i.ingredient_id == setup_data['ing_bin'].id).current_stock
         # 1000 - 800 = 200
         assert bin_stock == Decimal('200.00')
 
-    def test_complete_production_skip_stages(self, service, setup_data):
+    def test_complete_production_skip_stages(self, setup_data):
         # Tworzymy produkcję prosto w kolejce
         production = ProductionModel.objects.create(
             date=timezone.now().date(),
@@ -115,13 +116,13 @@ class TestFeedManagementService:
         )
 
         # Wymuszamy zakończenie z pominięciem etapów (checkbox "Od razu zatwierdź")
-        success, msg = service.complete_production(production.id, skip_stages=True)
+        success, msg = complete_production(None, production.id, skip_stages=True)
         assert success is True
 
         production.refresh_from_db()
         assert production.status == ProductionModel.Statuses.COMPLETED
 
-    def test_complete_production_blocks_if_no_stock(self, service, setup_data):
+    def test_complete_production_blocks_if_no_stock(self, setup_data):
         production = ProductionModel.objects.create(
             date=timezone.now().date(),
             recipe=setup_data['recipe'],
@@ -129,7 +130,7 @@ class TestFeedManagementService:
             status=ProductionModel.Statuses.STAGE_1_DONE
         )
 
-        success, msg = service.complete_production(production.id)
+        success, msg = complete_production(None, production.id)
         assert success is False
         assert "Brak wystarczającej ilości" in msg
 
@@ -137,7 +138,7 @@ class TestFeedManagementService:
         production.refresh_from_db()
         assert production.status == ProductionModel.Statuses.STAGE_1_DONE
 
-    def test_get_production_details_for_stages_splits_bin_and_bag_items(self, service, setup_data):
+    def test_get_production_details_for_stages_splits_bin_and_bag_items(self, setup_data):
         production = ProductionModel.objects.create(
             date=timezone.now().date(),
             recipe=setup_data['recipe'],
@@ -145,7 +146,7 @@ class TestFeedManagementService:
             status=ProductionModel.Statuses.QUEUED
         )
 
-        details = service.get_production_details_for_stages(production.id)
+        details = production_details_for_stages(None, production.id)
 
         assert details['production'] == production
         assert details['stage1_items'][0]['name'] == "Kukurydza"
@@ -153,7 +154,7 @@ class TestFeedManagementService:
         assert details['stage2_items'][0]['name'] == "Koncentrat"
         assert details['stage2_items'][0]['weight_kg'] == Decimal('200.00')
 
-    def test_process_stage_1_rejects_non_queued_production(self, service, setup_data):
+    def test_process_stage_1_rejects_non_queued_production(self, setup_data):
         production = ProductionModel.objects.create(
             date=timezone.now().date(),
             recipe=setup_data['recipe'],
@@ -161,12 +162,12 @@ class TestFeedManagementService:
             status=ProductionModel.Statuses.STAGE_1_DONE
         )
 
-        success, message = service.process_production_stage_1(production.id)
+        success, message = mark_stage_1_done(None, production.id)
 
         assert success is False
         assert "kolejce początkowej" in message
 
-    def test_complete_production_rejects_before_stage_1(self, service, setup_data):
+    def test_complete_production_rejects_before_stage_1(self, setup_data):
         production = ProductionModel.objects.create(
             date=timezone.now().date(),
             recipe=setup_data['recipe'],
@@ -174,12 +175,12 @@ class TestFeedManagementService:
             status=ProductionModel.Statuses.QUEUED
         )
 
-        success, message = service.complete_production(production.id)
+        success, message = complete_production(None, production.id)
 
         assert success is False
         assert "przed wykonaniem Etapu 1" in message
 
-    def test_complete_production_rejects_already_completed(self, service, setup_data):
+    def test_complete_production_rejects_already_completed(self, setup_data):
         production = ProductionModel.objects.create(
             date=timezone.now().date(),
             recipe=setup_data['recipe'],
@@ -187,12 +188,12 @@ class TestFeedManagementService:
             status=ProductionModel.Statuses.COMPLETED
         )
 
-        success, message = service.complete_production(production.id, skip_stages=True)
+        success, message = complete_production(None, production.id, skip_stages=True)
 
         assert success is False
         assert "wcześniej zaksięgowane" in message
 
-    def test_get_calculator_data_returns_recipe_costs(self, service, setup_data):
+    def test_get_calculator_data_returns_recipe_costs(self, setup_data):
         from feed.models import IngredientPriceConfigModel
 
         IngredientPriceConfigModel.objects.create(
@@ -204,7 +205,7 @@ class TestFeedManagementService:
             price_per_kg=Decimal('3.00')
         )
 
-        costs = service.get_calculator_data()
+        costs = recipe_costs()
 
         assert len(costs) == 1
         assert costs[0].recipe_name == "Standardowa"
@@ -240,10 +241,9 @@ class TestFeedManagementService:
             price_per_kg=Decimal('1.00'),
         )
 
-        service = FeedManagementService(farm=farm)
-        dashboard = service.get_inventory_dashboard()
+        dashboard = inventory_dashboard(farm)
 
         alert_ids = [item.ingredient_id for item in dashboard['low_stock_alerts']]
         assert alert_ids == [low_threshold_ingredient.id]
         assert dashboard['low_stock_alerts'][0].low_stock_threshold_kg == Decimal('750.00')
-        assert service.get_default_production_quantity() == Decimal('1800.00')
+        assert default_production_quantity(farm) == Decimal('1800.00')

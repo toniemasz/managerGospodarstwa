@@ -113,7 +113,7 @@ def test_get_farm_settings_creates_default_settings():
     assert settings.farm == farm
     assert settings.pregnancy_check_after_days == 30
     assert settings.gestation_days == 114
-    assert settings.nav_modules == ["tasks", "sows", "feed", "sales"]
+    assert settings.nav_modules == ["tasks", "statistics", "sows", "feed", "sales"]
     assert settings.interface_scale == "standard"
     assert settings.theme == "light"
     assert settings.font_scale == 100

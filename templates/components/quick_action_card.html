@@ -1,0 +1,9 @@
+<a href="{{ action.url }}" class="quick-action{% if class_name %} {{ class_name }}{% endif %}">
+    <span class="module-icon {{ action.tone }}">{% include 'components/app_icon.html' with name=action.icon_name %}</span>
+    <div>
+        <strong>{{ action.title }}</strong>
+        {% if show_description %}
+            <small>{{ action.description }}</small>
+        {% endif %}
+    </div>
+</a>

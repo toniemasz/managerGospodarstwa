@@ -9,8 +9,9 @@ from django.db.models import Max
 from django.utils import timezone
 
 from farms.services.audit_log_service import log_action
+from farms.services.cache import invalidate_farm_cache_on_commit
 from feed.models import ProductionModel, RecipeItemModel, RecipeModel, RecipeVersionItemModel, RecipeVersionModel
-from feed.services.inventory_service import InventoryMovementService
+from feed.actions.inventory import InventoryActions
 
 
 PERCENT_TOTAL = Decimal('100.00')
@@ -32,7 +33,25 @@ def _percentage_signature(items) -> tuple[tuple[int, Decimal], ...]:
     ))
 
 
-class RecipeVersionService:
+def recipe_version_items_from_formset(formset) -> list[dict]:
+    items = []
+    for form in formset.forms:
+        if not form.cleaned_data:
+            continue
+        if formset.can_delete and form.cleaned_data.get('DELETE'):
+            continue
+        ingredient = form.cleaned_data.get('ingredient')
+        percentage = form.cleaned_data.get('percentage')
+        if ingredient is None or percentage is None:
+            continue
+        items.append({
+            'ingredient': ingredient,
+            'percentage': percentage,
+        })
+    return items
+
+
+class RecipeVersionActions:
     def __init__(self, *, farm=None, user=None):
         self.farm = farm
         self.user = user
@@ -112,6 +131,7 @@ class RecipeVersionService:
                 'change_note': change_note,
             },
         )
+        invalidate_farm_cache_on_commit(recipe.farm, groups=("feed",))
         return version, True
 
     @transaction.atomic
@@ -172,6 +192,7 @@ class RecipeVersionService:
                 'change_note': change_note,
             },
         )
+        invalidate_farm_cache_on_commit(recipe.farm, groups=("feed",))
         return version
 
     @transaction.atomic
@@ -216,7 +237,7 @@ class RecipeVersionService:
         custom_recipe_count = sum(1 for production in completed if production.custom_recipe_data)
         rebuild_result = None
         if completed_ids:
-            rebuild_result = InventoryMovementService(version.recipe.farm).rebuild(
+            rebuild_result = InventoryActions(version.recipe.farm).rebuild(
                 prefer_existing_movements=True,
                 reconstruct_production_ids=set(completed_ids),
             )
@@ -246,6 +267,7 @@ class RecipeVersionService:
                 obj=version,
                 metadata=metadata,
             )
+        invalidate_farm_cache_on_commit(version.recipe.farm, groups=("feed",))
         return RecipeVersionUpdateResult(
             production_count=production_count,
             completed_count=len(completed_ids),

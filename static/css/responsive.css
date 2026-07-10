@@ -108,25 +108,24 @@
         border: 1px solid var(--border);
         border-radius: var(--radius);
         background: color-mix(in srgb, var(--surface) 96%, transparent);
-        padding: .35rem;
-        box-shadow: 0 14px 38px rgba(16, 32, 51, .18);
-        backdrop-filter: blur(14px);
+        padding: .28rem;
+        box-shadow: var(--shadow);
     }
 
     .mobile-nav-link {
         display: inline-flex;
         flex-direction: column;
-        min-height: 2.65rem;
-        min-width: 4.35rem;
+        min-height: 2.4rem;
+        min-width: 3.95rem;
         flex: 1 0 auto;
         align-items: center;
         justify-content: center;
-        padding: .55rem .25rem;
+        padding: .42rem .22rem;
         font-size: .72rem;
     }
 
     body {
-        padding-bottom: 5.75rem;
+        padding-bottom: 5.25rem;
     }
 }
 
@@ -161,9 +160,9 @@
     html {
         --control-height: max(2.85rem, var(--control-height));
         --button-height: max(2.85rem, var(--button-height));
-        --table-cell-padding-y: .75rem;
-        --table-cell-padding-x: .8rem;
-        --page-block-padding: 1rem 1.5rem;
+        --table-cell-padding-y: .62rem;
+        --table-cell-padding-x: .68rem;
+        --page-block-padding: .8rem 1rem;
     }
 
     .app-page,
@@ -173,6 +172,7 @@
     }
 
     .topbar {
+        gap: .45rem;
         padding: .7rem .75rem;
     }
 
@@ -193,7 +193,39 @@
     .compact-panel,
     .responsive-form,
     .quick-actions-grid {
-        padding: 1rem;
+        padding: .75rem;
+    }
+
+    .responsive-form .auto-resize-field {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .mobile-quick-dashboard {
+        display: grid;
+        gap: var(--section-gap);
+        margin-bottom: var(--section-gap);
+    }
+
+    .wide-dashboard {
+        display: none;
+    }
+
+    .mobile-quick-notice {
+        align-items: stretch;
+    }
+
+    .mobile-quick-notice .button {
+        width: 100%;
+    }
+
+    .mobile-quick-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        padding: .62rem;
+    }
+
+    .quick-action-large {
+        min-height: 4.6rem;
     }
 
     .header-actions,
@@ -230,8 +262,8 @@
 
     .mobile-card-table tbody {
         display: grid;
-        gap: .75rem;
-        padding: .85rem;
+        gap: .55rem;
+        padding: .62rem;
     }
 
     .mobile-card-table tr {
@@ -239,15 +271,15 @@
         border: 1px solid var(--border);
         border-radius: var(--radius);
         background: var(--surface);
-        box-shadow: 0 1px 2px rgba(16, 32, 51, .04);
+        box-shadow: none;
     }
 
     .mobile-card-table td {
         display: grid;
-        grid-template-columns: minmax(7.5rem, 38%) minmax(0, 1fr);
-        gap: .75rem;
+        grid-template-columns: minmax(7rem, 36%) minmax(0, 1fr);
+        gap: .55rem;
         border-bottom: 1px solid var(--border);
-        padding: .8rem;
+        padding: .62rem;
         text-align: left;
     }
 
@@ -277,6 +309,61 @@
 
     .mobile-card-table .row-actions {
         justify-content: flex-start;
+    }
+
+    .mobile-card-table .row-actions .table-link,
+    .mobile-card-table .table-link {
+        min-height: 2.85rem;
+        flex: 1 1 9rem;
+    }
+
+    .today-task-submit {
+        grid-template-columns: 1fr;
+    }
+
+    .today-task-submit button {
+        width: 100%;
+    }
+
+    .today-task-group-grid {
+        grid-template-columns: 1fr;
+        padding: .62rem;
+    }
+
+    .today-task-group-card {
+        gap: .55rem;
+        padding: .68rem;
+    }
+
+    .today-task-group-actions {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .today-task-group-actions .button,
+    .today-task-group-actions .table-link {
+        flex: 0 0 auto;
+        width: 100%;
+        min-height: var(--button-height);
+    }
+
+    .today-task-dialog {
+        width: min(100% - .75rem, 42rem);
+        max-height: calc(100dvh - .75rem);
+    }
+
+    .today-task-dialog-header,
+    .today-task-dialog-list,
+    .today-task-dialog-actions {
+        padding: .75rem;
+    }
+
+    .today-task-dialog-actions {
+        flex-direction: column-reverse;
+    }
+
+    .today-task-dialog-actions .button {
+        width: 100%;
     }
 
     .inventory-card,
@@ -339,5 +426,9 @@
     .stat-tile strong,
     .inventory-stock strong {
         font-size: 1.35rem;
+    }
+
+    .mobile-quick-actions {
+        grid-template-columns: 1fr;
     }
 }

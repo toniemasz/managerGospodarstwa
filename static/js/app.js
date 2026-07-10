@@ -136,6 +136,7 @@
             PREGNANCY_CHECK: document.getElementById('sec_pregnancy_check'),
             FARROWING: document.getElementById('sec_farrowing'),
             WEANING: document.getElementById('sec_weaning'),
+            MISCARRIAGE: document.getElementById('sec_miscarriage'),
             VACCINATION: document.getElementById('sec_vaccination')
         };
 
@@ -144,6 +145,7 @@
             PREGNANCY_CHECK: ['id_pregnancy_result'],
             FARROWING: ['id_born_alive', 'id_born_dead'],
             WEANING: ['id_count'],
+            MISCARRIAGE: [],
             VACCINATION: ['id_vaccine_name']
         };
 
@@ -191,6 +193,7 @@
             PREGNANCY_CHECK: ['pregnancy_result'],
             FARROWING: ['born_alive', 'born_dead'],
             WEANING: ['count'],
+            MISCARRIAGE: [],
             VACCINATION: ['vaccine_name']
         };
 
@@ -285,6 +288,97 @@
                 });
             });
         }
+    }
+
+    function initMortalityForm(root = document) {
+        const form = root.getElementById?.('mortality-form') || document.getElementById('mortality-form');
+        if (!form || form.dataset.mortalityBound === 'true') return;
+
+        const typeSelect = form.querySelector('#id_mortality_type');
+        const sowSection = document.getElementById('sec_mortality_sow');
+        const sowField = form.querySelector('#id_sow');
+        if (!typeSelect) return;
+
+        const syncMortalityFields = (shouldClear = false) => {
+            const isSow = typeSelect.value === 'sow';
+
+            sowSection?.classList.toggle('hidden', !isSow);
+            setFieldState(sowField, isSow, shouldClear);
+        };
+
+        form.dataset.mortalityBound = 'true';
+        typeSelect.addEventListener('change', () => syncMortalityFields(true));
+        syncMortalityFields(false);
+    }
+
+    function initTodayTaskForms(root = document) {
+        root.querySelectorAll('.today-task-form').forEach((form) => {
+            if (form.dataset.todayTasksBound === 'true') return;
+
+            const submitButton = form.querySelector('.today-task-submit-button');
+            const checkboxes = Array.from(form.querySelectorAll('.today-task-checkbox'));
+            if (!checkboxes.length) return;
+
+            const syncTaskRows = () => {
+                const hasSelection = checkboxes.some((checkbox) => checkbox.checked);
+                if (submitButton) submitButton.disabled = !hasSelection;
+
+                checkboxes.forEach((checkbox) => {
+                    const row = checkbox.closest('.today-task-row') || checkbox.closest('.today-task-dialog-item');
+                    const resultSelect = row?.querySelector('.today-task-result');
+                    row?.classList.toggle('is-selected', checkbox.checked);
+                    if (resultSelect) {
+                        resultSelect.disabled = !checkbox.checked;
+                        resultSelect.required = checkbox.checked;
+                    }
+                });
+            };
+
+            form.dataset.todayTasksBound = 'true';
+            checkboxes.forEach((checkbox) => {
+                checkbox.addEventListener('change', syncTaskRows);
+            });
+            syncTaskRows();
+        });
+    }
+
+    function initTodayTaskDialogs(root = document) {
+        root.querySelectorAll('[data-dialog-open]').forEach((button) => {
+            if (button.dataset.dialogOpenBound === 'true') return;
+
+            button.dataset.dialogOpenBound = 'true';
+            button.addEventListener('click', () => {
+                const dialog = document.getElementById(button.dataset.dialogOpen);
+                if (!dialog) return;
+
+                if (typeof dialog.showModal === 'function') {
+                    dialog.showModal();
+                } else {
+                    dialog.setAttribute('open', '');
+                }
+                dialog.querySelector('.today-task-checkbox')?.focus();
+            });
+        });
+
+        root.querySelectorAll('.today-task-dialog').forEach((dialog) => {
+            if (dialog.dataset.dialogCloseBound === 'true') return;
+
+            const closeDialog = () => {
+                if (typeof dialog.close === 'function') {
+                    dialog.close();
+                } else {
+                    dialog.removeAttribute('open');
+                }
+            };
+
+            dialog.dataset.dialogCloseBound = 'true';
+            dialog.addEventListener('click', (event) => {
+                if (event.target === dialog) closeDialog();
+            });
+            dialog.querySelectorAll('[data-dialog-close]').forEach((button) => {
+                button.addEventListener('click', closeDialog);
+            });
+        });
     }
 
     function initSaleFormset(root = document) {
@@ -527,6 +621,9 @@
         initDateRangeFilters();
         initSingleSowEventForm();
         initBulkEventForm();
+        initMortalityForm();
+        initTodayTaskForms();
+        initTodayTaskDialogs();
         initSaleFormset();
         initRecipeFormset();
         initProductionStageChecklist();

@@ -50,6 +50,16 @@ class TestSowEntity:
 
         assert empty_sow.is_due_for_pregnancy_check(date.today()) is True
 
+    def test_update_state_for_date_marks_sow_to_check_after_insemination_window(self, empty_sow):
+        insem_date = date.today() - timedelta(days=30)
+        empty_sow.load_history([
+            SowEvent(event_type="INSEMINATION", event_date=insem_date, details={})
+        ])
+
+        empty_sow.update_state_for_date(date.today())
+
+        assert empty_sow.status == "TO_CHECK"
+
     def test_not_due_for_pregnancy_check(self, empty_sow):
         insem_date = date.today() - timedelta(days=10)
         events = [SowEvent(event_type="INSEMINATION", event_date=insem_date, details={})]
@@ -80,6 +90,14 @@ class TestSowEntity:
         ])
         assert empty_sow.status == "IDLE"
         assert empty_sow.expected_farrowing_date is None
+
+    def test_vaccination_does_not_change_main_status(self, empty_sow):
+        empty_sow.load_history([
+            SowEvent(event_type="INSEMINATION", event_date=date(2023, 1, 1), details={}),
+            SowEvent(event_type="VACCINATION", event_date=date(2023, 1, 15), details={"vaccine_name": "Parwo"}),
+        ])
+
+        assert empty_sow.status == "INSEMINATED"
 
     def test_weaning_updates_average_and_status(self, empty_sow):
         empty_sow.load_history([

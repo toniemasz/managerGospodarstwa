@@ -4,11 +4,11 @@ from collections import defaultdict
 from decimal import Decimal
 
 from feed.models import DeliveryModel, ProductionModel
-from feed.services.feed_calculators import ProductionCalculator
-from feed.services.recipe_requirements import recipe_item_dicts_for_production
+from feed.calculators.feed_cost import ProductionCalculator
+from feed.selectors.recipe_requirements import recipe_item_dicts_for_production
 
 
-class ProductionCostService:
+class ProductionCostSelector:
     """Liczy koszt zrealizowanej paszy według daty produkcji i historycznych cen dostaw."""
 
     def __init__(self, farm):

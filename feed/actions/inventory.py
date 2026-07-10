@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -8,6 +7,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F, Sum
 
+from farms.services.cache import invalidate_farm_cache_on_commit
 from feed.models import (
     DeliveryModel,
     IngredientModel,
@@ -15,19 +15,13 @@ from feed.models import (
     ProductionIngredientUsageModel,
     ProductionModel,
 )
-from feed.services.feed_calculators import IngredientRequirement, ProductionCalculator
-from feed.services.recipe_requirements import recipe_item_dicts_for_production
+from feed.calculators.feed_cost import IngredientRequirement, ProductionCalculator
+from feed.selectors.recipe_requirements import recipe_item_dicts_for_production
 
 
 KG_QUANT = Decimal("0.01")
 MONEY_QUANT = Decimal("0.01")
 PRICE_QUANT = Decimal("0.00001")
-
-
-@dataclass(frozen=True)
-class InventoryBalance:
-    ingredient_id: int
-    quantity_kg: Decimal
 
 
 class InventoryRebuildError(Exception):
@@ -49,7 +43,7 @@ class InventoryRebuildError(Exception):
         return f"{super().__str__()}{suffix}"
 
 
-class InventoryMovementService:
+class InventoryActions:
     def __init__(self, farm):
         self.farm = farm
 
@@ -63,20 +57,6 @@ class InventoryMovementService:
             .annotate(total=Sum("quantity_kg"))
         )
         return {row["ingredient_id"]: row["total"] or Decimal("0.00") for row in rows}
-
-    def movement_totals(self) -> dict[int, tuple[Decimal, Decimal]]:
-        queryset = InventoryMovementModel.objects.all()
-        if self.farm is not None:
-            queryset = queryset.filter(farm=self.farm)
-        totals: dict[int, tuple[Decimal, Decimal]] = {}
-        for ingredient_id, quantity in queryset.values_list("ingredient_id", "quantity_kg"):
-            positive, negative = totals.get(ingredient_id, (Decimal("0.00"), Decimal("0.00")))
-            if quantity > 0:
-                positive += quantity
-            else:
-                negative += abs(quantity)
-            totals[ingredient_id] = (positive, negative)
-        return totals
 
     @transaction.atomic
     def sync_delivery(self, delivery: DeliveryModel, *, user=None) -> InventoryMovementModel:
@@ -349,7 +329,7 @@ class InventoryMovementService:
             signed_quantity = quantity
         else:
             raise ValidationError("Nieprawidłowy typ korekty.")
-        return InventoryMovementModel.objects.create(
+        movement = InventoryMovementModel.objects.create(
             farm=self.farm,
             ingredient=ingredient,
             movement_type=movement_type,
@@ -358,6 +338,8 @@ class InventoryMovementService:
             note=reason,
             created_by=user if getattr(user, "is_authenticated", False) else None,
         )
+        invalidate_farm_cache_on_commit(self.farm, groups=("inventory",))
+        return movement
 
     @transaction.atomic
     def rebuild(
