@@ -7,7 +7,7 @@
         <div>
             <p class="eyebrow">Maciory</p>
             <h1>{% if is_single %}Dodaj zdarzenie{% else %}Masowe dodawanie zdarzeń{% endif %}</h1>
-            <p class="page-subtitle">Wpisuj numery macior w tabeli albo wybieraj je z podpowiedzi istniejących rekordów.</p>
+            <p class="page-subtitle">{% if is_single %}Szybki wpis: numer kolczyka, typ zdarzenia, dzisiejsza data i najważniejsze pola.{% else %}Wpisuj numery macior w tabeli albo wybieraj je z podpowiedzi istniejących rekordów.{% endif %}</p>
         </div>
         <div class="header-actions">
             <a href="{% url 'bulk_sow_events' %}?rows=1" class="button button-secondary">Jedno zdarzenie</a>
@@ -35,8 +35,8 @@
         <section class="panel table-panel">
             <div class="section-heading">
                 <div>
-                    <h2>Tabela zdarzeń</h2>
-                    <p>Zapis nastąpi dopiero wtedy, gdy wszystkie wypełnione wiersze przejdą walidację cyklu maciory.</p>
+                    <h2>{% if is_single %}Dane zdarzenia{% else %}Tabela zdarzeń{% endif %}</h2>
+                    <p>{% if is_single %}Data jest ustawiona na dzisiaj. Dodatkowe pola pokażą się po wyborze typu zdarzenia i opisują skutek zapisu.{% else %}Zapis nastąpi dopiero wtedy, gdy wszystkie wypełnione wiersze przejdą walidację cyklu maciory.{% endif %}</p>
                 </div>
                 {% if not is_single %}
                 <button type="button" id="add-bulk-event-row" class="button button-secondary">Dodaj wiersz</button>
@@ -44,6 +44,65 @@
             </div>
 
             {{ formset.management_form }}
+            {% if is_single %}
+            <div id="bulk-event-rows" class="single-event-rows">
+                {% for form in formset %}
+                <div class="single-event-card bulk-event-row">
+                    {{ form.non_field_errors }}
+                    <div class="form-grid three-columns">
+                        <div class="form-field">
+                            <label for="{{ form.sow_ear_tag.id_for_label }}">{{ form.sow_ear_tag.label }}</label>
+                            {{ form.sow_ear_tag }}
+                            {{ form.sow_ear_tag.errors }}
+                        </div>
+                        <div class="form-field">
+                            <label for="{{ form.event_type.id_for_label }}">{{ form.event_type.label }}</label>
+                            {{ form.event_type }}
+                            {{ form.event_type.errors }}
+                        </div>
+                        <div class="form-field">
+                            <label for="{{ form.event_date.id_for_label }}">{{ form.event_date.label }}</label>
+                            {{ form.event_date }}
+                            {{ form.event_date.errors }}
+                        </div>
+                    </div>
+                    <div class="form-grid three-columns single-event-details">
+                        <div class="form-field">
+                            <label for="{{ form.technician.id_for_label }}">{{ form.technician.label }}</label>
+                            {{ form.technician }}
+                            {{ form.technician.errors }}
+                        </div>
+                        <div class="form-field">
+                            <label for="{{ form.pregnancy_result.id_for_label }}">{{ form.pregnancy_result.label }}</label>
+                            {{ form.pregnancy_result }}
+                            {{ form.pregnancy_result.errors }}
+                        </div>
+                        <div class="form-field">
+                            <label for="{{ form.born_alive.id_for_label }}">{{ form.born_alive.label }}</label>
+                            {{ form.born_alive }}
+                            {{ form.born_alive.errors }}
+                        </div>
+                        <div class="form-field">
+                            <label for="{{ form.born_dead.id_for_label }}">{{ form.born_dead.label }}</label>
+                            {{ form.born_dead }}
+                            {{ form.born_dead.errors }}
+                        </div>
+                        <div class="form-field">
+                            <label for="{{ form.count.id_for_label }}">{{ form.count.label }}</label>
+                            {{ form.count }}
+                            {{ form.count.errors }}
+                        </div>
+                        <div class="form-field">
+                            <label for="{{ form.vaccine_name.id_for_label }}">{{ form.vaccine_name.label }}</label>
+                            {{ form.vaccine_name }}
+                            {{ form.vaccine_name.errors }}
+                        </div>
+                    </div>
+                    <span class="hidden">{{ form.DELETE }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
             <div class="table-scroll">
                 <table class="data-table bulk-event-table" data-no-pagination="true">
                     <thead>
@@ -87,8 +146,10 @@
                     </tbody>
                 </table>
             </div>
+            {% endif %}
         </section>
 
+        {% if not is_single %}
         <template id="bulk-event-row-template">
             <tr class="bulk-event-row">
                 <td>
@@ -108,6 +169,7 @@
                 <td class="delete-cell"><span class="hidden">{{ formset.empty_form.DELETE }}</span><button type="button" class="link-button-danger remove-bulk-event-row">Usuń</button></td>
             </tr>
         </template>
+        {% endif %}
 
         <div class="form-actions">
             <a href="{% url 'dashboard' %}" class="button button-secondary">Anuluj</a>

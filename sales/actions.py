@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 
+from farms.services.cache import invalidate_farm_cache_on_commit
 from sales.models import PigSaleModel
 
 
@@ -24,4 +25,5 @@ def delete_sale(farm, sale_id: int) -> DeletedSale:
         object_repr=str(sale),
     )
     sale.delete()
+    invalidate_farm_cache_on_commit(farm, groups=("sales",))
     return deleted_sale

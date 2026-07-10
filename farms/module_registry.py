@@ -6,7 +6,7 @@ MODULE_GROUPS = (
 )
 
 MODULE_DEFINITIONS = (
-    {"key": "tasks", "title": "Zadania", "url_name": "task_center", "group": "production", "icon": "Z", "icon_name": "tasks", "tone": "green", "description": "Najważniejsze alerty produkcyjne, magazynowe i finansowe.", "active_urls": ("task_center",)},
+    {"key": "tasks", "title": "Zadania na dziś", "url_name": "task_center", "group": "production", "icon": "Z", "icon_name": "tasks", "tone": "green", "description": "Najważniejsze alerty produkcyjne, magazynowe i finansowe.", "active_urls": ("task_center", "complete_today_tasks")},
     {"key": "statistics", "title": "Statystyki", "url_name": "farm_statistics", "group": "production", "icon": "St", "icon_name": "statistics", "tone": "green", "description": "Globalne wskaźniki paszowe, sprzedażowe, magazynowe i finansowe.", "active_urls": ("farm_statistics",)},
     {"key": "sows", "title": "Maciory", "url_name": "dashboard", "group": "production", "icon": "M", "icon_name": "sow", "tone": "", "description": "Cykle rozrodcze, zdarzenia, szczepienia i statystyki stada.", "active_urls": ("dashboard", "sow_detail", "add_sow", "edit_sow", "add_event", "edit_event", "bulk_sow_events", "bulk_pregnancy_check", "bulk_vaccinate", "farrowing_panel", "general_statistics", "archived_sows", "mortality_list", "report_mortality", "vaccination_plans", "add_vaccination_plan", "edit_vaccination_plan")},
     {"key": "sales", "title": "Sprzedaż", "url_name": "sales_list", "group": "finance", "icon": "S", "icon_name": "sales", "tone": "green", "description": "Dokumenty sprzedaży, wagi i rozliczenia roczne.", "active_urls": ("sales_list", "add_sale", "edit_sale")},

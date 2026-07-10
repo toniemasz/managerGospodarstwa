@@ -28,6 +28,34 @@ TESTING = 'pytest' in sys.modules or any(
     for arg in sys.argv
 )
 DEBUG = env.bool('DEBUG', default=False)
+CACHE_URL = env('CACHE_URL', default='')
+CACHE_KEY_PREFIX = env('CACHE_KEY_PREFIX', default='manager_gospodarstwa')
+
+
+def _cache_backend_config(*, cache_url: str, testing: bool) -> dict:
+    if testing:
+        return {
+            'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
+            'KEY_PREFIX': CACHE_KEY_PREFIX,
+        }
+
+    if cache_url.startswith(('redis://', 'rediss://')):
+        return {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': cache_url,
+            'KEY_PREFIX': CACHE_KEY_PREFIX,
+        }
+
+    return {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'manager-gospodarstwa-cache',
+        'KEY_PREFIX': CACHE_KEY_PREFIX,
+    }
+
+
+CACHES = {
+    'default': _cache_backend_config(cache_url=CACHE_URL, testing=TESTING),
+}
 
 if DEBUG or TESTING:
     SECRET_KEY = env('SECRET_KEY', default='django-insecure-local-dev-test-key')

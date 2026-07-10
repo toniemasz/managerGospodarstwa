@@ -90,9 +90,9 @@ def test_task_center_uses_short_previews_and_links_to_full_panels(ui_client):
         for section in response.context["active_tab_data"]["sections"]
         for item in section["preview_items"]
     ]
-    assert "SHORT-1" in content and "SHORT-4" in content
-    assert all("SHORT-5" not in title and "SHORT-6" not in title for title in preview_titles)
-    assert "+ 2 więcej" in content
+    assert "SHORT-1" in content and "SHORT-3" in content
+    assert all("SHORT-4" not in title and "SHORT-5" not in title and "SHORT-6" not in title for title in preview_titles)
+    assert "+ 3 więcej" in content
     assert reverse("bulk_pregnancy_check") in content
     assert reverse("bulk_vaccinate") in content
     assert reverse("farrowing_panel") in content

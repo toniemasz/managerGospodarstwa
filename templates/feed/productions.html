@@ -28,7 +28,7 @@
             </div>
         </div>
         <div class="table-scroll">
-            <table class="data-table">
+            <table class="data-table mobile-card-table" data-mobile-cards="true">
                 <thead>
                     <tr>
                         <th>Data</th>
@@ -42,18 +42,18 @@
                 <tbody>
                     {% for prod in productions %}
                     <tr>
-                        <td>
+                        <td data-label="Data">
                             <strong>{{ prod.date|date:"d.m.Y" }}</strong>
                             {% if prod.time %}<br><span class="muted-small">{{ prod.time|time:"H:i" }}</span>{% endif %}
                         </td>
-                        <td>
+                        <td data-label="Receptura">
                             <a href="{% url 'recipe_detail' prod.recipe.id %}" class="table-link">{{ prod.recipe.name }}</a>
                             {% if prod.custom_recipe_data %}
                                 <br><span class="status-pill status-amber">Zmienione proporcje</span>
                             {% endif %}
                         </td>
-                        <td class="text-right"><strong>{{ prod.quantity_kg|feed_quantity }}</strong></td>
-                        <td class="text-right">
+                        <td data-label="Ilość" class="text-right"><strong>{{ prod.quantity_kg|feed_quantity }}</strong></td>
+                        <td data-label="Koszt FIFO" class="text-right">
                             {% if prod.status == 'COMPLETED' %}
                                 <strong>{{ prod.feed_cost_total|feed_money }}</strong>
                                 {% if prod.feed_cost_is_partial %}
@@ -63,7 +63,7 @@
                                 <span class="muted-small">--</span>
                             {% endif %}
                         </td>
-                        <td>
+                        <td data-label="Status">
                             {% if prod.status == 'QUEUED' %}
                                 <span class="status-pill">W kolejce</span>
                             {% elif prod.status == 'STAGE_1_DONE' %}
@@ -72,7 +72,7 @@
                                 <span class="status-pill status-green">Zakończone</span>
                             {% endif %}
                         </td>
-                        <td class="text-right">
+                        <td data-label="Akcje" class="text-right">
                             <div class="row-actions">
                                 {% if prod.status == 'QUEUED' %}
                                     <a href="{% url 'process_stage1' prod.id %}" class="table-link">Etap 1</a>

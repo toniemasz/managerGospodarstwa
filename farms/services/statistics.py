@@ -8,10 +8,13 @@ from django.urls import reverse
 
 from costs.models import CostModel
 from costs.services import CostService
+from farms.services.cache import STATISTICS_TTL, cached_farm_value
 from feed.models import DeliveryModel, ProductionModel
 from feed.selectors.inventory import inventory_dashboard
 from feed.selectors.production_costs import ProductionCostSelector
 from sales.models import PigSaleModel
+from sows.models import MortalityReportModel
+from sows.selectors.mortality import post_weaning_stock_summary
 
 
 ZERO = Decimal("0.00")
@@ -32,6 +35,15 @@ class FarmStatisticsService:
         self.farm = farm
 
     def calculate(self, *, date_from=None, date_to=None) -> dict:
+        return cached_farm_value(
+            self.farm,
+            "statistics",
+            (date_from, date_to),
+            timeout=STATISTICS_TTL,
+            builder=lambda: self._calculate(date_from=date_from, date_to=date_to),
+        )
+
+    def _calculate(self, *, date_from=None, date_to=None) -> dict:
         sales = self._sales_queryset(date_from=date_from, date_to=date_to)
         costs = self._cost_queryset(date_from=date_from, date_to=date_to)
         feed = ProductionCostSelector(self.farm).calculate(date_from=date_from, date_to=date_to)
@@ -42,6 +54,7 @@ class FarmStatisticsService:
         feed_efficiency = self._feed_efficiency(sales_summary, profitability, feed)
         production = self._production_summary(date_from=date_from, date_to=date_to, feed=feed)
         inventory = self._inventory_summary()
+        mortality = self._mortality_summary(date_from=date_from, date_to=date_to)
 
         return {
             "summary_cards": self._summary_cards(sales_summary, profitability, feed_efficiency),
@@ -51,6 +64,7 @@ class FarmStatisticsService:
             "feed_efficiency": feed_efficiency,
             "production": production,
             "inventory": inventory,
+            "mortality": mortality,
             "profitability": profitability,
             "recipe_ranking": feed["recipe_ranking"],
             "production_details": feed["details"],
@@ -234,6 +248,34 @@ class FarmStatisticsService:
             "latest_delivery": latest_delivery,
         }
 
+    def _mortality_summary(self, *, date_from=None, date_to=None) -> dict:
+        reports = MortalityReportModel.objects.filter(farm=self.farm)
+        if date_from:
+            reports = reports.filter(mortality_date__gte=date_from)
+        if date_to:
+            reports = reports.filter(mortality_date__lte=date_to)
+
+        rows_by_type = {
+            row["mortality_type"]: row
+            for row in reports.values("mortality_type").annotate(
+                report_count=Count("id"),
+                quantity=Sum("quantity"),
+            )
+        }
+
+        def quantity_for(mortality_type):
+            row = rows_by_type.get(mortality_type, {})
+            return row.get("quantity") or 0
+
+        stock = post_weaning_stock_summary(self.farm)
+        return {
+            "sow_deaths": quantity_for(MortalityReportModel.TYPE_SOW),
+            "post_weaning_deaths": quantity_for(MortalityReportModel.TYPE_POST_WEANING),
+            "post_weaning_current_stock": stock["current_stock"],
+            "post_weaning_weaned_total": stock["weaned_total"],
+            "post_weaning_deaths_total": stock["mortality_total"],
+        }
+
     @staticmethod
     def _summary_cards(sales_summary, profitability, feed_efficiency) -> list[dict]:
         net_result = profitability["net_result"]
@@ -306,8 +348,8 @@ class FarmStatisticsService:
                 "reason": "Średni dzienny przyrost i pobranie paszy wymagają dat wejścia/wyjścia grup oraz liczby dni tuczu.",
             },
             {
-                "title": "Śmiertelność / brakowanie",
-                "reason": "Aplikacja nie ma jeszcze ewidencji obsady grup tuczowych i upadków.",
+                "title": "Śmiertelność procentowa",
+                "reason": "Zgłoszenia upadków są widoczne w sekcji stada; do wskaźnika procentowego nadal potrzebna jest obsada grup tuczowych.",
             },
         ])
         if not feed["quantity_kg"]:
@@ -322,6 +364,7 @@ class FarmStatisticsService:
         return [
             {"label": "Opłacalność", "url": reverse("profitability")},
             {"label": "Sprzedaż", "url": reverse("sales_list")},
+            {"label": "Upadki", "url": reverse("mortality_list")},
             {"label": "Śrutowanie", "url": reverse("feed_productions")},
             {"label": "Magazyn", "url": reverse("feed_inventory")},
         ]

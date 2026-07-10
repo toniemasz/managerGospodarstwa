@@ -59,6 +59,37 @@
         </div>
     </section>
 
+    <section class="finance-section">
+        <div class="section-heading">
+            <div>
+                <h2>Stado i upadki</h2>
+                <p>Zgłoszenia upadków w wybranym okresie oraz bieżący stan zwierząt po odsadzeniu.</p>
+            </div>
+        </div>
+        <div class="stats-grid">
+            <div class="stat-tile{% if mortality.sow_deaths %} is-danger{% endif %}">
+                <span>Upadki macior</span>
+                <strong>{{ mortality.sow_deaths }} szt.</strong>
+                <small>W wybranym okresie.</small>
+            </div>
+            <div class="stat-tile{% if mortality.post_weaning_deaths %} is-warning{% endif %}">
+                <span>Upadki po odsadzeniu</span>
+                <strong>{{ mortality.post_weaning_deaths }} szt.</strong>
+                <small>W wybranym okresie.</small>
+            </div>
+            <div class="stat-tile is-success">
+                <span>Stan po odsadzeniu</span>
+                <strong>{{ mortality.post_weaning_current_stock }} szt.</strong>
+                <small>Odsadzone łącznie minus zgłoszone upadki po odsadzeniu.</small>
+            </div>
+            <div class="stat-tile">
+                <span>Upadki po odsadzeniu razem</span>
+                <strong>{{ mortality.post_weaning_deaths_total }} szt.</strong>
+                <small>Cały rejestr bieżącego gospodarstwa.</small>
+            </div>
+        </div>
+    </section>
+
     <section class="finance-grid">
         <div class="panel">
             <div class="section-heading">

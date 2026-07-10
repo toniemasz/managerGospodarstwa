@@ -49,6 +49,7 @@ class SowDashboardService:
             current_date=today,
             update_states=False,
         )
+        self._attach_operational_notes(sows, notifications)
 
         return {
             'total_sows': len(sows),
@@ -62,6 +63,7 @@ class SowDashboardService:
             'farrowing_due_count': notifications['farrowing_due_count'],
             'vaccination_groups': notifications['vaccination_groups'],
             'vaccinations_due_count': notifications['vaccinations_due_count'],
+            'sow_attention_items': self._attention_items(notifications),
             'all_sows': sows,
         }
 
@@ -131,6 +133,60 @@ class SowDashboardService:
 
     def _farrowing_alert_days_ahead(self) -> int:
         return self.settings.farrowing_alert_days_ahead if self.settings else FARROWING_ALERT_DAYS_AHEAD
+
+    def _attach_operational_notes(self, sows: list, notifications: dict) -> None:
+        notes = {}
+        for sow in notifications['sows_to_check_usg']:
+            notes[sow.id] = {
+                "label": "Wykonaj USG",
+                "date": sow.last_insemination_date,
+                "priority": "urgent",
+                "url_name": "bulk_pregnancy_check",
+            }
+        for item in notifications['farrowing_due_sows']:
+            notes.setdefault(item["id"], {
+                "label": item["alert_status_label"],
+                "date": item["expected_farrowing_date"],
+                "priority": item["priority"],
+                "url_name": "farrowing_panel",
+            })
+        for group_items in notifications['vaccination_groups'].values():
+            for item in group_items:
+                notes.setdefault(item["sow_id"], {
+                    "label": f"Szczepienie: {item['vaccine_name']}",
+                    "date": item["target_date"],
+                    "priority": "urgent" if item["days_to_target"] <= 0 else "upcoming",
+                    "url_name": "bulk_vaccinate",
+                })
+
+        for sow in sows:
+            note = notes.get(sow.id, {})
+            sow.operational_label = note.get("label", "Brak pilnych czynności")
+            sow.operational_date = note.get("date")
+            sow.operational_priority = note.get("priority", "")
+
+    @staticmethod
+    def _attention_items(notifications: dict) -> list[dict]:
+        items = []
+        items.extend({
+            "title": f"USG maciory {sow.ear_tag}",
+            "description": "Wpisz wynik badania, żeby status cyklu był aktualny.",
+            "priority": "urgent",
+        } for sow in notifications['sows_to_check_usg'][:3])
+        items.extend({
+            "title": f"Oproszenie maciory {item['ear_tag']}",
+            "description": item["time_label"],
+            "priority": item["priority"],
+        } for item in notifications['farrowing_due_sows'][:3])
+        for group_items in notifications['vaccination_groups'].values():
+            for item in group_items[:2]:
+                items.append({
+                    "title": f"Szczepienie maciory {item['ear_tag']}",
+                    "description": item["vaccine_name"],
+                    "priority": "urgent" if item["days_to_target"] <= 0 else "upcoming",
+                })
+        priority_order = {"urgent": 0, "today": 1, "upcoming": 2}
+        return sorted(items, key=lambda item: (priority_order.get(item["priority"], 9), item["title"]))[:5]
 
     def get_general_statistics(
         self,

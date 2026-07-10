@@ -7,6 +7,7 @@ from django.db import transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 
+from farms.services.cache import invalidate_farm_cache_on_commit
 from sows.domain.sow_state_machine import SowStateMachine
 from sows.models import SowEventModel, SowModel
 from sows.services.sow_event_service import SowEventService
@@ -49,12 +50,15 @@ class SowEventActions:
         data: dict,
         farrowing_decision: str | None = None,
     ):
-        return self.event_service.create_event(
+        result = self.event_service.create_event(
             sow=sow,
             sow_status=sow_status,
             data=data,
             farrowing_decision=farrowing_decision,
         )
+        if result.created_events:
+            invalidate_farm_cache_on_commit(self.farm, groups=("sows",))
+        return result
 
     @transaction.atomic
     def bulk_create_pregnancy_checks(
@@ -80,6 +84,8 @@ class SowEventActions:
                 details={"result": result},
             ))
 
+        if events:
+            invalidate_farm_cache_on_commit(self.farm, groups=("sows",))
         return events
 
     @transaction.atomic
@@ -90,9 +96,16 @@ class SowEventActions:
         vaccine_name: str,
         cycle_id: str,
         event_date=None,
+        note: str = "",
     ) -> list[SowEventModel]:
         event_date = event_date or date.today()
         events = []
+        details = {
+            "vaccine_name": vaccine_name,
+            "cycle_id": cycle_id,
+        }
+        if note:
+            details["note"] = note
 
         for sow_id in sow_ids:
             sow = self.repository.get_sow_model_by_id(sow_id)
@@ -100,12 +113,11 @@ class SowEventActions:
                 sow=sow,
                 event_type=SowStateMachine.VACCINATION,
                 event_date=event_date,
-                details={
-                    "vaccine_name": vaccine_name,
-                    "cycle_id": cycle_id,
-                },
+                details=details.copy(),
             ))
 
+        if events:
+            invalidate_farm_cache_on_commit(self.farm, groups=("sows",))
         return events
 
     @transaction.atomic
@@ -119,7 +131,10 @@ class SowEventActions:
             )
             for row in rows
         ]
-        return self.repository.bulk_create_events(events)
+        created_events = self.repository.bulk_create_events(events)
+        if created_events:
+            invalidate_farm_cache_on_commit(self.farm, groups=("sows",))
+        return created_events
 
     @transaction.atomic
     def update_event(self, *, event_id: int, data: dict) -> SowEventModel:
@@ -128,6 +143,7 @@ class SowEventActions:
         event.event_date = data["event_date"]
         event.details = self.event_service.build_details(data)
         event.save()
+        invalidate_farm_cache_on_commit(self.farm, groups=("sows",))
         return event
 
     @transaction.atomic
@@ -140,6 +156,7 @@ class SowEventActions:
             object_repr=str(event),
         )
         event.delete()
+        invalidate_farm_cache_on_commit(self.farm, groups=("sows",))
         return deleted_event
 
     @staticmethod
@@ -189,10 +206,12 @@ def record_bulk_vaccinations(
     vaccine_name: str,
     cycle_id: str,
     event_date=None,
+    note: str = "",
 ) -> list[SowEventModel]:
     return SowEventActions(farm=farm).bulk_create_vaccinations(
         sow_ids=sow_ids,
         vaccine_name=vaccine_name,
         cycle_id=cycle_id,
         event_date=event_date,
+        note=note,
     )

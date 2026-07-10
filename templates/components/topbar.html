@@ -1,13 +1,13 @@
 <aside class="desktop-sidebar" aria-label="Nawigacja główna">
     <a href="{% url 'modules_home' %}" class="sidebar-brand" aria-label="Przejdź do centrali">
         <span class="brand-title">Gospodarstwo Rolne</span>
-        <span class="brand-subtitle">Precision Farming</span>
+        <span class="brand-subtitle">Praca w gospodarstwie</span>
     </a>
 
     <nav class="sidebar-nav">
         <a href="{% url 'modules_home' %}" class="sidebar-nav-link{% if request.resolver_match.url_name == 'modules_home' %} is-active{% endif %}">
             <span class="module-icon compact">{% include 'components/app_icon.html' with name='dashboard' %}</span>
-            <span>Centrala</span>
+            <span>Dzisiaj</span>
         </a>
         {% for module in ui_primary_modules %}
             <a href="{{ module.url }}" class="sidebar-nav-link{% if module.is_active %} is-active{% endif %}"{% if module.is_active %} aria-current="page"{% endif %}>
@@ -39,7 +39,7 @@
 <header class="topbar">
     <a href="{% url 'modules_home' %}" class="mobile-brand" aria-label="Przejdź do centrali">
         <span class="brand-title">Gospodarstwo Rolne</span>
-        <span class="brand-subtitle">Precision Farming</span>
+        <span class="brand-subtitle">Praca w gospodarstwie</span>
     </a>
 
     <div class="topbar-context">
@@ -114,7 +114,7 @@
 <nav class="mobile-bottom-nav" aria-label="Nawigacja mobilna">
     <a href="{% url 'modules_home' %}" class="mobile-nav-link{% if request.resolver_match.url_name == 'modules_home' %} is-active{% endif %}">
         <span class="mobile-nav-icon">{% include 'components/app_icon.html' with name='dashboard' %}</span>
-        <span>Centrala</span>
+        <span>Dzisiaj</span>
     </a>
     {% for module in ui_mobile_modules %}
         <a href="{{ module.url }}" class="mobile-nav-link{% if module.is_active %} is-active{% endif %}"{% if module.is_active %} aria-current="page"{% endif %}>
@@ -122,4 +122,8 @@
             <span>{{ module.title }}</span>
         </a>
     {% endfor %}
+    <a href="{% url 'modules_catalog' %}" class="mobile-nav-link{% if request.resolver_match.url_name == 'modules_catalog' %} is-active{% endif %}">
+        <span class="mobile-nav-icon">{% include 'components/app_icon.html' with name='dashboard' %}</span>
+        <span>Moduły</span>
+    </a>
 </nav>

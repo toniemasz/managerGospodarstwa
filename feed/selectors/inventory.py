@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from feed.calculators.feed_cost import InventoryItem
 from feed.models import DeliveryModel, IngredientModel, InventoryMovementModel
+from farms.services.cache import INVENTORY_TTL, cached_farm_value
 
 
 def ingredients_for_farm(farm=None):
@@ -58,6 +59,16 @@ def movement_totals(farm=None) -> dict[int, tuple[Decimal, Decimal]]:
 
 
 def inventory_dashboard(farm=None) -> dict:
+    return cached_farm_value(
+        farm,
+        "inventory",
+        (),
+        timeout=INVENTORY_TTL,
+        builder=lambda: _build_inventory_dashboard(farm),
+    )
+
+
+def _build_inventory_dashboard(farm=None) -> dict:
     totals = movement_totals(farm)
     inventory_state = []
 

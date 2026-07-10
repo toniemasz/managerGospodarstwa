@@ -5,6 +5,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from costs.models import CostModel
+from farms.services.cache import TASK_CENTER_TTL, cached_farm_value
 from feed.models import ProductionModel
 from feed.selectors.inventory import inventory_dashboard
 from sales.models import PigSaleModel
@@ -53,8 +54,8 @@ class TaskCenterService:
             "title": title,
             "count": len(items),
             "items": items,
-            "preview_items": items[:4],
-            "more_count": max(0, len(items) - 4),
+            "preview_items": items[:3],
+            "more_count": max(0, len(items) - 3),
             "urgent_count": urgent_count,
             "panel_url": panel_url,
             "panel_label": panel_label,
@@ -141,7 +142,12 @@ class TaskCenterService:
                         object_url=reverse("sow_detail", args=[item["sow_id"]]),
                         action_url=reverse("bulk_vaccinate"),
                         action_label="Potwierdź szczepienie",
-                        metadata={"sow_id": item["sow_id"], "kind": "vaccination"},
+                        metadata={
+                            "sow_id": item["sow_id"],
+                            "kind": "vaccination",
+                            "vaccine_name": item["vaccine_name"],
+                            "cycle_id": item["cycle_id"],
+                        },
                     )
                 )
 
@@ -284,6 +290,18 @@ class TaskCenterService:
         )
 
     def get_tasks(self) -> dict:
+        result = cached_farm_value(
+            self.farm,
+            "task_center",
+            (self.today,),
+            timeout=TASK_CENTER_TTL,
+            builder=self._build_tasks,
+        )
+        self._low_stock = result.get("low_stock", [])
+        self._unsettled_sales = result.get("unsettled_sales", [])
+        return result
+
+    def _build_tasks(self) -> dict:
         tabs = {
             "production": self._production_tab(),
             "feed": self._feed_tab(),

@@ -2,6 +2,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
+from farms.services.cache import invalidate_farm_cache_on_commit
 from feed.actions.inventory import InventoryActions
 from feed.models import ProductionModel
 from feed.selectors.productions import production_for_processing, validate_production_capacity
@@ -9,7 +10,9 @@ from feed.selectors.productions import production_for_processing, validate_produ
 
 def create_production(form):
     with transaction.atomic():
-        return form.save()
+        production = form.save()
+        invalidate_farm_cache_on_commit(production.recipe.farm, groups=("feed",))
+        return production
 
 
 @transaction.atomic
@@ -20,6 +23,7 @@ def mark_stage_1_done(farm, production_id: int) -> tuple[bool, str]:
 
     production.status = ProductionModel.Statuses.STAGE_1_DONE
     production.save()
+    invalidate_farm_cache_on_commit(farm, groups=("feed",))
     return True, "Zakończono pobieranie z binów. Gotowe do Etapu 2."
 
 
@@ -55,6 +59,7 @@ def complete_production(
                 user=user,
                 forced=force_inventory,
             )
+            invalidate_farm_cache_on_commit(farm, groups=("feed",))
     except ValidationError as error:
         message = error.messages[0] if hasattr(error, "messages") else str(error)
         return False, message
@@ -63,10 +68,13 @@ def complete_production(
 
 def update_production(form):
     with transaction.atomic():
-        return form.save()
+        production = form.save()
+        invalidate_farm_cache_on_commit(production.recipe.farm, groups=("feed",))
+        return production
 
 
 def delete_production_with_inventory(farm, production):
     with transaction.atomic():
         InventoryActions(farm).release_production(production)
         production.delete()
+        invalidate_farm_cache_on_commit(farm, groups=("feed",))

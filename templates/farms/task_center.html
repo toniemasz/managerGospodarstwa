@@ -3,23 +3,38 @@
 {% block content %}
 <main class="app-page">
     <section class="page-header">
-        <div><p class="eyebrow">Centrala</p><h1>Panel zadań</h1><p class="page-subtitle">{{ task_count }} aktywnych zadań. Karty są skrótem prowadzącym do właściwych paneli obsługi.</p></div>
+        <div>
+            <p class="eyebrow">Centrala</p>
+            <h1>Panel zadań</h1>
+            <p class="page-subtitle">{{ task_count }} aktywnych zadań z produkcji, paszy i finansów. Zacznij od kart z oznaczeniem „Pilne” albo „Dzisiaj”.</p>
+        </div>
+        <div class="header-actions">
+            <a href="{% url 'modules_home' %}" class="button button-secondary">Wróć do Dzisiaj</a>
+        </div>
     </section>
 
     <nav class="task-tabs" aria-label="Kategorie zadań">
         {% for tab in tab_list %}
         <a href="{% url 'task_center' %}?tab={{ tab.key }}" class="task-tab{% if active_tab == tab.key %} is-active{% endif %}{% if tab.urgent_count %} has-urgent{% endif %}"{% if active_tab == tab.key %} aria-current="page"{% endif %}>
-            <span>{{ tab.title }}</span><span class="task-tab-badge{% if tab.urgent_count %} is-urgent{% endif %}">{{ tab.count }}</span>
+            <span>{{ tab.title }}{% if tab.urgent_count %}<small>{{ tab.urgent_count }} pilne</small>{% endif %}</span><span class="task-tab-badge{% if tab.urgent_count %} is-urgent{% endif %}">{{ tab.count }}</span>
         </a>
         {% endfor %}
     </nav>
 
     {% if active_tab_data.count %}
+    {% if active_tab_data.urgent_count %}
+    <section class="notice notice-warning task-center-notice">
+        <div>
+            <h2>{{ active_tab_data.urgent_count }} pilnych spraw w sekcji {{ active_tab_data.title }}</h2>
+            <p>Otwórz pierwszą kartę z oznaczeniem „Pilne” lub „Dzisiaj”, żeby przejść do właściwego formularza.</p>
+        </div>
+    </section>
+    {% endif %}
     <section class="task-summary-grid">
         {% for section in active_tab_data.sections %}{% include 'components/task_summary_card.html' with section=section %}{% endfor %}
     </section>
     {% else %}
-    <section class="panel">{% include 'components/empty_state.html' with empty_title=active_tab_data.title empty_message=active_tab_data.empty_message %}</section>
+    <section class="panel">{% include 'components/empty_state.html' with empty_title='Brak pilnych zadań' empty_message=active_tab_data.empty_message %}</section>
     {% endif %}
 </main>
 {% endblock %}

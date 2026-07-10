@@ -23,24 +23,34 @@ def _topbar_notifications(farm):
 
     from django.urls import reverse
 
+    from farms.services.cache import TOPBAR_NOTIFICATIONS_TTL, cached_farm_value
     from farms.services.task_center import TaskCenterService
 
-    priority_order = {"urgent": 0, "today": 1, "upcoming": 2}
-    task_summary = TaskCenterService(farm).get_tasks()
-    items = [
-        item
-        for tab in task_summary["tab_list"]
-        for section in tab["sections"]
-        for item in section["items"]
-    ]
-    items.sort(key=lambda item: (priority_order.get(item["priority"], 9), item.get("due_date") or date.max))
-    return [
-        {
-            **item,
-            "url": item.get("object_url") or item.get("action_url") or reverse("task_center"),
-        }
-        for item in items[:6]
-    ], len(items)
+    def build_notifications():
+        priority_order = {"urgent": 0, "today": 1, "upcoming": 2}
+        task_summary = TaskCenterService(farm).get_tasks()
+        items = [
+            item
+            for tab in task_summary["tab_list"]
+            for section in tab["sections"]
+            for item in section["items"]
+        ]
+        items.sort(key=lambda item: (priority_order.get(item["priority"], 9), item.get("due_date") or date.max))
+        return [
+            {
+                **item,
+                "url": item.get("object_url") or item.get("action_url") or reverse("task_center"),
+            }
+            for item in items[:6]
+        ], len(items)
+
+    return cached_farm_value(
+        farm,
+        "topbar_notifications",
+        (),
+        timeout=TOPBAR_NOTIFICATIONS_TTL,
+        builder=build_notifications,
+    )
 
 
 def current_farm(request):

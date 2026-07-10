@@ -10,6 +10,7 @@ from costs.models import CostModel
 from farms.dashboard_registry import DASHBOARD_STAT_DEFINITIONS, normalize_dashboard_stats
 from farms.models import AuditLogModel
 from farms.module_registry import MODULE_DEFINITIONS
+from farms.services.cache import DASHBOARD_TTL, cached_farm_value
 from farms.services.module_navigation import ModuleNavigationService, normalize_visible_modules
 from farms.services.profitability import ProfitabilityAnalyticsService
 from farms.services.settings_service import get_farm_settings
@@ -31,6 +32,15 @@ class FarmDashboardService:
         self._profitability = None
 
     def get_context(self) -> dict:
+        return cached_farm_value(
+            self.farm,
+            "dashboard",
+            (),
+            timeout=DASHBOARD_TTL,
+            builder=self._build_context,
+        )
+
+    def _build_context(self) -> dict:
         navigation = ModuleNavigationService(self.farm)
         modules = navigation.modules()
         return {

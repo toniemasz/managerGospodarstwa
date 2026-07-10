@@ -142,8 +142,8 @@ class TestSowViews:
         dashboard = setup_client.get(reverse('dashboard'))
         dashboard_content = dashboard.content.decode()
         assert dashboard.status_code == 200
-        assert "Oczekujące szczepienia" in dashboard_content
-        assert "Liczba szczepień do potwierdzenia" in dashboard_content
+        assert "Do obsługi" in dashboard_content
+        assert "Szczepienie maciory VAC-1" in dashboard_content
 
         confirm_page = setup_client.get(reverse('bulk_vaccinate'))
         assert confirm_page.status_code == 200
@@ -382,6 +382,36 @@ class TestSowViews:
             object_id=str(sow.id),
             metadata__archive_reason=SowModel.ARCHIVE_REASON_DEATH,
         ).exists()
+
+    def test_report_mortality_form_uses_sow_number_suggestions_and_visible_quantity(self, setup_client):
+        sow = SowModel.objects.create(ear_tag="1234", farm=setup_client.farm)
+        SowModel.objects.create(ear_tag="1290", farm=setup_client.farm)
+        other_user = User.objects.create_user(username='mortality-suggest-other', password='password')
+        other_farm = get_or_create_user_farm(other_user)
+        SowModel.objects.create(ear_tag="1255", farm=other_farm)
+
+        response = setup_client.get(reverse('report_mortality'), {'mortality_type': 'sow'})
+        content = response.content.decode()
+
+        assert response.status_code == 200
+        assert 'list="mortality-sow-options"' in content
+        assert 'value="1234"' in content
+        assert 'value="1290"' in content
+        assert 'value="1255"' not in content
+        assert 'id="sec_mortality_quantity" class="form-section dynamic-form-section"' in content
+        assert 'id="id_quantity"' in content
+
+        save_response = setup_client.post(reverse('report_mortality'), {
+            'mortality_type': 'sow',
+            'sow': '1234',
+            'mortality_date': date.today().isoformat(),
+            'reason': 'Nagły upadek',
+        })
+
+        assert save_response.status_code == 302
+        report = MortalityReportModel.objects.get(farm=setup_client.farm)
+        assert report.sow == sow
+        assert report.quantity == 1
 
     def test_report_sow_mortality_blocks_archived_and_foreign_sows(self, setup_client):
         archived_sow = SowModel.objects.create(

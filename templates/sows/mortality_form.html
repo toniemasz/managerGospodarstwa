@@ -38,15 +38,21 @@
             <div id="sec_mortality_sow" class="form-section dynamic-form-section hidden">
                 <div class="form-section-heading">
                     <h2>Maciora</h2>
-                    <p>Po zapisie wybrana maciora zostanie zarchiwizowana z powodu upadku.</p>
+                    <p>Wpisz początek numeru kolczyka i wybierz właściwą maciorę z podpowiedzi.</p>
                 </div>
                 {% include 'components/form_field.html' with field=form.sow %}
+                <datalist id="mortality-sow-options">
+                    {% for sow in form.sow_suggestions %}
+                        <option value="{{ sow.ear_tag }}">Maciora {{ sow.ear_tag }}</option>
+                    {% endfor %}
+                </datalist>
+                <p class="field-hint">Po zapisie wybrana maciora zostanie zarchiwizowana z powodu upadku.</p>
             </div>
 
-            <div id="sec_mortality_quantity" class="form-section dynamic-form-section hidden">
+            <div id="sec_mortality_quantity" class="form-section dynamic-form-section">
                 <div class="form-section-heading">
-                    <h2>Zwierzęta po odsadzeniu</h2>
-                    <p>Podaj liczbę sztuk, która pomniejszy bieżący stan po odsadzeniu.</p>
+                    <h2>Liczba sztuk</h2>
+                    <p>Dla zwierząt po odsadzeniu podaj liczbę, która pomniejszy bieżący stan. Dla maciory zapis zostanie ustawiony na 1 sztukę.</p>
                 </div>
                 {% include 'components/form_field.html' with field=form.quantity %}
             </div>

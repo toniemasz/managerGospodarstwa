@@ -9,6 +9,7 @@ from django.db.models import Max
 from django.utils import timezone
 
 from farms.services.audit_log_service import log_action
+from farms.services.cache import invalidate_farm_cache_on_commit
 from feed.models import ProductionModel, RecipeItemModel, RecipeModel, RecipeVersionItemModel, RecipeVersionModel
 from feed.actions.inventory import InventoryActions
 
@@ -130,6 +131,7 @@ class RecipeVersionActions:
                 'change_note': change_note,
             },
         )
+        invalidate_farm_cache_on_commit(recipe.farm, groups=("feed",))
         return version, True
 
     @transaction.atomic
@@ -190,6 +192,7 @@ class RecipeVersionActions:
                 'change_note': change_note,
             },
         )
+        invalidate_farm_cache_on_commit(recipe.farm, groups=("feed",))
         return version
 
     @transaction.atomic
@@ -264,6 +267,7 @@ class RecipeVersionActions:
                 obj=version,
                 metadata=metadata,
             )
+        invalidate_farm_cache_on_commit(version.recipe.farm, groups=("feed",))
         return RecipeVersionUpdateResult(
             production_count=production_count,
             completed_count=len(completed_ids),

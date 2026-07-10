@@ -8,29 +8,29 @@
     gap: .4rem;
     border: 1px solid transparent;
     border-radius: var(--radius);
-    padding: .55rem .9rem;
+    padding: .45rem .75rem;
     color: inherit;
     font-size: var(--button-font-size);
     font-weight: 850;
     line-height: 1;
     text-align: center;
-    transition: background .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease, transform .18s ease;
+    transition: background .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease;
 }
 
 .button:hover {
-    transform: translateY(-1px);
+    box-shadow: none;
 }
 
 .button-small {
     min-height: calc(var(--button-height) - .35rem);
-    padding: .5rem .75rem;
+    padding: .4rem .62rem;
     font-size: var(--small-font-size);
 }
 
 .button-primary {
     background: var(--primary);
     color: #fff;
-    box-shadow: 0 8px 18px rgba(0, 108, 73, .18);
+    box-shadow: none;
 }
 
 .button-primary:hover {
@@ -224,7 +224,7 @@
     border-color: var(--primary);
     background: var(--primary);
     color: #fff;
-    box-shadow: 0 8px 18px rgba(0, 108, 73, .18);
+    box-shadow: none;
 }
 
 .pagination-button.is-disabled {
@@ -247,20 +247,20 @@
 .unit-toggle {
     display: inline-flex;
     align-items: center;
-    gap: .25rem;
+    gap: 0;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--surface);
-    padding: .2rem;
+    padding: .12rem;
 }
 
 .unit-toggle button {
-    min-height: 2.2rem;
+    min-height: calc(var(--control-height) - .35rem);
     border: 0;
     border-radius: calc(var(--radius) - .15rem);
     background: transparent;
     color: var(--muted);
-    padding: .45rem .7rem;
+    padding: .35rem .62rem;
     font-size: .78rem;
     font-weight: 950;
 }

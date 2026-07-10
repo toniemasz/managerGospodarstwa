@@ -10,6 +10,7 @@ from farms.services.farm_service import get_or_create_user_farm
 from farms.services.statistics import FarmStatisticsService
 from feed.models import DeliveryModel, IngredientModel, ProductionModel, RecipeItemModel, RecipeModel
 from sales.models import PigSaleModel
+from sows.models import MortalityReportModel, SowEventModel, SowModel
 
 
 @pytest.fixture
@@ -79,6 +80,61 @@ def test_statistics_service_calculates_feed_sales_and_profitability(statistics_f
 
 
 @pytest.mark.django_db
+def test_statistics_service_includes_mortality_summary(statistics_farms):
+    _, farm, other_farm = statistics_farms
+    sow = SowModel.objects.create(farm=farm, ear_tag="STAT-MORT-1")
+    SowEventModel.objects.create(
+        sow=sow,
+        event_type="WEANING",
+        event_date=date(2026, 1, 10),
+        details={"count": 10},
+    )
+    MortalityReportModel.objects.create(
+        farm=farm,
+        mortality_type=MortalityReportModel.TYPE_SOW,
+        sow=sow,
+        mortality_date=date(2026, 2, 1),
+        quantity=1,
+    )
+    MortalityReportModel.objects.create(
+        farm=farm,
+        mortality_type=MortalityReportModel.TYPE_POST_WEANING,
+        mortality_date=date(2026, 2, 2),
+        quantity=2,
+    )
+    MortalityReportModel.objects.create(
+        farm=farm,
+        mortality_type=MortalityReportModel.TYPE_POST_WEANING,
+        mortality_date=date(2025, 12, 31),
+        quantity=3,
+    )
+    other_sow = SowModel.objects.create(farm=other_farm, ear_tag="STAT-MORT-OTHER")
+    SowEventModel.objects.create(
+        sow=other_sow,
+        event_type="WEANING",
+        event_date=date(2026, 1, 10),
+        details={"count": 20},
+    )
+    MortalityReportModel.objects.create(
+        farm=other_farm,
+        mortality_type=MortalityReportModel.TYPE_POST_WEANING,
+        mortality_date=date(2026, 2, 2),
+        quantity=9,
+    )
+
+    result = FarmStatisticsService(farm).calculate(
+        date_from=date(2026, 1, 1),
+        date_to=date(2026, 12, 31),
+    )
+
+    assert result["mortality"]["sow_deaths"] == 1
+    assert result["mortality"]["post_weaning_deaths"] == 2
+    assert result["mortality"]["post_weaning_weaned_total"] == 10
+    assert result["mortality"]["post_weaning_deaths_total"] == 5
+    assert result["mortality"]["post_weaning_current_stock"] == 5
+
+
+@pytest.mark.django_db
 def test_statistics_view_is_farm_scoped(client, statistics_farms):
     owner, farm, other_farm = statistics_farms
     _create_feed_flow(farm)
@@ -107,4 +163,6 @@ def test_statistics_view_is_farm_scoped(client, statistics_farms):
     assert response.status_code == 200
     assert response.context["sales"]["sold_quantity"] == 10
     assert "Grower statystyczny" in content
+    assert "Stado i upadki" in content
+    assert "Aplikacja nie ma jeszcze ewidencji obsady grup tuczowych i upadków" not in content
     assert "TAJNE-STAT" not in content

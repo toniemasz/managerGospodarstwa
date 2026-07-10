@@ -6,6 +6,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
+from farms.services.cache import invalidate_farm_cache_on_commit
 from sows.models import MortalityReportModel, SowModel
 
 
@@ -45,6 +46,7 @@ def create_mortality_report(*, farm, user=None, data: dict) -> MortalityReportRe
         _archive_sow_because_of_death(sow=sow, report=report)
         archived_sow = True
 
+    invalidate_farm_cache_on_commit(farm, groups=("sows",))
     return MortalityReportResult(report=report, archived_sow=archived_sow)
 
 

@@ -434,6 +434,80 @@ Przy dodawaniu nowej funkcji zadbaj, aby użytkownik rozumiał, co robi dana akc
 
 Dla operacji ryzykownych, takich jak usunięcie, archiwizacja, przeliczenie danych, import, restore albo zmiana historii, pokaż jasne ostrzeżenie albo wymagaj świadomego potwierdzenia, jeśli obecny UX projektu tak robi.
 
+GLOBALNA ZASADA UI / UX DLA PROJEKTU managerGospodarstwa
+
+Cały frontend aplikacji ma trzymać styl jak na referencyjnym screenie ustawień:
+- profesjonalny panel administracyjny dla gospodarstwa rolnego,
+- jasne tło aplikacji,
+- zielony kolor jako główny akcent,
+- lewy sidebar z prostą nawigacją,
+- górny pasek z tytułem strony i główną akcją,
+- sekcje formularzy oddzielone cienkimi liniami,
+- kompaktowe pola, przełączniki, checkboxy i segmentowane przyciski,
+- minimalne cienie,
+- bez dużych ozdobnych kart,
+- bez landing-page’owego wyglądu,
+- bez przesadnych gradientów, ilustracji i dekoracji.
+
+Preferowany styl komponentów:
+1. Sekcje
+   - Używaj prostych sekcji z nagłówkiem pisanym zielonym tekstem.
+   - Sekcje oddzielaj cienką linią.
+   - Nie rób każdej sekcji jako dużego kafelka z mocnym cieniem.
+   - Układ ma być zwarty, czytelny i administracyjny.
+
+2. Formularze
+   - Label nad polem.
+   - Pola input proste, jasne, z delikatną ramką.
+   - Pola mają mieć rozsądną szerokość, nie zawsze 100% na desktopie.
+   - Na mobile pola mogą być pełnej szerokości.
+
+3. Przełączniki i checkboxy
+   - Moduły i ustawienia pokazuj jako listę rzędów.
+   - Każdy rząd: nazwa po lewej, switch po prawej.
+   - Oddzielaj rzędy cienkimi liniami.
+   - Nie zamieniaj każdego modułu w osobną dużą kartę.
+
+4. Opcje wyboru
+   - Dla wyborów typu: Kompaktowy / Standardowy / Komfortowy używaj segmented control.
+   - Segmenty mają wyglądać jak na screenie: jeden wspólny prostokąt podzielony na opcje.
+   - Zaznaczona opcja ma delikatne tło.
+   - Nie rób z tych opcji dużych kafelków z opisami, ikonami i cieniami.
+
+5. Dashboard / centrale
+   - Widoczność elementów dashboardu pokazuj jako prostą listę checkboxów.
+   - Może być układ 2 kolumny na desktopie, 1 kolumna na mobile.
+   - Nie używaj dużych kart dla prostych ustawień widoczności.
+
+6. Kolory
+   - Główny akcent: ciemna zieleń.
+   - Tła: jasnoszare / bardzo jasne niebieskoszare.
+   - Ramki: delikatna zieleń lub szarość.
+   - Kolory ostrzegawcze tylko tam, gdzie faktycznie jest ryzyko.
+   - Nie dodawaj losowych kolorów.
+
+7. Gęstość
+   - Aplikacja ma być praktyczna, gęsta i szybka w użyciu.
+   - To narzędzie pracy, nie strona marketingowa.
+   - Unikaj dużych pustych przestrzeni.
+   - Desktop ma wykorzystywać szerokość ekranu.
+   - Mobile ma być prosty: jedna kolumna, duże pola, brak poziomego scrolla.
+
+8. Styl ogólny
+   - Wygląd ma być podobny do klasycznego systemu ERP / panelu admina.
+   - Ma sprawiać wrażenie stabilnego, prostego i użytkowego narzędzia.
+   - Priorytetem jest szybkość pracy i czytelność, nie efektowność.
+
+Zakazane:
+- Nie twórz dużych kafelków typu dashboard-card dla zwykłych ustawień.
+- Nie twórz ozdobnych kart z ikonami, opisami i mocnymi cieniami, jeśli wystarczy prosty wiersz.
+- Nie stosuj glassmorphism.
+- Nie stosuj dużych gradientów.
+- Nie stosuj przypadkowych kolorów.
+- Nie rozbijaj prostych formularzy na zbyt wiele osobnych komponentów.
+- Nie zmieniaj logiki backendu, jeśli zadanie dotyczy tylko frontendu.
+
+Przed każdą zmianą UI najpierw sprawdź, czy nowy widok pasuje do referencyjnego stylu ustawień ze screena.
 ---
 
 ## Formatowanie liczb i polskie dane

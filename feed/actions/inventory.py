@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F, Sum
 
+from farms.services.cache import invalidate_farm_cache_on_commit
 from feed.models import (
     DeliveryModel,
     IngredientModel,
@@ -328,7 +329,7 @@ class InventoryActions:
             signed_quantity = quantity
         else:
             raise ValidationError("Nieprawidłowy typ korekty.")
-        return InventoryMovementModel.objects.create(
+        movement = InventoryMovementModel.objects.create(
             farm=self.farm,
             ingredient=ingredient,
             movement_type=movement_type,
@@ -337,6 +338,8 @@ class InventoryActions:
             note=reason,
             created_by=user if getattr(user, "is_authenticated", False) else None,
         )
+        invalidate_farm_cache_on_commit(self.farm, groups=("inventory",))
+        return movement
 
     @transaction.atomic
     def rebuild(

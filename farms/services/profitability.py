@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from farms.services.cache import PROFITABILITY_TTL, cached_farm_value
 from farms.services.statistics import FarmStatisticsService
 
 
@@ -8,6 +9,15 @@ class ProfitabilityAnalyticsService:
         self.farm = farm
 
     def calculate(self, *, date_from=None, date_to=None) -> dict:
+        return cached_farm_value(
+            self.farm,
+            "profitability",
+            (date_from, date_to),
+            timeout=PROFITABILITY_TTL,
+            builder=lambda: self._calculate(date_from=date_from, date_to=date_to),
+        )
+
+    def _calculate(self, *, date_from=None, date_to=None) -> dict:
         stats = FarmStatisticsService(self.farm).calculate(date_from=date_from, date_to=date_to)
         sales = stats["sales"]
         feed = stats["feed"]

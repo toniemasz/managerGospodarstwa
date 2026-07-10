@@ -296,24 +296,89 @@
 
         const typeSelect = form.querySelector('#id_mortality_type');
         const sowSection = document.getElementById('sec_mortality_sow');
-        const quantitySection = document.getElementById('sec_mortality_quantity');
         const sowField = form.querySelector('#id_sow');
-        const quantityField = form.querySelector('#id_quantity');
         if (!typeSelect) return;
 
         const syncMortalityFields = (shouldClear = false) => {
             const isSow = typeSelect.value === 'sow';
-            const isPostWeaning = typeSelect.value === 'post_weaning';
 
             sowSection?.classList.toggle('hidden', !isSow);
-            quantitySection?.classList.toggle('hidden', !isPostWeaning);
             setFieldState(sowField, isSow, shouldClear);
-            setFieldState(quantityField, isPostWeaning, shouldClear);
         };
 
         form.dataset.mortalityBound = 'true';
         typeSelect.addEventListener('change', () => syncMortalityFields(true));
         syncMortalityFields(false);
+    }
+
+    function initTodayTaskForms(root = document) {
+        root.querySelectorAll('.today-task-form').forEach((form) => {
+            if (form.dataset.todayTasksBound === 'true') return;
+
+            const submitButton = form.querySelector('.today-task-submit-button');
+            const checkboxes = Array.from(form.querySelectorAll('.today-task-checkbox'));
+            if (!checkboxes.length) return;
+
+            const syncTaskRows = () => {
+                const hasSelection = checkboxes.some((checkbox) => checkbox.checked);
+                if (submitButton) submitButton.disabled = !hasSelection;
+
+                checkboxes.forEach((checkbox) => {
+                    const row = checkbox.closest('.today-task-row') || checkbox.closest('.today-task-dialog-item');
+                    const resultSelect = row?.querySelector('.today-task-result');
+                    row?.classList.toggle('is-selected', checkbox.checked);
+                    if (resultSelect) {
+                        resultSelect.disabled = !checkbox.checked;
+                        resultSelect.required = checkbox.checked;
+                    }
+                });
+            };
+
+            form.dataset.todayTasksBound = 'true';
+            checkboxes.forEach((checkbox) => {
+                checkbox.addEventListener('change', syncTaskRows);
+            });
+            syncTaskRows();
+        });
+    }
+
+    function initTodayTaskDialogs(root = document) {
+        root.querySelectorAll('[data-dialog-open]').forEach((button) => {
+            if (button.dataset.dialogOpenBound === 'true') return;
+
+            button.dataset.dialogOpenBound = 'true';
+            button.addEventListener('click', () => {
+                const dialog = document.getElementById(button.dataset.dialogOpen);
+                if (!dialog) return;
+
+                if (typeof dialog.showModal === 'function') {
+                    dialog.showModal();
+                } else {
+                    dialog.setAttribute('open', '');
+                }
+                dialog.querySelector('.today-task-checkbox')?.focus();
+            });
+        });
+
+        root.querySelectorAll('.today-task-dialog').forEach((dialog) => {
+            if (dialog.dataset.dialogCloseBound === 'true') return;
+
+            const closeDialog = () => {
+                if (typeof dialog.close === 'function') {
+                    dialog.close();
+                } else {
+                    dialog.removeAttribute('open');
+                }
+            };
+
+            dialog.dataset.dialogCloseBound = 'true';
+            dialog.addEventListener('click', (event) => {
+                if (event.target === dialog) closeDialog();
+            });
+            dialog.querySelectorAll('[data-dialog-close]').forEach((button) => {
+                button.addEventListener('click', closeDialog);
+            });
+        });
     }
 
     function initSaleFormset(root = document) {
@@ -557,6 +622,8 @@
         initSingleSowEventForm();
         initBulkEventForm();
         initMortalityForm();
+        initTodayTaskForms();
+        initTodayTaskDialogs();
         initSaleFormset();
         initRecipeFormset();
         initProductionStageChecklist();

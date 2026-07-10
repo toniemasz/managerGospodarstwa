@@ -23,10 +23,11 @@ from .forms import (
 from .models import MortalityReportModel, SowModel, SowEventModel
 from common.date_range import PERIOD_OPTIONS, parse_date_range
 from common.filter_ui import filter_ui_state
+from farms.services.cache import invalidate_farm_cache_on_commit
 from farms.services.current_farm import get_current_farm
-from farms.services.farm_dashboard import FarmDashboardService
 from farms.services.module_navigation import ModuleNavigationService
 from farms.services.audit_log_service import log_action
+from farms.services.today_dashboard import TodayDashboardService
 from sows.actions.mortality import create_mortality_report
 from sows.actions.events import SowEventActions
 from sows.domain.event_details import initial_data_from_event_details
@@ -36,8 +37,8 @@ logger = logging.getLogger(__name__)
 
 @login_required
 def modules_home_view(request):
-    context = FarmDashboardService(get_current_farm(request)).get_context()
-    return render(request, 'sows/modules_home.html', context)
+    context = TodayDashboardService(get_current_farm(request)).get_context()
+    return render(request, 'farms/today_dashboard.html', context)
 
 
 @login_required
@@ -70,6 +71,7 @@ def add_sow_view(request):
             sow = form.save(commit=False)
             sow.farm = farm
             sow.save()
+            invalidate_farm_cache_on_commit(farm, groups=("sows",))
             log_action(farm=farm, user=request.user, action="CREATE", obj=sow)
             return redirect('dashboard')
     else:
@@ -86,6 +88,7 @@ def edit_sow_view(request, sow_id):
         form = SowForm(request.POST, instance=db_sow)
         if form.is_valid():
             sow = form.save()
+            invalidate_farm_cache_on_commit(farm, groups=("sows",))
             log_action(farm=farm, user=request.user, action="UPDATE", obj=sow)
             messages.success(request, "Dane maciory zostały zaktualizowane.")
             return redirect('sow_detail', sow_id=db_sow.id)
@@ -116,6 +119,7 @@ def add_vaccination_plan_view(request):
             plan = form.save(commit=False)
             plan.farm = farm
             plan.save()
+            invalidate_farm_cache_on_commit(farm, groups=("sows",))
             messages.success(request, "Reguła szczepienia została dodana.")
             return redirect('vaccination_plans')
     else:
@@ -133,6 +137,7 @@ def edit_vaccination_plan_view(request, plan_id):
         form = VaccinationPlanForm(request.POST, instance=plan, farm=farm)
         if form.is_valid():
             form.save()
+            invalidate_farm_cache_on_commit(farm, groups=("sows",))
             messages.success(request, "Reguła szczepienia została zaktualizowana.")
             return redirect('vaccination_plans')
     else:
@@ -151,6 +156,7 @@ def delete_vaccination_plan_view(request, plan_id):
     plan = VaccinationPlanRepository(farm=farm).get_plan_model_by_id(plan_id)
     if request.method == 'POST':
         plan.delete()
+        invalidate_farm_cache_on_commit(farm, groups=("sows",))
         messages.success(request, "Reguła szczepienia została usunięta.")
     return redirect('vaccination_plans')
 
@@ -164,6 +170,7 @@ def sow_detail_view(request, sow_id):
         form = SowForm(request.POST, instance=db_sow)
         if form.is_valid():
             sow_model = form.save()
+            invalidate_farm_cache_on_commit(farm, groups=("sows",))
             log_action(farm=farm, user=request.user, action="UPDATE", obj=sow_model)
             return redirect('sow_detail', sow_id=db_sow.id)
     else:
@@ -229,6 +236,10 @@ def bulk_sow_events_view(request):
     service = BulkSowEventService(farm=farm)
     sows = SowModel.objects.filter(farm=farm, is_archived=False).order_by('ear_tag')
     is_single = request.GET.get('rows') == '1'
+    requested_event_type = request.GET.get('event_type', '')
+    allowed_event_types = {value for value, _label in SowEventModel.EVENT_TYPES}
+    if requested_event_type not in allowed_event_types:
+        requested_event_type = ''
 
     try:
         requested_rows = int(request.GET.get('rows', '1' if is_single else '8'))
@@ -269,7 +280,11 @@ def bulk_sow_events_view(request):
     else:
         formset = BulkSowEventFormSet(
             prefix='events',
-            initial=empty_bulk_event_initials(initial_count),
+            initial=empty_bulk_event_initials(
+                initial_count,
+                event_type=requested_event_type,
+                event_date=date.today() if is_single else None,
+            ),
             form_kwargs={'farm': farm},
         )
 
@@ -391,11 +406,13 @@ def delete_sow_view(request, sow_id):
             db_sow.death_date = None
             db_sow.death_note = ""
             db_sow.save()
+            invalidate_farm_cache_on_commit(farm, groups=("sows",))
             log_action(farm=farm, user=request.user, action="ARCHIVE", obj=db_sow)
         else:
             representation = str(db_sow)
             object_id = db_sow.pk
             db_sow.delete()
+            invalidate_farm_cache_on_commit(farm, groups=("sows",))
             log_action(farm=farm, user=request.user, action="DELETE", model_label="sows.SowModel", object_id=object_id, object_repr=representation)
 
         return redirect('dashboard')

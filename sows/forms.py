@@ -233,11 +233,24 @@ class BulkSowEventRowForm(forms.Form):
 BulkSowEventFormSet = formset_factory(BulkSowEventRowForm, extra=0, can_delete=True)
 
 
-def empty_bulk_event_initials(count: int = 8) -> list[dict]:
-    return [{'event_date': None} for _ in range(count)]
+def empty_bulk_event_initials(count: int = 8, *, event_type: str = '', event_date=None) -> list[dict]:
+    initial = {'event_date': event_date}
+    if event_type:
+        initial['event_type'] = event_type
+    return [initial.copy() for _ in range(count)]
 
 
 class MortalityReportForm(forms.ModelForm):
+    sow = forms.CharField(
+        label="Maciora",
+        max_length=50,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'list': 'mortality-sow-options',
+            'autocomplete': 'off',
+            'placeholder': 'Wpisz numer maciory',
+        }),
+    )
     quantity = forms.IntegerField(label="Liczba sztuk", min_value=1, required=False)
 
     class Meta:
@@ -258,38 +271,59 @@ class MortalityReportForm(forms.ModelForm):
     def __init__(self, *args, farm=None, **kwargs):
         self.farm = farm
         super().__init__(*args, **kwargs)
-        self.fields['sow'].queryset = SowModel.objects.none()
+        self.sow_suggestions = []
         if self.farm is not None:
-            self.fields['sow'].queryset = SowModel.objects.filter(
+            self.sow_suggestions = list(SowModel.objects.filter(
                 farm=self.farm,
                 is_archived=False,
-            ).order_by('ear_tag')
+            ).order_by('ear_tag').values('id', 'ear_tag'))
             self.instance.farm = self.farm
-        self.fields['sow'].required = False
-        self.fields['quantity'].help_text = "Dla maciory system zapisuje 1 sztukę automatycznie."
+        self.fields['sow'].help_text = "Wpisz numer, np. 12, i wybierz maciorę z podpowiedzi albo wpisz pełny numer."
+        self.fields['quantity'].help_text = "Dla maciory system zapisuje 1 sztukę; dla zwierząt po odsadzeniu wpisz liczbę."
 
     def clean(self):
         cleaned_data = super().clean()
         mortality_type = cleaned_data.get('mortality_type')
         mortality_date = cleaned_data.get('mortality_date')
-        sow = cleaned_data.get('sow')
+        sow_value = (cleaned_data.get('sow') or '').strip()
         quantity = cleaned_data.get('quantity')
 
         if mortality_date and mortality_date > timezone.localdate():
             self.add_error('mortality_date', "Data upadku nie może być z przyszłości.")
 
         if mortality_type == MortalityReportModel.TYPE_SOW:
-            if sow is None:
+            sow = self._find_active_sow(sow_value)
+            if sow is None and not self.errors.get('sow'):
                 self.add_error('sow', "Wybierz aktywną maciorę.")
             elif self.farm is not None and sow.farm_id != self.farm.id:
                 self.add_error('sow', "Wybrana maciora nie należy do bieżącego gospodarstwa.")
             elif sow.is_archived:
                 self.add_error('sow', "Nie można zgłosić upadku już zarchiwizowanej maciory.")
+            cleaned_data['sow'] = sow
             cleaned_data['quantity'] = 1
 
         elif mortality_type == MortalityReportModel.TYPE_POST_WEANING:
             if quantity is None:
                 self.add_error('quantity', "Podaj liczbę sztuk.")
             cleaned_data['sow'] = None
+        else:
+            cleaned_data['sow'] = None
 
         return cleaned_data
+
+    def _find_active_sow(self, sow_value):
+        if not sow_value or self.farm is None:
+            return None
+
+        queryset = SowModel.objects.filter(farm=self.farm, is_archived=False)
+        exact_matches = list(queryset.filter(ear_tag__iexact=sow_value)[:2])
+        if len(exact_matches) == 1:
+            return exact_matches[0]
+        if len(exact_matches) > 1:
+            self.add_error('sow', "W gospodarstwie jest więcej aktywnych macior o takim numerze.")
+            return None
+
+        if sow_value.isdigit():
+            return queryset.filter(pk=int(sow_value)).first()
+
+        return None

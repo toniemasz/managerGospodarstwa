@@ -134,6 +134,7 @@
                                             <span>Utworzono: <strong>{{ event.created_at|date:"d.m.Y H:i" }}</strong></span>
                                         {% elif event.event_type == 'VACCINATION' %}
                                             <span>Szczepionka: <strong>{{ event.details.vaccine_name|default:"Brak nazwy" }}</strong></span>
+                                            {% if event.details.note %}<span>Notatka: <strong>{{ event.details.note }}</strong></span>{% endif %}
                                         {% endif %}
                                     </div>
                                 </td>
@@ -216,6 +217,7 @@
                                 <span>Poronienie · utworzono {{ event.created_at|date:"d.m.Y H:i" }}</span>
                             {% elif event.event_type == 'VACCINATION' %}
                                 <span>Szczepionka: <strong>{{ event.details.vaccine_name|default:"Brak nazwy" }}</strong></span>
+                                {% if event.details.note %}<span>Notatka: <strong>{{ event.details.note }}</strong></span>{% endif %}
                             {% else %}
                                 <span>{{ event.get_event_type_display }}</span>
                             {% endif %}
