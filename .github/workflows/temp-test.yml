@@ -8,7 +8,7 @@ on:
 jobs:
   tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       DEBUG: "1"
       SECRET_KEY: test-secret-key
@@ -21,25 +21,45 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: pip install -q -r requirements.txt
-      - name: Run production completion tests
+      - name: Run all verification suites
         shell: bash
         run: |
           set +e
-          pytest feed/tests/integration/test_production_completion.py -q --tb=short > test-output.txt 2>&1
-          echo $? > test-exit-code.txt
+          pytest feed/tests/integration/test_production_completion.py -q --tb=short > production-output.txt 2>&1
+          production_code=$?
+          pytest feed/tests -q --tb=short > feed-output.txt 2>&1
+          feed_code=$?
+          pytest -q --tb=short > full-output.txt 2>&1
+          full_code=$?
+          printf '%s\n' "$production_code" > production-exit-code.txt
+          printf '%s\n' "$feed_code" > feed-exit-code.txt
+          printf '%s\n' "$full_code" > full-exit-code.txt
           exit 0
       - name: Upload pytest output
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: production-test-output
+          name: all-test-output
           path: |
-            test-output.txt
-            test-exit-code.txt
+            production-output.txt
+            feed-output.txt
+            full-output.txt
+            production-exit-code.txt
+            feed-exit-code.txt
+            full-exit-code.txt
           if-no-files-found: error
-      - name: Fail when tests failed
+      - name: Fail when any test suite failed
         shell: bash
         run: |
-          code="$(cat test-exit-code.txt)"
-          cat test-output.txt
-          exit "$code"
+          production_code="$(cat production-exit-code.txt)"
+          feed_code="$(cat feed-exit-code.txt)"
+          full_code="$(cat full-exit-code.txt)"
+          echo '=== production completion tests ==='
+          cat production-output.txt
+          echo '=== feed tests ==='
+          cat feed-output.txt
+          echo '=== full test suite ==='
+          cat full-output.txt
+          if [ "$production_code" -ne 0 ] || [ "$feed_code" -ne 0 ] || [ "$full_code" -ne 0 ]; then
+            exit 1
+          fi
