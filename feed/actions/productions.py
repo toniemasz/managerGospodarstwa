@@ -51,9 +51,7 @@ def complete_production(
     production_id: int,
     *,
     skip_stages: bool = False,
-    force_inventory: bool = False,
     user=None,
-    create_serving: bool | None = None,
 ) -> tuple[bool, str]:
     if farm is None:
         raise ValueError("Zakończenie produkcji wymaga jawnego gospodarstwa.")
@@ -65,8 +63,6 @@ def complete_production(
         ).complete(
             production_id,
             skip_stages=skip_stages,
-            force_inventory=force_inventory,
-            create_serving=create_serving,
         )
     except (ValidationError, FeedDomainError) as error:
         message = error.messages[0] if hasattr(error, "messages") else str(error)
@@ -83,19 +79,6 @@ def complete_production(
             "Nie udało się zakończyć śrutowania z powodu błędu danych. "
             "Szczegóły zapisano w logach."
         )
-    except Exception:
-        logger.exception(
-            "Nieoczekiwany błąd podczas zakończenia produkcji",
-            extra={
-                "farm_id": farm.pk,
-                "production_id": production_id,
-            },
-        )
-        return False, (
-            "Nie udało się zakończyć śrutowania. "
-            "Szczegóły zapisano w logach."
-        )
-
     return True, result.message
 
 
@@ -119,7 +102,6 @@ def bulk_complete_productions(
     farm,
     production_ids,
     *,
-    force_inventory: bool = False,
     user=None,
 ) -> dict:
     normalized_ids, invalid_count = _normalize_production_ids(production_ids)
@@ -151,7 +133,6 @@ def bulk_complete_productions(
             farm,
             production.pk,
             skip_stages=production.status == ProductionModel.Statuses.QUEUED,
-            force_inventory=force_inventory,
             user=user,
         )
         if success:

@@ -44,8 +44,8 @@ def test_actual_feed_cost_uses_fifo_delivery_batches():
         quantity_kg=Decimal("400.00"),
         status=ProductionModel.Statuses.STAGE_1_DONE,
     )
-    assert complete_production(farm, first_production.pk, user=user, create_serving=False)[0]
-    assert complete_production(farm, second_production.pk, user=user, create_serving=False)[0]
+    assert complete_production(farm, first_production.pk, user=user)[0]
+    assert complete_production(farm, second_production.pk, user=user)[0]
     ProductionModel.objects.create(recipe=recipe, date=date(2026, 7, 2), quantity_kg=9000, status=ProductionModel.Statuses.QUEUED)
 
     result = ProductionCostSelector(farm).calculate(date_from=date(2026, 1, 1), date_to=date(2026, 12, 31))

@@ -74,6 +74,8 @@ class ProductionReconciliationWorkflow:
         count = 0
         for production in productions:
             try:
+                # Tryb forced jest celowo ograniczony do tej administracyjnej
+                # odbudowy historycznego FIFO; żaden publiczny endpoint go nie udostępnia.
                 result = self.inventory.book_production(
                     production,
                     forced=True,

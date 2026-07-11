@@ -243,12 +243,8 @@ class InventoryAdjustmentForm(KilogramStorageFormMixin, forms.Form):
         return movement_date
 
 
-class ReadyFeedPurchaseForm(KilogramStorageFormMixin, forms.Form):
-    mass_fields = ('quantity_kg',)
-    product_name = forms.CharField(label="Nazwa gotowej paszy", max_length=150)
-    date = forms.DateField(label="Data dostawy", widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}))
-    quantity_kg = forms.DecimalField(label="Ilość", min_value=Decimal("0.01"), max_digits=12, decimal_places=2)
-    price_per_kg = forms.DecimalField(label="Cena za kg", min_value=Decimal("0.00001"), max_digits=14, decimal_places=5)
+class PurchasedReadyFeedProductForm(forms.Form):
+    name = forms.CharField(label="Nazwa gotowej paszy", max_length=150)
 
     def __init__(self, *args, farm=None, **kwargs):
         self.farm = farm
@@ -256,12 +252,25 @@ class ReadyFeedPurchaseForm(KilogramStorageFormMixin, forms.Form):
         for field in self.fields.values():
             _apply_widget_class(field)
 
-    def clean_product_name(self):
-        name = self.cleaned_data["product_name"].strip()
-        existing = FeedProductModel.objects.filter(farm=self.farm, name__iexact=name).first()
-        if existing and existing.source_type != FeedProductModel.SourceTypes.PURCHASED_READY:
-            raise forms.ValidationError("Produkt o tej nazwie jest powiązany z produkowaną paszą.")
+    def clean_name(self):
+        name = self.cleaned_data["name"].strip()
+        if not name:
+            raise forms.ValidationError("Nazwa gotowej paszy nie może być pusta.")
+        if FeedProductModel.objects.filter(farm=self.farm, name__iexact=name).exists():
+            raise forms.ValidationError("Produkt gotowej paszy o tej nazwie już istnieje.")
         return name
+
+
+class ReadyFeedDeliveryForm(KilogramStorageFormMixin, forms.Form):
+    mass_fields = ('quantity_kg',)
+    date = forms.DateField(label="Data dostawy", widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}))
+    quantity_kg = forms.DecimalField(label="Ilość", min_value=Decimal("0.01"), max_digits=12, decimal_places=2)
+    price_per_kg = forms.DecimalField(label="Cena za kg", min_value=Decimal("0.00001"), max_digits=14, decimal_places=5)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            _apply_widget_class(field)
 
 
 class FeedServingForm(KilogramStorageFormMixin, forms.Form):

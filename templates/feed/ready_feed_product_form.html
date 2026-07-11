@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block title %}Dodaj gotową paszę{% endblock %}
+{% block content %}
+<main class="app-page app-page-narrow">
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Gotowe pasze</p>
+            <h1>Dodaj gotową paszę</h1>
+            <p class="page-subtitle">Utwórz produkt kupowanej paszy gotowej. Dostawy będzie można przyjmować z listy produktów.</p>
+        </div>
+        <a class="button button-secondary" href="{% url 'finished_feed_inventory' %}">Wróć</a>
+    </section>
+    {% include 'feed/_feed_nav.html' %}
+    <form method="post" class="panel form-panel">
+        {% csrf_token %}
+        {% include 'components/form_errors.html' with form=form %}
+        <div class="form-field">
+            <label for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
+            {{ form.name }}
+            {{ form.name.errors }}
+        </div>
+        <div class="form-actions">
+            <a class="button button-secondary" href="{% url 'finished_feed_inventory' %}">Anuluj</a>
+            <button class="button button-primary" type="submit">Dodaj gotową paszę</button>
+        </div>
+    </form>
+</main>
+{% endblock %}

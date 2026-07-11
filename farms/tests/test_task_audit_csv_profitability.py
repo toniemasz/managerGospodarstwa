@@ -70,7 +70,7 @@ def test_csv_export_and_atomic_import_round_trip(two_farms):
         quantity_kg=Decimal("100.00"),
         status=ProductionModel.Statuses.STAGE_1_DONE,
     )
-    assert complete_production(source, production.pk, user=source.owner, create_serving=False)[0]
+    assert complete_production(source, production.pk, user=source.owner)[0]
     PigSaleModel.objects.create(farm=source, document_number="CSV/1", quantity=10)
     category = CostCategoryModel.objects.create(farm=source, name="CSV koszt")
     CostModel.objects.create(
@@ -164,7 +164,7 @@ def test_profitability_calculations_are_farm_scoped(two_farms):
         quantity_kg=1000,
         status=ProductionModel.Statuses.STAGE_1_DONE,
     )
-    assert complete_production(farm, production.pk, user=farm.owner, create_serving=False)[0]
+    assert complete_production(farm, production.pk, user=farm.owner)[0]
     PigSaleModel.objects.create(farm=farm, sale_date=date.today(), quantity=10, total_weight=1000, net_value=8000, gross_value=8640)
     PigSaleModel.objects.create(farm=other, sale_date=date.today(), quantity=99, net_value=99999, gross_value=99999)
 

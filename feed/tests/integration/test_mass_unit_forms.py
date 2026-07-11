@@ -11,7 +11,7 @@ from feed.forms import (
     IngredientForm,
     InventoryAdjustmentForm,
     ProductionForm,
-    ReadyFeedPurchaseForm,
+    ReadyFeedDeliveryForm,
 )
 from feed.models import FeedProductModel, IngredientModel, RecipeItemModel, RecipeModel
 
@@ -67,15 +67,14 @@ def test_all_feed_mass_forms_convert_tonnes_to_stored_kilograms():
     assert adjustment_form.is_valid(), adjustment_form.errors
     assert adjustment_form.cleaned_data["quantity_kg"] == Decimal("250.00")
 
-    purchase_form = ReadyFeedPurchaseForm(data={
-        "product_name": "Gotowa jednostki",
+    delivery_form = ReadyFeedDeliveryForm(data={
         "date": date.today().isoformat(),
         "quantity_kg": "1.75",
         "quantity_kg_unit": "t",
         "price_per_kg": "2.00000",
-    }, farm=farm)
-    assert purchase_form.is_valid(), purchase_form.errors
-    assert purchase_form.cleaned_data["quantity_kg"] == Decimal("1750.00")
+    })
+    assert delivery_form.is_valid(), delivery_form.errors
+    assert delivery_form.cleaned_data["quantity_kg"] == Decimal("1750.00")
 
     product = FeedProductModel.objects.create(
         farm=farm,

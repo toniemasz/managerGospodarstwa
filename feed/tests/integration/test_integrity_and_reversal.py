@@ -41,7 +41,7 @@ def _completed_production():
         quantity_kg=Decimal("100.00"),
         status=ProductionModel.Statuses.STAGE_1_DONE,
     )
-    success, message = complete_production(farm, production.pk, user=user, create_serving=True)
+    success, message = complete_production(farm, production.pk, user=user)
     assert success, message
     production.refresh_from_db()
     delivery.refresh_from_db()

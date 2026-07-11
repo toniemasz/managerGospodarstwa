@@ -14,6 +14,7 @@ from feed.actions.productions import complete_production
 from feed.actions.inventory import InventoryActions
 from feed.models import (
     DeliveryModel,
+    FeedProductModel,
     FeedServingAllocationModel,
     FeedServingModel,
     FinishedFeedBatchModel,
@@ -109,10 +110,35 @@ def test_full_two_stage_http_flow_completes_without_server_error(authenticated_f
 
 
 @pytest.mark.django_db
-def test_multi_ingredient_manual_mode_leaves_produced_feed_in_batch(authenticated_farm):
+def test_public_production_ui_has_no_force_or_serving_choice_controls(authenticated_farm):
+    client, _, farm = authenticated_farm
+    recipe, _ = create_recipe(farm, stock_kg="500.00")
+    production = create_production(recipe, status=ProductionModel.Statuses.STAGE_1_DONE)
+
+    responses = [
+        client.get(reverse("process_stage2", args=[production.pk])),
+        client.get(reverse("feed_productions")),
+        client.get(reverse("add_production")),
+        client.get(reverse("farm_settings")),
+    ]
+    combined = "\n".join(response.content.decode() for response in responses)
+    assert "force_inventory" not in combined
+    assert "create_feed_serving" not in combined
+    assert "Wymuś zakończenie" not in combined
+    assert "mimo braków" not in combined
+    assert "pozostać na magazynie" not in combined
+    assert "cała wyprodukowana ilość zostanie automatycznie zarejestrowana jako podana" in combined
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("legacy_mode", list(FarmSettingsModel.FeedServingModes.values))
+def test_legacy_serving_setting_and_post_choice_cannot_disable_automatic_serving(
+    authenticated_farm,
+    legacy_mode,
+):
     client, _, farm = authenticated_farm
     settings = get_farm_settings(farm)
-    settings.feed_serving_mode = FarmSettingsModel.FeedServingModes.MANUAL
+    settings.feed_serving_mode = legacy_mode
     settings.save(update_fields=("feed_serving_mode",))
     recipe, first = create_recipe(farm, stock_kg="500.00", price="1.00000")
     RecipeItemModel.objects.filter(recipe=recipe, ingredient=first).update(percentage=Decimal("50.00"))
@@ -122,35 +148,16 @@ def test_multi_ingredient_manual_mode_leaves_produced_feed_in_batch(authenticate
     RecipeItemModel.objects.create(recipe=recipe, ingredient=second, percentage=Decimal("50.00"))
     production = create_production(recipe, status=ProductionModel.Statuses.STAGE_1_DONE, quantity="100.00")
 
-    response = client.post(reverse("process_stage2", args=[production.pk]), {})
-
-    assert response.status_code == 302
-    batch = FinishedFeedBatchModel.objects.get(production=production)
-    assert batch.product.source_type == batch.product.SourceTypes.PRODUCED
-    assert batch.remaining_quantity_kg == Decimal("100.00")
-    assert not FeedServingModel.objects.filter(automatic_for_production=production).exists()
-
-
-@pytest.mark.django_db
-def test_single_ingredient_manual_mode_still_creates_produced_feed_without_serving(authenticated_farm):
-    client, _, farm = authenticated_farm
-    settings = get_farm_settings(farm)
-    settings.feed_serving_mode = FarmSettingsModel.FeedServingModes.MANUAL
-    settings.save(update_fields=("feed_serving_mode",))
-    recipe, _ = create_recipe(farm, stock_kg="500.00", price="1.25000")
-    production = create_production(
-        recipe,
-        status=ProductionModel.Statuses.STAGE_1_DONE,
-        quantity="100.00",
+    response = client.post(
+        reverse("process_stage2", args=[production.pk]),
+        {"create_feed_serving": "off", "create_feed_serving_present": "1"},
     )
 
-    response = client.post(reverse("process_stage2", args=[production.pk]), {})
-
     assert response.status_code == 302
     batch = FinishedFeedBatchModel.objects.get(production=production)
     assert batch.product.source_type == batch.product.SourceTypes.PRODUCED
-    assert batch.remaining_quantity_kg == Decimal("100.00")
-    assert not FeedServingModel.objects.filter(automatic_for_production=production).exists()
+    assert batch.remaining_quantity_kg == Decimal("0.00")
+    assert FeedServingModel.objects.filter(automatic_for_production=production).count() == 1
 
 
 @pytest.mark.django_db
@@ -167,7 +174,6 @@ def test_completed_production_cost_snapshots_match_fifo_registry_and_batch(authe
         farm,
         production.pk,
         user=user,
-        create_serving=False,
     )
 
     assert success is True, message
@@ -183,55 +189,7 @@ def test_completed_production_cost_snapshots_match_fifo_registry_and_batch(authe
     assert production.feed_cost_per_kg == batch.cost_per_kg
 
 
-@pytest.mark.django_db
-@pytest.mark.parametrize("ingredient_count", [1, 2])
-@pytest.mark.parametrize(
-    ("serving_mode", "explicit_choice", "expected_serving"),
-    [
-        (FarmSettingsModel.FeedServingModes.MANUAL, None, False),
-        (FarmSettingsModel.FeedServingModes.AUTO_FULL_PRODUCTION, None, True),
-        (FarmSettingsModel.FeedServingModes.MANUAL, True, True),
-        (FarmSettingsModel.FeedServingModes.AUTO_FULL_PRODUCTION, False, False),
-    ],
-)
-def test_serving_decision_matrix_is_independent_of_recipe_item_count(
-    authenticated_farm,
-    ingredient_count,
-    serving_mode,
-    explicit_choice,
-    expected_serving,
-):
-    _client, user, farm = authenticated_farm
-    settings = get_farm_settings(farm)
-    settings.feed_serving_mode = serving_mode
-    settings.save(update_fields=("feed_serving_mode",))
-    recipe, first = create_recipe(farm, stock_kg="500.00")
-    if ingredient_count == 2:
-        RecipeItemModel.objects.filter(recipe=recipe, ingredient=first).update(percentage=Decimal("50.00"))
-        second = IngredientModel.objects.create(farm=farm, name="Drugi składnik")
-        second_delivery = DeliveryModel.objects.create(
-            ingredient=second,
-            date=date(2026, 7, 1),
-            quantity_kg=Decimal("500.00"),
-            price_per_kg=Decimal("1.00000"),
-        )
-        InventoryActions(farm).sync_delivery(second_delivery)
-        RecipeItemModel.objects.create(recipe=recipe, ingredient=second, percentage=Decimal("50.00"))
-    production = create_production(recipe, status=ProductionModel.Statuses.STAGE_1_DONE)
-
-    success, message = complete_production(
-        farm,
-        production.pk,
-        user=user,
-        create_serving=explicit_choice,
-    )
-
-    assert success, message
-    assert FeedServingModel.objects.filter(automatic_for_production=production).exists() is expected_serving
-    assert FinishedFeedBatchModel.objects.get(production=production).product.source_type == "PRODUCED"
-
-
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_cost_sync_failure_rolls_back_fifo_status_and_batch(authenticated_farm):
     _client, user, farm = authenticated_farm
     recipe, ingredient = create_recipe(farm, stock_kg="500.00")
@@ -239,7 +197,7 @@ def test_cost_sync_failure_rolls_back_fifo_status_and_batch(authenticated_farm):
 
     with patch("feed.services.production_completion.sync_production_cost", side_effect=RuntimeError("awaria rejestru")):
         with pytest.raises(RuntimeError, match="awaria rejestru"):
-            complete_production(farm, production.pk, user=user, create_serving=False)
+            complete_production(farm, production.pk, user=user)
 
     production.refresh_from_db()
     assert production.status == ProductionModel.Statuses.STAGE_1_DONE
@@ -249,7 +207,7 @@ def test_cost_sync_failure_rolls_back_fifo_status_and_batch(authenticated_farm):
     assert not FinishedFeedBatchModel.objects.filter(production=production).exists()
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_batch_creation_failure_rolls_back_fifo_and_cost(authenticated_farm):
     _client, user, farm = authenticated_farm
     recipe, ingredient = create_recipe(farm, stock_kg="500.00")
@@ -260,7 +218,7 @@ def test_batch_creation_failure_rolls_back_fifo_and_cost(authenticated_farm):
         side_effect=RuntimeError("awaria partii"),
     ):
         with pytest.raises(RuntimeError, match="awaria partii"):
-            complete_production(farm, production.pk, user=user, create_serving=False)
+            complete_production(farm, production.pk, user=user)
 
     production.refresh_from_db()
     assert production.status == ProductionModel.Statuses.STAGE_1_DONE
@@ -290,6 +248,51 @@ def test_stage_two_auto_mode_creates_exactly_one_feed_serving(authenticated_farm
     client.post(reverse("process_stage2", args=[production.pk]), {"create_feed_serving": "on"})
     assert FinishedFeedBatchModel.objects.filter(production=production).count() == 1
     assert FeedServingModel.objects.filter(automatic_for_production=production).count() == 1
+
+
+@pytest.mark.django_db
+def test_automatic_serving_uses_only_batch_created_for_that_production(authenticated_farm):
+    _client, user, farm = authenticated_farm
+    recipe, _ = create_recipe(farm, stock_kg="500.00")
+    product = FeedProductModel.objects.create(
+        farm=farm,
+        name=recipe.name,
+        source_type=FeedProductModel.SourceTypes.PRODUCED,
+        recipe=recipe,
+    )
+    historical_production = create_production(
+        recipe,
+        production_date=date(2026, 7, 7),
+        status=ProductionModel.Statuses.COMPLETED,
+        quantity="25.00",
+    )
+    historical_batch = FinishedFeedBatchModel.objects.create(
+        farm=farm,
+        product=product,
+        batch_date=historical_production.date,
+        initial_quantity_kg=Decimal("25.00"),
+        remaining_quantity_kg=Decimal("25.00"),
+        cost_per_kg=Decimal("1.00000"),
+        total_cost=Decimal("25.00"),
+        production=historical_production,
+    )
+    production = create_production(
+        recipe,
+        production_date=date(2026, 7, 8),
+        status=ProductionModel.Statuses.STAGE_1_DONE,
+        quantity="100.00",
+    )
+
+    success, message = complete_production(farm, production.pk, user=user)
+
+    assert success, message
+    serving = FeedServingModel.objects.get(automatic_for_production=production)
+    new_batch = FinishedFeedBatchModel.objects.get(production=production)
+    assert list(serving.allocations.values_list("batch_id", flat=True)) == [new_batch.pk]
+    historical_batch.refresh_from_db()
+    new_batch.refresh_from_db()
+    assert historical_batch.remaining_quantity_kg == Decimal("25.00")
+    assert new_batch.remaining_quantity_kg == Decimal("0.00")
 
 
 @pytest.mark.django_db
@@ -339,7 +342,7 @@ def test_stage_two_uses_automatic_farm_setting_when_post_has_no_explicit_choice(
     assert FinishedFeedBatchModel.objects.get(production=production).remaining_quantity_kg == Decimal("0.00")
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_future_delivery_is_rejected_before_fifo_booking(authenticated_farm):
     client, _, farm = authenticated_farm
     recipe, ingredient = create_recipe(farm, stock_kg=None)
@@ -347,15 +350,27 @@ def test_future_delivery_is_rejected_before_fifo_booking(authenticated_farm):
     InventoryActions(farm).sync_delivery(future_delivery)
     production = create_production(recipe, production_date=date(2026, 7, 8), status=ProductionModel.Statuses.STAGE_1_DONE)
 
-    response = client.post(reverse("process_stage2", args=[production.pk]))
+    response = client.post(reverse("process_stage2", args=[production.pk]), {
+        "force_inventory": "on",
+        "create_feed_serving": "off",
+        "create_feed_serving_present": "1",
+    })
     assert response.status_code == 302
     production.refresh_from_db()
     assert production.status == ProductionModel.Statuses.STAGE_1_DONE
     assert production.completed_at is None
+    assert not ProductionIngredientUsageModel.objects.filter(production=production).exists()
+    assert not InventoryMovementModel.objects.filter(
+        movement_type=InventoryMovementModel.Types.PRODUCTION_USAGE,
+        source_model=production._meta.label,
+        source_id=str(production.pk),
+    ).exists()
+    assert not CostModel.objects.filter(production=production).exists()
     assert not FinishedFeedBatchModel.objects.filter(production=production).exists()
+    assert not FeedServingModel.objects.filter(automatic_for_production=production).exists()
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_stage_two_auto_serving_failure_rolls_back_entire_completion(authenticated_farm):
     client, _, farm = authenticated_farm
     recipe, ingredient = create_recipe(farm, stock_kg="500.00")
@@ -515,6 +530,10 @@ def test_bulk_completion_handles_queued_stage_one_and_duplicate_ids(authenticate
     assert completed_local_date(stage_one) == stage_one.date
     assert ProductionIngredientUsageModel.objects.filter(production=queued).count() == 1
     assert ProductionIngredientUsageModel.objects.filter(production=stage_one).count() == 1
+    assert FeedServingModel.objects.filter(automatic_for_production__in=[queued, stage_one]).count() == 2
+    assert FinishedFeedBatchModel.objects.filter(
+        production__in=[queued, stage_one], remaining_quantity_kg=Decimal("0.00"),
+    ).count() == 2
 
 
 @pytest.mark.django_db
@@ -559,6 +578,7 @@ def test_bulk_completion_continues_after_one_production_fails(authenticated_farm
 
     response = client.post(reverse("bulk_complete_productions"), {
         "production_ids": [str(missing.pk), str(available.pk)],
+        "force_inventory": "on",
     })
 
     assert response.status_code == 302
@@ -566,8 +586,13 @@ def test_bulk_completion_continues_after_one_production_fails(authenticated_farm
     available.refresh_from_db()
     assert missing.status == ProductionModel.Statuses.QUEUED
     assert missing.completed_at is None
+    assert not ProductionIngredientUsageModel.objects.filter(production=missing).exists()
+    assert not CostModel.objects.filter(production=missing).exists()
+    assert not FinishedFeedBatchModel.objects.filter(production=missing).exists()
+    assert not FeedServingModel.objects.filter(automatic_for_production=missing).exists()
     assert available.status == ProductionModel.Statuses.COMPLETED
     assert completed_local_date(available) == available.date
+    assert FeedServingModel.objects.filter(automatic_for_production=available).count() == 1
 
 
 @pytest.mark.django_db

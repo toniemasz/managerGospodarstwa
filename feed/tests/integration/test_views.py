@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from farms.services.farm_service import get_or_create_user_farm
 from feed.models import DeliveryModel, IngredientModel, ProductionModel, RecipeItemModel, RecipeModel
+from feed.actions.inventory import InventoryActions
 
 
 @pytest.fixture
@@ -56,6 +57,7 @@ def feed_objects(auth_client):
         quantity_kg=Decimal('1000.00'),
         price_per_kg=Decimal('1.00000'),
     )
+    InventoryActions(farm).sync_delivery(delivery)
     recipe = RecipeModel.objects.create(name="Widokowa", farm=farm)
     RecipeItemModel.objects.create(recipe=recipe, ingredient=ingredient, percentage=Decimal('100.00'))
     production = ProductionModel.objects.create(

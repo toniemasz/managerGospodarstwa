@@ -12,7 +12,6 @@ from feed.actions.productions import (
 )
 from feed.models import ProductionModel
 from feed.selectors.productions import production_details_for_stages, production_or_404
-from farms.services.settings_service import get_farm_settings
 
 
 def _redirect_from_stage_1(request, production):
@@ -67,18 +66,10 @@ def process_stage2_view(request, pk):
         return redirect("process_stage1", pk=pk)
 
     if request.method == "POST":
-        force_inventory = request.POST.get("force_inventory") == "on"
-        create_serving = (
-            request.POST.get("create_feed_serving") == "on"
-            if "create_feed_serving_present" in request.POST
-            else None
-        )
         success, message = complete_production(
             farm,
             pk,
-            force_inventory=force_inventory,
             user=request.user,
-            create_serving=create_serving,
         )
         if success:
             production.refresh_from_db()
@@ -87,7 +78,6 @@ def process_stage2_view(request, pk):
                 user=request.user,
                 action="PRODUCTION_COMPLETED",
                 obj=production,
-                metadata={"forced": force_inventory},
             )
             messages.success(request, message)
         else:
@@ -95,12 +85,6 @@ def process_stage2_view(request, pk):
         return redirect("feed_productions")
 
     context = production_details_for_stages(farm, pk)
-    settings = get_farm_settings(farm)
-    context.update({
-        "feed_serving_mode": settings.feed_serving_mode,
-        "default_create_feed_serving": settings.feed_serving_mode == settings.FeedServingModes.AUTO_FULL_PRODUCTION,
-        "force_ready_feed_serving": False,
-    })
     return render(request, "feed/stage2.html", context)
 
 
@@ -108,11 +92,9 @@ def process_stage2_view(request, pk):
 @require_POST
 def bulk_complete_productions_view(request):
     farm = get_current_farm(request)
-    force_inventory = request.POST.get("force_inventory") == "on"
     result = bulk_complete_productions(
         farm,
         request.POST.getlist("production_ids"),
-        force_inventory=force_inventory,
         user=request.user,
     )
 
@@ -128,7 +110,7 @@ def bulk_complete_productions_view(request):
             user=request.user,
             action="PRODUCTION_COMPLETED",
             obj=production,
-            metadata={"forced": force_inventory, "bulk": True},
+            metadata={"bulk": True},
         )
 
     completed_count = len(result["completed_ids"])
