@@ -11,6 +11,7 @@ from .models import RecipeModel, ProductionModel, IngredientModel, DeliveryModel
 from .forms import (
     CalculatorPriceForm,
     DeliveryForm,
+    DeliveryFormSet,
     IngredientForm,
     InventoryAdjustmentForm,
     ProductionForm,
@@ -23,7 +24,7 @@ from common.filter_ui import filter_ui_state, parse_filter_date
 from common.units import format_mass
 from farms.services.current_farm import get_current_farm
 from farms.services.audit_log_service import log_action
-from feed.actions.deliveries import create_delivery, delete_delivery, update_delivery
+from feed.actions.deliveries import create_deliveries, delete_delivery, update_delivery
 from feed.actions.ingredients import create_ingredient, delete_ingredient, update_ingredient
 from feed.actions.inventory import InventoryActions
 from feed.actions.productions import (
@@ -154,17 +155,26 @@ def feed_inventory_view(request):
 @login_required
 def add_delivery_view(request):
     farm = get_current_farm(request)
+    initial = [{"date": timezone.localdate()}]
     if request.method == 'POST':
-        form = DeliveryForm(request.POST, farm=farm)
-        if form.is_valid():
-            delivery = create_delivery(form, farm=farm, user=request.user)
-            log_action(farm=farm, user=request.user, action="CREATE", obj=delivery)
-            messages.success(request, "Dostawa została przyjęta na magazyn.")
+        formset = DeliveryFormSet(
+            request.POST,
+            prefix='deliveries',
+            initial=initial,
+            form_kwargs={'farm': farm},
+        )
+        if formset.is_valid():
+            deliveries = create_deliveries(formset, farm=farm, user=request.user)
+            messages.success(request, f"Przyjęto dostawy na magazyn: {len(deliveries)}.")
             return redirect('feed_inventory')
+        messages.error(request, "Nie przyjęto żadnej dostawy. Popraw oznaczone wiersze.")
     else:
-        form = DeliveryForm(farm=farm)
-    return render(request, 'feed/form_generic.html',
-                  {'form': form, 'title': 'Dodaj Dostawę', 'back_url': 'feed_inventory'})
+        formset = DeliveryFormSet(
+            prefix='deliveries',
+            initial=initial,
+            form_kwargs={'farm': farm},
+        )
+    return render(request, 'feed/delivery_form.html', {'formset': formset})
 
 
 @login_required

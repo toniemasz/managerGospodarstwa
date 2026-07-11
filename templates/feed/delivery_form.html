@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+{% block title %}Przyjmij dostawę{% endblock %}
+
+{% block content %}
+<main class="app-page">
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Pasze</p>
+            <h1>Przyjmij dostawę</h1>
+            <p class="page-subtitle">Dodaj jeden lub kilka składników dostarczonych do magazynu.</p>
+        </div>
+        <a href="{% url 'feed_inventory' %}" class="button button-secondary">Anuluj</a>
+    </section>
+
+    <section class="panel table-panel">
+        <form method="post" id="delivery-form">
+            {% csrf_token %}
+
+            {% if formset.non_form_errors %}
+            <div class="alert alert-error" role="alert">
+                <strong>Nie można przyjąć dostaw:</strong>
+                {{ formset.non_form_errors }}
+            </div>
+            {% endif %}
+
+            <div class="section-heading">
+                <div>
+                    <h2>Dostawy składników</h2>
+                    <p>Każdy wiersz zostanie zapisany jako osobna dostawa i partia FIFO.</p>
+                </div>
+                <button type="button" id="add-delivery-row" class="button button-secondary">Dodaj wiersz</button>
+            </div>
+
+            {{ formset.management_form }}
+            <div class="table-scroll">
+                <table class="data-table mobile-card-table delivery-form-table" data-no-pagination="true">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Składnik</th>
+                            <th>Ilość</th>
+                            <th>Jednostka</th>
+                            <th>Cena (PLN/kg)</th>
+                            <th>Usuń</th>
+                        </tr>
+                    </thead>
+                    <tbody id="delivery-rows">
+                        {% for form in formset %}
+                        <tr class="delivery-row{% if form.DELETE.value %} hidden{% endif %}"{% if form.DELETE.value %} hidden{% endif %}>
+                            <td data-label="Data">{{ form.date }}{{ form.date.errors }}{{ form.non_field_errors }}</td>
+                            <td data-label="Składnik">{{ form.ingredient }}{{ form.ingredient.errors }}</td>
+                            <td data-label="Ilość">{{ form.quantity_kg }}{{ form.quantity_kg.errors }}</td>
+                            <td data-label="Jednostka">{{ form.quantity_kg_unit }}{{ form.quantity_kg_unit.errors }}</td>
+                            <td data-label="Cena (PLN/kg)">{{ form.price_per_kg }}{{ form.price_per_kg.errors }}</td>
+                            <td data-label="Usuń" class="delete-cell">
+                                <span class="hidden">{{ form.DELETE }}</span>
+                                <button type="button" class="link-button-danger remove-delivery-row">Usuń</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <p id="delivery-rows-empty" class="empty-inline" hidden>Brak aktywnych wierszy. Dodaj dostawę przed zapisaniem.</p>
+
+            <template id="delivery-row-template">
+                <tr class="delivery-row">
+                    <td data-label="Data">{{ formset.empty_form.date }}</td>
+                    <td data-label="Składnik">{{ formset.empty_form.ingredient }}</td>
+                    <td data-label="Ilość">{{ formset.empty_form.quantity_kg }}</td>
+                    <td data-label="Jednostka">{{ formset.empty_form.quantity_kg_unit }}</td>
+                    <td data-label="Cena (PLN/kg)">{{ formset.empty_form.price_per_kg }}</td>
+                    <td data-label="Usuń" class="delete-cell">
+                        <span class="hidden">{{ formset.empty_form.DELETE }}</span>
+                        <button type="button" class="link-button-danger remove-delivery-row">Usuń</button>
+                    </td>
+                </tr>
+            </template>
+
+            <div class="form-actions">
+                <a href="{% url 'feed_inventory' %}" class="button button-secondary">Anuluj</a>
+                <button type="submit" class="button button-primary">Przyjmij dostawy</button>
+            </div>
+        </form>
+    </section>
+</main>
+{% endblock %}

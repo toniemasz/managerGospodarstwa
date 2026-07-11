@@ -1,7 +1,7 @@
 from decimal import Decimal
 from django import forms
 from django.db.models import Sum
-from django.forms import inlineformset_factory
+from django.forms import formset_factory, inlineformset_factory
 from django.forms.formsets import DELETION_FIELD_NAME
 from .models import IngredientModel, RecipeModel, RecipeItemModel, DeliveryModel, ProductionModel, \
     IngredientPriceConfigModel, ProductionIngredientUsageModel, RecipeVersionModel, RecipeVersionItemModel, \
@@ -183,6 +183,10 @@ class DeliveryForm(KilogramStorageFormMixin, forms.ModelForm):
         for field in self.fields.values():
             _apply_widget_class(field)
 
+    def has_changed(self):
+        unit_field = self.mass_unit_field_name('quantity_kg')
+        return any(field_name != unit_field for field_name in self.changed_data)
+
     def clean(self):
         cleaned_data = super().clean()
         quantity = cleaned_data.get('quantity_kg')
@@ -208,6 +212,34 @@ class DeliveryForm(KilogramStorageFormMixin, forms.ModelForm):
                 "Nie można zmienić składnika dostawy, która została już rozliczona w produkcji.",
             )
         return cleaned_data
+
+
+class BaseDeliveryFormSet(forms.BaseFormSet):
+    def clean(self):
+        super().clean()
+
+        active_forms = [
+            form
+            for form in self.forms
+            if not (
+                self.can_delete
+                and form.cleaned_data.get(DELETION_FIELD_NAME, False)
+            )
+            and form.has_changed()
+        ]
+        if any(form.errors for form in active_forms):
+            return
+
+        if not active_forms:
+            raise forms.ValidationError("Dodaj przynajmniej jedną dostawę.")
+
+
+DeliveryFormSet = formset_factory(
+    DeliveryForm,
+    formset=BaseDeliveryFormSet,
+    extra=0,
+    can_delete=True,
+)
 
 
 class InventoryAdjustmentForm(KilogramStorageFormMixin, forms.Form):
