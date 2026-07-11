@@ -513,6 +513,46 @@
         updateEmptyState();
     }
 
+    function initDeliveryFormset(root = document) {
+        const form = root.getElementById?.('delivery-form') || document.getElementById('delivery-form');
+        if (!form || form.dataset.deliveryRowsBound === 'true') return;
+
+        const rows = document.getElementById('delivery-rows');
+        const totalForms = form.querySelector('input[name$="-TOTAL_FORMS"]');
+        const template = document.getElementById('delivery-row-template');
+        const addButton = document.getElementById('add-delivery-row');
+        const emptyState = document.getElementById('delivery-rows-empty');
+        if (!rows || !totalForms || !template || !addButton) return;
+
+        const updateEmptyState = () => {
+            const hasVisibleRows = Array.from(rows.querySelectorAll('.delivery-row')).some((row) => !row.hidden);
+            if (emptyState) emptyState.hidden = hasVisibleRows;
+        };
+
+        form.dataset.deliveryRowsBound = 'true';
+        rows.addEventListener('click', (event) => {
+            const button = event.target.closest('.remove-delivery-row');
+            if (!button) return;
+
+            const row = button.closest('.delivery-row');
+            const deleteCheckbox = row?.querySelector('input[type="checkbox"][name$="-DELETE"]');
+            if (deleteCheckbox) deleteCheckbox.checked = true;
+            if (row) row.hidden = true;
+            updateEmptyState();
+        });
+
+        addButton.addEventListener('click', () => {
+            const index = parseInt(totalForms.value, 10);
+            const html = template.innerHTML.replaceAll('__prefix__', index);
+            rows.insertAdjacentHTML('beforeend', html);
+            totalForms.value = index + 1;
+            window.enhanceAutoResizeFields?.(rows.lastElementChild);
+            updateEmptyState();
+        });
+
+        updateEmptyState();
+    }
+
     function initProductionStageChecklist(root = document) {
         const form = root.getElementById?.('stageForm') || document.getElementById('stageForm');
         if (!form || form.dataset.stageChecklistBound === 'true') return;
@@ -626,6 +666,7 @@
         initTodayTaskDialogs();
         initSaleFormset();
         initRecipeFormset();
+        initDeliveryFormset();
         initProductionStageChecklist();
         initConfirmations();
         initDisclosureMenus();

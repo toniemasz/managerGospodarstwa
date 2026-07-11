@@ -80,7 +80,7 @@ def feed_objects(auth_client):
     ('add_ingredient', None, 'feed/form_generic.html'),
     ('edit_ingredient', 'ingredient', 'feed/form_generic.html'),
     ('feed_inventory', None, 'feed/inventory.html'),
-    ('add_delivery', None, 'feed/form_generic.html'),
+    ('add_delivery', None, 'feed/delivery_form.html'),
     ('edit_delivery', 'delivery', 'feed/form_generic.html'),
     ('feed_recipes', None, 'feed/recipes.html'),
     ('add_recipe', None, 'feed/add_recipe.html'),
@@ -160,10 +160,15 @@ def test_feed_post_create_and_delete_views(auth_client, feed_objects):
     assert soja.low_stock_threshold_kg == Decimal('250.00')
 
     add_delivery = auth_client.post(reverse('add_delivery'), {
-        'date': timezone.now().date(),
-        'ingredient': soja.id,
-        'quantity_kg': '50.00',
-        'price_per_kg': '2.00000',
+        'deliveries-TOTAL_FORMS': '1',
+        'deliveries-INITIAL_FORMS': '1',
+        'deliveries-MIN_NUM_FORMS': '0',
+        'deliveries-MAX_NUM_FORMS': '1000',
+        'deliveries-0-date': timezone.now().date(),
+        'deliveries-0-ingredient': soja.id,
+        'deliveries-0-quantity_kg': '50.00',
+        'deliveries-0-quantity_kg_unit': 'kg',
+        'deliveries-0-price_per_kg': '2.00000',
     })
     assert add_delivery.status_code == 302
     delivery = DeliveryModel.objects.get(ingredient=soja)
