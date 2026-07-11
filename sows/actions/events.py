@@ -178,7 +178,7 @@ class SowEventActions:
     def _get_event(self, event_id: int, *, lock_for_update: bool = False) -> SowEventModel:
         queryset = SowEventModel.objects.select_related("sow")
         if lock_for_update:
-            queryset = queryset.select_for_update()
+            queryset = queryset.select_for_update(of=("self",))
         filters = {"id": event_id, "sow__farm": self.farm}
         return get_object_or_404(queryset, **filters)
 
