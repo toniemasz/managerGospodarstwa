@@ -40,7 +40,7 @@ def _create_feed_flow(farm):
         quantity_kg=Decimal("1000.00"),
         status=ProductionModel.Statuses.STAGE_1_DONE,
     )
-    success, message = complete_production(farm, production.pk, user=farm.owner, create_serving=False)
+    success, message = complete_production(farm, production.pk, user=farm.owner)
     assert success, message
     production.refresh_from_db()
     return recipe, production

@@ -77,8 +77,8 @@ FIFO gotowej paszy alokuje `FinishedFeedBatchModel` po `batch_date, id`. Koszt p
 - zakończenie `ProductionModel` zawsze tworzy produkt typu `PRODUCED`, także dla jednej pozycji receptury;
 - zakup przez `ReadyFeedDeliveryModel` tworzy produkt typu `PURCHASED_READY`;
 - `FinishedFeedBatchModel` wskazuje dokładnie jedno źródło: produkcję albo dostawę gotowej paszy;
-- podanie jest osobnym zdarzeniem i domyślnie zależy od `FarmSettingsModel.feed_serving_mode`;
-- jawne `create_serving=True/False` ma pierwszeństwo przed ustawieniem;
+- podanie jest osobnym zdarzeniem tworzonym automatycznie dla całej zakończonej produkcji;
+- historyczne `FarmSettingsModel.feed_serving_mode` pozostaje wyłącznie dla zgodności danych i importów;
 - liczba składników nigdy nie wpływa na typ produktu ani decyzję o podaniu.
 
 ## Cofanie, edycja i usuwanie

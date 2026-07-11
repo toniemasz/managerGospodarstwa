@@ -440,13 +440,10 @@ def add_production_view(request):
             except Exception:
                 logger.exception("Nie udało się zapisać wpisu historii dla śrutowania %s", production.pk)
             if request.POST.get('instant_complete') == 'on':
-                force_inventory = request.POST.get('force_inventory') == 'on'
-
                 success, message = complete_production(
                     farm,
                     production.id,
                     skip_stages=True,
-                    force_inventory=force_inventory,
                     user=request.user,
                 )
                 if success:

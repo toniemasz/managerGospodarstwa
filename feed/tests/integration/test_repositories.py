@@ -36,7 +36,7 @@ def test_inventory_selector_calculates_inventory_state_correctly():
         quantity_kg=Decimal('500.00'),
         status=ProductionModel.Statuses.STAGE_1_DONE,
     )
-    assert complete_production(ing.farm, production.pk, user=ing.farm.owner, create_serving=False)[0]
+    assert complete_production(ing.farm, production.pk, user=ing.farm.owner)[0]
 
     # Act
     dashboard = inventory_dashboard(farm)['inventory']

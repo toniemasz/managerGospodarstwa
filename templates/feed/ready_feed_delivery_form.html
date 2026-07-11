@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% load feed_format %}
+{% block title %}Przyjmij dostawę{% endblock %}
+{% block content %}
+<main class="app-page app-page-narrow">
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Gotowe pasze</p>
+            <h1>Przyjmij dostawę</h1>
+            <p class="page-subtitle">Każda dostawa tworzy osobną partię FIFO z własną ceną.</p>
+        </div>
+        <a class="button button-secondary" href="{% url 'finished_feed_inventory' %}">Wróć</a>
+    </section>
+    {% include 'feed/_feed_nav.html' %}
+    <form method="post" class="panel form-panel">
+        {% csrf_token %}
+        {% include 'components/form_errors.html' with form=form %}
+        <div class="form-section-heading">
+            <h2>{{ product.name }}</h2>
+            <p>Aktualny stan: <strong>{{ stock_kg|feed_quantity }}</strong></p>
+        </div>
+        <div class="form-grid two-columns">
+            {% for field in form %}
+            <div class="form-field">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {{ field.errors }}
+            </div>
+            {% endfor %}
+        </div>
+        <div class="form-actions">
+            <a class="button button-secondary" href="{% url 'finished_feed_inventory' %}">Anuluj</a>
+            <button class="button button-primary" type="submit">Przyjmij dostawę</button>
+        </div>
+    </form>
+</main>
+{% endblock %}

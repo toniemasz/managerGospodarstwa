@@ -16,6 +16,7 @@ from feed.models import DeliveryModel, IngredientModel, InventoryMovementModel, 
 from feed.actions.productions import complete_production, delete_production_with_inventory
 from feed.actions.inventory import InventoryActions
 from feed.forms import InventoryAdjustmentForm
+from feed.services.reconciliation import ProductionReconciliationWorkflow
 
 
 @pytest.fixture
@@ -245,7 +246,7 @@ def test_rebuild_prefers_legacy_production_usage_movements(inventory_data):
 
 
 @pytest.mark.django_db
-def test_future_delivery_is_not_used_and_forced_completion_is_partial(inventory_data):
+def test_future_delivery_blocks_public_completion_but_reconciliation_can_restore_partial_history(inventory_data):
     user, farm, ingredient, recipe = inventory_data
     DeliveryModel.objects.filter(ingredient=ingredient).delete()
     future_delivery = DeliveryModel.objects.create(
@@ -269,13 +270,11 @@ def test_future_delivery_is_not_used_and_forced_completion_is_partial(inventory_
     production.refresh_from_db()
     assert production.status == ProductionModel.Statuses.STAGE_1_DONE
 
-    success, message = complete_production(farm, 
-        production.pk,
-        force_inventory=True,
-        user=user,
+    ProductionModel.objects.filter(pk=production.pk).update(
+        status=ProductionModel.Statuses.COMPLETED,
     )
+    ProductionReconciliationWorkflow(farm).rebuild()
 
-    assert success is True, message
     production.refresh_from_db()
     future_delivery.refresh_from_db()
     assert production.feed_cost_total == Decimal("0.00")

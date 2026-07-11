@@ -161,18 +161,6 @@
                     {{ form.default_production_quantity_kg_unit.errors }}
                 </div>
             </div>
-            <div class="settings-row settings-row-field">
-                <div class="form-field">
-                    <label>{{ form.feed_serving_mode.label }}</label>
-                    <p class="field-help">Określa, czy po zakończeniu śrutowania wyprodukowana pasza ma pozostać na magazynie, czy ma zostać od razu zarejestrowana jako podana.</p>
-                    <div class="settings-segmented-control" role="radiogroup" aria-label="{{ form.feed_serving_mode.label }}">
-                        {% for choice in form.feed_serving_mode %}
-                            <label class="settings-segment">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>
-                        {% endfor %}
-                    </div>
-                    {{ form.feed_serving_mode.errors }}
-                </div>
-            </div>
         </section>
 
         <div class="form-actions settings-save-bar">

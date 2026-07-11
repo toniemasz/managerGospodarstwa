@@ -23,7 +23,6 @@ class FarmSettingsForm(KilogramStorageFormMixin, forms.ModelForm):
             'farrowing_alert_days_ahead',
             'vaccination_alert_days_ahead',
             'default_production_quantity_kg',
-            'feed_serving_mode',
             'allow_farrowing_without_pregnancy_check',
             'ask_before_auto_pregnancy_check',
         ]
@@ -36,14 +35,12 @@ class FarmSettingsForm(KilogramStorageFormMixin, forms.ModelForm):
             'farrowing_alert_days_ahead': 'Dni alertu przed oproszeniem',
             'vaccination_alert_days_ahead': 'Dni alertu szczepienia',
             'default_production_quantity_kg': 'Domyślna ilość śrutowania',
-            'feed_serving_mode': 'Zachowanie po zakończeniu śrutowania',
             'allow_farrowing_without_pregnancy_check': 'Pozwalać na oproszenie bez badania',
             'ask_before_auto_pregnancy_check': 'Pytać o automatyczne badanie TAK',
         }
         widgets = {
             'interface_scale': forms.RadioSelect(),
             'theme': forms.RadioSelect(),
-            'feed_serving_mode': forms.RadioSelect(),
             'font_scale': forms.NumberInput(attrs={
                 'min': 20,
                 'max': 200,
@@ -60,7 +57,6 @@ class FarmSettingsForm(KilogramStorageFormMixin, forms.ModelForm):
             initial = {**initial, 'farm_name': farm.name}
         kwargs['initial'] = initial
         super().__init__(*args, **kwargs)
-        self.fields['feed_serving_mode'].required = False
         visible = normalize_visible_modules(getattr(self.instance, 'visible_modules', None))
         nav_modules = normalize_nav_modules(
             getattr(self.instance, 'nav_modules', None),
@@ -131,14 +127,6 @@ class FarmSettingsForm(KilogramStorageFormMixin, forms.ModelForm):
         if commit:
             settings.save()
         return settings
-
-    def clean_feed_serving_mode(self):
-        return (
-            self.cleaned_data.get('feed_serving_mode')
-            or getattr(self.instance, 'feed_serving_mode', None)
-            or FarmSettingsModel.FeedServingModes.MANUAL
-        )
-
 
 class UserBackupImportForm(forms.Form):
     backup_file = forms.FileField(
