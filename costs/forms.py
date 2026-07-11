@@ -74,6 +74,12 @@ class CostForm(forms.ModelForm):
             raise forms.ValidationError("Kategoria nie należy do tego gospodarstwa.")
         return category
 
+    def clean_amount(self):
+        amount = self.cleaned_data["amount"]
+        if amount <= 0:
+            raise forms.ValidationError("Kwota kosztu ręcznego musi być większa od zera.")
+        return amount
+
 
 class CostFilterForm(forms.Form):
     year = forms.IntegerField(required=False, min_value=2000, max_value=2100, label="Rok")

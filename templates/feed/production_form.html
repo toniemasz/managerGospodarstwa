@@ -7,7 +7,7 @@
         <div>
             <p class="eyebrow">Pasza</p>
             <h1>{% if is_edit %}Edycja śrutowania{% else %}Nowe śrutowanie{% endif %}</h1>
-            <p class="page-subtitle">Backend zapisuje proporcje i pilnuje, żeby składniki sumowały się do 100%.</p>
+            <p class="page-subtitle">Wybierz kg lub t. System zapisze ilość w kilogramach i dopilnuje proporcji receptury.</p>
         </div>
         <a href="{% url 'feed_productions' %}" class="button button-secondary">Wróć</a>
     </section>
@@ -50,6 +50,11 @@
                     <label for="{{ form.quantity_kg.id_for_label }}">{{ form.quantity_kg.label }}</label>
                     {{ form.quantity_kg }}
                     {{ form.quantity_kg.errors }}
+                </div>
+                <div class="form-field">
+                    <label for="{{ form.quantity_kg_unit.id_for_label }}">{{ form.quantity_kg_unit.label }}</label>
+                    {{ form.quantity_kg_unit }}
+                    {{ form.quantity_kg_unit.errors }}
                 </div>
             </div>
 

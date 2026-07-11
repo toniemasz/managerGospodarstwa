@@ -35,12 +35,6 @@ class VaccinationPlanModel(models.Model):
     def __str__(self):
         return self.name
 
-    def save(self, *args, **kwargs):
-        if self.farm_id is None:
-            from farms.services.farm_service import get_or_create_legacy_farm
-            self.farm = get_or_create_legacy_farm()
-        return super().save(*args, **kwargs)
-
 class SowModel(models.Model):
     ARCHIVE_REASON_MANUAL = 'manual'
     ARCHIVE_REASON_DEATH = 'death'
@@ -71,12 +65,6 @@ class SowModel(models.Model):
 
     def __str__(self):
         return f"Maciora {self.ear_tag}"
-
-    def save(self, *args, **kwargs):
-        if self.farm_id is None:
-            from farms.services.farm_service import get_or_create_legacy_farm
-            self.farm = get_or_create_legacy_farm()
-        return super().save(*args, **kwargs)
 
 class SowEventModel(models.Model):
     EVENT_TYPES = [

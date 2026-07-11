@@ -6,10 +6,16 @@ from django.utils import timezone
 from costs.forms import CostCategoryForm, CostFilterForm, CostForm
 from costs.models import CostCategoryModel, CostModel
 from costs.services import CostService
+from costs.actions import (
+    deactivate_cost_category,
+    delete_manual_cost,
+    save_cost_category,
+    save_manual_cost,
+)
 from common.filter_ui import filter_ui_state
 from farms.services.accounting_year import get_available_years
 from farms.services.audit_log_service import log_action
-from farms.services.cache import invalidate_farm_cache_on_commit
+from common.cache import invalidate_farm_cache_on_commit
 from farms.services.current_farm import get_current_farm
 
 
@@ -41,13 +47,7 @@ def _cost_form_view(request, *, cost, is_edit):
     if request.method == "POST":
         form = CostForm(request.POST, instance=cost, farm=farm)
         if form.is_valid():
-            saved = form.save(commit=False)
-            saved.farm = farm
-            if not saved.created_by_id:
-                saved.created_by = request.user
-            saved.full_clean()
-            saved.save()
-            invalidate_farm_cache_on_commit(farm, groups=("costs",))
+            saved = save_manual_cost(farm=farm, form=form, user=request.user)
             log_action(farm=farm, user=request.user, action="UPDATE" if is_edit else "CREATE", obj=saved)
             messages.success(request, "Koszt został zapisany.")
             return redirect("cost_list")
@@ -64,18 +64,23 @@ def add_cost_view(request):
 @login_required
 def edit_cost_view(request, pk):
     farm = get_current_farm(request)
-    return _cost_form_view(request, cost=get_object_or_404(CostModel, pk=pk, farm=farm), is_edit=True)
+    cost = get_object_or_404(CostModel, pk=pk, farm=farm)
+    if cost.production_id:
+        messages.error(request, "Koszt paszy jest wyliczany automatycznie z FIFO i nie można go edytować ręcznie.")
+        return redirect("cost_list")
+    return _cost_form_view(request, cost=cost, is_edit=True)
 
 
 @login_required
 def delete_cost_view(request, pk):
     farm = get_current_farm(request)
     cost = get_object_or_404(CostModel, pk=pk, farm=farm)
+    if cost.production_id:
+        messages.error(request, "Koszt paszy jest powiązany ze śrutowaniem i nie można go usunąć ręcznie.")
+        return redirect("cost_list")
     if request.method == "POST":
-        representation, object_id = str(cost), cost.pk
-        cost.delete()
-        invalidate_farm_cache_on_commit(farm, groups=("costs",))
-        log_action(farm=farm, user=request.user, action="DELETE", model_label="costs.CostModel", object_id=object_id, object_repr=representation)
+        deleted = delete_manual_cost(farm=farm, cost_id=cost.pk)
+        log_action(farm=farm, user=request.user, action="DELETE", **deleted)
         messages.success(request, "Koszt został usunięty.")
     return redirect("cost_list")
 
@@ -91,10 +96,7 @@ def _category_form_view(request, *, category, is_edit):
     if request.method == "POST":
         form = CostCategoryForm(request.POST, instance=category, farm=farm)
         if form.is_valid():
-            saved = form.save(commit=False)
-            saved.farm = farm
-            saved.save()
-            invalidate_farm_cache_on_commit(farm, groups=("costs",))
+            saved = save_cost_category(farm=farm, form=form)
             log_action(farm=farm, user=request.user, action="UPDATE" if is_edit else "CREATE", obj=saved)
             messages.success(request, "Kategoria kosztów została zapisana.")
             return redirect("cost_categories")
@@ -119,9 +121,7 @@ def deactivate_cost_category_view(request, pk):
     farm = get_current_farm(request)
     category = get_object_or_404(CostCategoryModel, pk=pk, farm=farm)
     if request.method == "POST":
-        category.is_active = False
-        category.save(update_fields=("is_active", "updated_at"))
-        invalidate_farm_cache_on_commit(farm, groups=("costs",))
+        category = deactivate_cost_category(farm=farm, category_id=category.pk)
         log_action(farm=farm, user=request.user, action="DEACTIVATE", obj=category)
         messages.success(request, "Kategoria została dezaktywowana.")
     return redirect("cost_categories")

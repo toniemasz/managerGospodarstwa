@@ -9,7 +9,7 @@ from django.test import Client
 from django.urls import reverse
 
 from farms.models import AuditLogModel
-from sales.forms import PigSaleForm, SaleClassRowFormSet
+from sales.forms import PigSaleForm, SaleClassRowForm, SaleClassRowFormSet
 from sales.models import PigSaleModel, SaleClassRowModel
 from sales.services.sale_form_service import SaleFormService
 from sales.services.sale_repository import SaleRepository
@@ -27,7 +27,10 @@ def auth_client(client):
 
 @pytest.mark.django_db
 def test_sale_model_form_repository_and_admin_registration():
+    user = User.objects.create_user(username="sales-model-owner")
+    farm = get_or_create_user_farm(user)
     sale = PigSaleModel.objects.create(
+        farm=farm,
         sale_date=date(2026, 6, 1),
         quantity=10,
         total_weight=Decimal('950.50'),
@@ -42,7 +45,7 @@ def test_sale_model_form_repository_and_admin_registration():
         'total_weight': '500.00',
         'price_per_kg': '7.50',
     })
-    repo = SaleRepository()
+    repo = SaleRepository(farm)
 
     assert str(sale) == "Sprzedaż 10 szt. - 2026-06-01"
     assert form.is_valid() is True
@@ -99,6 +102,22 @@ def test_sales_list_displays_net_values(auth_client):
     assert '8 640' in content
     assert '8\xa0000,00' not in content
     assert '8\xa0640,00' not in content
+
+
+@pytest.mark.django_db
+def test_sales_list_displays_large_mass_in_tonnes(auth_client):
+    PigSaleModel.objects.create(
+        farm=auth_client.farm,
+        sale_date=date.today(),
+        quantity=10,
+        total_weight=Decimal('1250.00'),
+        live_weight=Decimal('1500.00'),
+    )
+
+    content = auth_client.get(reverse('sales_list'), {'period': 'all'}).content.decode()
+
+    assert '1,25 t' in content
+    assert '1,5 t' in content
 
 
 @pytest.mark.django_db
@@ -346,3 +365,24 @@ def test_sale_form_service_rolls_back_rows_when_new_rows_fail(auth_client):
     assert SaleClassRowModel.objects.filter(id=old_row.id, sale=sale).exists()
     sale.refresh_from_db()
     assert sale.sale_date == date(2026, 6, 4)
+def test_sale_mass_forms_convert_selected_tonnes_to_kilograms():
+    sale_form = PigSaleForm(data={
+        "sale_date": "2026-07-11",
+        "document_number": "",
+        "tattoo": "",
+        "live_weight": "1,25",
+        "live_weight_unit": "t",
+    })
+    row_form = SaleClassRowForm(data={
+        "line_no": "1",
+        "weight": "1,5",
+        "weight_unit": "t",
+        "avg_weight": "0,12",
+        "avg_weight_unit": "t",
+    })
+
+    assert sale_form.is_valid(), sale_form.errors
+    assert row_form.is_valid(), row_form.errors
+    assert sale_form.cleaned_data["live_weight"] == Decimal("1250.00")
+    assert row_form.cleaned_data["weight"] == Decimal("1500.00")
+    assert row_form.cleaned_data["avg_weight"] == Decimal("120.00")

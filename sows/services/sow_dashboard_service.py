@@ -15,6 +15,8 @@ class SowDashboardService:
     """Serwis przygotowujący pełne statystyki oraz alerty (USG i szczepienia) dla panelu głównego."""
 
     def __init__(self, farm=None, repository: SowRepository = None):
+        if farm is None and repository is None:
+            raise ValueError("Dashboard macior wymaga jawnego gospodarstwa.")
         self.farm = farm
         self.repository = repository or SowRepository(farm=farm)
         self.settings = get_farm_settings(farm) if farm is not None else None

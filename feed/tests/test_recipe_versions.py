@@ -22,8 +22,9 @@ from feed.models import (
     RecipeVersionItemModel,
     RecipeVersionModel,
 )
-from feed.actions.productions import complete_production
+from feed.actions.productions import complete_production, create_production
 from feed.actions.recipe_versions import RecipeVersionActions
+from feed.actions.inventory import InventoryActions
 
 
 @pytest.fixture
@@ -32,18 +33,20 @@ def versioned_feed():
     farm = get_or_create_user_farm(user)
     barley = IngredientModel.objects.create(farm=farm, name="Jęczmień")
     soy = IngredientModel.objects.create(farm=farm, name="Soja")
-    DeliveryModel.objects.create(
+    barley_delivery = DeliveryModel.objects.create(
         ingredient=barley,
         date=date(2026, 1, 1),
         quantity_kg=Decimal("1000.00"),
         price_per_kg=Decimal("1.00000"),
     )
-    DeliveryModel.objects.create(
+    soy_delivery = DeliveryModel.objects.create(
         ingredient=soy,
         date=date(2026, 1, 1),
         quantity_kg=Decimal("1000.00"),
         price_per_kg=Decimal("2.00000"),
     )
+    InventoryActions(farm).sync_delivery(barley_delivery)
+    InventoryActions(farm).sync_delivery(soy_delivery)
     recipe = RecipeModel.objects.create(farm=farm, name="Grower")
     barley_item = RecipeItemModel.objects.create(
         recipe=recipe,
@@ -170,7 +173,7 @@ def test_new_production_gets_current_recipe_version_from_form(versioned_feed):
     )
 
     assert form.is_valid() is True
-    production = form.save()
+    production = create_production(form)
 
     assert production.recipe_version_id == version_2.id
 

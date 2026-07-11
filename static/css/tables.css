@@ -347,6 +347,18 @@ tbody tr:last-child td {
     text-align: right;
 }
 
+.mass-input-inline {
+    display: grid;
+    grid-template-columns: minmax(8ch, 1fr) 4.5rem;
+    gap: .3rem;
+    align-items: center;
+    min-width: 15rem;
+}
+
+.mass-input-inline .mass-unit-select {
+    min-width: 4.5rem;
+}
+
 .settlement-table input[name$="-meat_class"] {
     min-width: 7ch;
 }

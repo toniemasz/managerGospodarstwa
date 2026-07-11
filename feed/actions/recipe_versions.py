@@ -9,7 +9,7 @@ from django.db.models import Max
 from django.utils import timezone
 
 from farms.services.audit_log_service import log_action
-from farms.services.cache import invalidate_farm_cache_on_commit
+from common.cache import invalidate_farm_cache_on_commit
 from feed.models import ProductionModel, RecipeItemModel, RecipeModel, RecipeVersionItemModel, RecipeVersionModel
 from feed.actions.inventory import InventoryActions
 
@@ -52,7 +52,9 @@ def recipe_version_items_from_formset(formset) -> list[dict]:
 
 
 class RecipeVersionActions:
-    def __init__(self, *, farm=None, user=None):
+    def __init__(self, *, farm, user=None):
+        if farm is None:
+            raise ValueError("Operacje wersji receptur wymagają jawnego gospodarstwa.")
         self.farm = farm
         self.user = user
 

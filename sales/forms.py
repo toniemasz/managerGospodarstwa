@@ -5,6 +5,7 @@ from django.forms import formset_factory
 
 from .models import PigSaleModel
 from .number_parsing import parse_polish_decimal, parse_polish_int
+from common.forms import KilogramStorageFormMixin
 
 
 FORM_FIELD_CLASS = 'form-control'
@@ -34,7 +35,8 @@ class PolishIntegerField(forms.IntegerField):
         return super().to_python(value)
 
 
-class PigSaleForm(forms.ModelForm):
+class PigSaleForm(KilogramStorageFormMixin, forms.ModelForm):
+    mass_fields = ('live_weight',)
     avg_meatiness_seurop = PolishDecimalField(
         label="Średnia mięsność SEUROP (%)",
         required=False,
@@ -44,7 +46,7 @@ class PigSaleForm(forms.ModelForm):
         widget=forms.TextInput(attrs={'inputmode': 'decimal'}),
     )
     live_weight = PolishDecimalField(
-        label="Waga żywa (kg)",
+        label="Waga żywa",
         required=False,
         max_digits=10,
         decimal_places=2,
@@ -84,7 +86,7 @@ class PigSaleForm(forms.ModelForm):
             'supplier_name': 'Dostawca',
             'no_settlement': 'Bez rozliczenia',
             'avg_meatiness_seurop': 'Średnia mięsność SEUROP (%)',
-            'live_weight': 'Waga żywa (kg)',
+            'live_weight': 'Waga żywa',
             'dressing_percentage': 'Wybój (%)',
         }
         widgets = {
@@ -140,7 +142,8 @@ class PigSaleForm(forms.ModelForm):
         return uploaded
 
 
-class SaleClassRowForm(forms.Form):
+class SaleClassRowForm(KilogramStorageFormMixin, forms.Form):
+    mass_fields = ('weight', 'avg_weight')
     line_no = PolishIntegerField(
         label="Lp",
         min_value=1,

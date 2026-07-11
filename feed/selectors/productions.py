@@ -7,15 +7,14 @@ from django.utils import timezone
 from farms.services.settings_service import get_farm_settings
 from feed.calculators.feed_cost import ProductionCalculator
 from feed.domain.rules import DEFAULT_PRODUCTION_QUANTITY_KG
-from feed.models import ProductionModel, RecipeModel
+from feed.models import DeliveryModel, ProductionModel, RecipeModel
 from feed.selectors.inventory import inventory_dashboard, latest_delivery_prices_map
 from feed.selectors.recipe_requirements import recipe_item_dicts_for_production
+from common.units import format_mass
 
 
-def productions_for_farm(farm=None):
-    queryset = ProductionModel.objects.select_related("recipe", "recipe_version")
-    if farm is not None:
-        queryset = queryset.filter(recipe__farm=farm)
+def productions_for_farm(farm):
+    queryset = ProductionModel.objects.select_related("recipe", "recipe_version").filter(recipe__farm=farm)
     return queryset.order_by("-date", "-time", "-id")
 
 
@@ -34,12 +33,13 @@ def production_list_context(farm, *, status="", date_from=None, date_to=None) ->
 
 
 def production_for_processing(farm, production_id: int, *, lock_for_update: bool = False):
+    if farm is None:
+        raise ValueError("Pobranie produkcji do przetwarzania wymaga jawnego gospodarstwa.")
     queryset = ProductionModel.objects.select_related("recipe", "recipe_version").prefetch_related(
         "recipe__items__ingredient",
         "recipe_version__items__ingredient",
     )
-    if farm is not None:
-        queryset = queryset.filter(recipe__farm=farm)
+    queryset = queryset.filter(recipe__farm=farm)
     if lock_for_update:
         queryset = queryset.select_for_update()
     return queryset.get(pk=production_id)
@@ -84,18 +84,21 @@ def _calculator_for_production(production) -> ProductionCalculator:
 
 def validate_production_capacity(farm, production_id: int) -> tuple[bool, list[str]]:
     production = production_for_processing(farm, production_id)
-    inventory_state = inventory_dashboard(farm)["inventory"]
-    inventory_map = {item.ingredient_id: item.current_stock for item in inventory_state}
-    name_map = {item.ingredient_id: item.name for item in inventory_state}
-
     errors = []
     for requirement in _calculator_for_production(production).get_requirements():
-        available = inventory_map.get(requirement.ingredient_id, Decimal("0.00"))
+        available = DeliveryModel.objects.filter(
+            ingredient_id=requirement.ingredient_id,
+            ingredient__farm=farm,
+            date__lte=production.date,
+            price_per_kg__isnull=False,
+            price_per_kg__gt=0,
+            remaining_quantity_kg__gt=0,
+        ).aggregate(total=Sum("remaining_quantity_kg"))["total"] or Decimal("0.00")
         if requirement.required_kg > available:
-            ingredient_name = name_map.get(requirement.ingredient_id, requirement.name)
             errors.append(
-                f"Brakuje {requirement.required_kg - available:.2f} kg składnika "
-                f"'{ingredient_name}' (Dostępne: {available:.2f} kg)"
+                f"Brakuje rozliczalnych dostaw FIFO: {format_mass(requirement.required_kg - available)} składnika "
+                f"'{requirement.name}' w rozliczalnych dostawach FIFO "
+                f"z datą nie późniejszą niż {production.date:%d.%m.%Y} (Dostępne: {format_mass(available)})"
             )
 
     return len(errors) == 0, errors

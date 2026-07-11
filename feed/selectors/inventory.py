@@ -2,22 +2,19 @@ from decimal import Decimal
 
 from feed.calculators.feed_cost import InventoryItem
 from feed.models import DeliveryModel, IngredientModel, InventoryMovementModel
-from farms.services.cache import INVENTORY_TTL, cached_farm_value
+from common.cache import INVENTORY_TTL, cached_farm_value
 
 
-def ingredients_for_farm(farm=None):
-    filters = {"farm": farm} if farm is not None else {}
-    return IngredientModel.objects.filter(**filters).order_by("name")
+def ingredients_for_farm(farm):
+    return IngredientModel.objects.filter(farm=farm).order_by("name")
 
 
-def deliveries_for_farm(farm=None):
-    queryset = DeliveryModel.objects.select_related("ingredient")
-    if farm is not None:
-        queryset = queryset.filter(ingredient__farm=farm)
+def deliveries_for_farm(farm):
+    queryset = DeliveryModel.objects.select_related("ingredient").filter(ingredient__farm=farm)
     return queryset.order_by("-date", "-id")
 
 
-def latest_delivery_prices_map(farm=None) -> dict[int, Decimal]:
+def latest_delivery_prices_map(farm) -> dict[int, Decimal]:
     prices = {}
     for delivery in _latest_delivery_candidates(farm):
         if delivery.ingredient_id in prices:
@@ -27,7 +24,7 @@ def latest_delivery_prices_map(farm=None) -> dict[int, Decimal]:
     return prices
 
 
-def latest_delivery_price_sources(farm=None) -> dict[int, DeliveryModel]:
+def latest_delivery_price_sources(farm) -> dict[int, DeliveryModel]:
     sources = {}
     for delivery in _latest_delivery_candidates(farm):
         if delivery.ingredient_id not in sources:
@@ -35,17 +32,13 @@ def latest_delivery_price_sources(farm=None) -> dict[int, DeliveryModel]:
     return sources
 
 
-def _latest_delivery_candidates(farm=None):
-    queryset = DeliveryModel.objects.select_related("ingredient")
-    if farm is not None:
-        queryset = queryset.filter(ingredient__farm=farm)
+def _latest_delivery_candidates(farm):
+    queryset = DeliveryModel.objects.select_related("ingredient").filter(ingredient__farm=farm)
     return queryset.order_by("ingredient_id", "-date", "-id")
 
 
-def movement_totals(farm=None) -> dict[int, tuple[Decimal, Decimal]]:
-    queryset = InventoryMovementModel.objects.all()
-    if farm is not None:
-        queryset = queryset.filter(farm=farm)
+def movement_totals(farm) -> dict[int, tuple[Decimal, Decimal]]:
+    queryset = InventoryMovementModel.objects.filter(farm=farm)
 
     totals: dict[int, tuple[Decimal, Decimal]] = {}
     for ingredient_id, quantity in queryset.values_list("ingredient_id", "quantity_kg"):
@@ -58,7 +51,7 @@ def movement_totals(farm=None) -> dict[int, tuple[Decimal, Decimal]]:
     return totals
 
 
-def inventory_dashboard(farm=None) -> dict:
+def inventory_dashboard(farm) -> dict:
     return cached_farm_value(
         farm,
         "inventory",
@@ -68,7 +61,7 @@ def inventory_dashboard(farm=None) -> dict:
     )
 
 
-def _build_inventory_dashboard(farm=None) -> dict:
+def _build_inventory_dashboard(farm) -> dict:
     totals = movement_totals(farm)
     inventory_state = []
 

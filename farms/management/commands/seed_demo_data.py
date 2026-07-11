@@ -217,7 +217,15 @@ class Command(BaseCommand):
                 },
             )
         InventoryActions(farm).rebuild()
-        return {"maciory": len(sows), "składniki": len(ingredients), "receptury": len(recipes), "produkcje": len(statuses), "sprzedaże": 12, "kategorie kosztów": len(categories), "koszty": 18}
+        return {
+            "maciory": len(sows),
+            "składniki": len(ingredients),
+            "receptury": len(recipes),
+            "produkcje": len(statuses),
+            "sprzedaże": 12,
+            "kategorie kosztów": CostCategoryModel.objects.filter(farm=farm).count(),
+            "koszty": CostModel.objects.filter(farm=farm).count(),
+        }
 
     @staticmethod
     def _event(sow, event_type, event_date, details):

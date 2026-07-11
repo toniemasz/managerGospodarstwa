@@ -1,0 +1,56 @@
+name: Main pull request tests
+
+on:
+  pull_request:
+    branches:
+      - main
+
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: main-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: All Django tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      DEBUG: "True"
+      SECRET_KEY: "github-actions-test-only-secret-key"
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+
+    steps:
+      - name: Pobranie kodu
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12.7"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Instalacja zależności
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Sprawdzenie konfiguracji Django
+        run: python manage.py check
+
+      - name: Sprawdzenie brakujących migracji
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Uruchomienie wszystkich testów
+        run: pytest --tb=short -ra

@@ -2,6 +2,7 @@ from decimal import Decimal, InvalidOperation
 
 from django import template
 from django.utils.formats import number_format
+from common.units import format_mass
 
 
 register = template.Library()
@@ -48,6 +49,8 @@ def smart_number(value, max_decimals=6):
 
 @register.filter
 def smart_unit(value, unit):
+    if unit == "kg":
+        return format_mass(value)
     number = smart_number_value(value)
     if number == "-":
         return "-"

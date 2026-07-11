@@ -5,12 +5,13 @@ from sales.services.sale_entities import PigSaleEntity
 
 
 class SaleRepository:
-    def __init__(self, farm=None):
+    def __init__(self, farm):
+        if farm is None:
+            raise ValueError("Repozytorium sprzedaży wymaga jawnego gospodarstwa.")
         self.farm = farm
 
     def _filter_for_farm(self, **extra_filters):
-        if self.farm is not None:
-            extra_filters['farm'] = self.farm
+        extra_filters['farm'] = self.farm
         return extra_filters
 
     def _map_to_entity(self, db_model: PigSaleModel) -> PigSaleEntity:

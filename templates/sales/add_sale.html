@@ -75,6 +75,11 @@
                         {{ form.live_weight.errors }}
                     </div>
                     <div class="form-field">
+                        <label for="{{ form.live_weight_unit.id_for_label }}">{{ form.live_weight_unit.label }}</label>
+                        {{ form.live_weight_unit }}
+                        {{ form.live_weight_unit.errors }}
+                    </div>
+                    <div class="form-field">
                         <label for="{{ form.dressing_percentage.id_for_label }}">{{ form.dressing_percentage.label }}</label>
                         {{ form.dressing_percentage }}
                         {{ form.dressing_percentage.errors }}
@@ -151,8 +156,8 @@
                                 <td>{{ row_form.line_no }}</td>
                                 <td>{{ row_form.meat_class }}</td>
                                 <td class="numeric-cell">{{ row_form.quantity }}</td>
-                                <td class="numeric-cell">{{ row_form.weight }}</td>
-                                <td class="numeric-cell">{{ row_form.avg_weight }}</td>
+                                <td class="numeric-cell"><div class="mass-input-inline">{{ row_form.weight }}{{ row_form.weight_unit }}</div></td>
+                                <td class="numeric-cell"><div class="mass-input-inline">{{ row_form.avg_weight }}{{ row_form.avg_weight_unit }}</div></td>
                                 <td class="numeric-cell">{{ row_form.avg_meatiness }}</td>
                                 <td class="numeric-cell">{{ row_form.price_per_kg }}</td>
                                 <td class="numeric-cell">{{ row_form.net_value }}</td>
@@ -173,8 +178,8 @@
                 <td>{{ row_formset.empty_form.line_no }}</td>
                 <td>{{ row_formset.empty_form.meat_class }}</td>
                 <td class="numeric-cell">{{ row_formset.empty_form.quantity }}</td>
-                <td class="numeric-cell">{{ row_formset.empty_form.weight }}</td>
-                <td class="numeric-cell">{{ row_formset.empty_form.avg_weight }}</td>
+                <td class="numeric-cell"><div class="mass-input-inline">{{ row_formset.empty_form.weight }}{{ row_formset.empty_form.weight_unit }}</div></td>
+                <td class="numeric-cell"><div class="mass-input-inline">{{ row_formset.empty_form.avg_weight }}{{ row_formset.empty_form.avg_weight_unit }}</div></td>
                 <td class="numeric-cell">{{ row_formset.empty_form.avg_meatiness }}</td>
                 <td class="numeric-cell">{{ row_formset.empty_form.price_per_kg }}</td>
                 <td class="numeric-cell">{{ row_formset.empty_form.net_value }}</td>

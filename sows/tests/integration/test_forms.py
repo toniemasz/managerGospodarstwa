@@ -4,6 +4,7 @@ import pytest
 
 from sows.forms import SowEventForm, SowForm, VaccinationPlanForm
 from sows.models import VaccinationPlanModel
+from farms.services.farm_service import get_or_create_legacy_farm
 
 
 @pytest.mark.django_db
@@ -48,9 +49,10 @@ def test_vaccination_plan_form_requires_exactly_one_trigger():
     ('WEANING', {'count': 9}, {'count': 9}),
 ])
 def test_sow_event_form_builds_details(event_type, extra, expected_details):
+    farm = get_or_create_legacy_farm()
     data = {'event_type': event_type, 'event_date': date.today(), **extra}
 
-    form = SowEventForm(data=data)
+    form = SowEventForm(data=data, farm=farm)
 
     assert form.is_valid() is True
     assert form.save(commit=False).details == expected_details
@@ -58,20 +60,22 @@ def test_sow_event_form_builds_details(event_type, extra, expected_details):
 
 @pytest.mark.django_db
 def test_sow_event_form_validates_vaccination_name_and_state_machine():
-    VaccinationPlanModel.objects.create(name="Parwo", days_before_farrowing=21)
+    farm = get_or_create_legacy_farm()
+    VaccinationPlanModel.objects.create(farm=farm, name="Parwo", days_before_farrowing=21)
 
     missing_vaccine = SowEventForm(data={
         'event_type': 'VACCINATION',
         'event_date': date.today(),
-    })
+    }, farm=farm)
     valid_vaccine = SowEventForm(data={
         'event_type': 'VACCINATION',
         'event_date': date.today(),
         'vaccine_name': 'Parwo',
-    })
+    }, farm=farm)
     invalid_cycle_step = SowEventForm(
         data={'event_type': 'INSEMINATION', 'event_date': date.today()},
         sow_status='LACTATING',
+        farm=farm,
     )
 
     assert missing_vaccine.is_valid() is False

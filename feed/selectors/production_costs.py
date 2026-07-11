@@ -3,75 +3,20 @@ from __future__ import annotations
 from collections import defaultdict
 from decimal import Decimal
 
-from feed.models import DeliveryModel, ProductionModel
-from feed.calculators.feed_cost import ProductionCalculator
-from feed.selectors.recipe_requirements import recipe_item_dicts_for_production
+from feed.models import ProductionModel
 
 
 class ProductionCostSelector:
-    """Liczy koszt zrealizowanej paszy według daty produkcji i historycznych cen dostaw."""
+    """Prezentuje produkcje paszy, pobierając ich kwoty z rejestru kosztów."""
 
     def __init__(self, farm):
         self.farm = farm
 
     @staticmethod
-    def _requirements(production):
-        return ProductionCalculator(
-            quantity_kg=production.quantity_kg,
-            base_recipe_items=recipe_item_dicts_for_production(production),
-            custom_recipe_data=production.custom_recipe_data,
-        ).get_requirements()
-
-    def _price_at(self, ingredient_id, production_date) -> Decimal | None:
-        delivery = DeliveryModel.objects.filter(
-            ingredient_id=ingredient_id,
-            ingredient__farm=self.farm,
-            date__lte=production_date,
-            price_per_kg__isnull=False,
-            price_per_kg__gt=0,
-        ).order_by("-date", "-id").first()
-        if delivery:
-            return delivery.price_per_kg
-        fallback = DeliveryModel.objects.filter(
-            ingredient_id=ingredient_id,
-            ingredient__farm=self.farm,
-            price_per_kg__isnull=False,
-            price_per_kg__gt=0,
-        ).order_by("date", "id").first()
-        return fallback.price_per_kg if fallback else None
-
-    def _legacy_components(self, production):
-        components = []
-        production_cost = Decimal("0.00")
-        missing_prices = []
-        for requirement in self._requirements(production):
-            price = self._price_at(requirement.ingredient_id, production.date)
-            component_cost = None
-            if price is None:
-                missing_prices.append(requirement.name)
-            else:
-                component_cost = requirement.required_kg * price
-                production_cost += component_cost
-            components.append({
-                "ingredient_id": requirement.ingredient_id,
-                "name": requirement.name,
-                "quantity_kg": requirement.required_kg,
-                "unit_price": price,
-                "cost": component_cost,
-                "delivery": None,
-                "is_estimate": True,
-            })
-        return production_cost, components, missing_prices
-
-    @staticmethod
     def _fifo_components(production):
         usages = list(production.ingredient_usages.all())
-        if not usages:
-            return None
-        production_cost = Decimal("0.00")
         components = []
         for usage in usages:
-            production_cost += usage.cost
             components.append({
                 "ingredient_id": usage.ingredient_id,
                 "name": usage.ingredient.name,
@@ -81,15 +26,13 @@ class ProductionCostSelector:
                 "delivery": usage.delivery,
                 "is_estimate": False,
             })
-        return production_cost, components
+        return components
 
     def calculate(self, *, date_from=None, date_to=None) -> dict:
         productions = ProductionModel.objects.filter(
             recipe__farm=self.farm,
             status=ProductionModel.Statuses.COMPLETED,
-        ).select_related("recipe", "recipe_version").prefetch_related(
-            "recipe__items__ingredient",
-            "recipe_version__items__ingredient",
+        ).select_related("recipe", "recipe_version", "cost_entry", "finished_feed_batch").prefetch_related(
             "ingredient_usages__ingredient",
             "ingredient_usages__delivery",
         )
@@ -103,21 +46,30 @@ class ProductionCostSelector:
         recipe_totals = defaultdict(lambda: {"quantity_kg": Decimal("0.00"), "cost": Decimal("0.00")})
         monthly = defaultdict(lambda: {"production_kg": Decimal("0.00"), "feed_cost": Decimal("0.00")})
         details = []
+        missing_sync_count = 0
+        partial_cost_count = 0
+        integrity_issues = []
 
         for production in productions:
-            fifo_result = self._fifo_components(production)
-            if fifo_result is None:
-                production_cost, components, missing_prices = self._legacy_components(production)
-                is_partial = bool(missing_prices)
-                cost_note = (
-                    "Częściowy koszt - brak ceny składników: " + ", ".join(missing_prices)
-                    if missing_prices
-                    else production.feed_cost_note
-                )
-            else:
-                production_cost, components = fifo_result
-                is_partial = production.feed_cost_is_partial
-                cost_note = production.feed_cost_note
+            cost_entry = getattr(production, "cost_entry", None)
+            production_cost = cost_entry.amount if cost_entry is not None else Decimal("0.00")
+            components = self._fifo_components(production)
+            is_partial = production.feed_cost_is_partial or cost_entry is None
+            cost_note = production.feed_cost_note
+            if cost_entry is None:
+                missing_sync_count += 1
+                cost_note = "Brak zapisanego kosztu produkcji paszy. Wymagana synchronizacja FIFO."
+            if is_partial:
+                partial_cost_count += 1
+            fifo_total = sum((component["cost"] for component in components), Decimal("0.00"))
+            batch = getattr(production, "finished_feed_batch", None)
+            expected = production.feed_cost_total
+            if fifo_total != expected:
+                integrity_issues.append({"production_id": production.pk, "kind": "fifo_snapshot"})
+            if cost_entry is not None and cost_entry.amount != expected:
+                integrity_issues.append({"production_id": production.pk, "kind": "cost_registry"})
+            if batch is not None and (batch.total_cost != expected or batch.cost_per_kg != production.feed_cost_per_kg):
+                integrity_issues.append({"production_id": production.pk, "kind": "finished_batch"})
 
             total_quantity += production.quantity_kg
             total_cost += production_cost
@@ -159,4 +111,7 @@ class ProductionCostSelector:
             "recipe_ranking": ranking,
             "monthly": dict(monthly),
             "details": details,
+            "missing_sync_count": missing_sync_count,
+            "partial_cost_count": partial_cost_count,
+            "integrity_issues": integrity_issues,
         }

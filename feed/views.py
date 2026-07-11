@@ -20,6 +20,7 @@ from .forms import (
 )
 from common.date_range import PERIOD_OPTIONS, parse_date_range
 from common.filter_ui import filter_ui_state, parse_filter_date
+from common.units import format_mass
 from farms.services.current_farm import get_current_farm
 from farms.services.audit_log_service import log_action
 from feed.actions.deliveries import create_delivery, delete_delivery, update_delivery
@@ -29,7 +30,6 @@ from feed.actions.productions import (
     complete_production,
     create_production,
     delete_production_with_inventory,
-    mark_stage_1_done,
     update_production,
 )
 from feed.models import RecipeVersionModel
@@ -47,7 +47,6 @@ from feed.selectors.inventory import (
 from feed.selectors.productions import (
     default_production_initial,
     production_counts_for_version,
-    production_details_for_stages,
     production_list_context,
 )
 from feed.selectors.recipes import (
@@ -191,7 +190,7 @@ def edit_delivery_view(request, pk):
                       'delete_label': 'Usuń dostawę',
                       'delete_confirm': (
                           f"Usunięcie tej dostawy zmniejszy stan magazynowy składnika "
-                          f"{delivery.ingredient.name} o {delivery.quantity_kg} kg. Kontynuować?"
+                          f"{delivery.ingredient.name} o {format_mass(delivery.quantity_kg)}. Kontynuować?"
                       ),
                   })
 
@@ -443,18 +442,13 @@ def add_production_view(request):
             if request.POST.get('instant_complete') == 'on':
                 force_inventory = request.POST.get('force_inventory') == 'on'
 
-                try:
-                    success, message = complete_production(
-                        farm,
-                        production.id,
-                        skip_stages=True,
-                        force_inventory=force_inventory,
-                        user=request.user,
-                    )
-                except Exception:
-                    logger.exception("Nie udało się automatycznie zatwierdzić śrutowania %s", production.pk)
-                    success = False
-                    message = "wystąpił błąd podczas automatycznego zatwierdzania"
+                success, message = complete_production(
+                    farm,
+                    production.id,
+                    skip_stages=True,
+                    force_inventory=force_inventory,
+                    user=request.user,
+                )
                 if success:
                     messages.success(request, "Śrutowanie zostało od razu zatwierdzone.")
                 else:
@@ -504,54 +498,15 @@ def delete_production_view(request, pk):
     if request.method == 'POST':
         representation = str(production)
         object_id = production.pk
-        delete_production_with_inventory(farm, production)
-        log_action(farm=farm, user=request.user, action="DELETE", model_label="feed.ProductionModel", object_id=object_id, object_repr=representation)
-        messages.success(request, "Usunięto śrutowanie.")
+        try:
+            delete_production_with_inventory(farm, production)
+        except ValidationError as error:
+            messages.error(request, error.messages[0])
+        else:
+            log_action(farm=farm, user=request.user, action="DELETE", model_label="feed.ProductionModel", object_id=object_id, object_repr=representation)
+            messages.success(request, "Usunięto śrutowanie.")
     return redirect('feed_productions')
 
-
-@login_required
-def process_stage1_view(request, pk):
-    farm = get_current_farm(request)
-    get_object_or_404(ProductionModel, pk=pk, recipe__farm=farm)
-    if request.method == 'POST':
-        success, message = mark_stage_1_done(farm, pk)
-        if success:
-            log_action(farm=farm, user=request.user, action="PRODUCTION_STAGE_1", obj=ProductionModel.objects.get(pk=pk))
-            messages.success(request, message)
-        else:
-            messages.error(request, message)
-        return redirect('feed_productions')
-
-    context = production_details_for_stages(farm, pk)
-    return render(request, 'feed/stage1.html', context)
-
-
-@login_required
-def process_stage2_view(request, pk):
-    farm = get_current_farm(request)
-    get_object_or_404(ProductionModel, pk=pk, recipe__farm=farm)
-    if request.method == 'POST':
-        skip_stages = request.POST.get('skip_stages') == 'on'
-
-        force_inventory = request.POST.get('force_inventory') == 'on'
-
-        success, message = complete_production(
-            farm,
-            pk,
-            skip_stages=skip_stages,
-            force_inventory=force_inventory,
-            user=request.user,
-        )
-        if success:
-            log_action(farm=farm, user=request.user, action="PRODUCTION_COMPLETED", obj=ProductionModel.objects.get(pk=pk), metadata={"forced": force_inventory})
-            messages.success(request, message)
-        else:
-            messages.error(request, message)
-        return redirect('feed_productions')
-
-    context = production_details_for_stages(farm, pk)
-    return render(request, 'feed/stage2.html', context)
 
 @login_required
 def feed_calculator_view(request):

@@ -155,6 +155,23 @@
                     {{ form.default_production_quantity_kg }}
                     {{ form.default_production_quantity_kg.errors }}
                 </div>
+                <div class="form-field settings-compact-field">
+                    <label for="{{ form.default_production_quantity_kg_unit.id_for_label }}">{{ form.default_production_quantity_kg_unit.label }}</label>
+                    {{ form.default_production_quantity_kg_unit }}
+                    {{ form.default_production_quantity_kg_unit.errors }}
+                </div>
+            </div>
+            <div class="settings-row settings-row-field">
+                <div class="form-field">
+                    <label>{{ form.feed_serving_mode.label }}</label>
+                    <p class="field-help">Określa, czy po zakończeniu śrutowania wyprodukowana pasza ma pozostać na magazynie, czy ma zostać od razu zarejestrowana jako podana.</p>
+                    <div class="settings-segmented-control" role="radiogroup" aria-label="{{ form.feed_serving_mode.label }}">
+                        {% for choice in form.feed_serving_mode %}
+                            <label class="settings-segment">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>
+                        {% endfor %}
+                    </div>
+                    {{ form.feed_serving_mode.errors }}
+                </div>
             </div>
         </section>
 
@@ -165,69 +182,58 @@
 
     <section class="settings-card settings-data-section" id="settings-data">
         <div class="settings-card-heading">
-            <h2>Dane i import</h2>
-            <p>Eksportuj dane gospodarstwa albo zaimportuj archiwum do pustego gospodarstwa.</p>
+            <h2>Kopia danych gospodarstwa</h2>
+            <p>Jedna kopia obejmuje ustawienia, stado, surowce, FIFO, receptury, produkcje, gotowe pasze, podania, sprzedaż i koszty.</p>
         </div>
 
         <div class="settings-row-list">
             <div class="settings-action-row">
                 <div>
-                    <strong>Eksport danych</strong>
-                    <span>Pobierz archiwum ZIP lub pliki CSV przypisane do tego gospodarstwa.</span>
+                    <strong>Pobierz kopię gospodarstwa</strong>
+                    <span>Archiwum ZIP można później przeanalizować i bezpiecznie przywrócić.</span>
                 </div>
                 <div class="settings-row-actions">
-                    <a href="{% url 'export_user_data' %}" class="button button-secondary">Eksport ZIP</a>
-                    <a href="{% url 'export_csv' %}" class="button button-secondary">Eksport CSV</a>
+                    <a href="{% url 'export_user_data' %}" class="button button-secondary">Pobierz kopię</a>
                 </div>
             </div>
 
             <form method="post" enctype="multipart/form-data" class="settings-action-row">
                 {% csrf_token %}
                 <div class="settings-import-copy">
-                    <strong>Import CSV</strong>
-                    <span>Komplet plików CSV z archiwum eksportu. Gospodarstwo musi być puste.</span>
-                    {{ csv_import_form.non_field_errors }}
-                    <label class="settings-check-row">
-                        {{ csv_import_form.confirm_empty_import }}
-                        <span>{{ csv_import_form.confirm_empty_import.label }}</span>
-                    </label>
-                    {{ csv_import_form.confirm_empty_import.errors }}
-                </div>
-                <div class="settings-import-controls">
-                    <div class="form-field">
-                        <label for="{{ csv_import_form.csv_archive.id_for_label }}">{{ csv_import_form.csv_archive.label }}</label>
-                        {{ csv_import_form.csv_archive }}
-                        {{ csv_import_form.csv_archive.errors }}
-                    </div>
-                    <button type="submit" name="import_csv" value="1" class="button button-secondary">Importuj CSV</button>
-                </div>
-            </form>
-
-            <form method="post" enctype="multipart/form-data" class="settings-action-row settings-warning-row">
-                {% csrf_token %}
-                <div class="settings-import-copy">
-                    <strong>Awaryjne przywracanie danych</strong>
-                    <span>Import jest dostępny wyłącznie dla pustego gospodarstwa.</span>
-                    <p class="settings-warning-text" role="note">
-                        Jeżeli system wykryje istniejące dane lub duplikaty w pliku, cały import zostanie przerwany bez zapisywania zmian.
-                    </p>
+                    <strong>Sprawdź kopię przed importem</strong>
+                    <span>Najpierw pokażemy, co zostanie dodane, pominięte lub usunięte. Na tym etapie nic nie jest zapisywane.</span>
                     {{ import_form.non_field_errors }}
-                    <label class="settings-check-row">
-                        {{ import_form.confirm_empty_import }}
-                        <span>{{ import_form.confirm_empty_import.label }}</span>
-                    </label>
-                    {{ import_form.confirm_empty_import.errors }}
                 </div>
                 <div class="settings-import-controls">
                     <div class="form-field">
                         <label for="{{ import_form.backup_file.id_for_label }}">{{ import_form.backup_file.label }}</label>
                         {{ import_form.backup_file }}
-                        {% if import_form.backup_file.help_text %}<p class="help-text">{{ import_form.backup_file.help_text }}</p>{% endif %}
                         {{ import_form.backup_file.errors }}
                     </div>
-                    <button type="submit" name="import_backup" value="1" class="button button-secondary">Przywróć moje dane</button>
+                    <button type="submit" name="analyze_backup" value="1" class="button button-secondary">Sprawdź zawartość</button>
                 </div>
             </form>
+            {% if backup_analysis and apply_form %}
+            <form method="post" class="settings-action-row settings-warning-row">
+                {% csrf_token %}
+                <div class="settings-import-copy">
+                    <strong>Podsumowanie kopii: {{ backup_analysis.farm_name|default:"bez nazwy" }}</strong>
+                    <span>Kopia zawiera {{ backup_analysis.incoming_total }} rekordów. Obecne gospodarstwo ma {{ backup_analysis.current_total }} rekordów biznesowych.</span>
+                    <p><strong>Dodaj brakujące:</strong> do {{ backup_analysis.merge_new }} nowych rekordów; {{ backup_analysis.merge_existing }} rozpoznanych duplikatów zostanie pominiętych.</p>
+                    <p class="settings-warning-text">Dla bezpieczeństwa tryb dodawania nie scala zakończonych produkcji, sprzedaży ani historycznych podań z istniejącym FIFO. Taką historię można odtworzyć wyłącznie trybem „Zastąp”.</p>
+                    <p><strong>Zastąp:</strong> {{ backup_analysis.replace_remove }} obecnych rekordów zostanie usuniętych, a {{ backup_analysis.replace_add }} rekordów odtworzonych z kopii.</p>
+                    <ul class="settings-summary-list">{% for label, count in backup_analysis.incoming.items %}<li><span>{{ label }}</span><strong>{{ count }}</strong></li>{% endfor %}</ul>
+                    <p class="settings-warning-text">Tryb „Dodaj brakujące” nie zmienia istniejących rekordów. Tryb „Zastąp” usuwa dane wyłącznie tego gospodarstwa i odtwarza kopię w jednej transakcji.</p>
+                </div>
+                <div class="settings-import-controls">
+                    {{ apply_form.preview_token }}{{ apply_form.non_field_errors }}
+                    <div class="form-field"><label>{{ apply_form.import_mode.label }}</label>{{ apply_form.import_mode }}{{ apply_form.import_mode.errors }}</div>
+                    <label class="settings-check-row">{{ apply_form.confirm_replace }}<span>{{ apply_form.confirm_replace.label }}</span></label>{{ apply_form.confirm_replace.errors }}
+                    <div class="form-field"><label for="{{ apply_form.confirmation.id_for_label }}">W przypadku zastąpienia wpisz: ZASTĄP DANE GOSPODARSTWA</label>{{ apply_form.confirmation }}{{ apply_form.confirmation.errors }}</div>
+                    <button type="submit" name="apply_backup" value="1" class="button button-primary">Wykonaj import</button>
+                </div>
+            </form>
+            {% endif %}
         </div>
     </section>
 </main>

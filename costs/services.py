@@ -1,5 +1,7 @@
 from decimal import Decimal
 
+from collections import defaultdict
+
 from django.db.models import Count, Q, Sum
 
 from costs.models import CostCategoryModel, CostModel
@@ -10,7 +12,7 @@ class CostService:
         self.farm = farm
 
     def get_costs(self, *, year=None, date_from=None, date_to=None, category=None, payment_status=""):
-        queryset = CostModel.objects.filter(farm=self.farm).select_related("category", "created_by")
+        queryset = CostModel.objects.filter(farm=self.farm).select_related("category", "created_by", "production")
         if year:
             queryset = queryset.filter(date__year=year)
         if date_from:
@@ -52,3 +54,31 @@ class CostService:
         if not include_inactive:
             queryset = queryset.filter(is_active=True)
         return queryset.order_by("name")
+
+
+class CostReportingService:
+    """Publiczny kontrakt odczytowy rejestru kosztów."""
+
+    def __init__(self, farm):
+        self.farm = farm
+
+    def summary(self, *, date_from=None, date_to=None) -> dict:
+        costs = CostService(self.farm).get_costs(date_from=date_from, date_to=date_to)
+        manual_costs = costs.filter(production__isnull=True)
+        feed_costs = costs.filter(production__isnull=False)
+        result = CostService.summarize(costs)
+        result.update({
+            "feed_cost": feed_costs.aggregate(total=Sum("amount"))["total"] or Decimal("0.00"),
+            "other_cost": manual_costs.aggregate(total=Sum("amount"))["total"] or Decimal("0.00"),
+            "additional": CostService.summarize(manual_costs),
+            "monthly": self._monthly(costs),
+            "additional_monthly": self._monthly(manual_costs),
+        })
+        return result
+
+    @staticmethod
+    def _monthly(queryset) -> dict[str, Decimal]:
+        rows = defaultdict(lambda: Decimal("0.00"))
+        for cost_date, amount in queryset.values_list("date", "amount"):
+            rows[cost_date.strftime("%Y-%m")] += amount or Decimal("0.00")
+        return dict(rows)

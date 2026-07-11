@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from farms.services.cache import PROFITABILITY_TTL, cached_farm_value
+from common.cache import PROFITABILITY_TTL, cached_farm_value
 from farms.services.statistics import FarmStatisticsService
 
 
@@ -21,7 +21,7 @@ class ProfitabilityAnalyticsService:
         stats = FarmStatisticsService(self.farm).calculate(date_from=date_from, date_to=date_to)
         sales = stats["sales"]
         feed = stats["feed"]
-        costs = stats["costs"]
+        additional_costs = stats["additional_costs"]
         profitability = stats["profitability"]
         feed_efficiency = stats["feed_efficiency"]
         return {
@@ -37,7 +37,7 @@ class ProfitabilityAnalyticsService:
             "feed_cost_per_kg": feed_efficiency["average_feed_cost_per_kg"],
             "feed_cost_per_ton": feed_efficiency["average_feed_cost_per_ton"],
             "additional_cost": profitability["additional_cost"],
-            "additional_cost_categories": costs["categories"],
+            "additional_cost_categories": additional_costs["categories"],
             "total_cost": profitability["total_cost"],
             "net_result": profitability["net_result"],
             "gross_result": profitability["gross_result"],

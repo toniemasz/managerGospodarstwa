@@ -2,22 +2,21 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from django.db.models import Count, Sum
 from django.urls import reverse
 from django.utils import timezone
 
-from costs.models import CostModel
+from costs.dashboard import CostDashboardProvider
 from farms.dashboard_registry import DASHBOARD_STAT_DEFINITIONS, normalize_dashboard_stats
 from farms.models import AuditLogModel
 from farms.module_registry import MODULE_DEFINITIONS
-from farms.services.cache import DASHBOARD_TTL, cached_farm_value
+from common.cache import DASHBOARD_TTL, cached_farm_value
 from farms.services.module_navigation import ModuleNavigationService, normalize_visible_modules
 from farms.services.profitability import ProfitabilityAnalyticsService
+from common.units import format_mass
 from farms.services.settings_service import get_farm_settings
 from farms.services.task_center import TaskCenterService
-from feed.models import ProductionModel
-from feed.selectors.inventory import inventory_dashboard
-from sales.models import PigSaleModel
+from feed.services.dashboard import FeedDashboardProvider
+from sales.dashboard import SalesDashboardProvider
 from sows.services.sow_dashboard_service import SowDashboardService
 
 
@@ -30,6 +29,9 @@ class FarmDashboardService:
         self._inventory = None
         self._tasks = None
         self._profitability = None
+        self.feed_provider = FeedDashboardProvider(farm)
+        self.sales_provider = SalesDashboardProvider(farm)
+        self.cost_provider = CostDashboardProvider(farm)
 
     def get_context(self) -> dict:
         return cached_farm_value(
@@ -110,7 +112,7 @@ class FarmDashboardService:
 
     def _inventory_summary(self) -> dict:
         if self._inventory is None:
-            self._inventory = inventory_dashboard(self.farm)
+            self._inventory = self.feed_provider.inventory()
         return self._inventory
 
     def _task_summary(self) -> dict:
@@ -133,9 +135,8 @@ class FarmDashboardService:
         return f"{amount:,.2f}".replace(",", " ") + " PLN"
 
     @staticmethod
-    def _tonnes(value) -> str:
-        amount = Decimal(value or 0).quantize(Decimal("0.01"))
-        return f"{amount:,.2f}".replace(",", " ") + " t"
+    def _mass(value_kg) -> str:
+        return format_mass(value_kg or 0)
 
     def _stat_tasks_total(self) -> dict:
         tasks = self._task_summary()
@@ -198,17 +199,14 @@ class FarmDashboardService:
 
     def _stat_inventory_total(self) -> dict:
         return {
-            "value": self._tonnes(self._inventory_summary()["total_inventory_t"]),
+            "value": self._mass(self._inventory_summary()["total_inventory_kg"]),
             "unit": "",
             "note": "Łączny stan magazynu",
             "url": reverse("feed_full_inventory"),
         }
 
     def _stat_queued_productions(self) -> dict:
-        count = ProductionModel.objects.filter(
-            recipe__farm=self.farm,
-            status=ProductionModel.Statuses.QUEUED,
-        ).count()
+        count = self.feed_provider.queued().count()
         return {
             "value": self._count(count),
             "unit": "zleceń",
@@ -217,10 +215,7 @@ class FarmDashboardService:
         }
 
     def _stat_pending_sales(self) -> dict:
-        summary = PigSaleModel.objects.filter(farm=self.farm, no_settlement=True).aggregate(
-            count=Count("id"),
-            gross=Sum("gross_value"),
-        )
+        summary = self.sales_provider.pending_summary()
         count = summary["count"] or 0
         return {
             "value": self._money(summary["gross"]),
@@ -231,10 +226,7 @@ class FarmDashboardService:
         }
 
     def _stat_unpaid_costs(self) -> dict:
-        summary = CostModel.objects.filter(farm=self.farm, is_paid=False).aggregate(
-            count=Count("id"),
-            total=Sum("amount"),
-        )
+        summary = self.cost_provider.unpaid_summary()
         count = summary["count"] or 0
         return {
             "value": self._money(summary["total"]),

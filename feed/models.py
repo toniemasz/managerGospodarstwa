@@ -7,6 +7,7 @@ from django.db.models import JSONField, Q
 from django.core.validators import MinValueValidator, MaxValueValidator
 
 from feed.domain.rules import LOW_STOCK_THRESHOLD_KG
+from common.units import format_mass
 
 
 class IngredientModel(models.Model):
@@ -38,13 +39,6 @@ class IngredientModel(models.Model):
         storage_type = "BIN" if self.is_in_bin else "WOREK"
         return f"{self.name} [{storage_type}]"
 
-    def save(self, *args, **kwargs):
-        if self.farm_id is None:
-            from farms.services.farm_service import get_or_create_legacy_farm
-            self.farm = get_or_create_legacy_farm()
-        return super().save(*args, **kwargs)
-
-
 class DeliveryModel(models.Model):
     date = models.DateField(verbose_name="Data dostawy")
     ingredient = models.ForeignKey(IngredientModel, on_delete=models.RESTRICT, related_name='deliveries',
@@ -66,7 +60,7 @@ class DeliveryModel(models.Model):
     )
 
     def __str__(self):
-        return f"Dostawa: {self.ingredient.name} - {self.quantity_kg}kg ({self.date})"
+        return f"Dostawa: {self.ingredient.name} - {format_mass(self.quantity_kg)} ({self.date})"
 
 
 class IngredientPriceConfigModel(models.Model):
@@ -96,13 +90,6 @@ class RecipeModel(models.Model):
     def __str__(self):
         return self.name
 
-    def save(self, *args, **kwargs):
-        if self.farm_id is None:
-            from farms.services.farm_service import get_or_create_legacy_farm
-            self.farm = get_or_create_legacy_farm()
-        return super().save(*args, **kwargs)
-
-
 class RecipeItemModel(models.Model):
     recipe = models.ForeignKey('RecipeModel', on_delete=models.CASCADE, related_name='items', verbose_name="Receptura")
     ingredient = models.ForeignKey('IngredientModel', on_delete=models.RESTRICT, verbose_name="Składnik")
@@ -115,6 +102,11 @@ class RecipeItemModel(models.Model):
 
     def __str__(self):
         return f"{self.recipe.name} - {self.ingredient.name} ({self.percentage}%)"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.recipe_id and self.ingredient_id and self.recipe.farm_id != self.ingredient.farm_id:
+            raise ValidationError("Składnik i receptura muszą należeć do tego samego gospodarstwa.")
 
 
 class RecipeVersionModel(models.Model):
@@ -191,6 +183,15 @@ class RecipeVersionItemModel(models.Model):
     def __str__(self):
         return f"{self.recipe_version} - {self.ingredient.name} ({self.percentage}%)"
 
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if (
+            self.recipe_version_id
+            and self.ingredient_id
+            and self.recipe_version.recipe.farm_id != self.ingredient.farm_id
+        ):
+            raise ValidationError("Składnik i wersja receptury muszą należeć do tego samego gospodarstwa.")
+
 
 class ProductionModel(models.Model):
     class Statuses(models.TextChoices):
@@ -248,6 +249,7 @@ class ProductionModel(models.Model):
         blank=True,
         verbose_name="Uwagi do kosztu składników",
     )
+    completion_feed_serving_mode = models.CharField(max_length=24, blank=True)
 
     @property
     def status_label(self) -> str:
@@ -255,7 +257,145 @@ class ProductionModel(models.Model):
         return dict(self.Statuses.choices).get(self.status, self.status)
 
     def __str__(self):
-        return f"Śrutowanie: {self.recipe.name} ({self.quantity_kg}kg) - {self.status_label}"
+        return f"Śrutowanie: {self.recipe.name} ({format_mass(self.quantity_kg)}) - {self.status_label}"
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            previous = type(self).objects.filter(pk=self.pk).values(
+                "status", "date", "time", "recipe_id", "recipe_version_id",
+                "quantity_kg", "custom_recipe_data",
+            ).first()
+            if previous and previous["status"] == self.Statuses.COMPLETED:
+                protected_fields = (
+                    "date", "time", "recipe_id", "recipe_version_id", "quantity_kg", "custom_recipe_data",
+                )
+                if self.status != self.Statuses.COMPLETED or any(
+                    getattr(self, field) != previous[field] for field in protected_fields
+                ):
+                    from django.core.exceptions import ValidationError
+                    raise ValidationError(
+                        "Zakończonej produkcji nie można zmieniać bez kontrolowanego cofnięcia rozliczenia."
+                    )
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if self.status == self.Statuses.COMPLETED:
+            from django.core.exceptions import ValidationError
+            raise ValidationError(
+                "Zakończoną produkcję można usunąć wyłącznie przez kontrolowaną akcję domenową."
+            )
+        return super().delete(*args, **kwargs)
+
+
+class FeedProductModel(models.Model):
+    class SourceTypes(models.TextChoices):
+        PURCHASED_READY = "PURCHASED_READY", "Kupiona pasza gotowa"
+        PRODUCED = "PRODUCED", "Pasza wytworzona"
+
+    farm = models.ForeignKey('farms.FarmModel', on_delete=models.CASCADE, related_name='feed_products')
+    name = models.CharField(max_length=150)
+    source_type = models.CharField(max_length=24, choices=SourceTypes.choices)
+    recipe = models.ForeignKey(RecipeModel, on_delete=models.RESTRICT, null=True, blank=True, related_name='feed_products')
+    source_classification_conflict = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=('farm', 'name'), name='unique_feed_product_name_per_farm')]
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.recipe_id and self.recipe.farm_id != self.farm_id:
+            raise ValidationError("Receptura produktu nie należy do wskazanego gospodarstwa.")
+
+    def __str__(self):
+        return self.name
+
+
+class ReadyFeedDeliveryModel(models.Model):
+    farm = models.ForeignKey('farms.FarmModel', on_delete=models.CASCADE, related_name='ready_feed_deliveries')
+    product = models.ForeignKey(FeedProductModel, on_delete=models.RESTRICT, related_name='deliveries')
+    date = models.DateField()
+    quantity_kg = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))])
+    price_per_kg = models.DecimalField(max_digits=14, decimal_places=5, validators=[MinValueValidator(Decimal('0.00001'))])
+    total_cost = models.DecimalField(max_digits=14, decimal_places=2)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.product_id and self.product.farm_id != self.farm_id:
+            raise ValidationError("Produkt dostawy gotowej paszy należy do innego gospodarstwa.")
+
+
+class FinishedFeedBatchModel(models.Model):
+    farm = models.ForeignKey('farms.FarmModel', on_delete=models.CASCADE, related_name='finished_feed_batches')
+    product = models.ForeignKey(FeedProductModel, on_delete=models.RESTRICT, related_name='batches')
+    batch_date = models.DateField()
+    initial_quantity_kg = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))])
+    remaining_quantity_kg = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal('0.00'))])
+    cost_per_kg = models.DecimalField(max_digits=14, decimal_places=5)
+    total_cost = models.DecimalField(max_digits=14, decimal_places=2)
+    cost_is_partial = models.BooleanField(default=False)
+    production = models.OneToOneField(ProductionModel, on_delete=models.RESTRICT, null=True, blank=True, related_name='finished_feed_batch')
+    ready_feed_delivery = models.OneToOneField(ReadyFeedDeliveryModel, on_delete=models.CASCADE, null=True, blank=True, related_name='batch')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=Q(initial_quantity_kg__gt=0), name='finished_batch_initial_positive'),
+            models.CheckConstraint(condition=Q(remaining_quantity_kg__gte=0) & Q(remaining_quantity_kg__lte=models.F('initial_quantity_kg')), name='finished_batch_remaining_range'),
+            models.CheckConstraint(condition=(Q(production__isnull=False, ready_feed_delivery__isnull=True) | Q(production__isnull=True, ready_feed_delivery__isnull=False)), name='finished_batch_exactly_one_source'),
+        ]
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.product_id and self.product.farm_id != self.farm_id:
+            raise ValidationError("Produkt partii należy do innego gospodarstwa.")
+        if self.production_id and self.production.recipe.farm_id != self.farm_id:
+            raise ValidationError("Produkcja partii należy do innego gospodarstwa.")
+        if self.ready_feed_delivery_id and self.ready_feed_delivery.farm_id != self.farm_id:
+            raise ValidationError("Dostawa partii należy do innego gospodarstwa.")
+
+
+class FeedServingModel(models.Model):
+    farm = models.ForeignKey('farms.FarmModel', on_delete=models.CASCADE, related_name='feed_servings')
+    product = models.ForeignKey(FeedProductModel, on_delete=models.RESTRICT, related_name='servings')
+    date = models.DateField()
+    time = models.TimeField(null=True, blank=True)
+    quantity_kg = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))])
+    note = models.CharField(max_length=255, blank=True)
+    total_cost = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal('0.00'))
+    is_automatic = models.BooleanField(default=False)
+    automatic_for_production = models.OneToOneField(ProductionModel, on_delete=models.RESTRICT, null=True, blank=True, related_name='automatic_feed_serving')
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.product_id and self.product.farm_id != self.farm_id:
+            raise ValidationError("Produkt podania należy do innego gospodarstwa.")
+        if self.automatic_for_production_id and self.automatic_for_production.recipe.farm_id != self.farm_id:
+            raise ValidationError("Automatyczne podanie wskazuje produkcję innego gospodarstwa.")
+
+
+class FeedServingAllocationModel(models.Model):
+    serving = models.ForeignKey(FeedServingModel, on_delete=models.CASCADE, related_name='allocations')
+    batch = models.ForeignKey(FinishedFeedBatchModel, on_delete=models.RESTRICT, related_name='serving_allocations')
+    quantity_kg = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))])
+    unit_cost = models.DecimalField(max_digits=14, decimal_places=5)
+    cost = models.DecimalField(max_digits=14, decimal_places=2)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=('serving', 'batch'), name='unique_serving_batch_allocation')]
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.serving_id and self.batch_id:
+            if self.serving.farm_id != self.batch.farm_id:
+                raise ValidationError("Podanie i partia należą do różnych gospodarstw.")
+            if self.serving.product_id != self.batch.product_id:
+                raise ValidationError("Podanie i partia dotyczą różnych produktów.")
 
 
 class ProductionIngredientUsageModel(models.Model):
@@ -336,7 +476,7 @@ class ProductionIngredientUsageModel(models.Model):
 
     def __str__(self):
         delivery_label = f"z dostawy {self.delivery_id}" if self.delivery_id else "bez przypisanej dostawy"
-        return f"{self.production}: {self.ingredient.name} {self.quantity_kg} kg {delivery_label}"
+        return f"{self.production}: {self.ingredient.name} {format_mass(self.quantity_kg)} {delivery_label}"
 
 
 class InventoryMovementModel(models.Model):
@@ -397,4 +537,4 @@ class InventoryMovementModel(models.Model):
             raise ValidationError("Składnik nie należy do wskazanego gospodarstwa.")
 
     def __str__(self):
-        return f"{self.get_movement_type_display()}: {self.quantity_kg} kg {self.ingredient.name}"
+        return f"{self.get_movement_type_display()}: {format_mass(self.quantity_kg)} {self.ingredient.name}"

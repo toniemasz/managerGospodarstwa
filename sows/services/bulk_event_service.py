@@ -33,6 +33,8 @@ class BulkEventResult:
 
 class BulkSowEventService:
     def __init__(self, farm=None, repository: SowRepository | None = None):
+        if farm is None and repository is None:
+            raise ValueError("Operacje zbiorcze macior wymagają jawnego gospodarstwa.")
         self.farm = farm
         self.repository = repository or SowRepository(farm=farm)
 

@@ -8,7 +8,7 @@
         <div>
             <p class="eyebrow">Finanse</p>
             <h1>Koszty — {{ selected_year|unlocalize }}</h1>
-            <p class="page-subtitle">Koszty dodatkowe gospodarstwa, płatności i podział na kategorie.</p>
+            <p class="page-subtitle">Wszystkie koszty gospodarstwa, w tym automatyczne koszty paszy rozliczone przez FIFO.</p>
         </div>
         <div class="header-actions">
             <a href="{% url 'farm_statistics' %}?year={{ selected_year|unlocalize }}" class="button button-secondary">Statystyki</a>
@@ -48,9 +48,15 @@
                         <td data-label="Kategoria">{{ cost.category.name|default:'Bez kategorii' }}</td>
                         <td data-label="Dokument">{{ cost.document_number|default:'—' }}</td>
                         <td data-label="Dostawca">{{ cost.supplier|default:'—' }}</td>
-                        <td data-label="Status"><span class="status-pill {% if cost.is_paid %}status-green{% else %}status-amber{% endif %}">{% if cost.is_paid %}Opłacony{% else %}Nieopłacony{% endif %}</span></td>
+                        <td data-label="Status">
+                            {% if cost.production_id %}
+                                <span class="status-pill status-green">Automatyczny FIFO</span>
+                            {% else %}
+                                <span class="status-pill {% if cost.is_paid %}status-green{% else %}status-amber{% endif %}">{% if cost.is_paid %}Opłacony{% else %}Nieopłacony{% endif %}</span>
+                            {% endif %}
+                        </td>
                         <td data-label="Kwota" class="text-right"><strong>{{ cost.amount|smart_unit:"zł" }}</strong></td>
-                        <td data-label="Akcje" class="text-right"><a href="{% url 'edit_cost' cost.id %}" class="table-link">Edytuj</a></td>
+                        <td data-label="Akcje" class="text-right">{% if cost.production_id %}<span class="muted-small">Z FIFO</span>{% else %}<a href="{% url 'edit_cost' cost.id %}" class="table-link">Edytuj</a>{% endif %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

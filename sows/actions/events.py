@@ -7,7 +7,7 @@ from django.db import transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 
-from farms.services.cache import invalidate_farm_cache_on_commit
+from common.cache import invalidate_farm_cache_on_commit
 from sows.domain.sow_state_machine import SowStateMachine
 from sows.models import SowEventModel, SowModel
 from sows.services.sow_event_service import SowEventService
@@ -33,6 +33,8 @@ class SowEventActions:
         repository: SowRepository | None = None,
         event_service: SowEventService | None = None,
     ):
+        if farm is None:
+            raise ValueError("Operacje zdarzeń macior wymagają jawnego gospodarstwa.")
         self.farm = farm
         self.user = user
         self.repository = repository or SowRepository(farm=farm)
@@ -167,9 +169,7 @@ class SowEventActions:
         return result
 
     def _get_row_sow(self, sow_id: int) -> SowModel:
-        queryset = SowModel.objects.all()
-        if self.farm is not None:
-            queryset = queryset.filter(farm=self.farm)
+        queryset = SowModel.objects.filter(farm=self.farm)
         try:
             return queryset.get(id=sow_id)
         except SowModel.DoesNotExist as error:
@@ -179,9 +179,7 @@ class SowEventActions:
         queryset = SowEventModel.objects.select_related("sow")
         if lock_for_update:
             queryset = queryset.select_for_update()
-        filters = {"id": event_id}
-        if self.farm is not None:
-            filters["sow__farm"] = self.farm
+        filters = {"id": event_id, "sow__farm": self.farm}
         return get_object_or_404(queryset, **filters)
 
 

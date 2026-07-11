@@ -12,6 +12,6 @@ class CostCategoryAdmin(admin.ModelAdmin):
 
 @admin.register(CostModel)
 class CostAdmin(admin.ModelAdmin):
-    list_display = ("date", "description", "farm", "category", "amount", "is_paid")
+    list_display = ("date", "description", "farm", "category", "amount", "production", "is_paid")
     list_filter = ("farm", "category", "is_paid", "date")
     search_fields = ("description", "document_number", "supplier", "farm__name")

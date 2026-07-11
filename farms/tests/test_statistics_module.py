@@ -9,6 +9,8 @@ from costs.models import CostCategoryModel, CostModel
 from farms.services.farm_service import get_or_create_user_farm
 from farms.services.statistics import FarmStatisticsService
 from feed.models import DeliveryModel, IngredientModel, ProductionModel, RecipeItemModel, RecipeModel
+from feed.actions.productions import complete_production
+from feed.actions.inventory import InventoryActions
 from sales.models import PigSaleModel
 from sows.models import MortalityReportModel, SowEventModel, SowModel
 
@@ -23,20 +25,23 @@ def statistics_farms():
 
 def _create_feed_flow(farm):
     ingredient = IngredientModel.objects.create(farm=farm, name="Pszenica statystyczna")
-    DeliveryModel.objects.create(
+    delivery = DeliveryModel.objects.create(
         ingredient=ingredient,
         date=date(2026, 1, 1),
         quantity_kg=Decimal("2000.00"),
         price_per_kg=Decimal("1.50000"),
     )
+    InventoryActions(farm).sync_delivery(delivery)
     recipe = RecipeModel.objects.create(farm=farm, name="Grower statystyczny")
     RecipeItemModel.objects.create(recipe=recipe, ingredient=ingredient, percentage=Decimal("100.00"))
     production = ProductionModel.objects.create(
         recipe=recipe,
         date=date(2026, 2, 1),
         quantity_kg=Decimal("1000.00"),
-        status=ProductionModel.Statuses.COMPLETED,
+        status=ProductionModel.Statuses.STAGE_1_DONE,
     )
+    success, message = complete_production(farm, production.pk, user=farm.owner, create_serving=False)
+    assert success, message
     production.refresh_from_db()
     return recipe, production
 
@@ -72,11 +77,48 @@ def test_statistics_service_calculates_feed_sales_and_profitability(statistics_f
     assert result["sales"]["sold_quantity"] == 10
     assert result["feed"]["quantity_kg"] == Decimal("1000.00")
     assert result["feed"]["total_cost"] == Decimal("1500.00")
-    assert result["costs"]["total"] == Decimal("500.00")
+    assert result["costs"]["total"] == Decimal("2000.00")
+    assert result["additional_costs"]["total"] == Decimal("500.00")
     assert result["profitability"]["net_result"] == Decimal("6000.00")
     assert result["feed_efficiency"]["feed_to_live_weight_ratio"] == Decimal("0.8333333333333333333333333333")
     assert result["production"]["completed_count"] == 1
     assert result["recipe_ranking"][0]["recipe_name"] == "Grower statystyczny"
+
+
+@pytest.mark.django_db
+def test_statistics_take_feed_amount_from_cost_registry(statistics_farms):
+    _, farm, _ = statistics_farms
+    _, production = _create_feed_flow(farm)
+    assert production.feed_cost_total == Decimal("1500.00")
+    cost = CostModel.objects.get(production=production)
+    cost.amount = Decimal("1234.00")
+    cost.save(update_fields=("amount", "updated_at"))
+
+    result = FarmStatisticsService(farm).calculate(
+        date_from=date(2026, 1, 1),
+        date_to=date(2026, 12, 31),
+    )
+
+    assert result["feed"]["total_cost"] == Decimal("1234.00")
+    assert result["costs"]["total"] == Decimal("1234.00")
+    assert result["profitability"]["total_cost"] == Decimal("1234.00")
+
+
+@pytest.mark.django_db
+def test_statistics_detect_missing_feed_cost_sync_without_double_counting_snapshot(statistics_farms):
+    _, farm, _ = statistics_farms
+    _, production = _create_feed_flow(farm)
+    CostModel.objects.filter(production=production).delete()
+
+    result = FarmStatisticsService(farm).calculate(
+        date_from=date(2026, 1, 1),
+        date_to=date(2026, 12, 31),
+    )
+
+    assert production.feed_cost_total == Decimal("1500.00")
+    assert result["feed"]["total_cost"] == Decimal("0.00")
+    assert result["costs"]["total"] == Decimal("0.00")
+    assert result["feed"]["missing_sync_count"] == 1
 
 
 @pytest.mark.django_db

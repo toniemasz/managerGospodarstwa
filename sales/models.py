@@ -43,12 +43,6 @@ class PigSaleModel(models.Model):
         sale_date = self.sale_date or "bez daty"
         return f"Sprzedaż {self.quantity} szt. - {sale_date}"
 
-    def save(self, *args, **kwargs):
-        if self.farm_id is None:
-            from farms.services.farm_service import get_or_create_legacy_farm
-            self.farm = get_or_create_legacy_farm()
-        return super().save(*args, **kwargs)
-
     @property
     def settlement_status(self) -> str:
         if self.no_settlement:

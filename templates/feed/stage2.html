@@ -91,6 +91,27 @@
 
     <form method="post" id="stageForm" class="panel stage-confirm-panel" data-stage-storage-key="feed_prod_{{ production.id }}_stage2">
         {% csrf_token %}
+        <input type="hidden" name="create_feed_serving_present" value="1">
+        <div class="section-heading">
+            <div>
+                <h2>Po zakończeniu</h2>
+                <p>Utworzona zostanie partia {{ production.quantity_kg|feed_quantity }} gotowej paszy.</p>
+                {% if default_create_feed_serving %}
+                    <p>Domyślnie zostanie też zarejestrowane podanie całej produkcji.</p>
+                {% else %}
+                    <p>Domyślnie pasza pozostanie na magazynie.</p>
+                {% endif %}
+            </div>
+        </div>
+        {% if force_ready_feed_serving %}
+            <input type="hidden" name="create_feed_serving" value="on">
+            <p class="notice notice-info">Receptura ma jeden składnik, dlatego jest traktowana jako gotowa pasza. Po zakończeniu cała ilość zostanie zarejestrowana jako podana.</p>
+        {% else %}
+            <label class="checkbox-row">
+                <input type="checkbox" name="create_feed_serving"{% if default_create_feed_serving %} checked{% endif %}>
+                Po zakończeniu od razu podaj wyprodukowaną paszę
+            </label>
+        {% endif %}
         <label class="checkbox-row warning-option">
             <input type="checkbox" name="force_inventory" id="force_inventory">
             Wymuś śrutowanie mimo braków na magazynie

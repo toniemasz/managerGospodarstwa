@@ -14,9 +14,8 @@ from feed.selectors.inventory import (
 from feed.selectors.productions import productions_for_farm, production_summary
 
 
-def recipes_with_items(farm=None):
-    filters = {"farm": farm} if farm is not None else {}
-    return RecipeModel.objects.filter(**filters).prefetch_related("items__ingredient").order_by("name")
+def recipes_with_items(farm):
+    return RecipeModel.objects.filter(farm=farm).prefetch_related("items__ingredient").order_by("name")
 
 
 def recipe_list_context(farm) -> dict:
@@ -29,10 +28,7 @@ def recipe_list_context(farm) -> dict:
 
 
 def recipe_exists(farm, recipe_id: int) -> bool:
-    filters = {"pk": recipe_id}
-    if farm is not None:
-        filters["farm"] = farm
-    return RecipeModel.objects.filter(**filters).exists()
+    return RecipeModel.objects.filter(pk=recipe_id, farm=farm).exists()
 
 
 def recipe_with_items_or_404(farm, recipe_id: int):
@@ -40,10 +36,7 @@ def recipe_with_items_or_404(farm, recipe_id: int):
         "items__ingredient",
         "versions__items__ingredient",
     )
-    filters = {"id": recipe_id}
-    if farm is not None:
-        filters["farm"] = farm
-    return get_object_or_404(queryset, **filters)
+    return get_object_or_404(queryset, id=recipe_id, farm=farm)
 
 
 def productions_for_recipe(farm, recipe_id: int):
@@ -73,7 +66,7 @@ def recipe_version_detail_context(farm, recipe_pk, version_pk) -> dict:
     }
 
 
-def recipe_costs(farm=None, price_overrides: dict[int, Decimal] | None = None):
+def recipe_costs(farm, price_overrides: dict[int, Decimal] | None = None):
     prices_map = latest_delivery_prices_map(farm)
     if price_overrides:
         prices_map.update(price_overrides)
@@ -97,7 +90,7 @@ def recipe_costs(farm=None, price_overrides: dict[int, Decimal] | None = None):
     return costs
 
 
-def calculator_price_rows(farm=None, overrides: dict[int, Decimal] | None = None) -> list[dict]:
+def calculator_price_rows(farm, overrides: dict[int, Decimal] | None = None) -> list[dict]:
     prices_map = latest_delivery_prices_map(farm)
     sources = latest_delivery_price_sources(farm)
     if overrides:
@@ -162,7 +155,7 @@ def recipe_detail(farm, recipe_id: int, *, date_from=None, date_to=None, product
     }
 
 
-def _recipe_cost(recipe, farm=None):
+def _recipe_cost(recipe, farm):
     prices_map = latest_delivery_prices_map(farm)
     base_items = [
         {

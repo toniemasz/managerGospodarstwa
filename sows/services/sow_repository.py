@@ -8,16 +8,16 @@ from sows.services.sow_lifecycle import Sow, SowEvent
 
 
 class SowRepository:
-    def __init__(self, farm=None):
+    def __init__(self, farm):
+        if farm is None:
+            raise ValueError("Repozytorium macior wymaga jawnego gospodarstwa.")
         self.farm = farm
         self.gestation_days = GESTATION_DAYS
-        if self.farm is not None:
-            settings = get_farm_settings(self.farm)
-            self.gestation_days = settings.gestation_days
+        settings = get_farm_settings(self.farm)
+        self.gestation_days = settings.gestation_days
 
     def _filter_for_farm(self, **extra_filters):
-        if self.farm is not None:
-            extra_filters['farm'] = self.farm
+        extra_filters['farm'] = self.farm
         return extra_filters
 
     def _map_to_sow(self, db_sow: SowModel) -> Sow:
@@ -68,6 +68,7 @@ class SowRepository:
     def has_positive_pregnancy_check_before(self, sow_id: int, event_date) -> bool:
         return SowEventModel.objects.filter(
             sow_id=sow_id,
+            sow__farm=self.farm,
             event_type='PREGNANCY_CHECK',
             event_date__lte=event_date,
             details__result='TAK',
@@ -88,12 +89,13 @@ class SowRepository:
 class VaccinationPlanRepository:
     """Repozytorium do zarządzania regułami szczepień cyklicznych."""
 
-    def __init__(self, farm=None):
+    def __init__(self, farm):
+        if farm is None:
+            raise ValueError("Repozytorium szczepień wymaga jawnego gospodarstwa.")
         self.farm = farm
 
     def _filter_for_farm(self, **extra_filters):
-        if self.farm is not None:
-            extra_filters['farm'] = self.farm
+        extra_filters['farm'] = self.farm
         return extra_filters
 
     def get_all_plans(self) -> List[VaccinationPlanModel]:

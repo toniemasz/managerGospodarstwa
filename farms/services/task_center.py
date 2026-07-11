@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
 
-from costs.models import CostModel
-from farms.services.cache import TASK_CENTER_TTL, cached_farm_value
-from feed.models import ProductionModel
-from feed.selectors.inventory import inventory_dashboard
-from sales.models import PigSaleModel
+from costs.dashboard import CostDashboardProvider
+from common.cache import TASK_CENTER_TTL, cached_farm_value
+from feed.services.dashboard import FeedDashboardProvider
+from sales.dashboard import SalesDashboardProvider
 from sows.services.sow_dashboard_service import SowDashboardService
+from common.units import format_mass
 
 
 class TaskCenterService:
@@ -20,6 +19,9 @@ class TaskCenterService:
         self.today = timezone.localdate()
         self._low_stock = []
         self._unsettled_sales = []
+        self.feed_provider = FeedDashboardProvider(farm)
+        self.sales_provider = SalesDashboardProvider(farm)
+        self.cost_provider = CostDashboardProvider(farm)
 
     @staticmethod
     def _task(
@@ -164,14 +166,14 @@ class TaskCenterService:
         )
 
     def _feed_tab(self) -> dict:
-        inventory = inventory_dashboard(self.farm)
+        inventory = self.feed_provider.inventory()
         self._low_stock = inventory["low_stock_alerts"]
         low_stock_items = [
             self._task(
                 title=f"Niski stan: {item.name}",
                 description=(
-                    f"Pozostało {item.current_stock:.2f} kg; próg alertu "
-                    f"to {item.low_stock_threshold_kg:.2f} kg."
+                    f"Pozostało {format_mass(item.current_stock)}; próg alertu "
+                    f"to {format_mass(item.low_stock_threshold_kg)}."
                 ),
                 status_label="niski stan",
                 priority="urgent",
@@ -183,14 +185,11 @@ class TaskCenterService:
             for item in inventory["low_stock_alerts"]
         ]
 
-        queued = ProductionModel.objects.filter(
-            recipe__farm=self.farm,
-            status=ProductionModel.Statuses.QUEUED,
-        ).select_related("recipe").order_by("date", "time", "id")
+        queued = self.feed_provider.queued()
         queued_items = [
             self._task(
                 title=f"Śrutowanie: {production.recipe.name}",
-                description=f"Zaplanowano {production.quantity_kg} kg paszy.",
+                description=f"Zaplanowano {format_mass(production.quantity_kg)} paszy.",
                 status_label="w kolejce",
                 priority="upcoming",
                 due_date=production.date,
@@ -202,14 +201,11 @@ class TaskCenterService:
             for production in queued
         ]
 
-        stage_one = ProductionModel.objects.filter(
-            recipe__farm=self.farm,
-            status=ProductionModel.Statuses.STAGE_1_DONE,
-        ).select_related("recipe").order_by("date", "time", "id")
+        stage_one = self.feed_provider.stage_one_done()
         stage_one_items = [
             self._task(
                 title=f"Dokończ śrutowanie: {production.recipe.name}",
-                description=f"Etap 1 ukończony dla {production.quantity_kg} kg paszy.",
+                description=f"Etap 1 ukończony dla {format_mass(production.quantity_kg)} paszy.",
                 status_label="etap 2",
                 priority="today",
                 due_date=production.date,
@@ -234,10 +230,7 @@ class TaskCenterService:
         )
 
     def _finance_tab(self) -> dict:
-        sales = PigSaleModel.objects.filter(
-            farm=self.farm,
-            no_settlement=True,
-        ).order_by("sale_date", "id")
+        sales = self.sales_provider.unsettled()
         self._unsettled_sales = list(sales)
         sale_items = [
             self._task(
@@ -254,9 +247,7 @@ class TaskCenterService:
             for sale in self._unsettled_sales
         ]
 
-        costs = CostModel.objects.filter(farm=self.farm).filter(
-            Q(category__isnull=True) | Q(is_paid=False)
-        ).select_related("category").order_by("date", "id")
+        costs = self.cost_provider.attention_costs()
         cost_items = []
         for cost in costs:
             issues = []

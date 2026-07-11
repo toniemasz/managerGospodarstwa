@@ -2,6 +2,6 @@
 <article class="dashboard-stat-card{% if tone %} dashboard-stat-card--{{ tone }}{% endif %}{% if class_name %} {{ class_name }}{% endif %}">
     <span class="dashboard-card-icon {{ tone|default:'' }}">{% include 'components/app_icon.html' with name=icon_name|default:'dashboard' %}</span>
     <span class="dashboard-card-label">{{ title }}</span>
-    <strong>{{ value|smart_number }}{% if unit %} <small>{{ unit }}</small>{% endif %}</strong>
+    <strong>{% if unit == 'kg' %}{{ value|smart_unit:'kg' }}{% else %}{{ value|smart_number }}{% if unit %} <small>{{ unit }}</small>{% endif %}{% endif %}</strong>
     {% if note %}<small>{{ note }}</small>{% endif %}
 </article>

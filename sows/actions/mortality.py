@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from farms.services.cache import invalidate_farm_cache_on_commit
+from common.cache import invalidate_farm_cache_on_commit
 from sows.models import MortalityReportModel, SowModel
 
 

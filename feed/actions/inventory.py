@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from datetime import date
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F, Sum
 
-from farms.services.cache import invalidate_farm_cache_on_commit
+from common.cache import invalidate_farm_cache_on_commit
 from feed.models import (
     DeliveryModel,
     IngredientModel,
@@ -17,11 +17,11 @@ from feed.models import (
 )
 from feed.calculators.feed_cost import IngredientRequirement, ProductionCalculator
 from feed.selectors.recipe_requirements import recipe_item_dicts_for_production
-
-
-KG_QUANT = Decimal("0.01")
-MONEY_QUANT = Decimal("0.01")
-PRICE_QUANT = Decimal("0.00001")
+from common.units import format_mass
+from common.money import quantize_kg, quantize_money, quantize_price
+from costs.actions import delete_production_cost
+from feed.domain.exceptions import CrossFarmAccessError, InsufficientInventoryError
+from feed.domain.production import ProductionCostResult
 
 
 class InventoryRebuildError(Exception):
@@ -45,6 +45,8 @@ class InventoryRebuildError(Exception):
 
 class InventoryActions:
     def __init__(self, farm):
+        if farm is None:
+            raise ValueError("Operacje magazynowe wymagają jawnego gospodarstwa.")
         self.farm = farm
 
     def balances(self) -> dict[int, Decimal]:
@@ -61,7 +63,7 @@ class InventoryActions:
     @transaction.atomic
     def sync_delivery(self, delivery: DeliveryModel, *, user=None) -> InventoryMovementModel:
         delivery = DeliveryModel.objects.select_for_update().select_related("ingredient").get(pk=delivery.pk)
-        farm = self.farm or delivery.ingredient.farm
+        farm = self.farm
         if delivery.ingredient.farm_id != farm.id:
             raise ValidationError("Dostawa nie należy do tego gospodarstwa.")
         movement, _ = InventoryMovementModel.objects.update_or_create(
@@ -96,15 +98,15 @@ class InventoryActions:
 
     @staticmethod
     def _quantize_kg(value: Decimal) -> Decimal:
-        return Decimal(value).quantize(KG_QUANT, rounding=ROUND_HALF_UP)
+        return quantize_kg(value)
 
     @staticmethod
     def _quantize_money(value: Decimal) -> Decimal:
-        return Decimal(value).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+        return quantize_money(value)
 
     @staticmethod
     def _quantize_price(value: Decimal) -> Decimal:
-        return Decimal(value).quantize(PRICE_QUANT, rounding=ROUND_HALF_UP)
+        return quantize_price(value)
 
     @staticmethod
     def _production_requirements(production: ProductionModel):
@@ -147,8 +149,8 @@ class InventoryActions:
         return remaining
 
     @transaction.atomic
-    def release_production(self, production: ProductionModel) -> None:
-        farm = self.farm or production.recipe.farm
+    def release_production(self, production: ProductionModel, *, remove_cost: bool = True) -> None:
+        farm = self.farm
         usages = (
             ProductionIngredientUsageModel.objects.select_for_update()
             .filter(
@@ -178,6 +180,8 @@ class InventoryActions:
             feed_cost_is_partial=False,
             feed_cost_note="",
         )
+        if remove_cost:
+            delete_production_cost(farm=farm, production=production)
 
     @transaction.atomic
     def book_production(
@@ -187,20 +191,26 @@ class InventoryActions:
         user=None,
         forced=False,
         prefer_existing_movements=False,
-    ) -> int:
+    ) -> ProductionCostResult:
         production = (
             ProductionModel.objects.select_for_update()
             .select_related("recipe", "recipe_version")
             .prefetch_related("recipe__items__ingredient", "recipe_version__items__ingredient")
-            .get(pk=production.pk)
+            .get(pk=production.pk, recipe__farm=self.farm)
         )
-        farm = self.farm or production.recipe.farm
-        if production.recipe.farm_id != farm.id:
-            raise ValidationError("Produkcja nie należy do tego gospodarstwa.")
+        farm = self.farm
+        if farm is None or production.recipe.farm_id != farm.id:
+            raise CrossFarmAccessError("Produkcja nie należy do tego gospodarstwa.")
 
         if production.status != ProductionModel.Statuses.COMPLETED:
             self.release_production(production)
-            return 0
+            return ProductionCostResult(
+                total_cost=Decimal("0.00"),
+                cost_per_kg=Decimal("0.00000"),
+                is_partial=False,
+                missing_components=(),
+                usage_count=0,
+            )
 
         requirements = []
         if prefer_existing_movements:
@@ -210,7 +220,7 @@ class InventoryActions:
             # receptury/custom_recipe_data. To najlepsze przybliżenie, nie dowód historii.
             requirements = list(self._production_requirements(production))
 
-        self.release_production(production)
+        self.release_production(production, remove_cost=False)
 
         usage_count = 0
         total_cost = Decimal("0.00")
@@ -259,9 +269,10 @@ class InventoryActions:
 
             if remaining_to_allocate > 0:
                 partial = True
-                missing_messages.append(f"{requirement.name}: {remaining_to_allocate:.2f} kg")
+                missing_messages.append(f"{requirement.name}: {format_mass(remaining_to_allocate)}")
                 if not forced:
-                    raise ValidationError(
+                    raise InsufficientInventoryError(
+                        "Brak wystarczającej ilości składników. "
                         "Brakuje rozliczalnych dostaw FIFO dla produkcji: "
                         + ", ".join(missing_messages)
                     )
@@ -301,7 +312,13 @@ class InventoryActions:
         production.feed_cost_per_kg = cost_per_kg
         production.feed_cost_is_partial = partial
         production.feed_cost_note = note[:255]
-        return usage_count
+        return ProductionCostResult(
+            total_cost=self._quantize_money(total_cost),
+            cost_per_kg=cost_per_kg,
+            is_partial=partial,
+            missing_components=tuple(missing_messages),
+            usage_count=usage_count,
+        )
 
     @transaction.atomic
     def adjust(
@@ -348,50 +365,10 @@ class InventoryActions:
         prefer_existing_movements: bool = True,
         reconstruct_production_ids: set[int] | None = None,
     ) -> dict[str, int]:
-        reconstruct_production_ids = reconstruct_production_ids or set()
-        ProductionIngredientUsageModel.objects.filter(farm=self.farm).delete()
-        DeliveryModel.objects.filter(ingredient__farm=self.farm).update(remaining_quantity_kg=F("quantity_kg"))
-        InventoryMovementModel.objects.filter(
-            farm=self.farm,
-            movement_type=InventoryMovementModel.Types.DELIVERY,
-        ).delete()
-        delivery_count = 0
-        for delivery in DeliveryModel.objects.filter(ingredient__farm=self.farm).select_related("ingredient"):
-            try:
-                self.sync_delivery(delivery)
-            except Exception as error:
-                raise InventoryRebuildError(
-                    "Błąd synchronizacji dostawy podczas odbudowy FIFO",
-                    farm=self.farm,
-                ) from error
-            delivery_count += 1
-        production_count = 0
-        productions = ProductionModel.objects.filter(
-            recipe__farm=self.farm,
-            status=ProductionModel.Statuses.COMPLETED,
-        ).select_related("recipe", "recipe_version").prefetch_related(
-            "recipe__items__ingredient",
-            "recipe_version__items__ingredient",
-        ).order_by("date", "time", "id")
-        production_ids = [str(pk) for pk in productions.values_list("pk", flat=True)]
-        for production in productions:
-            try:
-                production_count += self.book_production(
-                    production,
-                    forced=True,
-                    prefer_existing_movements=(
-                        prefer_existing_movements
-                        and production.pk not in reconstruct_production_ids
-                    ),
-                )
-            except Exception as error:
-                raise InventoryRebuildError(
-                    "Błąd rozliczenia produkcji podczas odbudowy FIFO",
-                    farm=self.farm,
-                    production=production,
-                ) from error
-        InventoryMovementModel.objects.filter(
-            farm=self.farm,
-            movement_type=InventoryMovementModel.Types.PRODUCTION_USAGE,
-        ).exclude(source_id__in=production_ids).delete()
-        return {"deliveries": delivery_count, "production_movements": production_count}
+        # Warstwa zgodności dla istniejących integracji. Nowy kod powinien używać
+        # ProductionReconciliationWorkflow bezpośrednio.
+        from feed.services.reconciliation import ProductionReconciliationWorkflow
+        return ProductionReconciliationWorkflow(self.farm).rebuild(
+            prefer_existing_movements=prefer_existing_movements,
+            reconstruct_production_ids=reconstruct_production_ids,
+        )

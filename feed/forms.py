@@ -4,9 +4,11 @@ from django.db.models import Sum
 from django.forms import inlineformset_factory
 from django.forms.formsets import DELETION_FIELD_NAME
 from .models import IngredientModel, RecipeModel, RecipeItemModel, DeliveryModel, ProductionModel, \
-    IngredientPriceConfigModel, ProductionIngredientUsageModel, RecipeVersionModel, RecipeVersionItemModel
+    IngredientPriceConfigModel, ProductionIngredientUsageModel, RecipeVersionModel, RecipeVersionItemModel, \
+    FeedProductModel
 from feed.domain.rules import LOW_STOCK_THRESHOLD_KG
-from feed.actions.recipe_versions import RecipeVersionActions
+from common.forms import KilogramStorageFormMixin
+from common.units import format_mass
 
 
 FORM_FIELD_CLASS = 'form-control'
@@ -17,12 +19,13 @@ def _apply_widget_class(field):
     field.widget.attrs['class'] = f'{existing} {FORM_FIELD_CLASS}'.strip()
 
 
-class IngredientForm(forms.ModelForm):
+class IngredientForm(KilogramStorageFormMixin, forms.ModelForm):
+    mass_fields = ('low_stock_threshold_kg',)
     class Meta:
         model = IngredientModel
         fields = ['name', 'description', 'low_stock_threshold_kg', 'is_in_bin']
         labels = {
-            'low_stock_threshold_kg': 'Próg niskiego stanu (kg)',
+            'low_stock_threshold_kg': 'Próg niskiego stanu',
         }
         widgets = {
             'low_stock_threshold_kg': forms.NumberInput(attrs={'step': '0.01', 'min': '0'}),
@@ -160,7 +163,8 @@ def recipe_version_item_formset_factory(*, extra=0):
     )
 
 
-class DeliveryForm(forms.ModelForm):
+class DeliveryForm(KilogramStorageFormMixin, forms.ModelForm):
+    mass_fields = ('quantity_kg',)
     class Meta:
         model = DeliveryModel
         fields = ['date', 'ingredient', 'quantity_kg', 'price_per_kg']
@@ -179,21 +183,19 @@ class DeliveryForm(forms.ModelForm):
         for field in self.fields.values():
             _apply_widget_class(field)
 
-    def clean_quantity_kg(self):
-        quantity = self.cleaned_data['quantity_kg']
-        if self.instance.pk:
+    def clean(self):
+        cleaned_data = super().clean()
+        quantity = cleaned_data.get('quantity_kg')
+        if self.instance.pk and quantity is not None:
             allocated = ProductionIngredientUsageModel.objects.filter(
                 delivery=self.instance,
             ).aggregate(total=Sum('quantity_kg'))['total'] or Decimal('0.00')
             if quantity < allocated:
-                raise forms.ValidationError(
-                    f"Ta dostawa ma już rozliczone {allocated:.2f} kg w produkcji. "
-                    "Nie można ustawić mniejszej ilości."
+                self.add_error(
+                    'quantity_kg',
+                    f"Ta dostawa ma już rozliczone {format_mass(allocated)} w produkcji. "
+                    "Nie można ustawić mniejszej ilości.",
                 )
-        return quantity
-
-    def clean(self):
-        cleaned_data = super().clean()
         ingredient = cleaned_data.get('ingredient')
         if (
             self.instance.pk
@@ -208,14 +210,15 @@ class DeliveryForm(forms.ModelForm):
         return cleaned_data
 
 
-class InventoryAdjustmentForm(forms.Form):
+class InventoryAdjustmentForm(KilogramStorageFormMixin, forms.Form):
+    mass_fields = ('quantity_kg',)
     ingredient = forms.ModelChoiceField(queryset=IngredientModel.objects.none(), label="Składnik")
     movement_date = forms.DateField(
         label="Data korekty",
         widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
     )
     quantity_kg = forms.DecimalField(
-        label="Ilość (kg)", min_value=Decimal("0.01"), max_digits=12, decimal_places=2,
+        label="Ilość", min_value=Decimal("0.01"), max_digits=12, decimal_places=2,
         widget=forms.NumberInput(attrs={"step": "0.01", "min": "0.01"}),
     )
     direction = forms.ChoiceField(
@@ -240,7 +243,45 @@ class InventoryAdjustmentForm(forms.Form):
         return movement_date
 
 
-class ProductionForm(forms.ModelForm):
+class ReadyFeedPurchaseForm(KilogramStorageFormMixin, forms.Form):
+    mass_fields = ('quantity_kg',)
+    product_name = forms.CharField(label="Nazwa gotowej paszy", max_length=150)
+    date = forms.DateField(label="Data dostawy", widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}))
+    quantity_kg = forms.DecimalField(label="Ilość", min_value=Decimal("0.01"), max_digits=12, decimal_places=2)
+    price_per_kg = forms.DecimalField(label="Cena za kg", min_value=Decimal("0.00001"), max_digits=14, decimal_places=5)
+
+    def __init__(self, *args, farm=None, **kwargs):
+        self.farm = farm
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            _apply_widget_class(field)
+
+    def clean_product_name(self):
+        name = self.cleaned_data["product_name"].strip()
+        existing = FeedProductModel.objects.filter(farm=self.farm, name__iexact=name).first()
+        if existing and existing.source_type != FeedProductModel.SourceTypes.PURCHASED_READY:
+            raise forms.ValidationError("Produkt o tej nazwie jest powiązany z produkowaną paszą.")
+        return name
+
+
+class FeedServingForm(KilogramStorageFormMixin, forms.Form):
+    mass_fields = ('quantity_kg',)
+    product = forms.ModelChoiceField(queryset=FeedProductModel.objects.none(), label="Gotowa pasza")
+    date = forms.DateField(label="Data podania", widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}))
+    time = forms.TimeField(label="Godzina", required=False, widget=forms.TimeInput(format="%H:%M", attrs={"type": "time"}))
+    quantity_kg = forms.DecimalField(label="Ilość", min_value=Decimal("0.01"), max_digits=12, decimal_places=2)
+    note = forms.CharField(label="Cel, sektor, grupa lub notatka", required=False, max_length=255, widget=forms.Textarea(attrs={"rows": 3}))
+
+    def __init__(self, *args, farm=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if farm is not None:
+            self.fields["product"].queryset = FeedProductModel.objects.filter(farm=farm, is_active=True).order_by("name")
+        for field in self.fields.values():
+            _apply_widget_class(field)
+
+
+class ProductionForm(KilogramStorageFormMixin, forms.ModelForm):
+    mass_fields = ('quantity_kg',)
     custom_field_prefix = 'custom_percentage_'
 
     class Meta:
@@ -375,10 +416,6 @@ class ProductionForm(forms.ModelForm):
     def save(self, commit=True):
         instance = super().save(commit=False)
         instance.custom_recipe_data = self._custom_recipe_data
-        recipe_changed = self._original_recipe_id is not None and self._original_recipe_id != instance.recipe_id
-        if instance.recipe_id and (instance.pk is None or recipe_changed or instance.recipe_version_id is None):
-            version, _ = RecipeVersionActions(farm=self.farm).ensure_current_version(instance.recipe)
-            instance.recipe_version = version
         if commit:
             instance.save()
         return instance

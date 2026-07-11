@@ -8,13 +8,13 @@ from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
-from farms.forms import CsvImportForm, FarmSettingsForm, UserBackupImportForm
+from farms.forms import CsvImportForm, FarmSettingsForm, UserBackupApplyForm, UserBackupImportForm
 from farms.models import AuditLogModel
 from farms.services.audit_log_service import log_action
-from farms.services.cache import invalidate_farm_cache_on_commit
+from common.cache import invalidate_farm_cache_on_commit
 from farms.services.csv_transfer import build_csv_export, import_csv_archive
 from farms.services.current_farm import get_current_farm
-from farms.services.data_backup import BackupImportError, build_user_backup, import_user_backup
+from farms.services.data_backup import BackupImportError, build_user_backup, import_user_backup, load_user_backup_preview, store_user_backup_preview
 from farms.services.settings_service import get_farm_settings
 from farms.services.task_center import TaskCenterService
 from farms.services.today_dashboard import TodayDashboardService
@@ -41,23 +41,75 @@ def farm_settings_view(request):
 
 def _handle_settings_post(request, farm, settings):
     if 'import_backup' in request.POST:
-        return _handle_user_backup_import(request, farm, settings)
+        return _handle_legacy_user_backup_import(request, farm, settings)
     if 'import_csv' in request.POST:
-        return _handle_csv_import(request, farm, settings)
+        return _handle_legacy_csv_import(request, farm, settings)
+    if 'analyze_backup' in request.POST:
+        return _handle_user_backup_preview(request, farm, settings)
+    if 'apply_backup' in request.POST:
+        return _handle_user_backup_apply(request, farm, settings)
     return _handle_settings_update(request, farm, settings)
 
 
-def _handle_user_backup_import(request, farm, settings):
-    import_form = UserBackupImportForm(request.POST, request.FILES)
-    if not import_form.is_valid():
-        return _render_settings(request, farm, settings, import_form=import_form)
-
+def _handle_legacy_csv_import(request, farm, settings):
+    form = CsvImportForm(request.POST, request.FILES)
+    if not form.is_valid():
+        messages.error(request, 'Nieprawidłowy plik importu CSV.')
+        return redirect('farm_settings')
     try:
-        counts = import_user_backup(import_form.cleaned_data['backup_file'], farm)
+        counts = import_csv_archive(form.cleaned_data['csv_archive'], farm)
     except BackupImportError as error:
         messages.error(request, str(error))
     else:
-        total = sum(counts.values())
+        log_action(farm=farm, user=request.user, action="CSV_IMPORT", model_label="farms.FarmModel", object_id=farm.pk, object_repr=str(farm), metadata={"counts": counts})
+        messages.success(request, f"Zaimportowano dane CSV ({sum(counts.values())} rekordów).")
+    return redirect('farm_settings')
+
+
+def _handle_legacy_user_backup_import(request, farm, settings):
+    form = UserBackupImportForm(request.POST, request.FILES)
+    if not form.is_valid():
+        return _render_settings(request, farm, settings, import_form=form)
+    try:
+        counts = import_user_backup(form.cleaned_data['backup_file'], farm)
+    except BackupImportError as error:
+        messages.error(request, str(error))
+    else:
+        log_action(farm=farm, user=request.user, action="USER_BACKUP_IMPORT", model_label="farms.FarmModel", object_id=farm.pk, object_repr=str(farm), metadata={"counts": counts, "mode": "LEGACY_EMPTY"})
+        invalidate_farm_cache_on_commit(farm)
+        messages.success(request, f'Przywrócono dane gospodarstwa ({sum(counts.values())} rekordów).')
+    return redirect('farm_settings')
+
+
+def _handle_user_backup_preview(request, farm, settings):
+    import_form = UserBackupImportForm(request.POST, request.FILES)
+    if not import_form.is_valid():
+        return _render_settings(request, farm, settings, import_form=import_form)
+    try:
+        token, analysis = store_user_backup_preview(import_form.cleaned_data['backup_file'], user=request.user, farm=farm)
+    except BackupImportError as error:
+        messages.error(request, str(error))
+        return redirect('farm_settings')
+    apply_form = UserBackupApplyForm(initial={'preview_token': token, 'import_mode': 'ADD_MISSING'})
+    return _render_settings(request, farm, settings, import_form=UserBackupImportForm(), apply_form=apply_form, backup_analysis=analysis)
+
+
+def _handle_user_backup_apply(request, farm, settings):
+    apply_form = UserBackupApplyForm(request.POST)
+    if not apply_form.is_valid():
+        try:
+            _, uploaded = load_user_backup_preview(request.POST.get('preview_token', ''), user=request.user, farm=farm)
+            from farms.services.data_backup import analyze_user_backup
+            analysis = analyze_user_backup(uploaded, farm)
+        except BackupImportError:
+            analysis = None
+        return _render_settings(request, farm, settings, apply_form=apply_form, backup_analysis=analysis)
+    try:
+        cache_key, uploaded = load_user_backup_preview(apply_form.cleaned_data['preview_token'], user=request.user, farm=farm)
+        counts = import_user_backup(uploaded, farm, mode=apply_form.cleaned_data['import_mode'])
+    except BackupImportError as error:
+        messages.error(request, str(error))
+    else:
         log_action(
             farm=farm,
             user=request.user,
@@ -65,34 +117,12 @@ def _handle_user_backup_import(request, farm, settings):
             model_label="farms.FarmModel",
             object_id=farm.pk,
             object_repr=str(farm),
-            metadata={"counts": counts},
+            metadata={"counts": counts, "mode": apply_form.cleaned_data['import_mode']},
         )
         invalidate_farm_cache_on_commit(farm)
-        messages.success(request, f'Przywrócono dane gospodarstwa ({total} rekordów).')
-    return redirect('farm_settings')
-
-
-def _handle_csv_import(request, farm, settings):
-    csv_import_form = CsvImportForm(request.POST, request.FILES)
-    if not csv_import_form.is_valid():
-        return _render_settings(request, farm, settings, csv_import_form=csv_import_form)
-
-    try:
-        counts = import_csv_archive(csv_import_form.cleaned_data['csv_archive'], farm)
-    except BackupImportError as error:
-        messages.error(request, str(error))
-    else:
-        log_action(
-            farm=farm,
-            user=request.user,
-            action="CSV_IMPORT",
-            model_label="farms.FarmModel",
-            object_id=farm.pk,
-            object_repr=str(farm),
-            metadata={"counts": counts},
-        )
-        invalidate_farm_cache_on_commit(farm)
-        messages.success(request, f"Zaimportowano dane CSV ({sum(counts.values())} rekordów).")
+        from farms.models import BackupImportPreviewModel
+        BackupImportPreviewModel.objects.filter(pk=cache_key).delete()
+        messages.success(request, f"Zakończono import danych ({sum(counts.values())} rekordów).")
     return redirect('farm_settings')
 
 
@@ -107,22 +137,23 @@ def _handle_settings_update(request, farm, settings):
     return _render_settings(request, farm, settings, form=form)
 
 
-def _render_settings(request, farm, settings, *, form=None, import_form=None, csv_import_form=None):
+def _render_settings(request, farm, settings, *, form=None, import_form=None, apply_form=None, backup_analysis=None):
     form = form or FarmSettingsForm(instance=settings, farm=farm)
     import_form = import_form or UserBackupImportForm()
-    csv_import_form = csv_import_form or CsvImportForm()
     return render(request, 'farms/settings.html', _settings_context(
         form=form,
         import_form=import_form,
-        csv_import_form=csv_import_form,
+        apply_form=apply_form,
+        backup_analysis=backup_analysis,
     ))
 
 
-def _settings_context(*, form, import_form, csv_import_form):
+def _settings_context(*, form, import_form, apply_form=None, backup_analysis=None):
     return {
         'form': form,
         'import_form': import_form,
-        'csv_import_form': csv_import_form,
+        'apply_form': apply_form,
+        'backup_analysis': backup_analysis,
         'module_visibility_groups': module_visibility_groups(form),
         'dashboard_stat_groups': dashboard_stat_groups(form),
     }

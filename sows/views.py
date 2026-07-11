@@ -23,7 +23,7 @@ from .forms import (
 from .models import MortalityReportModel, SowModel, SowEventModel
 from common.date_range import PERIOD_OPTIONS, parse_date_range
 from common.filter_ui import filter_ui_state
-from farms.services.cache import invalidate_farm_cache_on_commit
+from common.cache import invalidate_farm_cache_on_commit
 from farms.services.current_farm import get_current_farm
 from farms.services.module_navigation import ModuleNavigationService
 from farms.services.audit_log_service import log_action
