@@ -10,7 +10,12 @@ from feed.selectors.productions import production_for_processing
 from feed.services.production_completion import ProductionCompletionWorkflow
 from feed.services.production_reversal import ProductionSettlementReversalWorkflow
 from feed.actions.recipe_versions import RecipeVersionActions
+import logging
 
+from django.core.exceptions import ValidationError
+from django.db import DatabaseError
+
+logger = logging.getLogger(__name__)
 
 def create_production(form):
     with transaction.atomic():
@@ -38,6 +43,9 @@ def mark_stage_1_done(farm, production_id: int) -> tuple[bool, str]:
     return True, "Zakończono pobieranie z binów. Gotowe do Etapu 2."
 
 
+
+
+
 def complete_production(
     farm,
     production_id: int,
@@ -49,8 +57,12 @@ def complete_production(
 ) -> tuple[bool, str]:
     if farm is None:
         raise ValueError("Zakończenie produkcji wymaga jawnego gospodarstwa.")
+
     try:
-        result = ProductionCompletionWorkflow(farm=farm, user=user).complete(
+        result = ProductionCompletionWorkflow(
+            farm=farm,
+            user=user,
+        ).complete(
             production_id,
             skip_stages=skip_stages,
             force_inventory=force_inventory,
@@ -59,6 +71,31 @@ def complete_production(
     except (ValidationError, FeedDomainError) as error:
         message = error.messages[0] if hasattr(error, "messages") else str(error)
         return False, message
+    except DatabaseError:
+        logger.exception(
+            "Błąd bazy podczas zakończenia produkcji",
+            extra={
+                "farm_id": farm.pk,
+                "production_id": production_id,
+            },
+        )
+        return False, (
+            "Nie udało się zakończyć śrutowania z powodu błędu danych. "
+            "Szczegóły zapisano w logach."
+        )
+    except Exception:
+        logger.exception(
+            "Nieoczekiwany błąd podczas zakończenia produkcji",
+            extra={
+                "farm_id": farm.pk,
+                "production_id": production_id,
+            },
+        )
+        return False, (
+            "Nie udało się zakończyć śrutowania. "
+            "Szczegóły zapisano w logach."
+        )
+
     return True, result.message
 
 
