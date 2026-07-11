@@ -193,7 +193,7 @@ class InventoryActions:
         prefer_existing_movements=False,
     ) -> ProductionCostResult:
         production = (
-            ProductionModel.objects.select_for_update()
+            ProductionModel.objects.select_for_update(of=("self",))
             .select_related("recipe", "recipe_version")
             .prefetch_related("recipe__items__ingredient", "recipe_version__items__ingredient")
             .get(pk=production.pk, recipe__farm=self.farm)
