@@ -9,6 +9,7 @@ from feed.actions.inventory import InventoryActions
 from feed.actions.finished_feed import create_feed_serving, create_finished_feed_batch_for_production, production_is_ready_feed
 from feed.models import ProductionModel
 from feed.selectors.productions import production_for_processing, validate_production_capacity
+from common.units import format_mass
 
 
 def create_production(form):
@@ -95,7 +96,7 @@ def complete_production(
             if should_serve:
                 create_feed_serving(
                     farm=farm, product=batch.product, date=production.date,
-                    quantity_kg=production.quantity_kg, user=user,
+                    time=production.time, quantity_kg=production.quantity_kg, user=user,
                     automatic_for_production=production,
                 )
             invalidate_farm_cache_on_commit(farm, groups=("feed",))
@@ -103,8 +104,8 @@ def complete_production(
         message = error.messages[0] if hasattr(error, "messages") else str(error)
         return False, message
     if should_serve:
-        return True, f"Produkcja zakończona. Utworzono {production.quantity_kg:.2f} kg gotowej paszy i zarejestrowano automatyczne podanie."
-    return True, f"Produkcja zakończona. Utworzono {production.quantity_kg:.2f} kg gotowej paszy. Pasza pozostała na magazynie."
+        return True, f"Produkcja zakończona. Utworzono {format_mass(production.quantity_kg)} gotowej paszy i zarejestrowano automatyczne podanie."
+    return True, f"Produkcja zakończona. Utworzono {format_mass(production.quantity_kg)} gotowej paszy. Pasza pozostała na magazynie."
 
 
 def _normalize_production_ids(production_ids) -> tuple[set[int], int]:

@@ -13,6 +13,7 @@ from feed.models import (
     ReadyFeedDeliveryModel,
 )
 from feed.selectors.recipe_requirements import recipe_item_dicts_for_production
+from common.units import format_mass
 
 
 def _money(value):
@@ -120,7 +121,7 @@ def create_feed_serving(*, farm, product, date, quantity_kg, user=None, note="",
     )
     available = sum((batch.remaining_quantity_kg for batch in batches), Decimal("0.00"))
     if quantity > available:
-        raise ValidationError(f"Brak gotowej paszy. Dostępne: {available:.2f} kg.")
+        raise ValidationError(f"Brak gotowej paszy. Dostępne: {format_mass(available)}.")
     serving = FeedServingModel.objects.create(
         farm=farm, product=product, date=date, time=time, quantity_kg=quantity, note=note,
         is_automatic=automatic_for_production is not None,

@@ -4,9 +4,11 @@ from farms.dashboard_registry import DASHBOARD_STAT_DEFINITIONS, normalize_dashb
 from farms.models import FarmSettingsModel
 from farms.module_registry import MODULE_DEFINITIONS
 from farms.services.module_navigation import normalize_nav_modules, normalize_visible_modules
+from common.forms import KilogramStorageFormMixin
 
 
-class FarmSettingsForm(forms.ModelForm):
+class FarmSettingsForm(KilogramStorageFormMixin, forms.ModelForm):
+    mass_fields = ('default_production_quantity_kg',)
     farm_name = forms.CharField(label="Nazwa gospodarstwa", max_length=150)
 
     class Meta:

@@ -2,6 +2,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from django import template
 from django.utils.formats import number_format
+from common.units import format_mass
 
 
 register = template.Library()
@@ -32,12 +33,7 @@ def _format_decimal(value: Decimal, max_decimals: int) -> str:
 
 @register.filter
 def feed_quantity(value):
-    amount = _to_decimal(value)
-    if amount is None:
-        return "-"
-    if abs(amount) >= Decimal("1000"):
-        return f"{_format_decimal(amount / Decimal('1000'), 2)} t"
-    return f"{_format_decimal(amount, 2)} kg"
+    return format_mass(value)
 
 
 @register.filter

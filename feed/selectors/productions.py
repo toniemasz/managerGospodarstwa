@@ -10,6 +10,7 @@ from feed.domain.rules import DEFAULT_PRODUCTION_QUANTITY_KG
 from feed.models import DeliveryModel, ProductionModel, RecipeModel
 from feed.selectors.inventory import inventory_dashboard, latest_delivery_prices_map
 from feed.selectors.recipe_requirements import recipe_item_dicts_for_production
+from common.units import format_mass
 
 
 def productions_for_farm(farm=None):
@@ -97,9 +98,9 @@ def validate_production_capacity(farm, production_id: int) -> tuple[bool, list[s
         ).aggregate(total=Sum("remaining_quantity_kg"))["total"] or Decimal("0.00")
         if requirement.required_kg > available:
             errors.append(
-                f"Brakuje rozliczalnych dostaw FIFO: {requirement.required_kg - available:.2f} kg składnika "
+                f"Brakuje rozliczalnych dostaw FIFO: {format_mass(requirement.required_kg - available)} składnika "
                 f"'{requirement.name}' w rozliczalnych dostawach FIFO "
-                f"z datą nie późniejszą niż {production.date:%d.%m.%Y} (Dostępne: {available:.2f} kg)"
+                f"z datą nie późniejszą niż {production.date:%d.%m.%Y} (Dostępne: {format_mass(available)})"
             )
 
     return len(errors) == 0, errors

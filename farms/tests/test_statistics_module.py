@@ -72,11 +72,31 @@ def test_statistics_service_calculates_feed_sales_and_profitability(statistics_f
     assert result["sales"]["sold_quantity"] == 10
     assert result["feed"]["quantity_kg"] == Decimal("1000.00")
     assert result["feed"]["total_cost"] == Decimal("1500.00")
-    assert result["costs"]["total"] == Decimal("500.00")
+    assert result["costs"]["total"] == Decimal("2000.00")
+    assert result["additional_costs"]["total"] == Decimal("500.00")
     assert result["profitability"]["net_result"] == Decimal("6000.00")
     assert result["feed_efficiency"]["feed_to_live_weight_ratio"] == Decimal("0.8333333333333333333333333333")
     assert result["production"]["completed_count"] == 1
     assert result["recipe_ranking"][0]["recipe_name"] == "Grower statystyczny"
+
+
+@pytest.mark.django_db
+def test_statistics_take_feed_amount_from_cost_registry(statistics_farms):
+    _, farm, _ = statistics_farms
+    _, production = _create_feed_flow(farm)
+    assert production.feed_cost_total == Decimal("1500.00")
+    cost = CostModel.objects.get(production=production)
+    cost.amount = Decimal("1234.00")
+    cost.save(update_fields=("amount", "updated_at"))
+
+    result = FarmStatisticsService(farm).calculate(
+        date_from=date(2026, 1, 1),
+        date_to=date(2026, 12, 31),
+    )
+
+    assert result["feed"]["total_cost"] == Decimal("1234.00")
+    assert result["costs"]["total"] == Decimal("1234.00")
+    assert result["profitability"]["total_cost"] == Decimal("1234.00")
 
 
 @pytest.mark.django_db

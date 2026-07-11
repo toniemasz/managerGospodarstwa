@@ -46,11 +46,19 @@ class FarmStatisticsService:
     def _calculate(self, *, date_from=None, date_to=None) -> dict:
         sales = self._sales_queryset(date_from=date_from, date_to=date_to)
         costs = self._cost_queryset(date_from=date_from, date_to=date_to)
+        additional_costs = costs.filter(production__isnull=True)
         feed = ProductionCostSelector(self.farm).calculate(date_from=date_from, date_to=date_to)
         sales_summary = self._sales_summary(sales)
         cost_summary = CostService.summarize(costs)
-        timeline = self._timeline(sales=sales, costs=costs, feed=feed)
-        profitability = self._profitability(sales_summary, cost_summary, feed, timeline)
+        additional_cost_summary = CostService.summarize(additional_costs)
+        timeline = self._timeline(sales=sales, additional_costs=additional_costs, feed=feed)
+        profitability = self._profitability(
+            sales_summary,
+            cost_summary,
+            additional_cost_summary,
+            feed,
+            timeline,
+        )
         feed_efficiency = self._feed_efficiency(sales_summary, profitability, feed)
         production = self._production_summary(date_from=date_from, date_to=date_to, feed=feed)
         inventory = self._inventory_summary()
@@ -60,6 +68,7 @@ class FarmStatisticsService:
             "summary_cards": self._summary_cards(sales_summary, profitability, feed_efficiency),
             "sales": sales_summary,
             "costs": cost_summary,
+            "additional_costs": additional_cost_summary,
             "feed": feed,
             "feed_efficiency": feed_efficiency,
             "production": production,
@@ -123,7 +132,7 @@ class FarmStatisticsService:
         }
 
     @staticmethod
-    def _timeline(*, sales, costs, feed) -> list[dict]:
+    def _timeline(*, sales, additional_costs, feed) -> list[dict]:
         rows = defaultdict(lambda: {
             "sales_net": ZERO,
             "sales_gross": ZERO,
@@ -138,7 +147,7 @@ class FarmStatisticsService:
                 rows[month]["sales_gross"] += sale.gross_value or ZERO
         for month, values in feed["monthly"].items():
             rows[month].update(values)
-        for cost in costs:
+        for cost in additional_costs:
             rows[cost.date.strftime("%Y-%m")]["additional_cost"] += cost.amount or ZERO
         for values in rows.values():
             values["result_net"] = values["sales_net"] - values["feed_cost"] - values["additional_cost"]
@@ -146,8 +155,8 @@ class FarmStatisticsService:
         return [{"month": month, **values} for month, values in sorted(rows.items())]
 
     @staticmethod
-    def _profitability(sales_summary, cost_summary, feed, timeline) -> dict:
-        total_cost = feed["total_cost"] + cost_summary["total"]
+    def _profitability(sales_summary, cost_summary, additional_cost_summary, feed, timeline) -> dict:
+        total_cost = cost_summary["total"]
         net_sales = sales_summary["net_sales"]
         gross_sales = sales_summary["gross_sales"]
         live_weight = sales_summary["live_weight_kg"]
@@ -156,7 +165,7 @@ class FarmStatisticsService:
             "net_sales": net_sales,
             "vat_sales": sales_summary["vat_sales"],
             "feed_cost": feed["total_cost"],
-            "additional_cost": cost_summary["total"],
+            "additional_cost": additional_cost_summary["total"],
             "total_cost": total_cost,
             "net_result": net_sales - total_cost,
             "gross_result": gross_sales - total_cost,

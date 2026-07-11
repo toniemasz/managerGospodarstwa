@@ -82,6 +82,6 @@ def test_legacy_feed_cost_marks_missing_price_as_partial_instead_of_zero():
 
     assert detail["production"] == production
     assert detail["is_partial"] is True
-    assert "brak ceny składników: Soja" in detail["cost_note"]
-    assert detail["components"][0]["unit_price"] is None
-    assert detail["components"][0]["cost"] is None
+    assert result["total_cost"] == Decimal("0.00")
+    assert "Brak zapisanego kosztu produkcji paszy" in detail["cost_note"]
+    assert detail["components"] == []

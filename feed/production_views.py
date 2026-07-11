@@ -69,7 +69,11 @@ def process_stage2_view(request, pk):
 
     if request.method == "POST":
         force_inventory = request.POST.get("force_inventory") == "on"
-        create_serving = request.POST.get("create_feed_serving") == "on"
+        create_serving = (
+            request.POST.get("create_feed_serving") == "on"
+            if "create_feed_serving_present" in request.POST
+            else None
+        )
         success, message = complete_production(
             farm,
             pk,

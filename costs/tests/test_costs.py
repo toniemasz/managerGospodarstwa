@@ -1,7 +1,9 @@
 from datetime import date
 from decimal import Decimal
+from importlib import import_module
 
 import pytest
+from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
@@ -10,6 +12,7 @@ from costs.models import CostCategoryModel, CostModel
 from costs.services import CostService
 from farms.models import AuditLogModel
 from farms.services.farm_service import get_or_create_user_farm
+from feed.models import ProductionModel, RecipeModel
 
 
 @pytest.fixture
@@ -105,3 +108,47 @@ def test_empty_cost_list_has_clear_empty_state(cost_context):
     client, _user, _farm = cost_context
     response = client.get(reverse("cost_list"), {"year": 2026})
     assert "Brak kosztów" in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_manual_cost_cannot_have_zero_amount(cost_context):
+    _client, _user, farm = cost_context
+    category = CostCategoryModel.objects.create(farm=farm, name="Energia")
+    form = CostForm(data={
+        "date": "2026-03-10",
+        "amount": "0.00",
+        "category": category.pk,
+        "description": "Nieprawidłowy koszt",
+        "document_number": "",
+        "supplier": "",
+    }, farm=farm)
+
+    assert not form.is_valid()
+    assert "większa od zera" in form.errors["amount"][0]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_historical_backfill_creates_cost_even_when_fifo_amount_is_zero(cost_context):
+    _client, _user, farm = cost_context
+    recipe = RecipeModel.objects.create(farm=farm, name="Historyczna pasza bez ceny")
+    production = ProductionModel.objects.create(
+        recipe=recipe,
+        date=date(2025, 1, 1),
+        quantity_kg=Decimal("1000.00"),
+        status=ProductionModel.Statuses.QUEUED,
+        feed_cost_total=Decimal("0.00"),
+        feed_cost_is_partial=True,
+    )
+    ProductionModel.objects.filter(pk=production.pk).update(status=ProductionModel.Statuses.COMPLETED)
+
+    migration = import_module("costs.migrations.0002_production_costs")
+    migration.backfill_production_costs(django_apps, None)
+    migration.backfill_production_costs(django_apps, None)
+    format_migration = import_module("costs.migrations.0003_format_feed_cost_mass_units")
+    format_migration.format_feed_cost_descriptions(django_apps, None)
+
+    cost = CostModel.objects.get(production=production)
+    assert cost.amount == Decimal("0.00")
+    assert cost.category.name == "Pasza"
+    assert "1 t" in cost.description
+    assert CostModel.objects.filter(production=production).count() == 1

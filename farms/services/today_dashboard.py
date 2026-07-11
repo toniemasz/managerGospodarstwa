@@ -18,6 +18,7 @@ from feed.selectors.inventory import inventory_dashboard
 from sales.models import PigSaleModel
 from sows.models import MortalityReportModel, SowEventModel
 from sows.services.sow_dashboard_service import SowDashboardService
+from common.units import format_mass
 
 
 class TodayDashboardService:
@@ -428,7 +429,7 @@ class TodayDashboardService:
                 date_value=delivery.date,
                 type_label="Dostawa",
                 title=delivery.ingredient.name,
-                description=f"{delivery.quantity_kg} kg",
+                description=format_mass(delivery.quantity_kg),
                 url=reverse("edit_delivery", args=[delivery.id]),
                 icon_name="warehouse",
                 sort_value=delivery.date,
@@ -448,7 +449,7 @@ class TodayDashboardService:
                 date_value=production.date,
                 type_label="Śrutowanie",
                 title=production.recipe.name,
-                description=f"{production.quantity_kg} kg · {production.status_label}",
+                description=f"{format_mass(production.quantity_kg)} · {production.status_label}",
                 url=reverse("edit_production", args=[production.id]),
                 icon_name="production",
                 sort_value=production.created_at,

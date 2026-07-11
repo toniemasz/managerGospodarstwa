@@ -49,7 +49,7 @@ class CostModel(models.Model):
     amount = models.DecimalField(
         max_digits=14,
         decimal_places=2,
-        validators=[MinValueValidator(Decimal("0.01"))],
+        validators=[MinValueValidator(Decimal("0.00"))],
         verbose_name="Kwota",
     )
     description = models.TextField(verbose_name="Opis")
@@ -62,6 +62,14 @@ class CostModel(models.Model):
         related_name="created_costs",
         null=True,
         blank=True,
+    )
+    production = models.OneToOneField(
+        "feed.ProductionModel",
+        on_delete=models.CASCADE,
+        related_name="cost_entry",
+        null=True,
+        blank=True,
+        verbose_name="Śrutowanie źródłowe",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -80,6 +88,8 @@ class CostModel(models.Model):
 
         if self.category_id and self.category.farm_id != self.farm_id:
             raise ValidationError({"category": "Kategoria nie należy do tego gospodarstwa."})
+        if self.production_id and self.production.recipe.farm_id != self.farm_id:
+            raise ValidationError({"production": "Śrutowanie nie należy do tego gospodarstwa."})
 
     def __str__(self):
         return f"{self.date}: {self.description} ({self.amount} zł)"

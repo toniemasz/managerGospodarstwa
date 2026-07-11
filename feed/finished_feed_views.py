@@ -11,6 +11,7 @@ from feed.actions.finished_feed import create_feed_serving, delete_feed_serving,
 from feed.forms import FeedServingForm, ReadyFeedPurchaseForm
 from feed.models import FeedServingModel
 from feed.selectors.finished_feed import feed_servings_context, finished_feed_inventory_context
+from common.units import format_mass
 
 
 @login_required
@@ -26,7 +27,7 @@ def purchase_ready_feed_view(request):
     if request.method == "POST" and form.is_valid():
         delivery = purchase_ready_feed(farm=farm, user=request.user, **form.cleaned_data)
         log_action(farm=farm, user=request.user, action="READY_FEED_PURCHASE", obj=delivery)
-        messages.success(request, f"Przyjęto {delivery.quantity_kg:.2f} kg gotowej paszy „{delivery.product.name}”.")
+        messages.success(request, f"Przyjęto {format_mass(delivery.quantity_kg)} gotowej paszy „{delivery.product.name}”.")
         return redirect("finished_feed_inventory")
     return render(request, "feed/ready_feed_purchase_form.html", {"form": form})
 
@@ -43,7 +44,7 @@ def create_feed_serving_view(request):
             form.add_error(None, error.messages[0])
         else:
             log_action(farm=farm, user=request.user, action="FEED_SERVING_CREATE", obj=serving)
-            messages.success(request, f"Zarejestrowano podanie {serving.quantity_kg:.2f} kg paszy „{serving.product.name}”.")
+            messages.success(request, f"Zarejestrowano podanie {format_mass(serving.quantity_kg)} paszy „{serving.product.name}”.")
             return redirect("feed_servings")
     return render(request, "feed/feed_serving_form.html", {"form": form})
 

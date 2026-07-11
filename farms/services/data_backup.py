@@ -413,7 +413,11 @@ def _merge_user_records(payload, data, farm):
         category_map[str(record['pk'])] = obj
         counts['kategorie kosztów'] += int(created)
     for record in _records(data, 'costs.CostModel'):
-        fields = _clean_fields(record['fields'], {'farm', 'category', 'created_by', 'created_at', 'updated_at'})
+        production_id = record['fields'].get('production')
+        if production_id:
+            counts['pominięte rekordy wymagające pełnego odtworzenia'] += 1
+            continue
+        fields = _clean_fields(record['fields'], {'farm', 'category', 'production', 'created_by', 'created_at', 'updated_at'})
         category_id = record['fields'].get('category')
         category = _mapped(category_map, category_id, 'kategorie kosztów') if category_id else None
         _, created = CostModel.objects.get_or_create(
@@ -639,12 +643,19 @@ def _restore_user_records(payload, data, farm):
 
     _create_related_models(data, 'sales.SaleClassRowModel', SaleClassRowModel, 'sale', sale_map, counts)
     for record in _records(data, 'costs.CostModel'):
-        fields = _clean_fields(record['fields'], {'farm', 'category', 'created_by'})
+        fields = _clean_fields(record['fields'], {'farm', 'category', 'production', 'created_by'})
         category_id = record['fields'].get('category')
         category = _mapped(cost_category_map, category_id, 'kategorie kosztów') if category_id else None
+        production_id = record['fields'].get('production')
         created_at = fields.pop('created_at', None)
         updated_at = fields.pop('updated_at', None)
-        obj = CostModel.objects.create(farm=farm, category=category, created_by=None, **fields)
+        obj = CostModel.objects.create(
+            farm=farm,
+            category=category,
+            production=_mapped(production_map, production_id, 'produkcje') if production_id else None,
+            created_by=None,
+            **fields,
+        )
         timestamp_values = {}
         if created_at:
             timestamp_values['created_at'] = created_at

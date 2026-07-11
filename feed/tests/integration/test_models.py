@@ -10,6 +10,7 @@ from feed.models import (
     RecipeItemModel,
     RecipeModel,
 )
+from common.units import format_mass
 
 
 @pytest.mark.django_db
@@ -52,9 +53,9 @@ def test_feed_model_string_representations_and_status_label():
     )
 
     assert str(ing) == "Jęczmień [BIN]"
-    assert str(delivery) == "Dostawa: Jęczmień - 1250.50kg (2026-06-01)"
+    assert str(delivery) == f"Dostawa: Jęczmień - {format_mass(Decimal('1250.50'))} (2026-06-01)"
     assert str(price) == "Cena: Jęczmień - 0.85000 PLN/kg"
     assert str(recipe) == "Grower"
     assert str(item) == "Grower - Jęczmień (100.00%)"
     assert production.status_label == "Etap 1 zakończony (Biny)"
-    assert str(production) == "Śrutowanie: Grower (500.00kg) - Etap 1 zakończony (Biny)"
+    assert str(production) == f"Śrutowanie: Grower ({format_mass(Decimal('500.00'))}) - Etap 1 zakończony (Biny)"

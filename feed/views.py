@@ -20,6 +20,7 @@ from .forms import (
 )
 from common.date_range import PERIOD_OPTIONS, parse_date_range
 from common.filter_ui import filter_ui_state, parse_filter_date
+from common.units import format_mass
 from farms.services.current_farm import get_current_farm
 from farms.services.audit_log_service import log_action
 from feed.actions.deliveries import create_delivery, delete_delivery, update_delivery
@@ -189,7 +190,7 @@ def edit_delivery_view(request, pk):
                       'delete_label': 'Usuń dostawę',
                       'delete_confirm': (
                           f"Usunięcie tej dostawy zmniejszy stan magazynowy składnika "
-                          f"{delivery.ingredient.name} o {delivery.quantity_kg} kg. Kontynuować?"
+                          f"{delivery.ingredient.name} o {format_mass(delivery.quantity_kg)}. Kontynuować?"
                       ),
                   })
 

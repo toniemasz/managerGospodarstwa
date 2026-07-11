@@ -24,8 +24,9 @@ def test_seed_demo_data_creates_realistic_idempotent_dataset():
         PigSaleModel.objects.filter(farm=farm).count(),
     )
     assert counts == (40, 15, 6, 20, 12)
-    assert CostCategoryModel.objects.filter(farm=farm).count() == 9
-    assert CostModel.objects.filter(farm=farm).count() == 18
+    assert CostCategoryModel.objects.filter(farm=farm).count() == 10
+    assert CostModel.objects.filter(farm=farm).count() == 28
+    assert CostModel.objects.filter(farm=farm, production__isnull=False).count() == 10
     assert CostModel.objects.filter(farm=farm, is_paid=True).exists()
     assert CostModel.objects.filter(farm=farm, is_paid=False).exists()
     assert PigSaleModel.objects.filter(farm=farm, live_weight__gt=0).exists()
@@ -37,6 +38,8 @@ def test_seed_demo_data_creates_realistic_idempotent_dataset():
         ProductionModel.objects.filter(recipe__farm=farm).count(),
         PigSaleModel.objects.filter(farm=farm).count(),
     )
+    assert CostCategoryModel.objects.filter(farm=farm).count() == 10
+    assert CostModel.objects.filter(farm=farm).count() == 28
 
 
 @pytest.mark.django_db

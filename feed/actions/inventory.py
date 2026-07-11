@@ -17,6 +17,7 @@ from feed.models import (
 )
 from feed.calculators.feed_cost import IngredientRequirement, ProductionCalculator
 from feed.selectors.recipe_requirements import recipe_item_dicts_for_production
+from common.units import format_mass
 
 
 KG_QUANT = Decimal("0.01")
@@ -147,7 +148,7 @@ class InventoryActions:
         return remaining
 
     @transaction.atomic
-    def release_production(self, production: ProductionModel) -> None:
+    def release_production(self, production: ProductionModel, *, remove_cost: bool = True) -> None:
         farm = self.farm or production.recipe.farm
         usages = (
             ProductionIngredientUsageModel.objects.select_for_update()
@@ -178,6 +179,9 @@ class InventoryActions:
             feed_cost_is_partial=False,
             feed_cost_note="",
         )
+        if remove_cost:
+            from costs.actions import delete_production_cost
+            delete_production_cost(production)
 
     @transaction.atomic
     def book_production(
@@ -210,7 +214,7 @@ class InventoryActions:
             # receptury/custom_recipe_data. To najlepsze przybliżenie, nie dowód historii.
             requirements = list(self._production_requirements(production))
 
-        self.release_production(production)
+        self.release_production(production, remove_cost=False)
 
         usage_count = 0
         total_cost = Decimal("0.00")
@@ -259,7 +263,7 @@ class InventoryActions:
 
             if remaining_to_allocate > 0:
                 partial = True
-                missing_messages.append(f"{requirement.name}: {remaining_to_allocate:.2f} kg")
+                missing_messages.append(f"{requirement.name}: {format_mass(remaining_to_allocate)}")
                 if not forced:
                     raise ValidationError(
                         "Brakuje rozliczalnych dostaw FIFO dla produkcji: "
@@ -301,6 +305,8 @@ class InventoryActions:
         production.feed_cost_per_kg = cost_per_kg
         production.feed_cost_is_partial = partial
         production.feed_cost_note = note[:255]
+        from costs.actions import sync_production_cost
+        sync_production_cost(production, user=user)
         return usage_count
 
     @transaction.atomic
@@ -349,6 +355,8 @@ class InventoryActions:
         reconstruct_production_ids: set[int] | None = None,
     ) -> dict[str, int]:
         reconstruct_production_ids = reconstruct_production_ids or set()
+        from costs.actions import delete_stale_production_costs
+        delete_stale_production_costs(self.farm)
         ProductionIngredientUsageModel.objects.filter(farm=self.farm).delete()
         DeliveryModel.objects.filter(ingredient__farm=self.farm).update(remaining_quantity_kg=F("quantity_kg"))
         InventoryMovementModel.objects.filter(

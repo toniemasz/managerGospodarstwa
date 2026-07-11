@@ -64,13 +64,20 @@ def add_cost_view(request):
 @login_required
 def edit_cost_view(request, pk):
     farm = get_current_farm(request)
-    return _cost_form_view(request, cost=get_object_or_404(CostModel, pk=pk, farm=farm), is_edit=True)
+    cost = get_object_or_404(CostModel, pk=pk, farm=farm)
+    if cost.production_id:
+        messages.error(request, "Koszt paszy jest wyliczany automatycznie z FIFO i nie można go edytować ręcznie.")
+        return redirect("cost_list")
+    return _cost_form_view(request, cost=cost, is_edit=True)
 
 
 @login_required
 def delete_cost_view(request, pk):
     farm = get_current_farm(request)
     cost = get_object_or_404(CostModel, pk=pk, farm=farm)
+    if cost.production_id:
+        messages.error(request, "Koszt paszy jest powiązany ze śrutowaniem i nie można go usunąć ręcznie.")
+        return redirect("cost_list")
     if request.method == "POST":
         representation, object_id = str(cost), cost.pk
         cost.delete()

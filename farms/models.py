@@ -60,7 +60,7 @@ class FarmSettingsModel(models.Model):
     feed_serving_mode = models.CharField(
         max_length=24,
         choices=FeedServingModes.choices,
-        default=FeedServingModes.MANUAL,
+        default=FeedServingModes.AUTO_FULL_PRODUCTION,
     )
     default_dashboard_period = models.CharField(max_length=20, default="6m")
     date_format = models.CharField(max_length=20, default="YYYY-MM-DD")

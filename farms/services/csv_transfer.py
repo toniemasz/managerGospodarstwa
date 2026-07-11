@@ -32,8 +32,10 @@ SCHEMAS = {
     "sales.csv": ("id", "sale_date", "document_number", "tattoo", "no_settlement", "quantity", "total_weight", "meat_class", "price_per_kg", "avg_meatiness_seurop", "live_weight", "dressing_percentage", "net_value", "vat_value", "gross_value"),
     "sale_rows.csv": ("id", "sale_id", "line_no", "meat_class", "quantity", "weight", "avg_weight", "avg_meatiness", "price_per_kg", "net_value", "vat_value", "gross_value"),
     "cost_categories.csv": ("id", "name", "description", "is_active"),
-    "costs.csv": ("id", "category_id", "date", "amount", "description", "document_number", "supplier", "is_paid"),
+    "costs.csv": ("id", "category_id", "production_id", "date", "amount", "description", "document_number", "supplier", "is_paid"),
 }
+
+OPTIONAL_COLUMNS = {"costs.csv": {"production_id"}}
 
 
 def _value(value):
@@ -112,7 +114,7 @@ def _read_archive(uploaded_file):
                     raise BackupImportError(f"Plik {filename} nie jest zapisany w UTF-8.") from error
                 reader = csv.DictReader(StringIO(text))
                 columns = tuple(reader.fieldnames or ())
-                missing_columns = set(required) - set(columns)
+                missing_columns = set(required) - OPTIONAL_COLUMNS.get(filename, set()) - set(columns)
                 if missing_columns:
                     raise BackupImportError(f"Plik {filename} nie ma kolumn: {', '.join(sorted(missing_columns))}.")
                 rows = list(reader)
@@ -277,6 +279,7 @@ def import_csv_archive(uploaded_file, farm) -> dict[str, int]:
         RecipeItemModel.objects.create(recipe=_related(recipe_map, row["recipe_id"], "receptury"), ingredient=_related(ingredient_map, row["ingredient_id"], "składniki"), percentage=_decimal(row["percentage"]))
     for row in rows["deliveries.csv"]:
         DeliveryModel.objects.create(ingredient=_related(ingredient_map, row["ingredient_id"], "składniki"), date=_date(row["date"]), quantity_kg=_decimal(row["quantity_kg"]), price_per_kg=_decimal(row["price_per_kg"], nullable=True))
+    production_map = {}
     for row in rows["productions.csv"]:
         try:
             custom = json.loads(row["custom_recipe_data"] or "null")
@@ -284,15 +287,23 @@ def import_csv_archive(uploaded_file, farm) -> dict[str, int]:
             raise BackupImportError("Nieprawidłowy JSON w productions.csv.") from error
         if isinstance(custom, dict):
             custom = {str(_related(ingredient_map, key, "składniki").pk): value for key, value in custom.items()}
-        ProductionModel.objects.create(
+        production = ProductionModel(
             recipe=_related(recipe_map, row["recipe_id"], "receptury"),
             date=_date(row["date"]),
             time=_time(row["time"]),
             quantity_kg=_decimal(row["quantity_kg"]),
             custom_recipe_data=custom,
+            status=ProductionModel.Statuses.QUEUED,
+            completed_at=_datetime(row["completed_at"]),
+        )
+        production._skip_inventory_sync = True
+        production.save()
+        ProductionModel.objects.filter(pk=production.pk).update(
             status=row["status"],
             completed_at=_datetime(row["completed_at"]),
         )
+        production.status = row["status"]
+        production_map[row["id"]] = production
     sale_map = {}
     decimal_fields = ("total_weight", "price_per_kg", "avg_meatiness_seurop", "live_weight", "dressing_percentage", "net_value", "vat_value", "gross_value")
     for row in rows["sales.csv"]:
@@ -312,16 +323,24 @@ def import_csv_archive(uploaded_file, farm) -> dict[str, int]:
         category = None
         if row["category_id"]:
             category = _related(category_map, row["category_id"], "kategorii kosztu")
-        CostModel.objects.create(
-            farm=farm,
-            category=category,
-            date=_date(row["date"]),
-            amount=_decimal(row["amount"]),
-            description=row["description"],
-            document_number=row["document_number"],
-            supplier=row["supplier"],
-            is_paid=_bool(row["is_paid"]),
-        )
+        production_id = row.get("production_id") or ""
+        defaults = {
+            "farm": farm,
+            "category": category,
+            "date": _date(row["date"]),
+            "amount": _decimal(row["amount"]),
+            "description": row["description"],
+            "document_number": row["document_number"],
+            "supplier": row["supplier"],
+            "is_paid": _bool(row["is_paid"]),
+        }
+        if production_id:
+            CostModel.objects.update_or_create(
+                production=_related(production_map, production_id, "produkcji"),
+                defaults=defaults,
+            )
+        else:
+            CostModel.objects.create(**defaults)
     InventoryActions(farm).rebuild()
     counts.update({"składniki": len(ingredient_map), "receptury": len(recipe_map), "dostawy": len(rows["deliveries.csv"]), "produkcje": len(rows["productions.csv"]), "sprzedaże": len(sale_map), "wiersze sprzedaży": len(rows["sale_rows.csv"]), "kategorie kosztów": len(category_map), "koszty": len(rows["costs.csv"])})
     return counts

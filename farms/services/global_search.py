@@ -8,6 +8,7 @@ from farms.services.module_navigation import ModuleNavigationService
 from feed.models import IngredientModel, ProductionModel, RecipeModel
 from sales.models import PigSaleModel
 from sows.models import SowModel, VaccinationPlanModel
+from common.units import format_mass
 
 
 MIN_SEARCH_LENGTH = 2
@@ -132,7 +133,7 @@ def _production_results(farm, query: str, active_url_name: str) -> dict:
     items = [
         {
             "title": f"Śrutowanie: {production.recipe.name}",
-            "subtitle": f"{production.quantity_kg} kg paszy",
+            "subtitle": f"{format_mass(production.quantity_kg)} paszy",
             "meta": f"{production.status_label} • {production.date:%d.%m.%Y}",
             "url": reverse("edit_production", args=[production.id]),
             "icon_name": "production",

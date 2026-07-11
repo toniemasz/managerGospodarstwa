@@ -10,6 +10,7 @@ from feed.models import ProductionModel
 from feed.selectors.inventory import inventory_dashboard
 from sales.models import PigSaleModel
 from sows.services.sow_dashboard_service import SowDashboardService
+from common.units import format_mass
 
 
 class TaskCenterService:
@@ -170,8 +171,8 @@ class TaskCenterService:
             self._task(
                 title=f"Niski stan: {item.name}",
                 description=(
-                    f"Pozostało {item.current_stock:.2f} kg; próg alertu "
-                    f"to {item.low_stock_threshold_kg:.2f} kg."
+                    f"Pozostało {format_mass(item.current_stock)}; próg alertu "
+                    f"to {format_mass(item.low_stock_threshold_kg)}."
                 ),
                 status_label="niski stan",
                 priority="urgent",
@@ -190,7 +191,7 @@ class TaskCenterService:
         queued_items = [
             self._task(
                 title=f"Śrutowanie: {production.recipe.name}",
-                description=f"Zaplanowano {production.quantity_kg} kg paszy.",
+                description=f"Zaplanowano {format_mass(production.quantity_kg)} paszy.",
                 status_label="w kolejce",
                 priority="upcoming",
                 due_date=production.date,
@@ -209,7 +210,7 @@ class TaskCenterService:
         stage_one_items = [
             self._task(
                 title=f"Dokończ śrutowanie: {production.recipe.name}",
-                description=f"Etap 1 ukończony dla {production.quantity_kg} kg paszy.",
+                description=f"Etap 1 ukończony dla {format_mass(production.quantity_kg)} paszy.",
                 status_label="etap 2",
                 priority="today",
                 due_date=production.date,

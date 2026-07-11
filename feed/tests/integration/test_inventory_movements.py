@@ -10,6 +10,7 @@ from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
+from costs.models import CostModel
 from farms.services.farm_service import get_or_create_user_farm
 from feed.models import DeliveryModel, IngredientModel, InventoryMovementModel, ProductionIngredientUsageModel, ProductionModel, RecipeItemModel, RecipeModel
 from feed.actions.productions import complete_production
@@ -75,6 +76,8 @@ def test_completed_production_edit_and_delete_rebuilds_fifo_usage(inventory_data
     first_delivery, second_delivery = _replace_fifo_deliveries(ingredient)
     production = _complete_production(farm, recipe, "1200.00", date(2026, 3, 1), user)
     assert production.feed_cost_total == Decimal("1500.00")
+    production_cost = CostModel.objects.get(production=production)
+    assert production_cost.amount == Decimal("1500.00")
     assert ProductionIngredientUsageModel.objects.filter(production=production).count() == 2
     first_delivery.refresh_from_db()
     second_delivery.refresh_from_db()
@@ -85,6 +88,8 @@ def test_completed_production_edit_and_delete_rebuilds_fifo_usage(inventory_data
     production.save()
     production.refresh_from_db()
     assert production.feed_cost_total == Decimal("600.00")
+    production_cost.refresh_from_db()
+    assert production_cost.amount == Decimal("600.00")
     assert ProductionIngredientUsageModel.objects.filter(production=production).count() == 1
     first_delivery.refresh_from_db()
     second_delivery.refresh_from_db()
@@ -98,6 +103,7 @@ def test_completed_production_edit_and_delete_rebuilds_fifo_usage(inventory_data
     assert second_delivery.remaining_quantity_kg == Decimal("1000.00")
     assert not ProductionIngredientUsageModel.objects.exists()
     assert not InventoryMovementModel.objects.filter(movement_type=InventoryMovementModel.Types.PRODUCTION_USAGE).exists()
+    assert not CostModel.objects.filter(pk=production_cost.pk).exists()
 
 
 @pytest.mark.django_db

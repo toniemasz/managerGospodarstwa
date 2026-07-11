@@ -7,6 +7,7 @@ from django.db.models import JSONField, Q
 from django.core.validators import MinValueValidator, MaxValueValidator
 
 from feed.domain.rules import LOW_STOCK_THRESHOLD_KG
+from common.units import format_mass
 
 
 class IngredientModel(models.Model):
@@ -66,7 +67,7 @@ class DeliveryModel(models.Model):
     )
 
     def __str__(self):
-        return f"Dostawa: {self.ingredient.name} - {self.quantity_kg}kg ({self.date})"
+        return f"Dostawa: {self.ingredient.name} - {format_mass(self.quantity_kg)} ({self.date})"
 
 
 class IngredientPriceConfigModel(models.Model):
@@ -256,7 +257,7 @@ class ProductionModel(models.Model):
         return dict(self.Statuses.choices).get(self.status, self.status)
 
     def __str__(self):
-        return f"Śrutowanie: {self.recipe.name} ({self.quantity_kg}kg) - {self.status_label}"
+        return f"Śrutowanie: {self.recipe.name} ({format_mass(self.quantity_kg)}) - {self.status_label}"
 
 
 class FeedProductModel(models.Model):
@@ -418,7 +419,7 @@ class ProductionIngredientUsageModel(models.Model):
 
     def __str__(self):
         delivery_label = f"z dostawy {self.delivery_id}" if self.delivery_id else "bez przypisanej dostawy"
-        return f"{self.production}: {self.ingredient.name} {self.quantity_kg} kg {delivery_label}"
+        return f"{self.production}: {self.ingredient.name} {format_mass(self.quantity_kg)} {delivery_label}"
 
 
 class InventoryMovementModel(models.Model):
@@ -479,4 +480,4 @@ class InventoryMovementModel(models.Model):
             raise ValidationError("Składnik nie należy do wskazanego gospodarstwa.")
 
     def __str__(self):
-        return f"{self.get_movement_type_display()}: {self.quantity_kg} kg {self.ingredient.name}"
+        return f"{self.get_movement_type_display()}: {format_mass(self.quantity_kg)} {self.ingredient.name}"

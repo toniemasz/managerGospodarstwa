@@ -13,6 +13,7 @@ from farms.module_registry import MODULE_DEFINITIONS
 from farms.services.cache import DASHBOARD_TTL, cached_farm_value
 from farms.services.module_navigation import ModuleNavigationService, normalize_visible_modules
 from farms.services.profitability import ProfitabilityAnalyticsService
+from common.units import format_mass
 from farms.services.settings_service import get_farm_settings
 from farms.services.task_center import TaskCenterService
 from feed.models import ProductionModel
@@ -133,9 +134,8 @@ class FarmDashboardService:
         return f"{amount:,.2f}".replace(",", " ") + " PLN"
 
     @staticmethod
-    def _tonnes(value) -> str:
-        amount = Decimal(value or 0).quantize(Decimal("0.01"))
-        return f"{amount:,.2f}".replace(",", " ") + " t"
+    def _mass(value_kg) -> str:
+        return format_mass(value_kg or 0)
 
     def _stat_tasks_total(self) -> dict:
         tasks = self._task_summary()
@@ -198,7 +198,7 @@ class FarmDashboardService:
 
     def _stat_inventory_total(self) -> dict:
         return {
-            "value": self._tonnes(self._inventory_summary()["total_inventory_t"]),
+            "value": self._mass(self._inventory_summary()["total_inventory_kg"]),
             "unit": "",
             "note": "Łączny stan magazynu",
             "url": reverse("feed_full_inventory"),

@@ -10,7 +10,7 @@ class CostService:
         self.farm = farm
 
     def get_costs(self, *, year=None, date_from=None, date_to=None, category=None, payment_status=""):
-        queryset = CostModel.objects.filter(farm=self.farm).select_related("category", "created_by")
+        queryset = CostModel.objects.filter(farm=self.farm).select_related("category", "created_by", "production")
         if year:
             queryset = queryset.filter(date__year=year)
         if date_from:

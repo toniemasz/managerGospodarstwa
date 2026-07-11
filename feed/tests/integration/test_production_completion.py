@@ -8,6 +8,7 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from django.utils import timezone
 
+from costs.models import CostModel
 from farms.services.farm_service import get_or_create_user_farm
 from feed.actions.productions import complete_production
 from feed.models import (
@@ -93,6 +94,11 @@ def test_full_two_stage_http_flow_completes_without_server_error(authenticated_f
     assert DeliveryModel.objects.get(ingredient=ingredient).remaining_quantity_kg == Decimal("400.00")
     assert production.feed_cost_total == Decimal("125.00")
     assert production.feed_cost_per_kg == Decimal("1.25000")
+    cost = CostModel.objects.get(production=production, farm=farm)
+    assert cost.amount == Decimal("125.00")
+    assert cost.category.name == "Pasza"
+    assert cost.date == production.date
+    assert cost.is_paid is True
     batch = FinishedFeedBatchModel.objects.get(production=production)
     assert batch.product.source_type == batch.product.SourceTypes.PURCHASED_READY
     assert batch.initial_quantity_kg == Decimal("100.00")
@@ -103,6 +109,9 @@ def test_full_two_stage_http_flow_completes_without_server_error(authenticated_f
 @pytest.mark.django_db
 def test_multi_ingredient_manual_mode_leaves_produced_feed_in_batch(authenticated_farm):
     client, _, farm = authenticated_farm
+    settings = get_farm_settings(farm)
+    settings.feed_serving_mode = FarmSettingsModel.FeedServingModes.MANUAL
+    settings.save(update_fields=("feed_serving_mode",))
     recipe, first = create_recipe(farm, stock_kg="500.00", price="1.00000")
     RecipeItemModel.objects.filter(recipe=recipe, ingredient=first).update(percentage=Decimal("50.00"))
     second = IngredientModel.objects.create(farm=farm, name="Soja", is_in_bin=False)
@@ -140,6 +149,52 @@ def test_stage_two_auto_mode_creates_exactly_one_feed_serving(authenticated_farm
     client.post(reverse("process_stage2", args=[production.pk]), {"create_feed_serving": "on"})
     assert FinishedFeedBatchModel.objects.filter(production=production).count() == 1
     assert FeedServingModel.objects.filter(automatic_for_production=production).count() == 1
+
+
+@pytest.mark.django_db
+def test_automatic_fifo_cost_cannot_be_edited_or_deleted_manually(authenticated_farm):
+    client, user, farm = authenticated_farm
+    recipe, _ = create_recipe(farm, stock_kg="500.00")
+    production = create_production(recipe, status=ProductionModel.Statuses.STAGE_1_DONE)
+    success, message = complete_production(farm, production.pk, user=user)
+    assert success is True, message
+    cost = CostModel.objects.get(production=production)
+
+    edit_response = client.get(reverse("edit_cost", args=[cost.pk]))
+    delete_response = client.post(reverse("delete_cost", args=[cost.pk]))
+
+    assert edit_response.status_code == 302
+    assert delete_response.status_code == 302
+    production.refresh_from_db()
+    cost.refresh_from_db()
+    assert cost.amount == production.feed_cost_total
+
+
+@pytest.mark.django_db
+def test_stage_two_uses_automatic_farm_setting_when_post_has_no_explicit_choice(authenticated_farm):
+    client, _, farm = authenticated_farm
+    settings = get_farm_settings(farm)
+    settings.feed_serving_mode = FarmSettingsModel.FeedServingModes.AUTO_FULL_PRODUCTION
+    settings.save(update_fields=("feed_serving_mode",))
+    recipe, first = create_recipe(farm, stock_kg="500.00")
+    RecipeItemModel.objects.filter(recipe=recipe, ingredient=first).update(percentage=Decimal("50.00"))
+    second = IngredientModel.objects.create(farm=farm, name="Jęczmień", is_in_bin=True)
+    DeliveryModel.objects.create(
+        ingredient=second,
+        date=date(2026, 7, 1),
+        quantity_kg=Decimal("500.00"),
+        price_per_kg=Decimal("1.00000"),
+    )
+    RecipeItemModel.objects.create(recipe=recipe, ingredient=second, percentage=Decimal("50.00"))
+    production = create_production(recipe, status=ProductionModel.Statuses.STAGE_1_DONE)
+
+    response = client.post(reverse("process_stage2", args=[production.pk]), {})
+
+    assert response.status_code == 302
+    serving = FeedServingModel.objects.get(automatic_for_production=production)
+    assert serving.quantity_kg == production.quantity_kg
+    assert serving.time == production.time
+    assert FinishedFeedBatchModel.objects.get(production=production).remaining_quantity_kg == Decimal("0.00")
 
 
 @pytest.mark.django_db

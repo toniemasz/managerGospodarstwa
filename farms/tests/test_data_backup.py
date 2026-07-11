@@ -22,6 +22,7 @@ from farms.services.data_backup import (
 )
 from farms.services.farm_service import get_or_create_user_farm
 from farms.services.settings_service import get_farm_settings
+from costs.models import CostModel
 from feed.models import (
     DeliveryModel,
     IngredientModel,
@@ -82,6 +83,7 @@ def _create_complete_farm_data(farm):
         time=time(8, 30),
         quantity_kg=Decimal('2000.00'),
         custom_recipe_data={str(ingredient.pk): '100.00'},
+        status=ProductionModel.Statuses.COMPLETED,
     )
 
     sale = PigSaleModel.objects.create(
@@ -134,6 +136,11 @@ def test_user_backup_restores_all_models_and_relationships():
     assert restored_item.ingredient.farm == target_farm
     restored_production = ProductionModel.objects.get(recipe__farm=target_farm)
     assert list(restored_production.custom_recipe_data) == [str(restored_item.ingredient_id)]
+    assert CostModel.objects.filter(
+        farm=target_farm,
+        production=restored_production,
+        amount=restored_production.feed_cost_total,
+    ).exists()
     assert SaleClassRowModel.objects.get(sale__farm=target_farm).sale.document_number == 'FV/BACKUP/1'
 
 

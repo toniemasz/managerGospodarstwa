@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 import pytest
 from django.contrib.auth.models import AnonymousUser, User
 from django.test import RequestFactory
@@ -135,7 +137,8 @@ def test_farm_settings_view_updates_farm_and_rules(client):
         'gestation_days': '115',
         'farrowing_alert_days_ahead': '5',
         'vaccination_alert_days_ahead': '9',
-        'default_production_quantity_kg': '1800.00',
+        'default_production_quantity_kg': '1.8',
+        'default_production_quantity_kg_unit': 't',
         'allow_farrowing_without_pregnancy_check': 'on',
         'ask_before_auto_pregnancy_check': 'on',
     })
@@ -149,3 +152,4 @@ def test_farm_settings_view_updates_farm_and_rules(client):
     assert settings.interface_scale == 'compact'
     assert settings.theme == 'dark'
     assert settings.font_scale == 137
+    assert settings.default_production_quantity_kg == Decimal('1800.00')

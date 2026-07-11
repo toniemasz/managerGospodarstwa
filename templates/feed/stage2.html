@@ -91,6 +91,7 @@
 
     <form method="post" id="stageForm" class="panel stage-confirm-panel" data-stage-storage-key="feed_prod_{{ production.id }}_stage2">
         {% csrf_token %}
+        <input type="hidden" name="create_feed_serving_present" value="1">
         <div class="section-heading">
             <div>
                 <h2>Po zakończeniu</h2>

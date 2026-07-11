@@ -61,6 +61,12 @@ def test_csv_export_and_atomic_import_round_trip(two_farms):
     DeliveryModel.objects.create(ingredient=ingredient, date=date.today(), quantity_kg=1000, price_per_kg=1)
     recipe = RecipeModel.objects.create(farm=source, name="CSV recipe")
     RecipeItemModel.objects.create(recipe=recipe, ingredient=ingredient, percentage=100)
+    production = ProductionModel.objects.create(
+        recipe=recipe,
+        date=date.today(),
+        quantity_kg=Decimal("100.00"),
+        status=ProductionModel.Statuses.COMPLETED,
+    )
     PigSaleModel.objects.create(farm=source, document_number="CSV/1", quantity=10)
     category = CostCategoryModel.objects.create(farm=source, name="CSV koszt")
     CostModel.objects.create(
@@ -75,11 +81,18 @@ def test_csv_export_and_atomic_import_round_trip(two_farms):
     payload, _ = build_csv_export(source)
     uploaded = SimpleUploadedFile("export.zip", payload, content_type="application/zip")
     counts = import_csv_archive(uploaded, target)
+    production.refresh_from_db()
 
     assert counts["maciory"] == 1
     assert SowModel.objects.filter(farm=target, ear_tag=sow.ear_tag).exists()
     assert IngredientModel.objects.filter(farm=target, name="Pszenica").exists()
     assert CostModel.objects.filter(farm=target, description="Koszt z CSV", amount=Decimal("123.45")).exists()
+    restored_production = ProductionModel.objects.get(recipe__farm=target, recipe__name=recipe.name)
+    assert CostModel.objects.filter(
+        farm=target,
+        production=restored_production,
+        amount=production.feed_cost_total,
+    ).exists()
     assert not SowModel.objects.filter(farm=source).exclude(pk=sow.pk).exists()
 
 
