@@ -41,7 +41,7 @@ def production_for_processing(farm, production_id: int, *, lock_for_update: bool
     )
     queryset = queryset.filter(recipe__farm=farm)
     if lock_for_update:
-        queryset = queryset.select_for_update()
+        queryset = queryset.select_for_update(of=("self"), )
     return queryset.get(pk=production_id)
 
 
