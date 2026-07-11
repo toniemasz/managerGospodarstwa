@@ -42,8 +42,7 @@ class TestSowDashboardService:
         mock_repo.get_archived_sows.return_value = [mock_sow]
 
 
-        service = SowDashboardService()
-        service.repository = mock_repo
+        service = SowDashboardService(repository=mock_repo)
 
         # Act
         result = service.get_archived_sows_list()

@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 from django.db import transaction
 
-from farms.services.cache import invalidate_farm_cache_on_commit
+from sales.actions import replace_sale_rows, save_sale as save_sale_action
 from sales.forms import SaleClassRowFormSet, empty_sale_row_initials
 from sales.models import PigSaleModel, SaleClassRowModel
 from sales.services.parsers.factory import SaleSettlementParserFactory
@@ -57,62 +57,22 @@ class SalePdfImportResult:
 
 
 class SaleFormService:
-    def __init__(self, farm=None):
+    def __init__(self, farm):
+        if farm is None:
+            raise ValueError("Zapis sprzedaży wymaga jawnego gospodarstwa.")
         self.farm = farm
 
     @transaction.atomic
     def save_sale(self, form, row_formset, sale: PigSaleModel) -> PigSaleModel:
-        saved_sale = form.save(commit=False)
-        saved_sale.farm = sale.farm or self.farm
-        saved_sale.save()
-        self.replace_sale_rows(saved_sale, row_formset)
-        invalidate_farm_cache_on_commit(saved_sale.farm, groups=("sales",))
-        return saved_sale
+        return save_sale_action(
+            farm=self.farm,
+            form=form,
+            row_formset=row_formset,
+            sale=sale,
+        )
 
     def replace_sale_rows(self, sale: PigSaleModel, row_formset) -> None:
-        sale.rows.all().delete()
-
-        rows = []
-        for index, form in enumerate(row_formset.forms, start=1):
-            if form.cleaned_data.get('DELETE') or not form.has_row_data():
-                continue
-            rows.append(SaleClassRowModel(
-                sale=sale,
-                line_no=form.cleaned_data.get('line_no') or len(rows) + 1 or index,
-                meat_class=form.cleaned_data.get('meat_class') or '',
-                quantity=form.cleaned_data.get('quantity'),
-                weight=form.cleaned_data.get('weight'),
-                avg_weight=form.cleaned_data.get('avg_weight'),
-                avg_meatiness=form.cleaned_data.get('avg_meatiness'),
-                price_per_kg=form.cleaned_data.get('price_per_kg'),
-                net_value=form.cleaned_data.get('net_value'),
-                vat_value=form.cleaned_data.get('vat_value'),
-                gross_value=form.cleaned_data.get('gross_value'),
-            ))
-
-        if rows:
-            SaleClassRowModel.objects.bulk_create(rows)
-            sale.recalculate_from_rows()
-            sale.meat_class = rows[0].meat_class or sale.meat_class
-            sale.save(update_fields=[
-                'quantity',
-                'total_weight',
-                'meat_class',
-                'price_per_kg',
-                'net_value',
-                'vat_value',
-                'gross_value',
-            ])
-        else:
-            sale.recalculate_from_rows()
-            sale.save(update_fields=[
-                'quantity',
-                'total_weight',
-                'price_per_kg',
-                'net_value',
-                'vat_value',
-                'gross_value',
-            ])
+        replace_sale_rows(sale, row_formset)
 
     def parse_pdf_import(self, uploaded_pdf, post_data) -> SalePdfImportResult:
         parsed = SaleSettlementParserFactory.create('pdf').parse(uploaded_pdf)

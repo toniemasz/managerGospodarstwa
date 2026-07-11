@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from farms.services.cache import PROFITABILITY_TTL, cached_farm_value
+from common.cache import PROFITABILITY_TTL, cached_farm_value
 from farms.services.statistics import FarmStatisticsService
 
 

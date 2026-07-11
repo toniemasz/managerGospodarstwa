@@ -11,19 +11,22 @@ from feed.models import (
     RecipeModel,
 )
 from common.units import format_mass
+from farms.services.farm_service import get_or_create_legacy_farm
 
 
 @pytest.mark.django_db
 def test_ingredient_str_representation():
-    ing = IngredientModel.objects.create(name="Otręby")
+    farm = get_or_create_legacy_farm()
+    ing = IngredientModel.objects.create(farm=farm, name="Otręby")
     # Zmieniliśmy model tak, że domyślnie is_in_bin=False daje dopisek [WOREK]
     assert str(ing) == "Otręby [WOREK]"
 
 
 @pytest.mark.django_db
 def test_recipe_item_percentage_validation():
-    ing = IngredientModel.objects.create(name="Owies")
-    recipe = RecipeModel.objects.create(name="Testowa")
+    farm = get_or_create_legacy_farm()
+    ing = IngredientModel.objects.create(farm=farm, name="Owies")
+    recipe = RecipeModel.objects.create(farm=farm, name="Testowa")
 
     # Tworzymy element z niedozwolonym procentem (powyżej 100%)
     item = RecipeItemModel(recipe=recipe, ingredient=ing, percentage=Decimal('150.00'))
@@ -35,7 +38,8 @@ def test_recipe_item_percentage_validation():
 
 @pytest.mark.django_db
 def test_feed_model_string_representations_and_status_label():
-    ing = IngredientModel.objects.create(name="Jęczmień", is_in_bin=True)
+    farm = get_or_create_legacy_farm()
+    ing = IngredientModel.objects.create(farm=farm, name="Jęczmień", is_in_bin=True)
     delivery = DeliveryModel.objects.create(
         ingredient=ing,
         date=date(2026, 6, 1),
@@ -43,7 +47,7 @@ def test_feed_model_string_representations_and_status_label():
         price_per_kg=Decimal('0.80000'),
     )
     price = IngredientPriceConfigModel.objects.create(ingredient=ing, price_per_kg=Decimal('0.85000'))
-    recipe = RecipeModel.objects.create(name="Grower")
+    recipe = RecipeModel.objects.create(farm=farm, name="Grower")
     item = RecipeItemModel.objects.create(recipe=recipe, ingredient=ing, percentage=Decimal('100.00'))
     production = ProductionModel.objects.create(
         date=date(2026, 6, 2),

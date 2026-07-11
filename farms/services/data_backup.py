@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from copy import deepcopy
 from collections import Counter
 from io import BytesIO, StringIO
 from tempfile import NamedTemporaryFile
@@ -33,10 +34,11 @@ from feed.models import (
     RecipeVersionModel,
 )
 from sales.models import PigSaleModel, SaleClassRowModel
-from sows.models import SowEventModel, SowModel, VaccinationPlanModel
+from sows.models import MortalityReportModel, SowEventModel, SowModel, VaccinationPlanModel
 
 
-BACKUP_FORMAT_VERSION = 2
+BACKUP_FORMAT_VERSION = 3
+SUPPORTED_USER_BACKUP_VERSIONS = {1, 2, 3}
 MAX_UPLOAD_SIZE = 25 * 1024 * 1024
 MAX_UNCOMPRESSED_SIZE = 100 * 1024 * 1024
 
@@ -46,6 +48,7 @@ USER_EXPORT_QUERYSETS = {
     'sows.VaccinationPlanModel': lambda farm: VaccinationPlanModel.objects.filter(farm=farm).order_by('id'),
     'sows.SowModel': lambda farm: SowModel.objects.filter(farm=farm).order_by('id'),
     'sows.SowEventModel': lambda farm: SowEventModel.objects.filter(sow__farm=farm).order_by('id'),
+    'sows.MortalityReportModel': lambda farm: MortalityReportModel.objects.filter(farm=farm).order_by('id'),
     'feed.IngredientModel': lambda farm: IngredientModel.objects.filter(farm=farm).order_by('id'),
     'feed.DeliveryModel': lambda farm: DeliveryModel.objects.filter(ingredient__farm=farm).order_by('id'),
     'feed.IngredientPriceConfigModel': lambda farm: IngredientPriceConfigModel.objects.filter(ingredient__farm=farm).order_by('id'),
@@ -69,6 +72,7 @@ BUSINESS_MODELS = (
     VaccinationPlanModel,
     SowModel,
     SowEventModel,
+    MortalityReportModel,
     IngredientModel,
     DeliveryModel,
     IngredientPriceConfigModel,
@@ -325,6 +329,7 @@ def _delete_farm_business_data(farm):
     DeliveryModel.objects.filter(ingredient__farm=farm).delete()
     IngredientPriceConfigModel.objects.filter(ingredient__farm=farm).delete()
     IngredientModel.objects.filter(farm=farm).delete()
+    MortalityReportModel.objects.filter(farm=farm).delete()
     SowModel.objects.filter(farm=farm).delete()
     VaccinationPlanModel.objects.filter(farm=farm).delete()
 
@@ -347,6 +352,19 @@ def _merge_user_records(payload, data, farm):
         sow = _mapped(sow_map, record['fields'].get('sow'), 'maciory')
         _, created = SowEventModel.objects.get_or_create(sow=sow, event_type=fields.pop('event_type'), event_date=fields.pop('event_date'), defaults=fields)
         counts['zdarzenia macior'] += int(created)
+    for record in _records(data, 'sows.MortalityReportModel'):
+        fields = _clean_fields(record['fields'], {'farm', 'sow', 'created_by', 'created_at'})
+        sow_id = record['fields'].get('sow')
+        sow = _mapped(sow_map, sow_id, 'maciory') if sow_id else None
+        _, created = MortalityReportModel.objects.get_or_create(
+            farm=farm,
+            sow=sow,
+            mortality_type=fields.pop('mortality_type'),
+            mortality_date=fields.pop('mortality_date'),
+            quantity=fields.pop('quantity'),
+            defaults={**fields, 'created_by': None},
+        )
+        counts['upadki'] += int(created)
     ingredient_map = {}
     for record in _records(data, 'feed.IngredientModel'):
         fields = _clean_fields(record['fields'], {'farm', 'created_at'})
@@ -437,6 +455,7 @@ def user_business_data_counts(farm: FarmModel) -> dict[str, int]:
         'plany szczepień': VaccinationPlanModel.objects.filter(farm=farm),
         'maciory': SowModel.objects.filter(farm=farm),
         'zdarzenia macior': SowEventModel.objects.filter(sow__farm=farm),
+        'upadki': MortalityReportModel.objects.filter(farm=farm),
         'składniki': IngredientModel.objects.filter(farm=farm),
         'dostawy': DeliveryModel.objects.filter(ingredient__farm=farm),
         'ceny składników': IngredientPriceConfigModel.objects.filter(ingredient__farm=farm),
@@ -515,6 +534,16 @@ def _restore_user_records(payload, data, farm):
         counts['produkty gotowej paszy'] += 1
 
     _create_related_models(data, 'sows.SowEventModel', SowEventModel, 'sow', sow_map, counts)
+    for record in _records(data, 'sows.MortalityReportModel'):
+        fields = _clean_fields(record['fields'], {'farm', 'sow', 'created_by', 'created_at'})
+        sow_id = record['fields'].get('sow')
+        MortalityReportModel.objects.create(
+            farm=farm,
+            sow=_mapped(sow_map, sow_id, 'maciory') if sow_id else None,
+            created_by=None,
+            **fields,
+        )
+        counts['upadki'] += 1
     _create_related_models(data, 'feed.DeliveryModel', DeliveryModel, 'ingredient', ingredient_map, counts)
     _create_related_models(
         data,
@@ -736,6 +765,26 @@ def _validate_user_records(data):
                 f'Import zatrzymany: duplikaty w sekcji {label}: {", ".join(duplicates)}.'
             )
 
+    required_fields = {
+        'sows.SowModel': {'ear_tag'},
+        'sows.SowEventModel': {'sow', 'event_type', 'event_date'},
+        'sows.MortalityReportModel': {'mortality_type', 'mortality_date', 'quantity'},
+        'feed.IngredientModel': {'name'},
+        'feed.DeliveryModel': {'ingredient', 'date', 'quantity_kg'},
+        'feed.RecipeModel': {'name'},
+        'feed.RecipeItemModel': {'recipe', 'ingredient', 'percentage'},
+        'feed.ProductionModel': {'recipe', 'date', 'quantity_kg'},
+        'costs.CostModel': {'date', 'amount', 'description'},
+    }
+    for label, names in required_fields.items():
+        for record in _records(data, label):
+            missing = sorted(name for name in names if record['fields'].get(name) in (None, ''))
+            if missing:
+                raise BackupImportError(
+                    f'Import zatrzymany: rekord {label}#{record["pk"]} nie ma wymaganych pól: '
+                    f'{", ".join(missing)}.'
+                )
+
 
 def _assert_database_can_be_restored(fixture):
     existing = {model._meta.verbose_name_plural: model.objects.count() for model in BUSINESS_MODELS if model.objects.exists()}
@@ -832,7 +881,27 @@ def _select_user_payload(documents):
     payloads = [value for _, value in documents.values() if isinstance(value, dict) and isinstance(value.get('data'), dict)]
     if len(payloads) != 1:
         raise BackupImportError('Kopia użytkownika musi zawierać dokładnie jeden zestaw danych gospodarstwa.')
-    return payloads[0]
+    return _upgrade_user_payload(payloads[0])
+
+
+def _upgrade_user_payload(payload):
+    upgraded = deepcopy(payload)
+    raw_version = upgraded.get('version', 1)
+    try:
+        version = int(raw_version)
+    except (TypeError, ValueError) as error:
+        raise BackupImportError('Kopia gospodarstwa ma nieprawidłowy numer wersji.') from error
+    if version not in SUPPORTED_USER_BACKUP_VERSIONS:
+        raise BackupImportError(
+            f'Nieobsługiwana wersja kopii gospodarstwa: {version}. '
+            f'Obsługiwane wersje: {sorted(SUPPORTED_USER_BACKUP_VERSIONS)}.'
+        )
+    data = upgraded.setdefault('data', {})
+    for label in USER_EXPORT_QUERYSETS:
+        data.setdefault(label, [])
+    upgraded['source_version'] = version
+    upgraded['version'] = BACKUP_FORMAT_VERSION
+    return upgraded
 
 
 def _verify_database_manifest(documents, fixture_text):

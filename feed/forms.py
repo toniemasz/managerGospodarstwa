@@ -7,7 +7,6 @@ from .models import IngredientModel, RecipeModel, RecipeItemModel, DeliveryModel
     IngredientPriceConfigModel, ProductionIngredientUsageModel, RecipeVersionModel, RecipeVersionItemModel, \
     FeedProductModel
 from feed.domain.rules import LOW_STOCK_THRESHOLD_KG
-from feed.actions.recipe_versions import RecipeVersionActions
 from common.forms import KilogramStorageFormMixin
 from common.units import format_mass
 
@@ -417,10 +416,6 @@ class ProductionForm(KilogramStorageFormMixin, forms.ModelForm):
     def save(self, commit=True):
         instance = super().save(commit=False)
         instance.custom_recipe_data = self._custom_recipe_data
-        recipe_changed = self._original_recipe_id is not None and self._original_recipe_id != instance.recipe_id
-        if instance.recipe_id and (instance.pk is None or recipe_changed or instance.recipe_version_id is None):
-            version, _ = RecipeVersionActions(farm=self.farm).ensure_current_version(instance.recipe)
-            instance.recipe_version = version
         if commit:
             instance.save()
         return instance

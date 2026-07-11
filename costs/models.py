@@ -65,7 +65,7 @@ class CostModel(models.Model):
     )
     production = models.OneToOneField(
         "feed.ProductionModel",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         related_name="cost_entry",
         null=True,
         blank=True,

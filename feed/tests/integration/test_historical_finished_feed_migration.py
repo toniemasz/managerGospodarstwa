@@ -19,8 +19,70 @@ from feed.models import (
     ProductionModel,
     RecipeItemModel,
     RecipeModel,
+    ReadyFeedDeliveryModel,
 )
 from feed.selectors.production_costs import ProductionCostSelector
+
+
+@pytest.mark.django_db(transaction=True)
+def test_source_classification_migration_splits_purchase_and_production_conflict_idempotently():
+    user = User.objects.create_user(username="classification-conflict")
+    farm = get_or_create_user_farm(user)
+    recipe = RecipeModel.objects.create(farm=farm, name="Konflikt")
+    product = FeedProductModel.objects.create(
+        farm=farm,
+        name="Konflikt",
+        source_type=FeedProductModel.SourceTypes.PURCHASED_READY,
+    )
+    delivery = ReadyFeedDeliveryModel.objects.create(
+        farm=farm,
+        product=product,
+        date=date(2026, 1, 1),
+        quantity_kg=Decimal("100.00"),
+        price_per_kg=Decimal("2.00000"),
+        total_cost=Decimal("200.00"),
+    )
+    FinishedFeedBatchModel.objects.create(
+        farm=farm,
+        product=product,
+        batch_date=delivery.date,
+        initial_quantity_kg=delivery.quantity_kg,
+        remaining_quantity_kg=delivery.quantity_kg,
+        cost_per_kg=delivery.price_per_kg,
+        total_cost=delivery.total_cost,
+        ready_feed_delivery=delivery,
+    )
+    production = ProductionModel.objects.create(
+        recipe=recipe,
+        date=date(2026, 1, 2),
+        quantity_kg=Decimal("100.00"),
+        status=ProductionModel.Statuses.COMPLETED,
+        feed_cost_total=Decimal("100.00"),
+        feed_cost_per_kg=Decimal("1.00000"),
+    )
+    produced_batch = FinishedFeedBatchModel.objects.create(
+        farm=farm,
+        product=product,
+        batch_date=production.date,
+        initial_quantity_kg=production.quantity_kg,
+        remaining_quantity_kg=production.quantity_kg,
+        cost_per_kg=production.feed_cost_per_kg,
+        total_cost=production.feed_cost_total,
+        production=production,
+    )
+    migration = import_module("feed.migrations.0010_fix_feed_product_source_classification")
+
+    migration.fix_source_classification(django_apps, None)
+    migration.fix_source_classification(django_apps, None)
+
+    product.refresh_from_db()
+    produced_batch.refresh_from_db()
+    assert product.source_type == FeedProductModel.SourceTypes.PURCHASED_READY
+    assert product.source_classification_conflict is True
+    assert produced_batch.product_id != product.pk
+    assert produced_batch.product.source_type == FeedProductModel.SourceTypes.PRODUCED
+    assert produced_batch.product.source_classification_conflict is True
+    assert FeedProductModel.objects.filter(farm=farm).count() == 2
 
 
 @pytest.mark.django_db(transaction=True)
@@ -54,6 +116,11 @@ def test_historical_migration_classifies_recipes_serves_ready_feed_and_preserves
     migration = import_module("feed.migrations.0008_backfill_finished_feed_history")
     migration.backfill_finished_feed_history(django_apps, None)
     migration.backfill_finished_feed_history(django_apps, None)
+    classification_migration = import_module("feed.migrations.0010_fix_feed_product_source_classification")
+    classification_migration.fix_source_classification(django_apps, None)
+    classification_migration.fix_source_classification(django_apps, None)
+    cost_migration = import_module("costs.migrations.0002_production_costs")
+    cost_migration.backfill_production_costs(django_apps, None)
 
     ready_production.refresh_from_db(); mixed_production.refresh_from_db()
     assert ready_production.feed_cost_total == Decimal("200.00")
@@ -63,7 +130,7 @@ def test_historical_migration_classifies_recipes_serves_ready_feed_and_preserves
 
     ready_product = FeedProductModel.objects.get(recipe=ready_recipe)
     mixed_product = FeedProductModel.objects.get(recipe=mixed_recipe)
-    assert ready_product.source_type == FeedProductModel.SourceTypes.PURCHASED_READY
+    assert ready_product.source_type == FeedProductModel.SourceTypes.PRODUCED
     assert mixed_product.source_type == FeedProductModel.SourceTypes.PRODUCED
     ready_batch = FinishedFeedBatchModel.objects.get(production=ready_production)
     mixed_batch = FinishedFeedBatchModel.objects.get(production=mixed_production)

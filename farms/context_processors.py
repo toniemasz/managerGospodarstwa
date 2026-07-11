@@ -23,7 +23,7 @@ def _topbar_notifications(farm):
 
     from django.urls import reverse
 
-    from farms.services.cache import TOPBAR_NOTIFICATIONS_TTL, cached_farm_value
+    from common.cache import TOPBAR_NOTIFICATIONS_TTL, cached_farm_value
     from farms.services.task_center import TaskCenterService
 
     def build_notifications():

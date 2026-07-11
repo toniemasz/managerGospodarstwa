@@ -4,19 +4,17 @@ import hashlib
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
-from django.db.models import Sum
 from django.urls import reverse
 from django.utils import timezone
 
-from costs.models import CostModel
-from farms.services.cache import TODAY_DASHBOARD_TTL, cached_farm_value
+from costs.dashboard import CostDashboardProvider
+from common.cache import TODAY_DASHBOARD_TTL, cached_farm_value
 from farms.services.module_navigation import ModuleNavigationService, normalize_visible_modules
 from farms.services.settings_service import get_farm_settings
 from farms.services.task_center import TaskCenterService
-from feed.models import DeliveryModel, ProductionModel
-from feed.selectors.inventory import inventory_dashboard
-from sales.models import PigSaleModel
-from sows.models import MortalityReportModel, SowEventModel
+from feed.services.dashboard import FeedDashboardProvider
+from sales.dashboard import SalesDashboardProvider
+from sows.services.activity import SowActivityProvider
 from sows.services.sow_dashboard_service import SowDashboardService
 from common.units import format_mass
 
@@ -109,6 +107,10 @@ class TodayDashboardService:
         self._tasks = None
         self._sows = None
         self._inventory = None
+        self.feed_provider = FeedDashboardProvider(farm)
+        self.sales_provider = SalesDashboardProvider(farm)
+        self.cost_provider = CostDashboardProvider(farm)
+        self.sow_activity_provider = SowActivityProvider(farm)
 
     def get_context(self) -> dict:
         return cached_farm_value(
@@ -308,12 +310,7 @@ class TodayDashboardService:
 
     def _recent_mortality_alerts(self) -> list[dict]:
         since = self.today - timedelta(days=7)
-        reports = (
-            MortalityReportModel.objects
-            .filter(farm=self.farm, mortality_date__gte=since)
-            .select_related("sow")
-            .order_by("-mortality_date", "-created_at")[:3]
-        )
+        reports = self.sow_activity_provider.recent_mortality(limit=3, since=since)
         return [
             {
                 "title": report.get_mortality_type_display(),
@@ -378,12 +375,7 @@ class TodayDashboardService:
         return items[:10]
 
     def _recent_sow_events(self) -> list[dict]:
-        events = (
-            SowEventModel.objects
-            .filter(sow__farm=self.farm)
-            .select_related("sow")
-            .order_by("-created_at", "-event_date", "-id")[:5]
-        )
+        events = self.sow_activity_provider.recent_events(limit=5)
         return [
             self._event_item(
                 date_value=event.event_date,
@@ -398,12 +390,7 @@ class TodayDashboardService:
         ]
 
     def _recent_mortality_events(self) -> list[dict]:
-        reports = (
-            MortalityReportModel.objects
-            .filter(farm=self.farm)
-            .select_related("sow")
-            .order_by("-created_at", "-mortality_date", "-id")[:5]
-        )
+        reports = self.sow_activity_provider.recent_mortality(limit=5)
         return [
             self._event_item(
                 date_value=report.mortality_date,
@@ -418,12 +405,7 @@ class TodayDashboardService:
         ]
 
     def _recent_deliveries(self) -> list[dict]:
-        deliveries = (
-            DeliveryModel.objects
-            .filter(ingredient__farm=self.farm)
-            .select_related("ingredient")
-            .order_by("-date", "-id")[:5]
-        )
+        deliveries = self.feed_provider.recent_deliveries(limit=5)
         return [
             self._event_item(
                 date_value=delivery.date,
@@ -438,12 +420,7 @@ class TodayDashboardService:
         ]
 
     def _recent_productions(self) -> list[dict]:
-        productions = (
-            ProductionModel.objects
-            .filter(recipe__farm=self.farm)
-            .select_related("recipe")
-            .order_by("-created_at", "-date", "-id")[:5]
-        )
+        productions = self.feed_provider.recent_productions(limit=5)
         return [
             self._event_item(
                 date_value=production.date,
@@ -458,7 +435,7 @@ class TodayDashboardService:
         ]
 
     def _recent_sales(self) -> list[dict]:
-        sales = PigSaleModel.objects.filter(farm=self.farm).order_by("-created_at", "-sale_date", "-id")[:5]
+        sales = self.sales_provider.recent(limit=5)
         return [
             self._event_item(
                 date_value=sale.sale_date,
@@ -473,7 +450,7 @@ class TodayDashboardService:
         ]
 
     def _recent_costs(self) -> list[dict]:
-        costs = CostModel.objects.filter(farm=self.farm).order_by("-created_at", "-date", "-id")[:5]
+        costs = self.cost_provider.recent(limit=5)
         return [
             self._event_item(
                 date_value=cost.date,
@@ -523,38 +500,20 @@ class TodayDashboardService:
 
     def _inventory_summary(self) -> dict:
         if self._inventory is None:
-            self._inventory = inventory_dashboard(self.farm)
+            self._inventory = self.feed_provider.inventory()
         return self._inventory
 
     def _mortality_month_total(self) -> int:
-        return (
-            MortalityReportModel.objects
-            .filter(farm=self.farm, mortality_date__gte=self.month_start, mortality_date__lte=self.today)
-            .aggregate(total=Sum("quantity"))
-            .get("total") or 0
-        )
+        return self.sow_activity_provider.mortality_total_between(self.month_start, self.today)
 
     def _production_in_progress_count(self) -> int:
-        return ProductionModel.objects.filter(
-            recipe__farm=self.farm,
-            status=ProductionModel.Statuses.STAGE_1_DONE,
-        ).count()
+        return self.feed_provider.in_progress_count()
 
     def _sales_net_this_month(self) -> Decimal:
-        return (
-            PigSaleModel.objects
-            .filter(farm=self.farm, sale_date__gte=self.month_start, sale_date__lte=self.today)
-            .aggregate(total=Sum("net_value"))
-            .get("total") or Decimal("0.00")
-        )
+        return self.sales_provider.net_between(self.month_start, self.today)
 
     def _costs_this_month(self) -> Decimal:
-        return (
-            CostModel.objects
-            .filter(farm=self.farm, date__gte=self.month_start, date__lte=self.today)
-            .aggregate(total=Sum("amount"))
-            .get("total") or Decimal("0.00")
-        )
+        return self.cost_provider.total_between(self.month_start, self.today)
 
     def _module_visible(self, module_key: str | None) -> bool:
         return bool(module_key) and module_key in self.visible_keys
@@ -581,7 +540,7 @@ class TodayDashboardService:
         }
 
     @staticmethod
-    def _mortality_description(report: MortalityReportModel) -> str:
+    def _mortality_description(report) -> str:
         if report.sow_id:
             return f"Maciora {report.sow.ear_tag} · {report.quantity} szt."
         return f"{report.quantity} szt. po odsadzeniu"

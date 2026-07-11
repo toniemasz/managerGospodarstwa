@@ -15,6 +15,8 @@ from farms.services.profitability import ProfitabilityAnalyticsService
 from farms.services.task_center import TaskCenterService
 from costs.models import CostCategoryModel, CostModel
 from feed.models import DeliveryModel, IngredientModel, ProductionModel, RecipeItemModel, RecipeModel
+from feed.actions.productions import complete_production
+from feed.actions.inventory import InventoryActions
 from sales.models import PigSaleModel
 from sows.models import SowModel
 
@@ -58,15 +60,17 @@ def test_csv_export_and_atomic_import_round_trip(two_farms):
     _, source, _, target = two_farms
     sow = SowModel.objects.create(farm=source, ear_tag="CSV-1")
     ingredient = IngredientModel.objects.create(farm=source, name="Pszenica")
-    DeliveryModel.objects.create(ingredient=ingredient, date=date.today(), quantity_kg=1000, price_per_kg=1)
+    delivery = DeliveryModel.objects.create(ingredient=ingredient, date=date.today(), quantity_kg=1000, price_per_kg=1)
+    InventoryActions(source).sync_delivery(delivery)
     recipe = RecipeModel.objects.create(farm=source, name="CSV recipe")
     RecipeItemModel.objects.create(recipe=recipe, ingredient=ingredient, percentage=100)
     production = ProductionModel.objects.create(
         recipe=recipe,
         date=date.today(),
         quantity_kg=Decimal("100.00"),
-        status=ProductionModel.Statuses.COMPLETED,
+        status=ProductionModel.Statuses.STAGE_1_DONE,
     )
+    assert complete_production(source, production.pk, user=source.owner, create_serving=False)[0]
     PigSaleModel.objects.create(farm=source, document_number="CSV/1", quantity=10)
     category = CostCategoryModel.objects.create(farm=source, name="CSV koszt")
     CostModel.objects.create(
@@ -150,10 +154,17 @@ def test_csv_import_rejects_broken_archive_without_partial_writes(two_farms):
 def test_profitability_calculations_are_farm_scoped(two_farms):
     _, farm, _, other = two_farms
     ingredient = IngredientModel.objects.create(farm=farm, name="Zboże")
-    DeliveryModel.objects.create(ingredient=ingredient, date=date.today(), quantity_kg=2000, price_per_kg=Decimal("1.50"))
+    delivery = DeliveryModel.objects.create(ingredient=ingredient, date=date.today(), quantity_kg=2000, price_per_kg=Decimal("1.50"))
+    InventoryActions(farm).sync_delivery(delivery)
     recipe = RecipeModel.objects.create(farm=farm, name="Pasza")
     RecipeItemModel.objects.create(recipe=recipe, ingredient=ingredient, percentage=100)
-    ProductionModel.objects.create(recipe=recipe, date=date.today(), quantity_kg=1000, status=ProductionModel.Statuses.COMPLETED)
+    production = ProductionModel.objects.create(
+        recipe=recipe,
+        date=date.today(),
+        quantity_kg=1000,
+        status=ProductionModel.Statuses.STAGE_1_DONE,
+    )
+    assert complete_production(farm, production.pk, user=farm.owner, create_serving=False)[0]
     PigSaleModel.objects.create(farm=farm, sale_date=date.today(), quantity=10, total_weight=1000, net_value=8000, gross_value=8640)
     PigSaleModel.objects.create(farm=other, sale_date=date.today(), quantity=99, net_value=99999, gross_value=99999)
 

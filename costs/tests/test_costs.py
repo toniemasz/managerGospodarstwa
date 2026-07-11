@@ -5,11 +5,13 @@ from importlib import import_module
 import pytest
 from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.urls import reverse
 
 from costs.forms import CostForm
 from costs.models import CostCategoryModel, CostModel
 from costs.services import CostService
+from costs.actions import sync_production_cost
 from farms.models import AuditLogModel
 from farms.services.farm_service import get_or_create_user_farm
 from feed.models import ProductionModel, RecipeModel
@@ -152,3 +154,34 @@ def test_historical_backfill_creates_cost_even_when_fifo_amount_is_zero(cost_con
     assert cost.category.name == "Pasza"
     assert "1 t" in cost.description
     assert CostModel.objects.filter(production=production).count() == 1
+
+
+@pytest.mark.django_db
+def test_production_cost_sync_is_idempotent_and_farm_scoped(cost_context):
+    _client, user, farm = cost_context
+    recipe = RecipeModel.objects.create(farm=farm, name="Koszt jawny")
+    production = ProductionModel.objects.create(
+        recipe=recipe,
+        date=date(2026, 4, 1),
+        quantity_kg=Decimal("100.00"),
+        status=ProductionModel.Statuses.QUEUED,
+    )
+    ProductionModel.objects.filter(pk=production.pk).update(
+        status=ProductionModel.Statuses.COMPLETED,
+        feed_cost_total=Decimal("123.45"),
+    )
+    production.refresh_from_db()
+
+    first = sync_production_cost(farm=farm, production=production, user=user)
+    ProductionModel.objects.filter(pk=production.pk).update(feed_cost_total=Decimal("150.00"))
+    production.refresh_from_db()
+    second = sync_production_cost(farm=farm, production=production, user=user)
+
+    assert first.pk == second.pk
+    assert CostModel.objects.filter(production=production).count() == 1
+    assert CostModel.objects.get(production=production).amount == Decimal("150.00")
+
+    other_user = get_user_model().objects.create_user(username="foreign-cost-sync")
+    other_farm = get_or_create_user_farm(other_user)
+    with pytest.raises(ValidationError, match="innego gospodarstwa"):
+        sync_production_cost(farm=other_farm, production=production, user=other_user)

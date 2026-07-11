@@ -10,7 +10,6 @@ from feed.actions.productions import (
     complete_production,
     mark_stage_1_done,
 )
-from feed.actions.finished_feed import production_is_ready_feed
 from feed.models import ProductionModel
 from feed.selectors.productions import production_details_for_stages, production_or_404
 from farms.services.settings_service import get_farm_settings
@@ -97,11 +96,10 @@ def process_stage2_view(request, pk):
 
     context = production_details_for_stages(farm, pk)
     settings = get_farm_settings(farm)
-    is_ready_feed = production_is_ready_feed(production)
     context.update({
         "feed_serving_mode": settings.feed_serving_mode,
-        "default_create_feed_serving": is_ready_feed or settings.feed_serving_mode == settings.FeedServingModes.AUTO_FULL_PRODUCTION,
-        "force_ready_feed_serving": is_ready_feed,
+        "default_create_feed_serving": settings.feed_serving_mode == settings.FeedServingModes.AUTO_FULL_PRODUCTION,
+        "force_ready_feed_serving": False,
     })
     return render(request, "feed/stage2.html", context)
 

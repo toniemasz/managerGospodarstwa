@@ -8,7 +8,7 @@ from django.core.cache import cache
 from django.test import override_settings
 from django.utils import timezone
 
-from farms.services.cache import (
+from common.cache import (
     cached_farm_value,
     farm_cache_key,
     safe_cache_get,

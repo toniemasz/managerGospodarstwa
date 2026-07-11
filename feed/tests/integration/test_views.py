@@ -242,21 +242,20 @@ def test_feed_production_post_actions(auth_client, feed_objects):
 
 @pytest.mark.django_db
 def test_add_queued_production_does_not_touch_inventory_release(auth_client, feed_objects):
-    with patch("feed.signals.InventoryActions.release_production") as release_production:
-        response = auth_client.post(reverse('add_production'), {
-            'date': timezone.now().date(),
-            'time': '08:30',
-            'recipe': feed_objects['recipe'].id,
-            'quantity_kg': '25.00',
-        })
+    response = auth_client.post(reverse('add_production'), {
+        'date': timezone.now().date(),
+        'time': '08:30',
+        'recipe': feed_objects['recipe'].id,
+        'quantity_kg': '25.00',
+    })
 
     assert response.status_code == 302
-    release_production.assert_not_called()
-    assert ProductionModel.objects.filter(
+    production = ProductionModel.objects.get(
         recipe=feed_objects['recipe'],
         quantity_kg=Decimal('25.00'),
         status=ProductionModel.Statuses.QUEUED,
-    ).exists()
+    )
+    assert not production.ingredient_usages.exists()
 
 
 @pytest.mark.django_db

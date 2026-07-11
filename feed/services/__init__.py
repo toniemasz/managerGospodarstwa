@@ -1,0 +1,1 @@
+"""Procesy biznesowe domeny paszowej."""

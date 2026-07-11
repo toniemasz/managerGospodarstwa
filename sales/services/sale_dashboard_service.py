@@ -1,10 +1,13 @@
 from typing import Dict, Any
 from decimal import Decimal
 from sales.services.sale_repository import SaleRepository
+from feed.services.reporting import FeedReportingService
 
 
 class SaleDashboardService:
     def __init__(self, farm=None, repository: SaleRepository = None):
+        if farm is None and repository is None:
+            raise ValueError("Dashboard sprzedaży wymaga jawnego gospodarstwa.")
         self.farm = farm
         self.repository = repository or SaleRepository(farm=farm)
 
@@ -28,18 +31,10 @@ class SaleDashboardService:
 
         feed_kg = Decimal('0.00')
         if self.farm is not None:
-            from django.db.models import Sum
-            from feed.models import ProductionModel
-
-            productions = ProductionModel.objects.filter(
-                recipe__farm=self.farm,
-                status=ProductionModel.Statuses.COMPLETED,
-            )
-            if date_from is not None:
-                productions = productions.filter(date__gte=date_from)
-            if date_to is not None:
-                productions = productions.filter(date__lte=date_to)
-            feed_kg = productions.aggregate(total=Sum('quantity_kg'))['total'] or Decimal('0.00')
+            feed_kg = FeedReportingService(self.farm).summary(
+                date_from=date_from,
+                date_to=date_to,
+            )['quantity_kg']
 
         return {
             'sales': sales,

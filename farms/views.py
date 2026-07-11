@@ -11,7 +11,7 @@ from django.utils import timezone
 from farms.forms import CsvImportForm, FarmSettingsForm, UserBackupApplyForm, UserBackupImportForm
 from farms.models import AuditLogModel
 from farms.services.audit_log_service import log_action
-from farms.services.cache import invalidate_farm_cache_on_commit
+from common.cache import invalidate_farm_cache_on_commit
 from farms.services.csv_transfer import build_csv_export, import_csv_archive
 from farms.services.current_farm import get_current_farm
 from farms.services.data_backup import BackupImportError, build_user_backup, import_user_backup, load_user_backup_preview, store_user_backup_preview

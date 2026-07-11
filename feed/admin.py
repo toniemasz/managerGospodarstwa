@@ -11,6 +11,7 @@ from .models import (
     RecipeVersionModel,
     InventoryMovementModel,
 )
+from feed.actions.inventory import InventoryActions
 
 
 @admin.register(IngredientModel)
@@ -32,6 +33,23 @@ class DeliveryAdmin(admin.ModelAdmin):
     list_display = ('date', 'ingredient', 'quantity_kg', 'remaining_quantity_kg', 'price_per_kg')
     list_filter = ('ingredient__farm', 'ingredient')
     search_fields = ('ingredient__name', 'ingredient__farm__name')
+
+    def save_model(self, request, obj, form, change):
+        previous_ingredient_id = None
+        if change and obj.pk:
+            previous_ingredient_id = DeliveryModel.objects.filter(pk=obj.pk).values_list("ingredient_id", flat=True).first()
+        super().save_model(request, obj, form, change)
+        if previous_ingredient_id and previous_ingredient_id != obj.ingredient_id:
+            InventoryMovementModel.objects.filter(
+                movement_type=InventoryMovementModel.Types.DELIVERY,
+                source_model=obj._meta.label,
+                source_id=str(obj.pk),
+            ).delete()
+        InventoryActions(obj.ingredient.farm).sync_delivery(obj, user=request.user)
+
+    def delete_model(self, request, obj):
+        InventoryActions(obj.ingredient.farm).remove_delivery(obj)
+        super().delete_model(request, obj)
 
 
 @admin.register(IngredientPriceConfigModel)

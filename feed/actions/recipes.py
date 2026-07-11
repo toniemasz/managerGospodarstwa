@@ -1,6 +1,6 @@
 from django.db import transaction
 
-from farms.services.cache import invalidate_farm_cache_on_commit
+from common.cache import invalidate_farm_cache_on_commit
 from feed.actions.recipe_versions import RecipeVersionActions
 
 

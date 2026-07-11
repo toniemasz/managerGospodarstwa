@@ -27,7 +27,10 @@ def auth_client(client):
 
 @pytest.mark.django_db
 def test_sale_model_form_repository_and_admin_registration():
+    user = User.objects.create_user(username="sales-model-owner")
+    farm = get_or_create_user_farm(user)
     sale = PigSaleModel.objects.create(
+        farm=farm,
         sale_date=date(2026, 6, 1),
         quantity=10,
         total_weight=Decimal('950.50'),
@@ -42,7 +45,7 @@ def test_sale_model_form_repository_and_admin_registration():
         'total_weight': '500.00',
         'price_per_kg': '7.50',
     })
-    repo = SaleRepository()
+    repo = SaleRepository(farm)
 
     assert str(sale) == "Sprzedaż 10 szt. - 2026-06-01"
     assert form.is_valid() is True

@@ -4,11 +4,11 @@ from django.db import models
 
 from farms.dashboard_registry import default_dashboard_stats
 from farms.defaults import (
-    DEFAULT_PRODUCTION_QUANTITY_KG,
     FARROWING_ALERT_DAYS_AHEAD,
     GESTATION_DAYS,
     PREGNANCY_CHECK_AFTER_DAYS,
 )
+from feed.domain.rules import DEFAULT_PRODUCTION_QUANTITY_KG
 from farms.module_registry import default_nav_modules, default_visible_modules
 
 

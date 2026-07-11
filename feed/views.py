@@ -442,18 +442,13 @@ def add_production_view(request):
             if request.POST.get('instant_complete') == 'on':
                 force_inventory = request.POST.get('force_inventory') == 'on'
 
-                try:
-                    success, message = complete_production(
-                        farm,
-                        production.id,
-                        skip_stages=True,
-                        force_inventory=force_inventory,
-                        user=request.user,
-                    )
-                except Exception:
-                    logger.exception("Nie udało się automatycznie zatwierdzić śrutowania %s", production.pk)
-                    success = False
-                    message = "wystąpił błąd podczas automatycznego zatwierdzania"
+                success, message = complete_production(
+                    farm,
+                    production.id,
+                    skip_stages=True,
+                    force_inventory=force_inventory,
+                    user=request.user,
+                )
                 if success:
                     messages.success(request, "Śrutowanie zostało od razu zatwierdzone.")
                 else:
@@ -503,9 +498,13 @@ def delete_production_view(request, pk):
     if request.method == 'POST':
         representation = str(production)
         object_id = production.pk
-        delete_production_with_inventory(farm, production)
-        log_action(farm=farm, user=request.user, action="DELETE", model_label="feed.ProductionModel", object_id=object_id, object_repr=representation)
-        messages.success(request, "Usunięto śrutowanie.")
+        try:
+            delete_production_with_inventory(farm, production)
+        except ValidationError as error:
+            messages.error(request, error.messages[0])
+        else:
+            log_action(farm=farm, user=request.user, action="DELETE", model_label="feed.ProductionModel", object_id=object_id, object_repr=representation)
+            messages.success(request, "Usunięto śrutowanie.")
     return redirect('feed_productions')
 
 

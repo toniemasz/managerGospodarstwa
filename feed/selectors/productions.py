@@ -13,10 +13,8 @@ from feed.selectors.recipe_requirements import recipe_item_dicts_for_production
 from common.units import format_mass
 
 
-def productions_for_farm(farm=None):
-    queryset = ProductionModel.objects.select_related("recipe", "recipe_version")
-    if farm is not None:
-        queryset = queryset.filter(recipe__farm=farm)
+def productions_for_farm(farm):
+    queryset = ProductionModel.objects.select_related("recipe", "recipe_version").filter(recipe__farm=farm)
     return queryset.order_by("-date", "-time", "-id")
 
 
@@ -35,12 +33,13 @@ def production_list_context(farm, *, status="", date_from=None, date_to=None) ->
 
 
 def production_for_processing(farm, production_id: int, *, lock_for_update: bool = False):
+    if farm is None:
+        raise ValueError("Pobranie produkcji do przetwarzania wymaga jawnego gospodarstwa.")
     queryset = ProductionModel.objects.select_related("recipe", "recipe_version").prefetch_related(
         "recipe__items__ingredient",
         "recipe_version__items__ingredient",
     )
-    if farm is not None:
-        queryset = queryset.filter(recipe__farm=farm)
+    queryset = queryset.filter(recipe__farm=farm)
     if lock_for_update:
         queryset = queryset.select_for_update()
     return queryset.get(pk=production_id)
@@ -85,7 +84,6 @@ def _calculator_for_production(production) -> ProductionCalculator:
 
 def validate_production_capacity(farm, production_id: int) -> tuple[bool, list[str]]:
     production = production_for_processing(farm, production_id)
-    farm = farm or production.recipe.farm
     errors = []
     for requirement in _calculator_for_production(production).get_requirements():
         available = DeliveryModel.objects.filter(

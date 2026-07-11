@@ -8,6 +8,7 @@ from feed.models import DeliveryModel, IngredientModel, RecipeItemModel, RecipeM
 from feed.calculators.feed_cost import RecipeCostCalculator
 from feed.selectors.inventory import latest_delivery_prices_map
 from feed.selectors.recipes import recipe_costs
+from farms.services.farm_service import get_or_create_legacy_farm
 
 
 def test_recipe_cost_calculates_percentage_of_one_tonne():
@@ -59,22 +60,23 @@ def test_recipe_cost_marks_missing_price_without_free_ingredient():
 
 @pytest.mark.django_db
 def test_service_does_not_convert_null_delivery_price_to_zero():
-    ingredient = IngredientModel.objects.create(name="Soja")
+    farm = get_or_create_legacy_farm()
+    ingredient = IngredientModel.objects.create(farm=farm, name="Soja")
     DeliveryModel.objects.create(
         ingredient=ingredient,
         date=date.today(),
         quantity_kg=Decimal("1000.00"),
         price_per_kg=None,
     )
-    recipe = RecipeModel.objects.create(name="Starter")
+    recipe = RecipeModel.objects.create(farm=farm, name="Starter")
     RecipeItemModel.objects.create(
         recipe=recipe,
         ingredient=ingredient,
         percentage=Decimal("100.00"),
     )
 
-    prices = latest_delivery_prices_map()
-    costs = recipe_costs()
+    prices = latest_delivery_prices_map(farm)
+    costs = recipe_costs(farm)
 
     assert ingredient.id not in prices
     assert costs[0].is_complete is False
@@ -84,21 +86,22 @@ def test_service_does_not_convert_null_delivery_price_to_zero():
 
 @pytest.mark.django_db
 def test_service_treats_zero_delivery_price_as_missing_price():
-    ingredient = IngredientModel.objects.create(name="Kukurydza")
+    farm = get_or_create_legacy_farm()
+    ingredient = IngredientModel.objects.create(farm=farm, name="Kukurydza")
     DeliveryModel.objects.create(
         ingredient=ingredient,
         date=date.today(),
         quantity_kg=Decimal("1000.00"),
         price_per_kg=Decimal("0.00000"),
     )
-    recipe = RecipeModel.objects.create(name="Starter")
+    recipe = RecipeModel.objects.create(farm=farm, name="Starter")
     RecipeItemModel.objects.create(
         recipe=recipe,
         ingredient=ingredient,
         percentage=Decimal("100.00"),
     )
 
-    costs = recipe_costs()
+    costs = recipe_costs(farm)
 
     assert costs[0].is_complete is False
     assert costs[0].missing_price_ingredients == ["Kukurydza"]
@@ -107,7 +110,8 @@ def test_service_treats_zero_delivery_price_as_missing_price():
 
 @pytest.mark.django_db
 def test_calculator_price_form_rejects_zero_price_override():
-    ingredient = IngredientModel.objects.create(name="Pszenica")
+    farm = get_or_create_legacy_farm()
+    ingredient = IngredientModel.objects.create(farm=farm, name="Pszenica")
     field_name = CalculatorPriceForm.field_name_for_ingredient(ingredient.id)
     form = CalculatorPriceForm(
         data={field_name: "0"},

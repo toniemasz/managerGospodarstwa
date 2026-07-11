@@ -7,6 +7,11 @@ from sows.domain.rules import FARROWING_ALERT_DAYS_AHEAD, PREGNANCY_CHECK_AFTER_
 from sows.services.sow_repository import VaccinationPlanRepository
 
 
+class _EmptyVaccinationPlanRepository:
+    def get_all_plans(self):
+        return []
+
+
 class SowNotificationService:
     def __init__(
         self,
@@ -18,7 +23,11 @@ class SowNotificationService:
         self.farm = farm
         self.pregnancy_check_after_days = pregnancy_check_after_days
         self.farrowing_alert_days_ahead = farrowing_alert_days_ahead
-        self.vaccination_plan_repository = VaccinationPlanRepository(farm=farm)
+        self.vaccination_plan_repository = (
+            VaccinationPlanRepository(farm=farm)
+            if farm is not None
+            else _EmptyVaccinationPlanRepository()
+        )
 
     def build_notifications(self, sows: list, current_date: date) -> dict:
         sows_to_check_usg = []

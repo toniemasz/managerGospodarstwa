@@ -35,7 +35,7 @@ from feed.models import (
     ReadyFeedDeliveryModel,
 )
 from sales.models import PigSaleModel, SaleClassRowModel
-from sows.models import SowEventModel, SowModel, VaccinationPlanModel
+from sows.models import MortalityReportModel, SowEventModel, SowModel, VaccinationPlanModel
 
 
 def _user_backup_fixture(user, farm):
@@ -61,6 +61,14 @@ def _create_complete_farm_data(farm):
         event_type='FARROWING',
         event_date=date(2025, 5, 1),
         details={'born_alive': 12, 'born_dead': 1},
+    )
+    MortalityReportModel.objects.create(
+        farm=farm,
+        sow=sow,
+        mortality_type=MortalityReportModel.TYPE_SOW,
+        mortality_date=date(2025, 7, 1),
+        quantity=1,
+        reason='Test kopii',
     )
 
     ingredient = IngredientModel.objects.create(
@@ -127,11 +135,15 @@ def test_user_backup_restores_all_models_and_relationships():
     assert get_farm_settings(target_farm).gestation_days == 116
     assert counts['maciory'] == 1
     assert counts['zdarzenia macior'] == 1
+    assert counts['upadki'] == 1
     assert counts['składniki'] == 1
     assert counts['receptury'] == 1
     assert counts['produkcje'] == 1
     assert counts['sprzedaże'] == 1
     assert SowEventModel.objects.get(sow__farm=target_farm).sow.ear_tag == 'SOW-BACKUP'
+    restored_mortality = MortalityReportModel.objects.get(farm=target_farm)
+    assert restored_mortality.sow.ear_tag == 'SOW-BACKUP'
+    assert restored_mortality.reason == 'Test kopii'
     restored_item = RecipeItemModel.objects.get(recipe__farm=target_farm)
     assert restored_item.ingredient.farm == target_farm
     restored_production = ProductionModel.objects.get(recipe__farm=target_farm)
@@ -183,6 +195,59 @@ def test_user_backup_refuses_duplicates_inside_file():
         import_user_backup(backup_file, target_farm)
 
     assert not IngredientModel.objects.filter(farm=target_farm).exists()
+
+
+@pytest.mark.django_db
+def test_version_2_backup_without_new_optional_sections_is_upgraded_safely():
+    source_user = User.objects.create_user(username='legacy-backup-source')
+    source_farm = get_or_create_user_farm(source_user)
+    SowModel.objects.create(farm=source_farm, ear_tag='LEGACY-SOW')
+    archive, _ = build_user_backup(source_user, source_farm)
+    payload = _payload_from_archive(archive)
+    payload['version'] = 2
+    payload['data'].pop('sows.MortalityReportModel')
+    payload['data'].pop('feed.FeedServingAllocationModel')
+
+    target_user = User.objects.create_user(username='legacy-backup-target')
+    target_farm = get_or_create_user_farm(target_user)
+    backup_file = SimpleUploadedFile(
+        'legacy-v2.json',
+        json.dumps(payload).encode(),
+        content_type='application/json',
+    )
+
+    analysis = analyze_user_backup(backup_file, target_farm)
+    assert analysis['format_version'] == 3
+    assert analysis['payload']['source_version'] == 2
+
+    backup_file.seek(0)
+    counts = import_user_backup(backup_file, target_farm)
+    assert counts['maciory'] == 1
+    assert SowModel.objects.filter(farm=target_farm, ear_tag='LEGACY-SOW').exists()
+    assert not MortalityReportModel.objects.filter(farm=target_farm).exists()
+
+
+@pytest.mark.django_db
+def test_backup_missing_required_field_is_rejected_without_partial_write():
+    source_user = User.objects.create_user(username='invalid-backup-source')
+    source_farm = get_or_create_user_farm(source_user)
+    SowModel.objects.create(farm=source_farm, ear_tag='INVALID-SOW')
+    archive, _ = build_user_backup(source_user, source_farm)
+    payload = _payload_from_archive(archive)
+    payload['data']['sows.SowModel'][0]['fields'].pop('ear_tag')
+
+    target_user = User.objects.create_user(username='invalid-backup-target')
+    target_farm = get_or_create_user_farm(target_user)
+    backup_file = SimpleUploadedFile(
+        'invalid.json',
+        json.dumps(payload).encode(),
+        content_type='application/json',
+    )
+
+    with pytest.raises(BackupImportError, match='nie ma wymaganych pól: ear_tag'):
+        import_user_backup(backup_file, target_farm)
+
+    assert not SowModel.objects.filter(farm=target_farm).exists()
 
 
 @pytest.mark.django_db(transaction=True)

@@ -32,7 +32,7 @@ class ProductionCostSelector:
         productions = ProductionModel.objects.filter(
             recipe__farm=self.farm,
             status=ProductionModel.Statuses.COMPLETED,
-        ).select_related("recipe", "recipe_version", "cost_entry").prefetch_related(
+        ).select_related("recipe", "recipe_version", "cost_entry", "finished_feed_batch").prefetch_related(
             "ingredient_usages__ingredient",
             "ingredient_usages__delivery",
         )
@@ -46,6 +46,9 @@ class ProductionCostSelector:
         recipe_totals = defaultdict(lambda: {"quantity_kg": Decimal("0.00"), "cost": Decimal("0.00")})
         monthly = defaultdict(lambda: {"production_kg": Decimal("0.00"), "feed_cost": Decimal("0.00")})
         details = []
+        missing_sync_count = 0
+        partial_cost_count = 0
+        integrity_issues = []
 
         for production in productions:
             cost_entry = getattr(production, "cost_entry", None)
@@ -54,7 +57,19 @@ class ProductionCostSelector:
             is_partial = production.feed_cost_is_partial or cost_entry is None
             cost_note = production.feed_cost_note
             if cost_entry is None:
+                missing_sync_count += 1
                 cost_note = "Brak zapisanego kosztu produkcji paszy. Wymagana synchronizacja FIFO."
+            if is_partial:
+                partial_cost_count += 1
+            fifo_total = sum((component["cost"] for component in components), Decimal("0.00"))
+            batch = getattr(production, "finished_feed_batch", None)
+            expected = production.feed_cost_total
+            if fifo_total != expected:
+                integrity_issues.append({"production_id": production.pk, "kind": "fifo_snapshot"})
+            if cost_entry is not None and cost_entry.amount != expected:
+                integrity_issues.append({"production_id": production.pk, "kind": "cost_registry"})
+            if batch is not None and (batch.total_cost != expected or batch.cost_per_kg != production.feed_cost_per_kg):
+                integrity_issues.append({"production_id": production.pk, "kind": "finished_batch"})
 
             total_quantity += production.quantity_kg
             total_cost += production_cost
@@ -96,4 +111,7 @@ class ProductionCostSelector:
             "recipe_ranking": ranking,
             "monthly": dict(monthly),
             "details": details,
+            "missing_sync_count": missing_sync_count,
+            "partial_cost_count": partial_cost_count,
+            "integrity_issues": integrity_issues,
         }

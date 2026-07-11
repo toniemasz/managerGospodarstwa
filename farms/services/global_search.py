@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from django.db.models import Q
 from django.urls import reverse
 
-from costs.models import CostCategoryModel, CostModel
+from costs.search import search_cost_categories, search_costs
 from farms.services.module_navigation import ModuleNavigationService
-from feed.models import IngredientModel, ProductionModel, RecipeModel
-from sales.models import PigSaleModel
-from sows.models import SowModel, VaccinationPlanModel
+from feed.services.search import FeedSearchProvider
+from sales.search import search_sales
+from sows.services.search import search_sows, search_vaccination_plans
 from common.units import format_mass
 
 
@@ -84,7 +83,7 @@ def _sow_results(farm, query: str, active_url_name: str) -> dict:
             "icon_name": "sow",
             "tone": "green",
         }
-        for sow in SowModel.objects.filter(farm=farm, ear_tag__icontains=query).order_by("is_archived", "ear_tag")[:MAX_RESULTS_PER_GROUP]
+        for sow in search_sows(farm, query, limit=MAX_RESULTS_PER_GROUP)
     ]
     plans = [
         {
@@ -95,12 +94,13 @@ def _sow_results(farm, query: str, active_url_name: str) -> dict:
             "icon_name": "health",
             "tone": "green",
         }
-        for plan in VaccinationPlanModel.objects.filter(farm=farm, name__icontains=query).order_by("name")[:MAX_RESULTS_PER_GROUP]
+        for plan in search_vaccination_plans(farm, query, limit=MAX_RESULTS_PER_GROUP)
     ]
     return _group("sows", "Maciory i rozrod", "sow", (items + plans)[:MAX_RESULTS_PER_GROUP])
 
 
 def _feed_results(farm, query: str, active_url_name: str) -> dict:
+    provider = FeedSearchProvider(farm)
     ingredients = [
         {
             "title": ingredient.name,
@@ -110,10 +110,7 @@ def _feed_results(farm, query: str, active_url_name: str) -> dict:
             "icon_name": "feed",
             "tone": "amber",
         }
-        for ingredient in IngredientModel.objects.filter(
-            Q(farm=farm),
-            Q(name__icontains=query) | Q(description__icontains=query),
-        ).order_by("name")[:MAX_RESULTS_PER_GROUP]
+        for ingredient in provider.ingredients(query, limit=MAX_RESULTS_PER_GROUP)
     ]
     recipes = [
         {
@@ -124,7 +121,7 @@ def _feed_results(farm, query: str, active_url_name: str) -> dict:
             "icon_name": "recipes",
             "tone": "amber",
         }
-        for recipe in RecipeModel.objects.filter(farm=farm, name__icontains=query).order_by("name")[:MAX_RESULTS_PER_GROUP]
+        for recipe in provider.recipes(query, limit=MAX_RESULTS_PER_GROUP)
     ]
     return _group("feed", "Pasza i magazyn", "feed", (ingredients + recipes)[:MAX_RESULTS_PER_GROUP])
 
@@ -139,10 +136,7 @@ def _production_results(farm, query: str, active_url_name: str) -> dict:
             "icon_name": "production",
             "tone": "amber",
         }
-        for production in ProductionModel.objects.filter(
-            Q(recipe__farm=farm),
-            Q(recipe__name__icontains=query) | Q(status__icontains=query),
-        ).select_related("recipe").order_by("-date", "-id")[:MAX_RESULTS_PER_GROUP]
+        for production in FeedSearchProvider(farm).productions(query, limit=MAX_RESULTS_PER_GROUP)
     ]
     return _group("production", "Śrutowanie", "production", items)
 
@@ -157,10 +151,7 @@ def _sales_results(farm, query: str, active_url_name: str) -> dict:
             "icon_name": "sales",
             "tone": "green",
         }
-        for sale in PigSaleModel.objects.filter(
-            Q(farm=farm),
-            Q(document_number__icontains=query) | Q(tattoo__icontains=query),
-        ).order_by("-sale_date", "-id")[:MAX_RESULTS_PER_GROUP]
+        for sale in search_sales(farm, query, limit=MAX_RESULTS_PER_GROUP)
     ]
     return _group("sales", "Sprzedaż", "sales", items)
 
@@ -175,10 +166,7 @@ def _cost_results(farm, query: str, active_url_name: str) -> dict:
             "icon_name": "costs",
             "tone": "green" if cost.is_paid else "warning",
         }
-        for cost in CostModel.objects.filter(
-            Q(farm=farm),
-            Q(description__icontains=query) | Q(document_number__icontains=query) | Q(supplier__icontains=query) | Q(category__name__icontains=query),
-        ).select_related("category").order_by("-date", "-id")[:MAX_RESULTS_PER_GROUP]
+        for cost in search_costs(farm, query, limit=MAX_RESULTS_PER_GROUP)
     ]
     categories = [
         {
@@ -189,10 +177,7 @@ def _cost_results(farm, query: str, active_url_name: str) -> dict:
             "icon_name": "costs",
             "tone": "green",
         }
-        for category in CostCategoryModel.objects.filter(
-            Q(farm=farm),
-            Q(name__icontains=query) | Q(description__icontains=query),
-        ).order_by("name")[:MAX_RESULTS_PER_GROUP]
+        for category in search_cost_categories(farm, query, limit=MAX_RESULTS_PER_GROUP)
     ]
     return _group("costs", "Koszty", "costs", (costs + categories)[:MAX_RESULTS_PER_GROUP])
 
