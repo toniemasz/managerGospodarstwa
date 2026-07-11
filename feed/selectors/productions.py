@@ -7,7 +7,7 @@ from django.utils import timezone
 from farms.services.settings_service import get_farm_settings
 from feed.calculators.feed_cost import ProductionCalculator
 from feed.domain.rules import DEFAULT_PRODUCTION_QUANTITY_KG
-from feed.models import ProductionModel, RecipeModel
+from feed.models import DeliveryModel, ProductionModel, RecipeModel
 from feed.selectors.inventory import inventory_dashboard, latest_delivery_prices_map
 from feed.selectors.recipe_requirements import recipe_item_dicts_for_production
 
@@ -84,18 +84,22 @@ def _calculator_for_production(production) -> ProductionCalculator:
 
 def validate_production_capacity(farm, production_id: int) -> tuple[bool, list[str]]:
     production = production_for_processing(farm, production_id)
-    inventory_state = inventory_dashboard(farm)["inventory"]
-    inventory_map = {item.ingredient_id: item.current_stock for item in inventory_state}
-    name_map = {item.ingredient_id: item.name for item in inventory_state}
-
+    farm = farm or production.recipe.farm
     errors = []
     for requirement in _calculator_for_production(production).get_requirements():
-        available = inventory_map.get(requirement.ingredient_id, Decimal("0.00"))
+        available = DeliveryModel.objects.filter(
+            ingredient_id=requirement.ingredient_id,
+            ingredient__farm=farm,
+            date__lte=production.date,
+            price_per_kg__isnull=False,
+            price_per_kg__gt=0,
+            remaining_quantity_kg__gt=0,
+        ).aggregate(total=Sum("remaining_quantity_kg"))["total"] or Decimal("0.00")
         if requirement.required_kg > available:
-            ingredient_name = name_map.get(requirement.ingredient_id, requirement.name)
             errors.append(
-                f"Brakuje {requirement.required_kg - available:.2f} kg składnika "
-                f"'{ingredient_name}' (Dostępne: {available:.2f} kg)"
+                f"Brakuje rozliczalnych dostaw FIFO: {requirement.required_kg - available:.2f} kg składnika "
+                f"'{requirement.name}' w rozliczalnych dostawach FIFO "
+                f"z datą nie późniejszą niż {production.date:%d.%m.%Y} (Dostępne: {available:.2f} kg)"
             )
 
     return len(errors) == 0, errors

@@ -248,6 +248,7 @@ class ProductionModel(models.Model):
         blank=True,
         verbose_name="Uwagi do kosztu składników",
     )
+    completion_feed_serving_mode = models.CharField(max_length=24, blank=True)
 
     @property
     def status_label(self) -> str:
@@ -256,6 +257,87 @@ class ProductionModel(models.Model):
 
     def __str__(self):
         return f"Śrutowanie: {self.recipe.name} ({self.quantity_kg}kg) - {self.status_label}"
+
+
+class FeedProductModel(models.Model):
+    class SourceTypes(models.TextChoices):
+        PURCHASED_READY = "PURCHASED_READY", "Kupiona pasza gotowa"
+        PRODUCED = "PRODUCED", "Pasza wytworzona"
+
+    farm = models.ForeignKey('farms.FarmModel', on_delete=models.CASCADE, related_name='feed_products')
+    name = models.CharField(max_length=150)
+    source_type = models.CharField(max_length=24, choices=SourceTypes.choices)
+    recipe = models.ForeignKey(RecipeModel, on_delete=models.RESTRICT, null=True, blank=True, related_name='feed_products')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=('farm', 'name'), name='unique_feed_product_name_per_farm')]
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.recipe_id and self.recipe.farm_id != self.farm_id:
+            raise ValidationError("Receptura produktu nie należy do wskazanego gospodarstwa.")
+
+    def __str__(self):
+        return self.name
+
+
+class ReadyFeedDeliveryModel(models.Model):
+    farm = models.ForeignKey('farms.FarmModel', on_delete=models.CASCADE, related_name='ready_feed_deliveries')
+    product = models.ForeignKey(FeedProductModel, on_delete=models.RESTRICT, related_name='deliveries')
+    date = models.DateField()
+    quantity_kg = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))])
+    price_per_kg = models.DecimalField(max_digits=14, decimal_places=5, validators=[MinValueValidator(Decimal('0.00001'))])
+    total_cost = models.DecimalField(max_digits=14, decimal_places=2)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class FinishedFeedBatchModel(models.Model):
+    farm = models.ForeignKey('farms.FarmModel', on_delete=models.CASCADE, related_name='finished_feed_batches')
+    product = models.ForeignKey(FeedProductModel, on_delete=models.RESTRICT, related_name='batches')
+    batch_date = models.DateField()
+    initial_quantity_kg = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))])
+    remaining_quantity_kg = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal('0.00'))])
+    cost_per_kg = models.DecimalField(max_digits=14, decimal_places=5)
+    total_cost = models.DecimalField(max_digits=14, decimal_places=2)
+    cost_is_partial = models.BooleanField(default=False)
+    production = models.OneToOneField(ProductionModel, on_delete=models.CASCADE, null=True, blank=True, related_name='finished_feed_batch')
+    ready_feed_delivery = models.OneToOneField(ReadyFeedDeliveryModel, on_delete=models.CASCADE, null=True, blank=True, related_name='batch')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=Q(initial_quantity_kg__gt=0), name='finished_batch_initial_positive'),
+            models.CheckConstraint(condition=Q(remaining_quantity_kg__gte=0) & Q(remaining_quantity_kg__lte=models.F('initial_quantity_kg')), name='finished_batch_remaining_range'),
+            models.CheckConstraint(condition=(Q(production__isnull=False, ready_feed_delivery__isnull=True) | Q(production__isnull=True, ready_feed_delivery__isnull=False)), name='finished_batch_exactly_one_source'),
+        ]
+
+
+class FeedServingModel(models.Model):
+    farm = models.ForeignKey('farms.FarmModel', on_delete=models.CASCADE, related_name='feed_servings')
+    product = models.ForeignKey(FeedProductModel, on_delete=models.RESTRICT, related_name='servings')
+    date = models.DateField()
+    time = models.TimeField(null=True, blank=True)
+    quantity_kg = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))])
+    note = models.CharField(max_length=255, blank=True)
+    total_cost = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal('0.00'))
+    is_automatic = models.BooleanField(default=False)
+    automatic_for_production = models.OneToOneField(ProductionModel, on_delete=models.CASCADE, null=True, blank=True, related_name='automatic_feed_serving')
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class FeedServingAllocationModel(models.Model):
+    serving = models.ForeignKey(FeedServingModel, on_delete=models.CASCADE, related_name='allocations')
+    batch = models.ForeignKey(FinishedFeedBatchModel, on_delete=models.RESTRICT, related_name='serving_allocations')
+    quantity_kg = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))])
+    unit_cost = models.DecimalField(max_digits=14, decimal_places=5)
+    cost = models.DecimalField(max_digits=14, decimal_places=2)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=('serving', 'batch'), name='unique_serving_batch_allocation')]
 
 
 class ProductionIngredientUsageModel(models.Model):

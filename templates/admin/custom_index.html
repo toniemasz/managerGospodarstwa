@@ -10,19 +10,25 @@
     </p>
 </div>
 <div class="module" style="margin-bottom: 20px;">
-    <h2>Awaryjne przywracanie bazy</h2>
-    <p>Przywracanie zadziała tylko wtedy, gdy baza nie zawiera danych biznesowych. Wykrycie danych lub konfliktu użytkownika przerwie całą operację.</p>
+    <h2>Przywracanie całej bazy</h2>
+    <p>Najpierw sprawdź kopię. Analiza nie zmienia żadnych danych.</p>
     <form method="post" enctype="multipart/form-data" action="{% url 'admin_database_restore' %}">
         {% csrf_token %}
         <p><input type="file" name="backup_file" accept=".zip,.json" required></p>
-        <p>
-            <label>
-                <input type="checkbox" name="confirm_empty_restore" required>
-                Rozumiem, że jest to import awaryjny przeznaczony wyłącznie dla pustej bazy.
-            </label>
-        </p>
-        <p><button type="submit" class="button">Przywróć kopię</button></p>
+        <p><button type="submit" name="analyze_database_backup" value="1" class="button">Sprawdź zawartość</button></p>
     </form>
+    {% if database_backup_analysis %}
+    <hr>
+    <h3>Podsumowanie: {{ database_backup_analysis.record_count }} rekordów</h3>
+    <ul>{% for label, count in database_backup_analysis.model_counts.items %}<li>{{ label }}: {{ count }}</li>{% endfor %}</ul>
+    <p><strong>Uwaga:</strong> operacja usunie wszystkie obecne dane, konta i sesje, a następnie odtworzy stan z kopii.</p>
+    <form method="post" action="{% url 'admin_database_restore' %}">
+        {% csrf_token %}<input type="hidden" name="preview_token" value="{{ database_backup_token }}">
+        <p><label><input type="checkbox" name="confirm_replace" required> Rozumiem, że cała obecna baza zostanie zastąpiona.</label></p>
+        <p><label>Wpisz: ZASTĄP CAŁĄ BAZĘ DANYCH<br><input type="text" name="confirmation" required></label></p>
+        <p><button type="submit" class="deletelink">Zastąp całą bazę</button></p>
+    </form>
+    {% endif %}
 </div>
 {% endif %}
 {{ block.super }}

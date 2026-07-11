@@ -1,6 +1,6 @@
 # feed/urls.py
 from django.urls import path
-from . import production_views, views
+from . import finished_feed_views, production_views, views
 
 urlpatterns = [
     # Składniki
@@ -16,6 +16,11 @@ urlpatterns = [
     path('magazyn/dostawa/<int:pk>/usun/', views.delete_delivery_view, name='delete_delivery'),
     path('magazyn/pelny/', views.feed_full_inventory_view, name='feed_full_inventory'),
     path('magazyn/korekta/', views.inventory_adjustment_view, name='inventory_adjustment'),
+    path('magazyn/gotowe-pasze/', finished_feed_views.finished_feed_inventory_view, name='finished_feed_inventory'),
+    path('magazyn/gotowe-pasze/zakup/', finished_feed_views.purchase_ready_feed_view, name='purchase_ready_feed'),
+    path('magazyn/podania/', finished_feed_views.feed_servings_view, name='feed_servings'),
+    path('magazyn/podania/dodaj/', finished_feed_views.create_feed_serving_view, name='create_feed_serving'),
+    path('magazyn/podania/<int:pk>/usun/', finished_feed_views.delete_feed_serving_view, name='delete_feed_serving'),
     # Receptury
     path('receptury/', views.feed_recipes_view, name='feed_recipes'),
     path('receptury/dodaj/', views.add_recipe_view, name='add_recipe'),

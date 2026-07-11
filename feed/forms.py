@@ -4,7 +4,8 @@ from django.db.models import Sum
 from django.forms import inlineformset_factory
 from django.forms.formsets import DELETION_FIELD_NAME
 from .models import IngredientModel, RecipeModel, RecipeItemModel, DeliveryModel, ProductionModel, \
-    IngredientPriceConfigModel, ProductionIngredientUsageModel, RecipeVersionModel, RecipeVersionItemModel
+    IngredientPriceConfigModel, ProductionIngredientUsageModel, RecipeVersionModel, RecipeVersionItemModel, \
+    FeedProductModel
 from feed.domain.rules import LOW_STOCK_THRESHOLD_KG
 from feed.actions.recipe_versions import RecipeVersionActions
 
@@ -238,6 +239,41 @@ class InventoryAdjustmentForm(forms.Form):
         if movement_date > timezone.localdate():
             raise forms.ValidationError("Data korekty nie może być z przyszłości.")
         return movement_date
+
+
+class ReadyFeedPurchaseForm(forms.Form):
+    product_name = forms.CharField(label="Nazwa gotowej paszy", max_length=150)
+    date = forms.DateField(label="Data dostawy", widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}))
+    quantity_kg = forms.DecimalField(label="Ilość (kg)", min_value=Decimal("0.01"), max_digits=12, decimal_places=2)
+    price_per_kg = forms.DecimalField(label="Cena za kg", min_value=Decimal("0.00001"), max_digits=14, decimal_places=5)
+
+    def __init__(self, *args, farm=None, **kwargs):
+        self.farm = farm
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            _apply_widget_class(field)
+
+    def clean_product_name(self):
+        name = self.cleaned_data["product_name"].strip()
+        existing = FeedProductModel.objects.filter(farm=self.farm, name__iexact=name).first()
+        if existing and existing.source_type != FeedProductModel.SourceTypes.PURCHASED_READY:
+            raise forms.ValidationError("Produkt o tej nazwie jest powiązany z produkowaną paszą.")
+        return name
+
+
+class FeedServingForm(forms.Form):
+    product = forms.ModelChoiceField(queryset=FeedProductModel.objects.none(), label="Gotowa pasza")
+    date = forms.DateField(label="Data podania", widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}))
+    time = forms.TimeField(label="Godzina", required=False, widget=forms.TimeInput(format="%H:%M", attrs={"type": "time"}))
+    quantity_kg = forms.DecimalField(label="Ilość (kg)", min_value=Decimal("0.01"), max_digits=12, decimal_places=2)
+    note = forms.CharField(label="Cel, sektor, grupa lub notatka", required=False, max_length=255, widget=forms.Textarea(attrs={"rows": 3}))
+
+    def __init__(self, *args, farm=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if farm is not None:
+            self.fields["product"].queryset = FeedProductModel.objects.filter(farm=farm, is_active=True).order_by("name")
+        for field in self.fields.values():
+            _apply_widget_class(field)
 
 
 class ProductionForm(forms.ModelForm):

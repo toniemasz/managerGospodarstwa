@@ -21,6 +21,7 @@ class FarmSettingsForm(forms.ModelForm):
             'farrowing_alert_days_ahead',
             'vaccination_alert_days_ahead',
             'default_production_quantity_kg',
+            'feed_serving_mode',
             'allow_farrowing_without_pregnancy_check',
             'ask_before_auto_pregnancy_check',
         ]
@@ -33,12 +34,14 @@ class FarmSettingsForm(forms.ModelForm):
             'farrowing_alert_days_ahead': 'Dni alertu przed oproszeniem',
             'vaccination_alert_days_ahead': 'Dni alertu szczepienia',
             'default_production_quantity_kg': 'Domyślna ilość śrutowania',
+            'feed_serving_mode': 'Zachowanie po zakończeniu śrutowania',
             'allow_farrowing_without_pregnancy_check': 'Pozwalać na oproszenie bez badania',
             'ask_before_auto_pregnancy_check': 'Pytać o automatyczne badanie TAK',
         }
         widgets = {
             'interface_scale': forms.RadioSelect(),
             'theme': forms.RadioSelect(),
+            'feed_serving_mode': forms.RadioSelect(),
             'font_scale': forms.NumberInput(attrs={
                 'min': 20,
                 'max': 200,
@@ -55,6 +58,7 @@ class FarmSettingsForm(forms.ModelForm):
             initial = {**initial, 'farm_name': farm.name}
         kwargs['initial'] = initial
         super().__init__(*args, **kwargs)
+        self.fields['feed_serving_mode'].required = False
         visible = normalize_visible_modules(getattr(self.instance, 'visible_modules', None))
         nav_modules = normalize_nav_modules(
             getattr(self.instance, 'nav_modules', None),
@@ -126,6 +130,13 @@ class FarmSettingsForm(forms.ModelForm):
             settings.save()
         return settings
 
+    def clean_feed_serving_mode(self):
+        return (
+            self.cleaned_data.get('feed_serving_mode')
+            or getattr(self.instance, 'feed_serving_mode', None)
+            or FarmSettingsModel.FeedServingModes.MANUAL
+        )
+
 
 class UserBackupImportForm(forms.Form):
     backup_file = forms.FileField(
@@ -133,14 +144,29 @@ class UserBackupImportForm(forms.Form):
         help_text='Wybierz plik ZIP lub JSON utworzony przez eksport danych gospodarstwa.',
         widget=forms.FileInput(attrs={'accept': '.zip,.json'}),
     )
-    confirm_empty_import = forms.BooleanField(
-        label='Rozumiem, że import zadziała tylko wtedy, gdy gospodarstwo nie ma danych.',
-    )
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['backup_file'].widget.attrs['class'] = 'form-control'
-        self.fields['confirm_empty_import'].widget.attrs['class'] = 'checkbox-input'
+
+
+class UserBackupApplyForm(forms.Form):
+    MODES = (
+        ('ADD_MISSING', 'Dodaj tylko brakujące dane'),
+        ('REPLACE_FARM', 'Zastąp dane gospodarstwa'),
+    )
+    preview_token = forms.CharField(widget=forms.HiddenInput)
+    import_mode = forms.ChoiceField(label='Sposób importu', choices=MODES, widget=forms.RadioSelect)
+    confirmation = forms.CharField(label='Potwierdzenie', required=False)
+    confirm_replace = forms.BooleanField(label='Rozumiem, że obecne dane gospodarstwa zostaną usunięte.', required=False)
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get('import_mode') == 'REPLACE_FARM':
+            if not cleaned.get('confirm_replace'):
+                self.add_error('confirm_replace', 'Potwierdzenie jest wymagane.')
+            if cleaned.get('confirmation', '').strip() != 'ZASTĄP DANE GOSPODARSTWA':
+                self.add_error('confirmation', 'Wpisz dokładnie: ZASTĄP DANE GOSPODARSTWA')
+        return cleaned
 
 
 class CsvImportForm(forms.Form):

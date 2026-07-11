@@ -67,6 +67,8 @@ class ProductionCostSelector:
     def _fifo_components(production):
         usages = list(production.ingredient_usages.all())
         if not usages:
+            if production.feed_cost_total > 0 or production.feed_cost_is_partial:
+                return production.feed_cost_total, []
             return None
         production_cost = Decimal("0.00")
         components = []

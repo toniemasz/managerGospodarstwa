@@ -29,7 +29,6 @@ from feed.actions.productions import (
     complete_production,
     create_production,
     delete_production_with_inventory,
-    mark_stage_1_done,
     update_production,
 )
 from feed.models import RecipeVersionModel
@@ -47,7 +46,6 @@ from feed.selectors.inventory import (
 from feed.selectors.productions import (
     default_production_initial,
     production_counts_for_version,
-    production_details_for_stages,
     production_list_context,
 )
 from feed.selectors.recipes import (
@@ -509,49 +507,6 @@ def delete_production_view(request, pk):
         messages.success(request, "Usunięto śrutowanie.")
     return redirect('feed_productions')
 
-
-@login_required
-def process_stage1_view(request, pk):
-    farm = get_current_farm(request)
-    get_object_or_404(ProductionModel, pk=pk, recipe__farm=farm)
-    if request.method == 'POST':
-        success, message = mark_stage_1_done(farm, pk)
-        if success:
-            log_action(farm=farm, user=request.user, action="PRODUCTION_STAGE_1", obj=ProductionModel.objects.get(pk=pk))
-            messages.success(request, message)
-        else:
-            messages.error(request, message)
-        return redirect('feed_productions')
-
-    context = production_details_for_stages(farm, pk)
-    return render(request, 'feed/stage1.html', context)
-
-
-@login_required
-def process_stage2_view(request, pk):
-    farm = get_current_farm(request)
-    get_object_or_404(ProductionModel, pk=pk, recipe__farm=farm)
-    if request.method == 'POST':
-        skip_stages = request.POST.get('skip_stages') == 'on'
-
-        force_inventory = request.POST.get('force_inventory') == 'on'
-
-        success, message = complete_production(
-            farm,
-            pk,
-            skip_stages=skip_stages,
-            force_inventory=force_inventory,
-            user=request.user,
-        )
-        if success:
-            log_action(farm=farm, user=request.user, action="PRODUCTION_COMPLETED", obj=ProductionModel.objects.get(pk=pk), metadata={"forced": force_inventory})
-            messages.success(request, message)
-        else:
-            messages.error(request, message)
-        return redirect('feed_productions')
-
-    context = production_details_for_stages(farm, pk)
-    return render(request, 'feed/stage2.html', context)
 
 @login_required
 def feed_calculator_view(request):

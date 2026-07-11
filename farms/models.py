@@ -26,6 +26,11 @@ class FarmModel(models.Model):
 
 
 class FarmSettingsModel(models.Model):
+    class FeedServingModes(models.TextChoices):
+        MANUAL = "MANUAL", "Pozostaw na magazynie"
+        ASK_ON_COMPLETION = "ASK_ON_COMPLETION", "Zapytaj przy zakończeniu"
+        AUTO_FULL_PRODUCTION = "AUTO_FULL_PRODUCTION", "Automatycznie podaj całą produkcję"
+
     INTERFACE_SCALE_CHOICES = [
         ("compact", "Kompaktowy"),
         ("standard", "Standardowy"),
@@ -51,6 +56,11 @@ class FarmSettingsModel(models.Model):
         max_digits=10,
         decimal_places=2,
         default=DEFAULT_PRODUCTION_QUANTITY_KG,
+    )
+    feed_serving_mode = models.CharField(
+        max_length=24,
+        choices=FeedServingModes.choices,
+        default=FeedServingModes.MANUAL,
     )
     default_dashboard_period = models.CharField(max_length=20, default="6m")
     date_format = models.CharField(max_length=20, default="YYYY-MM-DD")
@@ -115,3 +125,17 @@ class AuditLogModel(models.Model):
 
     def __str__(self):
         return f"{self.action}: {self.object_repr or self.model_label}"
+
+
+class BackupImportPreviewModel(models.Model):
+    class Kinds(models.TextChoices):
+        FARM = "FARM", "Gospodarstwo"
+        DATABASE = "DATABASE", "Cała baza"
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="backup_import_previews")
+    farm = models.ForeignKey(FarmModel, on_delete=models.CASCADE, null=True, blank=True, related_name="backup_import_previews")
+    kind = models.CharField(max_length=16, choices=Kinds.choices)
+    payload = models.BinaryField()
+    sha256 = models.CharField(max_length=64)
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)

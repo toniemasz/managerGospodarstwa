@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from farms.services.cache import invalidate_farm_cache_on_commit
 from feed.actions.inventory import InventoryActions
+from feed.actions.finished_feed import create_feed_serving, create_finished_feed_batch_for_production, production_is_ready_feed
 from feed.models import ProductionModel
 from feed.selectors.productions import production_for_processing, validate_production_capacity
 
@@ -47,10 +48,12 @@ def complete_production(
     skip_stages: bool = False,
     force_inventory: bool = False,
     user=None,
+    create_serving: bool | None = None,
 ) -> tuple[bool, str]:
     try:
         with transaction.atomic():
             production = production_for_processing(farm, production_id, lock_for_update=True)
+            farm = farm or production.recipe.farm
 
             if production.status == ProductionModel.Statuses.COMPLETED:
                 return False, "To śrutowanie zostało już wcześniej zaksięgowane."
@@ -72,11 +75,36 @@ def complete_production(
                 user=user,
                 forced=force_inventory,
             )
+            production.refresh_from_db()
+            from farms.models import FarmSettingsModel
+            from farms.services.settings_service import get_farm_settings
+            get_farm_settings(farm)
+            settings = FarmSettingsModel.objects.select_for_update().get(farm=farm)
+            is_ready_feed = production_is_ready_feed(production)
+            should_serve = is_ready_feed or (
+                settings.feed_serving_mode == FarmSettingsModel.FeedServingModes.AUTO_FULL_PRODUCTION
+                if create_serving is None else create_serving
+            )
+            mode_used = (
+                FarmSettingsModel.FeedServingModes.AUTO_FULL_PRODUCTION
+                if should_serve else FarmSettingsModel.FeedServingModes.MANUAL
+            )
+            production.completion_feed_serving_mode = mode_used
+            production.save(update_fields=("completion_feed_serving_mode",))
+            batch = create_finished_feed_batch_for_production(production)
+            if should_serve:
+                create_feed_serving(
+                    farm=farm, product=batch.product, date=production.date,
+                    quantity_kg=production.quantity_kg, user=user,
+                    automatic_for_production=production,
+                )
             invalidate_farm_cache_on_commit(farm, groups=("feed",))
     except ValidationError as error:
         message = error.messages[0] if hasattr(error, "messages") else str(error)
         return False, message
-    return True, "Śrutowanie zakończone pomyślnie. Zaktualizowano stany magazynowe i koszt FIFO."
+    if should_serve:
+        return True, f"Produkcja zakończona. Utworzono {production.quantity_kg:.2f} kg gotowej paszy i zarejestrowano automatyczne podanie."
+    return True, f"Produkcja zakończona. Utworzono {production.quantity_kg:.2f} kg gotowej paszy. Pasza pozostała na magazynie."
 
 
 def _normalize_production_ids(production_ids) -> tuple[set[int], int]:

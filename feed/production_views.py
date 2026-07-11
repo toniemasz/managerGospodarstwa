@@ -10,8 +10,10 @@ from feed.actions.productions import (
     complete_production,
     mark_stage_1_done,
 )
+from feed.actions.finished_feed import production_is_ready_feed
 from feed.models import ProductionModel
 from feed.selectors.productions import production_details_for_stages, production_or_404
+from farms.services.settings_service import get_farm_settings
 
 
 def _redirect_from_stage_1(request, production):
@@ -67,11 +69,13 @@ def process_stage2_view(request, pk):
 
     if request.method == "POST":
         force_inventory = request.POST.get("force_inventory") == "on"
+        create_serving = request.POST.get("create_feed_serving") == "on"
         success, message = complete_production(
             farm,
             pk,
             force_inventory=force_inventory,
             user=request.user,
+            create_serving=create_serving,
         )
         if success:
             production.refresh_from_db()
@@ -87,7 +91,15 @@ def process_stage2_view(request, pk):
             messages.error(request, message)
         return redirect("feed_productions")
 
-    return render(request, "feed/stage2.html", production_details_for_stages(farm, pk))
+    context = production_details_for_stages(farm, pk)
+    settings = get_farm_settings(farm)
+    is_ready_feed = production_is_ready_feed(production)
+    context.update({
+        "feed_serving_mode": settings.feed_serving_mode,
+        "default_create_feed_serving": is_ready_feed or settings.feed_serving_mode == settings.FeedServingModes.AUTO_FULL_PRODUCTION,
+        "force_ready_feed_serving": is_ready_feed,
+    })
+    return render(request, "feed/stage2.html", context)
 
 
 @login_required

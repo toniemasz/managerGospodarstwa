@@ -16,6 +16,7 @@ from farms.services.data_backup import (
     BackupImportError,
     build_database_backup,
     build_user_backup,
+    analyze_user_backup,
     import_user_backup,
     restore_database_backup,
 )
@@ -28,6 +29,9 @@ from feed.models import (
     ProductionModel,
     RecipeItemModel,
     RecipeModel,
+    FeedProductModel,
+    FinishedFeedBatchModel,
+    ReadyFeedDeliveryModel,
 )
 from sales.models import PigSaleModel, SaleClassRowModel
 from sows.models import SowEventModel, SowModel, VaccinationPlanModel
@@ -324,3 +328,91 @@ def test_admin_restore_view_reports_non_empty_database(client):
     messages = [str(message) for message in get_messages(response.wsgi_request)]
     assert any('baza ma już dane biznesowe' in message for message in messages)
     assert SowModel.objects.filter(ear_tag='ADMIN-EXISTING').exists()
+
+
+@pytest.mark.django_db
+def test_replace_farm_backup_restores_finished_feed_and_removes_previous_data():
+    source_user = User.objects.create_user(username='replace-source')
+    source_farm = get_or_create_user_farm(source_user)
+    product = FeedProductModel.objects.create(farm=source_farm, name='Bebito', source_type=FeedProductModel.SourceTypes.PURCHASED_READY)
+    delivery = ReadyFeedDeliveryModel.objects.create(farm=source_farm, product=product, date=date(2026, 7, 1), quantity_kg=Decimal('100.00'), price_per_kg=Decimal('2.00000'), total_cost=Decimal('200.00'))
+    FinishedFeedBatchModel.objects.create(farm=source_farm, product=product, batch_date=delivery.date, initial_quantity_kg=delivery.quantity_kg, remaining_quantity_kg=delivery.quantity_kg, cost_per_kg=delivery.price_per_kg, total_cost=delivery.total_cost, ready_feed_delivery=delivery)
+    backup = _user_backup_fixture(source_user, source_farm)
+
+    target_user = User.objects.create_user(username='replace-target')
+    target_farm = get_or_create_user_farm(target_user)
+    SowModel.objects.create(farm=target_farm, ear_tag='DO-USUNIECIA')
+    counts = import_user_backup(backup, target_farm, mode='REPLACE_FARM')
+
+    assert not SowModel.objects.filter(farm=target_farm).exists()
+    restored = FeedProductModel.objects.get(farm=target_farm, name='Bebito')
+    assert restored.batches.get().remaining_quantity_kg == Decimal('100.00')
+    assert counts['partie gotowej paszy'] == 1
+
+
+@pytest.mark.django_db
+def test_add_missing_import_does_not_duplicate_existing_ingredient():
+    source_user = User.objects.create_user(username='merge-source')
+    source_farm = get_or_create_user_farm(source_user)
+    IngredientModel.objects.create(farm=source_farm, name='Pszenica')
+    IngredientModel.objects.create(farm=source_farm, name='Jęczmień')
+    backup = _user_backup_fixture(source_user, source_farm)
+    target_user = User.objects.create_user(username='merge-target')
+    target_farm = get_or_create_user_farm(target_user)
+    IngredientModel.objects.create(farm=target_farm, name='Pszenica')
+
+    import_user_backup(backup, target_farm, mode='ADD_MISSING')
+
+    assert IngredientModel.objects.filter(farm=target_farm, name='Pszenica').count() == 1
+    assert IngredientModel.objects.filter(farm=target_farm, name='Jęczmień').count() == 1
+
+
+@pytest.mark.django_db
+def test_settings_backup_flow_shows_preview_before_replace(client):
+    source_user = User.objects.create_user(username='preview-source')
+    source_farm = get_or_create_user_farm(source_user)
+    IngredientModel.objects.create(farm=source_farm, name='Soja')
+    backup = _user_backup_fixture(source_user, source_farm)
+    target_user = User.objects.create_user(username='preview-target', password='password')
+    target_farm = get_or_create_user_farm(target_user)
+    IngredientModel.objects.create(farm=target_farm, name='Stary składnik')
+    client.login(username='preview-target', password='password')
+
+    preview = client.post(reverse('farm_settings'), {'analyze_backup': '1', 'backup_file': backup})
+    assert preview.status_code == 200
+    assert 'Podsumowanie kopii' in preview.content.decode()
+    assert IngredientModel.objects.filter(farm=target_farm, name='Stary składnik').exists()
+    token = preview.context['apply_form'].initial['preview_token']
+    applied = client.post(reverse('farm_settings'), {
+        'apply_backup': '1', 'preview_token': token, 'import_mode': 'REPLACE_FARM',
+        'confirm_replace': 'on', 'confirmation': 'ZASTĄP DANE GOSPODARSTWA',
+    })
+    assert applied.status_code == 302
+    assert not IngredientModel.objects.filter(farm=target_farm, name='Stary składnik').exists()
+    assert IngredientModel.objects.filter(farm=target_farm, name='Soja').exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_admin_database_replace_requires_preview_and_replaces_everything(client):
+    admin_user = User.objects.create_superuser(username='full-replace-admin', password='password', email='admin@example.com')
+    farm = get_or_create_user_farm(admin_user)
+    SowModel.objects.create(farm=farm, ear_tag='W-KOPII')
+    archive, _ = build_database_backup()
+    SowModel.objects.create(farm=farm, ear_tag='PO-KOPII')
+    client.login(username='full-replace-admin', password='password')
+
+    preview = client.post(reverse('admin_database_restore'), {
+        'analyze_database_backup': '1',
+        'backup_file': SimpleUploadedFile('database.zip', archive),
+    })
+    assert preview.status_code == 200
+    assert b'Podsumowanie' in preview.content
+    token = preview.context['database_backup_token']
+    response = client.post(reverse('admin_database_restore'), {
+        'preview_token': token,
+        'confirm_replace': 'on',
+        'confirmation': 'ZASTĄP CAŁĄ BAZĘ DANYCH',
+    })
+    assert response.status_code == 302
+    assert SowModel.objects.filter(ear_tag='W-KOPII').exists()
+    assert not SowModel.objects.filter(ear_tag='PO-KOPII').exists()
