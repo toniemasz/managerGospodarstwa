@@ -83,8 +83,8 @@ class SowRepository:
         vaccination_fields = {}
         if event_type == 'VACCINATION':
             vaccination_fields = {
-                'vaccine_name': details.get('vaccine_name', ''),
-                'cycle_id': details.get('cycle_id', ''),
+                'vaccine_name': details.get('vaccine_name') or '',
+                'cycle_id': details.get('cycle_id') or '',
                 'scheduled_date': details.get('scheduled_date') or None,
                 'vaccination_plan_id': details.get('vaccination_plan_id') or None,
             }
