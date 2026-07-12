@@ -8,7 +8,7 @@
         <div>
             <p class="eyebrow">Maciory</p>
             <h1>Upadki</h1>
-            <p class="page-subtitle">Zgłoszenia upadków macior i zwierząt po odsadzeniu w bieżącym gospodarstwie.</p>
+            <p class="page-subtitle">Ręczne zgłoszenia oraz automatyczne straty przed odsadzeniem w bieżącym gospodarstwie.</p>
         </div>
         <div class="header-actions">
             <a href="{% url 'report_mortality' %}" class="button button-primary">Zgłoś upadek</a>
@@ -19,21 +19,13 @@
     {% include 'components/filter_panel.html' with filter_action=mortality_filter_url filter_clear_url=filter_clear_url filter_fields_template='sows/_mortality_filters.html' %}
 
     <section class="stats-grid compact-stats">
-        <div class="stat-tile">
-            <span>Odsadzone łącznie</span>
-            <strong>{{ post_weaning_stock.weaned_total }} szt.</strong>
-            <small>Suma zapisanych odsadzeń w historii macior.</small>
-        </div>
-        <div class="stat-tile{% if post_weaning_stock.mortality_total %} is-warning{% endif %}">
-            <span>Upadki po odsadzeniu</span>
-            <strong>{{ post_weaning_stock.mortality_total }} szt.</strong>
-            <small>Zgłoszone przez formularz upadków.</small>
-        </div>
-        <div class="stat-tile is-success">
-            <span>Stan po odsadzeniu</span>
-            <strong>{{ post_weaning_stock.current_stock }} szt.</strong>
-            <small>Odsadzone minus zgłoszone upadki po odsadzeniu.</small>
-        </div>
+        <div class="stat-tile"><span>Upadki macior</span><strong>{{ summary.sow }} szt.</strong></div>
+        <div class="stat-tile"><span>Przed odsadzeniem</span><strong>{{ summary.pre_weaning }} szt.</strong><small>Wyliczone per cykl.</small></div>
+        <div class="stat-tile"><span>Upadki prosiąt</span><strong>{{ summary.piglet }} szt.</strong></div>
+        <div class="stat-tile"><span>Upadki warchlaków</span><strong>{{ summary.weaner }} szt.</strong></div>
+        <div class="stat-tile"><span>Upadki tuczników</span><strong>{{ summary.finisher }} szt.</strong></div>
+        <div class="stat-tile{% if summary.post_weaning %} is-warning{% endif %}"><span>Łącznie po odsadzeniu</span><strong>{{ summary.post_weaning }} szt.</strong></div>
+        {% if summary.unspecified %}<div class="stat-tile is-warning"><span>Nieokreślone po odsadzeniu</span><strong>{{ summary.unspecified }} szt.</strong><small>Rekordy historyczne do klasyfikacji.</small></div>{% endif %}
     </section>
 
     <section class="panel table-panel">
@@ -44,19 +36,22 @@
             </div>
         </div>
 
-        {% if mortality_reports %}
+        {% if mortality_reports or automatic_mortality_rows %}
         <div class="table-scroll">
             <table class="data-table mobile-card-table" data-mobile-cards="true">
                 <thead>
                     <tr>
                         <th>Data</th>
                         <th>Typ</th>
+                        <th>Źródło</th>
                         <th>Maciora</th>
+                        <th>Cykl</th>
                         <th class="text-right">Liczba</th>
                         <th>Przyczyna</th>
                         <th>Notatka</th>
                         <th>Utworzył</th>
                         <th>Utworzono</th>
+                        <th>Akcje</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -68,6 +63,7 @@
                                 {{ report.get_mortality_type_display }}
                             </span>
                         </td>
+                        <td data-label="Źródło">Ręczne</td>
                         <td data-label="Maciora">
                             {% if report.sow %}
                                 <a href="{% url 'sow_detail' report.sow.id %}" class="table-link">{{ report.sow.ear_tag }}</a>
@@ -75,11 +71,27 @@
                                 —
                             {% endif %}
                         </td>
+                        <td data-label="Cykl">—</td>
                         <td data-label="Liczba" class="text-right"><strong>{{ report.quantity }}</strong> szt.</td>
                         <td data-label="Przyczyna">{{ report.reason|default:"—" }}</td>
                         <td data-label="Notatka">{{ report.note|default:"—" }}</td>
                         <td data-label="Utworzył">{{ report.created_by.username|default:"—" }}</td>
                         <td data-label="Utworzono">{{ report.created_at|date:"d.m.Y H:i" }}</td>
+                        <td data-label="Akcje">{% if report.mortality_type != 'MACIORA' %}<div class="row-actions"><a href="{% url 'edit_mortality' report.id %}" class="table-link">Edytuj</a><form method="post" action="{% url 'delete_mortality' report.id %}" data-confirm="Usunąć zgłoszenie upadku?">{% csrf_token %}<button type="submit" class="table-link button-link danger-link">Usuń</button></form></div>{% else %}—{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                    {% for row in automatic_mortality_rows %}
+                    <tr>
+                        <td data-label="Data"><strong>{{ row.mortality_date|date:"d.m.Y" }}</strong></td>
+                        <td data-label="Typ"><span class="status-pill status-blue">Przed odsadzeniem</span></td>
+                        <td data-label="Źródło">Wyliczone automatycznie z oproszenia i odsadzenia</td>
+                        <td data-label="Maciora"><a href="{% url 'sow_detail' row.sow.id %}" class="table-link">{{ row.sow.ear_tag }}</a></td>
+                        <td data-label="Cykl">{{ row.cycle_label }}</td>
+                        <td data-label="Liczba" class="text-right"><strong>{% if row.quantity != None %}{{ row.quantity }} szt.{% else %}—{% endif %}</strong></td>
+                        <td data-label="Przyczyna">{% if row.is_inconsistent %}Niespójność: odsadzono więcej niż urodzono{% else %}—{% endif %}</td>
+                        <td data-label="Notatka">{% if row.unavailable_reason %}Nie można obliczyć — {{ row.unavailable_reason|lower }}{% else %}—{% endif %}</td>
+                        <td data-label="Utworzył">System</td><td data-label="Utworzono">—</td>
+                        <td data-label="Akcje"><a href="{% url 'sow_detail' row.sow.id %}" class="table-link">Zdarzenia maciory</a></td>
                     </tr>
                     {% endfor %}
                 </tbody>

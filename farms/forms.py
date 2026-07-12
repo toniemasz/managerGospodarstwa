@@ -168,3 +168,17 @@ class CsvImportForm(forms.Form):
         label="Potwierdzam import do pustego gospodarstwa.",
         widget=forms.CheckboxInput(attrs={"class": "checkbox-input"}),
     )
+
+class ModulePinForm(forms.Form):
+    module_key = forms.ChoiceField(
+        choices=[
+            (module["key"], module["title"])
+            for module in MODULE_DEFINITIONS
+            if module["key"] != "settings"
+        ],
+        widget=forms.HiddenInput,
+    )
+    is_pinned = forms.BooleanField(
+        required=False,
+        widget=forms.HiddenInput,
+    )

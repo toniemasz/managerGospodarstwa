@@ -8,9 +8,20 @@
     </select>
 </div>
 <div class="table-control">
+    <label for="source">Źródło</label>
+    <select name="source" id="source">
+        <option value="">Wszystkie źródła</option>
+        <option value="manual"{% if selected_source == 'manual' %} selected{% endif %}>Ręczne</option>
+        <option value="automatic"{% if selected_source == 'automatic' %} selected{% endif %}>Automatyczne</option>
+    </select>
+</div>
+<div class="table-control">
     <label for="date_from">Od</label>
     <input type="date" name="date_from" id="date_from" value="{{ date_from|date:'Y-m-d' }}">
 </div>
+<div class="table-control"><label for="reason">Przyczyna</label><input type="search" name="reason" id="reason" value="{{ request.GET.reason }}"></div>
+<div class="table-control"><label for="sow">Maciora</label><input type="search" name="sow" id="sow" value="{{ request.GET.sow }}"></div>
+<div class="table-control"><label for="cycle">Cykl</label><input type="search" name="cycle" id="cycle" value="{{ request.GET.cycle }}" placeholder="dd.mm.rrrr"></div>
 <div class="table-control">
     <label for="date_to">Do</label>
     <input type="date" name="date_to" id="date_to" value="{{ date_to|date:'Y-m-d' }}">

@@ -10,12 +10,9 @@
             <h1>Statystyki — {{ selected_year|unlocalize }}</h1>
             <p class="page-subtitle">Wspólne miejsce dla wyliczeń paszowych, sprzedażowych, magazynowych i finansowych.</p>
         </div>
-        <div class="header-actions">
-            {% for link in statistic_links %}
-                <a href="{{ link.url }}" class="button button-secondary">{{ link.label }}</a>
-            {% endfor %}
-        </div>
     </section>
+
+    {% include 'components/module_tabs.html' with tabs=statistic_links aria_label='Sekcje statystyk' %}
 
     {% url 'farm_statistics' as statistics_filter_url %}
     {% include 'components/filter_panel.html' with filter_action=statistics_filter_url filter_clear_url=statistics_filter_url filter_fields_template='farms/_statistics_filters.html' %}
@@ -30,7 +27,7 @@
         {% endfor %}
     </section>
 
-    <section class="finance-section">
+    <section class="panel finance-section">
         <div class="section-heading">
             <div>
                 <h2>Pasza i efektywność</h2>
@@ -59,7 +56,7 @@
         </div>
     </section>
 
-    <section class="finance-section">
+    <section class="panel finance-section">
         <div class="section-heading">
             <div>
                 <h2>Stado i upadki</h2>
@@ -73,10 +70,15 @@
                 <small>W wybranym okresie.</small>
             </div>
             <div class="stat-tile{% if mortality.post_weaning_deaths %} is-warning{% endif %}">
-                <span>Upadki po odsadzeniu</span>
+                <span>Łączne upadki po odsadzeniu</span>
                 <strong>{{ mortality.post_weaning_deaths }} szt.</strong>
                 <small>W wybranym okresie.</small>
             </div>
+            <div class="stat-tile"><span>Upadki przed odsadzeniem</span><strong>{{ mortality.pre_weaning_deaths }} szt.</strong><small>Wyliczone z cykli oproszenie–odsadzenie.</small></div>
+            <div class="stat-tile"><span>Prosiaki</span><strong>{{ mortality.piglet_deaths }} szt.</strong></div>
+            <div class="stat-tile"><span>Warchlaki</span><strong>{{ mortality.weaner_deaths }} szt.</strong></div>
+            <div class="stat-tile"><span>Tuczniki</span><strong>{{ mortality.finisher_deaths }} szt.</strong></div>
+            {% if mortality.unspecified_post_weaning_deaths %}<div class="stat-tile is-warning"><span>Nieokreślone po odsadzeniu</span><strong>{{ mortality.unspecified_post_weaning_deaths }} szt.</strong><small>Historyczne rekordy do klasyfikacji.</small></div>{% endif %}
             <div class="stat-tile is-success">
                 <span>Stan po odsadzeniu</span>
                 <strong>{{ mortality.post_weaning_current_stock }} szt.</strong>

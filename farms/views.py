@@ -5,11 +5,19 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
-from farms.forms import CsvImportForm, FarmSettingsForm, UserBackupApplyForm, UserBackupImportForm
+from farms.actions.module_navigation import set_module_pinned
+from farms.forms import (
+    CsvImportForm,
+    FarmSettingsForm,
+    ModulePinForm,
+    UserBackupApplyForm,
+    UserBackupImportForm,
+)
 from farms.models import AuditLogModel
 from farms.services.audit_log_service import log_action
 from common.cache import invalidate_farm_cache_on_commit
@@ -39,6 +47,71 @@ def farm_settings_view(request):
 
     return _render_settings(request, farm, settings)
 
+
+@login_required
+@require_POST
+def set_module_pin_view(request):
+    """
+    Przypina albo odpina moduł od głównego paska nawigacji gospodarstwa.
+    """
+
+    farm = get_current_farm(request)
+    form = ModulePinForm(request.POST)
+
+    if not form.is_valid():
+        messages.error(
+            request,
+            "Nie udało się zmienić przypięcia modułu.",
+        )
+        return redirect("modules_catalog")
+
+    module_key = form.cleaned_data["module_key"]
+    is_pinned = form.cleaned_data["is_pinned"]
+
+    try:
+        settings = set_module_pinned(
+            farm=farm,
+            module_key=module_key,
+            is_pinned=is_pinned,
+        )
+    except ValidationError as error:
+        message = (
+            error.messages[0]
+            if error.messages
+            else str(error)
+        )
+        messages.error(request, message)
+        return redirect("modules_catalog")
+
+    invalidate_farm_cache_on_commit(
+        farm,
+        groups=("settings",),
+    )
+
+    log_action(
+        farm=farm,
+        user=request.user,
+        action="SETTINGS_UPDATE",
+        obj=settings,
+        metadata={
+            "module_key": module_key,
+            "is_pinned": is_pinned,
+            "source": "modules_catalog",
+        },
+    )
+
+    if is_pinned:
+        messages.success(
+            request,
+            "Moduł został przypięty do paska nawigacji.",
+        )
+    else:
+        messages.success(
+            request,
+            "Moduł został odpięty od paska nawigacji.",
+        )
+
+    return redirect("modules_catalog")
 
 def _handle_settings_post(request, farm, settings):
     if 'import_backup' in request.POST:
@@ -320,20 +393,31 @@ def profitability_view(request):
 
 
 @login_required
-def statistics_view(request):
+def statistics_view(request, section=None):
     farm = get_current_farm(request)
     accounting_year = parse_accounting_year(request.GET)
-    context = FarmStatisticsService(farm).calculate(
-        date_from=accounting_year.date_from,
-        date_to=accounting_year.date_to,
-    )
+    service = FarmStatisticsService(farm)
+    if section is None:
+        context = service.calculate(date_from=accounting_year.date_from, date_to=accounting_year.date_to)
+        active_section = "overview"
+        template_name = "farms/statistics.html"
+    else:
+        if section not in service.SECTION_KEYS:
+            raise Http404("Nieznana sekcja statystyk.")
+        context = service.section_context(
+            section,
+            date_from=accounting_year.date_from,
+            date_to=accounting_year.date_to,
+        )
+        active_section = section
+        template_name = "farms/statistics_section.html"
     context.update({
         "selected_year": accounting_year.year,
         "available_years": get_available_years(farm),
-        "statistic_links": FarmStatisticsService.statistic_links(),
+        "statistic_links": service.statistic_links(active_section),
     })
     context.update(filter_ui_state(request.GET, {'year': 'Rok'}))
-    return render(request, "farms/statistics.html", context)
+    return render(request, template_name, context)
 
 
 @login_required

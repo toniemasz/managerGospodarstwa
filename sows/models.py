@@ -230,12 +230,26 @@ class VaccinationCycleModel(models.Model):
 
 
 class MortalityReportModel(models.Model):
-    TYPE_SOW = 'sow'
-    TYPE_POST_WEANING = 'post_weaning'
+    TYPE_SOW = 'MACIORA'
+    TYPE_PIGLET = 'PROSIAK'
+    TYPE_WEANER = 'WARCHLAK'
+    TYPE_FINISHER = 'TUCZNIK'
+    TYPE_UNSPECIFIED_POST_WEANING = 'NIEOKRESLONY_PO_ODSADZENIU'
+    TYPE_POST_WEANING = TYPE_UNSPECIFIED_POST_WEANING  # zgodność kodu i importów sprzed migracji
+    POST_WEANING_TYPES = (
+        TYPE_PIGLET,
+        TYPE_WEANER,
+        TYPE_FINISHER,
+        TYPE_UNSPECIFIED_POST_WEANING,
+    )
     TYPE_CHOICES = [
         (TYPE_SOW, 'Maciora'),
-        (TYPE_POST_WEANING, 'Zwierzęta po odsadzeniu'),
+        (TYPE_PIGLET, 'Prosiak'),
+        (TYPE_WEANER, 'Warchlak'),
+        (TYPE_FINISHER, 'Tucznik'),
+        (TYPE_UNSPECIFIED_POST_WEANING, 'Nieokreślone po odsadzeniu'),
     ]
+    MANUAL_TYPE_CHOICES = TYPE_CHOICES[:4]
 
     farm = models.ForeignKey(
         'farms.FarmModel',
@@ -244,7 +258,7 @@ class MortalityReportModel(models.Model):
         verbose_name="Gospodarstwo",
     )
     mortality_type = models.CharField(
-        max_length=20,
+        max_length=32,
         choices=TYPE_CHOICES,
         verbose_name="Typ upadku",
     )
@@ -277,6 +291,30 @@ class MortalityReportModel(models.Model):
         ordering = ('-mortality_date', '-created_at', '-id')
         indexes = [
             models.Index(fields=('farm', '-mortality_date'), name='mortality_farm_date_idx'),
+            models.Index(fields=('farm', 'mortality_type', '-mortality_date'), name='mortality_farm_type_date_idx'),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(mortality_type__in=(
+                    'MACIORA', 'PROSIAK', 'WARCHLAK', 'TUCZNIK',
+                    'NIEOKRESLONY_PO_ODSADZENIU',
+                )),
+                name='mortality_type_valid',
+            ),
+            models.CheckConstraint(condition=models.Q(quantity__gt=0), name='mortality_quantity_positive'),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(mortality_type='MACIORA', sow__isnull=False)
+                    | models.Q(
+                        mortality_type__in=(
+                            'PROSIAK', 'WARCHLAK', 'TUCZNIK',
+                            'NIEOKRESLONY_PO_ODSADZENIU',
+                        ),
+                        sow__isnull=True,
+                    )
+                ),
+                name='mortality_sow_matches_type',
+            ),
         ]
         verbose_name = "Zgłoszenie upadku"
         verbose_name_plural = "Zgłoszenia upadków"

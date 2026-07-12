@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% load ui_format %}
+{% load l10n %}
+{% block title %}{{ section_title }} — statystyki{% endblock %}
+{% block content %}
+<main class="app-page">
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Statystyki</p>
+            <h1>{{ section_title }} — {{ selected_year|unlocalize }}</h1>
+            <p class="page-subtitle">{{ section_description }}</p>
+        </div>
+    </section>
+    {% include 'components/module_tabs.html' with tabs=statistic_links aria_label='Sekcje statystyk' %}
+    {% url 'farm_statistics_section' active_section as statistics_filter_url %}
+    {% include 'components/filter_panel.html' with filter_action=statistics_filter_url filter_clear_url=statistics_filter_url filter_fields_template='farms/_statistics_filters.html' %}
+
+    <section class="stats-grid featured-stats compact-stats">
+        {% for card in section_cards %}
+        <div class="stat-tile {{ card.tone }}">
+            <span>{{ card.title }}</span>
+            <strong>{% if card.value != None %}{{ card.value|smart_unit:card.unit }}{% else %}Brak danych{% endif %}</strong>
+            {% if card.note %}<small>{{ card.note }}</small>{% endif %}
+        </div>
+        {% endfor %}
+    </section>
+
+    {% if row_kind == 'timeline' %}
+    <section class="panel table-panel">
+        <div class="section-heading"><div><h2>Zestawienie miesięczne</h2><p>Wartości w obrębie wybranego roku.</p></div></div>
+        {% if section_rows %}<div class="table-scroll"><table class="data-table mobile-card-table"><thead><tr><th>Miesiąc</th><th class="text-right">Sprzedaż netto</th><th class="text-right">Koszt paszy</th><th class="text-right">Pozostałe koszty</th><th class="text-right">Wynik</th></tr></thead><tbody>{% for row in section_rows %}<tr><td data-label="Miesiąc">{{ row.month }}</td><td data-label="Sprzedaż" class="text-right">{{ row.sales_net|smart_unit:'zł' }}</td><td data-label="Pasza" class="text-right">{{ row.feed_cost|smart_unit:'zł' }}</td><td data-label="Pozostałe" class="text-right">{{ row.additional_cost|smart_unit:'zł' }}</td><td data-label="Wynik" class="text-right">{{ row.result_net|smart_unit:'zł' }}</td></tr>{% endfor %}</tbody></table></div>{% else %}{% include 'components/empty_state.html' with empty_message='Brak danych w wybranym roku.' %}{% endif %}
+    </section>
+    {% elif row_kind == 'recipes' %}
+    <section class="panel table-panel">
+        <div class="section-heading"><div><h2>Receptury</h2><p>Produkcja i rzeczywisty koszt FIFO.</p></div></div>
+        {% if section_rows %}<div class="table-scroll"><table class="data-table mobile-card-table"><thead><tr><th>Receptura</th><th class="text-right">Ilość</th><th class="text-right">Koszt/t</th></tr></thead><tbody>{% for row in section_rows %}<tr><td data-label="Receptura">{{ row.recipe_name }}</td><td data-label="Ilość" class="text-right">{{ row.quantity_kg|smart_unit:'kg' }}</td><td data-label="Koszt/t" class="text-right">{{ row.cost_per_ton|smart_unit:'zł/t' }}</td></tr>{% endfor %}</tbody></table></div>{% else %}{% include 'components/empty_state.html' with empty_message='Brak zakończonych śrutowań.' %}{% endif %}
+    </section>
+    {% endif %}
+</main>
+{% endblock %}

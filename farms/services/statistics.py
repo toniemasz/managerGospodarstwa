@@ -26,6 +26,8 @@ def _safe_divide(numerator, denominator):
 class FarmStatisticsService:
     """Jedno miejsce agregowania statystyk gospodarstwa."""
 
+    SECTION_KEYS = ("profitability", "sales", "mortality", "feed", "inventory", "costs")
+
     def __init__(self, farm):
         self.farm = farm
 
@@ -77,6 +79,145 @@ class FarmStatisticsService:
             "chart_labels": [row["month"] for row in timeline],
             "chart_datasets": self._chart_datasets(timeline),
             "unavailable_indicators": self._unavailable_indicators(sales_summary, feed),
+        }
+
+    def section_context(self, section, *, date_from=None, date_to=None) -> dict:
+        """Zwraca prezentacyjny kontrakt pojedynczej sekcji z tego samego wyniku obliczeń."""
+        if section not in self.SECTION_KEYS:
+            raise ValueError("Nieznana sekcja statystyk.")
+        data = self.calculate(date_from=date_from, date_to=date_to)
+        builders = {
+            "profitability": self._profitability_section,
+            "sales": self._sales_section,
+            "mortality": self._mortality_section,
+            "feed": self._feed_section,
+            "inventory": self._inventory_section,
+            "costs": self._costs_section,
+        }
+        return {**data, **builders[section](data), "active_section": section}
+
+    @staticmethod
+    def _card(title, value, unit="", note="", tone=""):
+        return {"title": title, "value": value, "unit": unit, "note": note, "tone": tone}
+
+    @classmethod
+    def _profitability_section(cls, data):
+        values = data["profitability"]
+        return {
+            "section_title": "Opłacalność",
+            "section_description": "Sprzedaż, koszty i wynik gospodarstwa w wybranym roku.",
+            "section_cards": [
+                cls._card("Wynik netto", values["net_result"], "zł", tone="is-success" if values["net_result"] >= 0 else "is-danger"),
+                cls._card("Sprzedaż netto", values["net_sales"], "zł"),
+                cls._card("Koszty razem", values["total_cost"], "zł"),
+                cls._card("Koszt/kg żywej", values["total_cost_per_live_kg"], "zł/kg"),
+                cls._card("Sprzedaż brutto/kg żywej", values["gross_per_live_kg"], "zł/kg"),
+                cls._card("Koszt paszy", values["feed_cost"], "zł"),
+                cls._card("Pozostałe koszty", values["additional_cost"], "zł"),
+                cls._card("Wynik brutto", values["gross_result"], "zł"),
+            ],
+            "section_rows": data["timeline"],
+            "row_kind": "timeline",
+        }
+
+    @classmethod
+    def _sales_section(cls, data):
+        values = data["sales"]
+        return {
+            "section_title": "Sprzedaż",
+            "section_description": "Wolumen, masa i wartości dokumentów sprzedaży.",
+            "section_cards": [
+                cls._card("Sprzedane sztuki", values["sold_quantity"], "szt."),
+                cls._card("Dokumenty", values["sale_count"]),
+                cls._card("Sprzedaż netto", values["net_sales"], "zł"),
+                cls._card("Sprzedaż brutto", values["gross_sales"], "zł"),
+                cls._card("VAT", values["vat_sales"], "zł"),
+                cls._card("Waga żywa", values["live_weight_kg"], "kg"),
+                cls._card("Waga poubojowa", values["slaughter_weight_kg"], "kg"),
+                cls._card("Średnia cena/kg", values["average_price_per_kg"], "zł/kg"),
+                cls._card("Średnia waga poubojowa/szt.", values["average_slaughter_weight_per_pig"], "kg"),
+                cls._card("Średnia waga żywa/szt.", values["average_live_weight_per_pig"], "kg"),
+                cls._card("Średnia mięsność", values["average_meatiness"], "%"),
+            ],
+            "section_rows": data["timeline"],
+            "row_kind": "timeline",
+        }
+
+    @classmethod
+    def _mortality_section(cls, data):
+        values = data["mortality"]
+        return {
+            "section_title": "Upadki i stan",
+            "section_description": "Rozdzielone straty przed i po odsadzeniu oraz bieżący stan.",
+            "section_cards": [
+                cls._card("Maciory", values["sow_deaths"], "szt."),
+                cls._card("Przed odsadzeniem", values["pre_weaning_deaths"], "szt."),
+                cls._card("Prosiaki", values["piglet_deaths"], "szt."),
+                cls._card("Warchlaki", values["weaner_deaths"], "szt."),
+                cls._card("Tuczniki", values["finisher_deaths"], "szt."),
+                cls._card("Nieokreślone", values["unspecified_post_weaning_deaths"], "szt."),
+                cls._card("Po odsadzeniu razem", values["post_weaning_deaths"], "szt."),
+                cls._card("Stan po odsadzeniu", values["post_weaning_current_stock"], "szt.", tone="is-success"),
+            ],
+            "section_rows": [],
+        }
+
+    @classmethod
+    def _feed_section(cls, data):
+        efficiency = data["feed_efficiency"]
+        production = data["production"]
+        return {
+            "section_title": "Pasza i śrutowanie",
+            "section_description": "Produkcja, koszt FIFO i wskaźniki wykorzystania paszy.",
+            "section_cards": [
+                cls._card("Wyprodukowana pasza", efficiency["feed_quantity_kg"], "kg"),
+                cls._card("Koszt paszy", efficiency["feed_cost"], "zł"),
+                cls._card("Średni koszt tony", efficiency["average_feed_cost_per_ton"], "zł/t"),
+                cls._card("Pasza / waga żywa", efficiency["feed_to_live_weight_ratio"], "t/t"),
+                cls._card("Pasza / waga poubojowa", efficiency["feed_to_slaughter_weight_ratio"], "t/t"),
+                cls._card("Zakończone śrutowania", production["completed_count"]),
+                cls._card("W kolejce", production["queued_count"]),
+                cls._card("W toku", production["in_progress_count"]),
+                cls._card("Podana gotowa pasza", data["feed"]["served_quantity_kg"], "kg"),
+                cls._card("Stan gotowej paszy", data["feed"]["finished_feed_stock_kg"], "kg"),
+                cls._card("Udział paszy w sprzedaży", efficiency["feed_cost_share_of_net_sales_percent"], "%"),
+            ],
+            "section_rows": data["recipe_ranking"],
+            "row_kind": "recipes",
+        }
+
+    @classmethod
+    def _inventory_section(cls, data):
+        values = data["inventory"]
+        return {
+            "section_title": "Magazyn",
+            "section_description": "Bieżący stan surowców i sygnały niskiego zapasu.",
+            "section_cards": [
+                cls._card("Stan łącznie", values["total_inventory_kg"], "kg"),
+                cls._card("Silosy", values["bin_stock_kg"], "kg"),
+                cls._card("Workowane / pozostałe", values["bag_stock_kg"], "kg"),
+                cls._card("Poniżej progu", values["low_stock_count"]),
+                cls._card("Liczba składników", values["ingredient_count"]),
+            ],
+            "section_rows": [],
+        }
+
+    @classmethod
+    def _costs_section(cls, data):
+        values = data["costs"]
+        return {
+            "section_title": "Koszty",
+            "section_description": "Koszt paszy i pozostałe koszty gospodarstwa bez podwójnego liczenia.",
+            "section_cards": [
+                cls._card("Koszty razem", values["total"], "zł"),
+                cls._card("Koszt paszy", values["feed_cost"], "zł"),
+                cls._card("Pozostałe koszty", values["additional"]["total"], "zł"),
+                cls._card("Liczba kosztów dodatkowych", values["additional"]["count"]),
+                cls._card("Zapłacone", values["paid"], "zł"),
+                cls._card("Niezapłacone", values["unpaid"], "zł"),
+            ],
+            "section_rows": data["timeline"],
+            "row_kind": "timeline",
         }
 
     @staticmethod
@@ -227,11 +368,15 @@ class FarmStatisticsService:
         return items
 
     @staticmethod
-    def statistic_links() -> list[dict]:
+    def statistic_links(active_section="overview") -> list[dict]:
         return [
-            {"label": "Opłacalność", "url": reverse("profitability")},
-            {"label": "Sprzedaż", "url": reverse("sales_list")},
-            {"label": "Upadki", "url": reverse("mortality_list")},
-            {"label": "Śrutowanie", "url": reverse("feed_productions")},
-            {"label": "Magazyn", "url": reverse("feed_inventory")},
+            {"label": "Podsumowanie", "url": reverse("farm_statistics"), "is_active": active_section == "overview"},
+            *[
+                {"label": label, "url": reverse("farm_statistics_section", args=[key]), "is_active": active_section == key}
+                for key, label in (
+                    ("profitability", "Opłacalność"), ("sales", "Sprzedaż"),
+                    ("mortality", "Upadki"), ("feed", "Pasza i śrutowanie"),
+                    ("inventory", "Magazyn"), ("costs", "Koszty"),
+                )
+            ],
         ]

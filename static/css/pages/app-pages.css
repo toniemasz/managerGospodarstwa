@@ -541,10 +541,6 @@
 
 .finance-section {
     overflow: hidden;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
-    box-shadow: none;
 }
 
 .finance-section .stats-grid {

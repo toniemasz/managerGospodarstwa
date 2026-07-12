@@ -1,14 +1,14 @@
 {% extends 'base.html' %}
 
-{% block title %}Zgłoś upadek{% endblock %}
+{% block title %}{% if is_edit %}Edytuj upadek{% else %}Zgłoś upadek{% endif %}{% endblock %}
 
 {% block content %}
 <main class="app-page app-page-narrow">
     <section class="page-header">
         <div>
             <p class="eyebrow">Maciory</p>
-            <h1>Zgłoś upadek</h1>
-            <p class="page-subtitle">Rejestruj upadek maciory albo zwierząt po odsadzeniu.</p>
+            <h1>{% if is_edit %}Edytuj upadek{% else %}Zgłoś upadek{% endif %}</h1>
+            <p class="page-subtitle">Rejestruj upadek maciory, prosiaka, warchlaka albo tucznika.</p>
         </div>
         <a href="{% url 'mortality_list' %}" class="button button-secondary">Lista upadków</a>
     </section>
@@ -16,7 +16,7 @@
     <section class="notice notice-warning">
         <div>
             <h2>Zakres zgłoszenia</h2>
-            <p>Prosiąt przed odsadzeniem nie zgłaszamy tutaj osobno. Ich straty wynikają z liczby żywo urodzonych i odsadzonych. Ten formularz służy do upadku maciory albo zwierząt po odsadzeniu.</p>
+            <p>Upadki przed odsadzeniem są wyliczane automatycznie z oproszenia i odsadzenia. Ich liczby nie można wpisywać ręcznie.</p>
         </div>
     </section>
 
@@ -62,7 +62,7 @@
 
             <div class="form-actions">
                 <a href="{% url 'mortality_list' %}" class="button button-secondary">Anuluj</a>
-                <button type="submit" class="button button-primary">Zapisz zgłoszenie</button>
+                <button type="submit" class="button button-primary">{% if is_edit %}Zapisz zmiany{% else %}Zapisz zgłoszenie{% endif %}</button>
             </div>
         </form>
     </section>

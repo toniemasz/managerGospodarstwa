@@ -1,0 +1,5 @@
+<nav class="subnav" aria-label="{{ aria_label|default:'Nawigacja modułu' }}">
+    {% for tab in tabs %}
+        <a href="{{ tab.url }}"{% if tab.is_active %} class="is-active" aria-current="page"{% endif %}>{{ tab.label }}</a>
+    {% endfor %}
+</nav>
