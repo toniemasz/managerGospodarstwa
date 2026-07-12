@@ -158,8 +158,8 @@
 
 @media (max-width: 720px) {
     html {
-        --control-height: max(2.85rem, var(--control-height));
-        --button-height: max(2.85rem, var(--button-height));
+        --control-height: 2.85rem;
+        --button-height: 2.85rem;
         --table-cell-padding-y: .62rem;
         --table-cell-padding-x: .68rem;
         --page-block-padding: .8rem 1rem;

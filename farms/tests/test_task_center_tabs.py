@@ -29,7 +29,15 @@ def test_task_center_has_three_tabs_sections_counts_empty_states_and_isolation(c
     SowEventModel.objects.create(sow=farrowing_sow, event_type="PREGNANCY_CHECK", event_date=insemination + timedelta(days=30), details={"result": "TAK"})
 
     vaccination_sow = SowModel.objects.create(farm=farm, ear_tag="SZCZEP-1", entry_date=today - timedelta(days=30))
-    VaccinationPlanModel.objects.create(farm=farm, name="Różyca", interval_months=1, reminder_days_ahead=7)
+    VaccinationPlanModel.objects.create(
+        farm=farm,
+        name="Różyca",
+        interval_value=1,
+        interval_unit="MONTHS",
+        schedule_mode="FIXED",
+        first_due_date=today,
+        reminder_days_ahead=7,
+    )
 
     ingredient = IngredientModel.objects.create(farm=farm, name="Pszenica", low_stock_threshold_kg=100)
     recipe = RecipeModel.objects.create(farm=farm, name="Grower")

@@ -223,7 +223,15 @@ class Command(BaseCommand):
             {"name": "Parwowiroza przed oproszeniem", "days_before_farrowing": 21, "reminder_days_ahead": 14},
             {"name": "Kolibakterioza przed oproszeniem", "days_before_farrowing": 14, "reminder_days_ahead": 14},
             {"name": "Różyca po inseminacji", "days_after_event": 28, "event_source": "INSEMINATION", "reminder_days_ahead": 10},
-            {"name": "Różyca cykliczna", "interval_months": 6, "reminder_days_ahead": 14},
+            {
+                "name": "Różyca cykliczna",
+                "interval_months": 6,
+                "interval_value": 6,
+                "interval_unit": "MONTHS",
+                "schedule_mode": "FROM_LAST_COMPLETED",
+                "first_due_date": date(2025, 1, 1),
+                "reminder_days_ahead": 14,
+            },
         ]
         plans = {}
         for payload in plan_payloads:

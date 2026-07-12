@@ -9,6 +9,30 @@ from django.db import models
 
 class VaccinationPlanModel(models.Model):
     """Konfiguracja cyklicznych szczepień dla stada."""
+    INTERVAL_DAYS = 'DAYS'
+    INTERVAL_WEEKS = 'WEEKS'
+    INTERVAL_MONTHS = 'MONTHS'
+    INTERVAL_YEARS = 'YEARS'
+    INTERVAL_UNIT_CHOICES = [
+        (INTERVAL_DAYS, 'dni'),
+        (INTERVAL_WEEKS, 'tygodnie'),
+        (INTERVAL_MONTHS, 'miesiące'),
+        (INTERVAL_YEARS, 'lata'),
+    ]
+
+    SCHEDULE_FIXED = 'FIXED'
+    SCHEDULE_FROM_LAST_COMPLETED = 'FROM_LAST_COMPLETED'
+    SCHEDULE_MODE_CHOICES = [
+        (SCHEDULE_FIXED, 'Stały harmonogram'),
+        (SCHEDULE_FROM_LAST_COMPLETED, 'Od ostatniego wykonanego szczepienia'),
+    ]
+
+    SCOPE_ALL = 'ALL'
+    SCOPE_SELECTED = 'SELECTED'
+    SCOPE_CHOICES = [
+        (SCOPE_ALL, 'Wszystkie aktywne maciory'),
+        (SCOPE_SELECTED, 'Wybrane aktywne maciory'),
+    ]
     EVENT_SOURCES = [
         ('FARROWING', 'Oproszenie'),
         ('INSEMINATION', 'Inseminacja'),
@@ -25,6 +49,50 @@ class VaccinationPlanModel(models.Model):
     days_after_event = models.IntegerField(null=True, blank=True, help_text="Ile dni po zdarzeniu?")
     event_source = models.CharField(max_length=20, choices=EVENT_SOURCES, null=True, blank=True, help_text="Zdarzenie odniesienia")
     interval_months = models.IntegerField(null=True, blank=True, help_text="Cyklicznie co X miesięcy?")
+    interval_value = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1)],
+        verbose_name="Wartość interwału",
+    )
+    interval_unit = models.CharField(
+        max_length=10,
+        choices=INTERVAL_UNIT_CHOICES,
+        null=True,
+        blank=True,
+        verbose_name="Jednostka interwału",
+    )
+    schedule_mode = models.CharField(
+        max_length=24,
+        choices=SCHEDULE_MODE_CHOICES,
+        null=True,
+        blank=True,
+        verbose_name="Tryb harmonogramu",
+    )
+    first_due_date = models.DateField(null=True, blank=True, verbose_name="Data pierwszego terminu")
+    scope = models.CharField(
+        max_length=10,
+        choices=SCOPE_CHOICES,
+        default=SCOPE_ALL,
+        verbose_name="Zakres planu",
+    )
+    is_active = models.BooleanField(default=True, verbose_name="Plan aktywny")
+    requires_configuration = models.BooleanField(
+        default=False,
+        verbose_name="Wymaga uzupełnienia konfiguracji",
+    )
+    selected_sows = models.ManyToManyField(
+        'SowModel',
+        blank=True,
+        related_name='selected_vaccination_plans',
+        verbose_name="Wybrane maciory",
+    )
+    excluded_sows = models.ManyToManyField(
+        'SowModel',
+        blank=True,
+        related_name='excluded_vaccination_plans',
+        verbose_name="Wykluczone maciory",
+    )
     reminder_days_ahead = models.IntegerField(default=7, help_text="Ile dni wcześniej wyświetlać przypomnienie?")
 
     class Meta:
@@ -80,10 +148,85 @@ class SowEventModel(models.Model):
     event_type = models.CharField(max_length=20, choices=EVENT_TYPES)
     event_date = models.DateField()
     details = models.JSONField(default=dict, blank=True)
+    vaccination_plan = models.ForeignKey(
+        VaccinationPlanModel,
+        on_delete=models.SET_NULL,
+        related_name='vaccination_events',
+        null=True,
+        blank=True,
+        verbose_name="Plan szczepienia",
+    )
+    vaccine_name = models.CharField(max_length=100, blank=True, verbose_name="Nazwa szczepienia")
+    cycle_id = models.CharField(max_length=160, blank=True, verbose_name="Identyfikator cyklu")
+    scheduled_date = models.DateField(null=True, blank=True, verbose_name="Planowany termin")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.event_type} - {self.event_date} (Maciora: {self.sow.ear_tag})"
+
+
+class VaccinationCycleModel(models.Model):
+    """Trwały zapis zamkniętego cyklu szczepienia konkretnej maciory."""
+
+    STATUS_COMPLETED = 'COMPLETED'
+    STATUS_SKIPPED = 'SKIPPED'
+    STATUS_CHOICES = [
+        (STATUS_COMPLETED, 'Wykonane'),
+        (STATUS_SKIPPED, 'Pominięte'),
+    ]
+
+    plan = models.ForeignKey(
+        VaccinationPlanModel,
+        on_delete=models.PROTECT,
+        related_name='cycle_records',
+        verbose_name="Plan szczepienia",
+    )
+    sow = models.ForeignKey(
+        SowModel,
+        on_delete=models.PROTECT,
+        related_name='vaccination_cycles',
+        verbose_name="Maciora",
+    )
+    cycle_id = models.CharField(max_length=160, verbose_name="Identyfikator cyklu")
+    scheduled_date = models.DateField(verbose_name="Planowany termin")
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES)
+    completed_at = models.DateField(null=True, blank=True, verbose_name="Data wykonania")
+    skipped_at = models.DateField(null=True, blank=True, verbose_name="Data pominięcia")
+    note = models.TextField(blank=True, verbose_name="Powód lub notatka")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=('plan', 'sow', 'cycle_id'),
+                name='unique_vaccination_cycle_per_sow',
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        status='COMPLETED',
+                        completed_at__isnull=False,
+                        skipped_at__isnull=True,
+                    )
+                    | models.Q(
+                        status='SKIPPED',
+                        completed_at__isnull=True,
+                        skipped_at__isnull=False,
+                    )
+                ),
+                name='vaccination_cycle_status_dates_valid',
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=('plan', 'sow', 'scheduled_date'),
+                name='vacc_cycle_plan_sow_date_idx',
+            ),
+        ]
+        ordering = ('scheduled_date', 'id')
+
+    def __str__(self):
+        return f"{self.plan} · {self.sow} · {self.scheduled_date}"
 
 
 class MortalityReportModel(models.Model):

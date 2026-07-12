@@ -7,7 +7,7 @@
         <div>
             <p class="eyebrow">Maciory</p>
             <h1>Panel szczepień</h1>
-            <p class="page-subtitle">Potwierdź zwierzęta, którym zapisujemy zdarzenie szczepienia.</p>
+            <p class="page-subtitle">Obsłuż bieżący cykl pojedynczo albo zarejestruj wykonanie dla kilku macior.</p>
         </div>
         <a href="{% url 'dashboard' %}" class="button button-secondary">Wróć</a>
     </section>
@@ -19,6 +19,8 @@
                 {% csrf_token %}
                 <input type="hidden" name="vaccine_name" value="{{ sows_list.0.vaccine_name }}">
                 <input type="hidden" name="cycle_id" value="{{ sows_list.0.cycle_id }}">
+                <input type="hidden" name="plan_id" value="{{ sows_list.0.plan_id }}">
+                <input type="hidden" name="scheduled_date" value="{{ sows_list.0.scheduled_date|date:'Y-m-d' }}">
                 <input type="hidden" name="confirm" value="yes">
 
                 <div class="section-heading">
@@ -32,49 +34,61 @@
                     {% for item in sows_list %}
                     <label class="checkbox-row form-section">
                         <input type="checkbox" name="sow_ids" value="{{ item.sow_id }}" checked>
-                        <span>Maciora {{ item.ear_tag }}{% if item.status_display %} · {{ item.status_display }}{% endif %}</span>
+                        <span>
+                            <strong>Maciora {{ item.ear_tag }}</strong>
+                            · termin {{ item.target_date|date:"d.m.Y" }}
+                            · {{ item.status_label }}
+                            {% if item.status_display %} · {{ item.status_display }}{% endif %}
+                        </span>
                     </label>
                     {% endfor %}
                 </div>
 
                 <div class="form-actions">
                     <button type="submit" class="button button-primary">
-                        Potwierdź szczepienie
+                        Zarejestruj zaznaczone szczepienia
                     </button>
                 </div>
             </form>
+
+            {% for item in sows_list %}
+            <div class="form-section">
+                <div class="section-heading">
+                    <div>
+                        <h3>{{ item.vaccine_name }} · maciora {{ item.ear_tag }}</h3>
+                        <p>Termin: {{ item.target_date|date:"d.m.Y" }} · status: {{ item.status_label }}</p>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <form method="post" action="{% url 'record_vaccination' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="plan_id" value="{{ item.plan_id }}">
+                        <input type="hidden" name="sow_id" value="{{ item.sow_id }}">
+                        <input type="hidden" name="cycle_id" value="{{ item.cycle_id }}">
+                        <input type="hidden" name="scheduled_date" value="{{ item.scheduled_date|date:'Y-m-d' }}">
+                        <button type="submit" class="button button-primary">Zarejestruj szczepienie</button>
+                    </form>
+                    <form method="post" action="{% url 'skip_vaccination' %}" data-confirm="Pominąć tylko termin {{ item.target_date|date:'d.m.Y' }} dla maciory {{ item.ear_tag|escapejs }}? Historia pozostanie, a następny cykl zostanie naliczony od planowanego terminu.">
+                        {% csrf_token %}
+                        <input type="hidden" name="plan_id" value="{{ item.plan_id }}">
+                        <input type="hidden" name="sow_id" value="{{ item.sow_id }}">
+                        <input type="hidden" name="cycle_id" value="{{ item.cycle_id }}">
+                        <input type="hidden" name="scheduled_date" value="{{ item.scheduled_date|date:'Y-m-d' }}">
+                        <button type="submit" class="button button-secondary">Pomiń to szczepienie</button>
+                    </form>
+                    <form method="post" action="{% url 'exclude_sow_from_vaccination' %}" data-confirm="Usunąć szczepienie {{ item.vaccine_name|escapejs }} dla maciory {{ item.ear_tag|escapejs }} na stałe? Bieżące i przyszłe przypomnienia znikną, ale historia pozostanie.">
+                        {% csrf_token %}
+                        <input type="hidden" name="plan_id" value="{{ item.plan_id }}">
+                        <input type="hidden" name="sow_id" value="{{ item.sow_id }}">
+                        <input type="hidden" name="cycle_id" value="{{ item.cycle_id }}">
+                        <input type="hidden" name="scheduled_date" value="{{ item.scheduled_date|date:'Y-m-d' }}">
+                        <button type="submit" class="button button-danger">Usuń szczepienie dla tej maciory</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
         </section>
         {% endfor %}
-    {% elif sows %}
-    <section class="panel compact-panel">
-        <form method="post" action="{% url 'bulk_vaccinate' %}" class="responsive-form" data-confirm="Potwierdzić zapis szczepienia dla zaznaczonych macior?">
-            {% csrf_token %}
-            <input type="hidden" name="vaccine_name" value="{{ vaccine_name }}">
-            <input type="hidden" name="cycle_id" value="{{ cycle_id }}">
-            <input type="hidden" name="confirm" value="yes">
-
-            <div class="option-box">
-                <strong>Podawana szczepionka: {{ vaccine_name }}</strong>
-                <p>Odznacz pozycje, których nie chcesz zapisać.</p>
-            </div>
-
-            <div class="responsive-form">
-                {% for sow in sows %}
-                <label class="checkbox-row form-section">
-                    <input type="checkbox" name="sow_ids" value="{{ sow.id }}" checked>
-                    <span>Maciora {{ sow.ear_tag }}</span>
-                </label>
-                {% empty %}
-                <p class="field-hint">Brak macior do szczepienia.</p>
-                {% endfor %}
-            </div>
-
-            <div class="form-actions">
-                <a href="{% url 'dashboard' %}" class="button button-secondary">Anuluj</a>
-                <button type="submit" class="button button-primary">Zatwierdź</button>
-            </div>
-        </form>
-    </section>
     {% else %}
     <section class="panel compact-panel empty-state">
         Brak szczepień oczekujących na potwierdzenie.

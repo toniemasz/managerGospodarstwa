@@ -9,7 +9,7 @@ from django.shortcuts import get_object_or_404
 
 from common.cache import invalidate_farm_cache_on_commit
 from sows.domain.sow_state_machine import SowStateMachine
-from sows.models import SowEventModel, SowModel
+from sows.models import SowEventModel, SowModel, VaccinationCycleModel
 from sows.services.sow_event_service import SowEventService
 from sows.services.sow_repository import SowRepository
 
@@ -99,7 +99,22 @@ class SowEventActions:
         cycle_id: str,
         event_date=None,
         note: str = "",
+        plan_id: int | None = None,
+        scheduled_date=None,
     ) -> list[SowEventModel]:
+        if plan_id is not None:
+            if scheduled_date is None:
+                raise ValueError("Planowany termin jest wymagany dla cyklu planu szczepienia.")
+            from sows.actions.vaccinations import VaccinationActions
+
+            return VaccinationActions(self.farm, user=self.user).record_many(
+                plan_id=plan_id,
+                sow_ids=sow_ids,
+                cycle_id=cycle_id,
+                scheduled_date=scheduled_date,
+                performed_date=event_date,
+                note=note,
+            )
         event_date = event_date or date.today()
         events = []
         details = {
@@ -130,6 +145,7 @@ class SowEventActions:
                 event_type=row.event_type,
                 event_date=row.event_date,
                 details=row.details,
+                vaccine_name=(row.details.get("vaccine_name", "") if row.event_type == "VACCINATION" else ""),
             )
             for row in rows
         ]
@@ -141,9 +157,38 @@ class SowEventActions:
     @transaction.atomic
     def update_event(self, *, event_id: int, data: dict) -> SowEventModel:
         event = self._get_event(event_id, lock_for_update=True)
+        old_plan_id = event.vaccination_plan_id
+        old_cycle_id = event.cycle_id
+        old_scheduled_date = event.scheduled_date
         event.event_type = data["event_type"]
         event.event_date = data["event_date"]
         event.details = self.event_service.build_details(data)
+        if event.event_type == SowStateMachine.VACCINATION:
+            event.vaccination_plan_id = event.details.get("vaccination_plan_id") or None
+            event.vaccine_name = event.details.get("vaccine_name", "")
+            if old_cycle_id and old_scheduled_date and event.vaccination_plan_id == old_plan_id:
+                event.cycle_id = old_cycle_id
+                event.scheduled_date = old_scheduled_date
+                event.details.update({
+                    "cycle_id": old_cycle_id,
+                    "scheduled_date": old_scheduled_date.isoformat(),
+                })
+                VaccinationCycleModel.objects.filter(
+                    plan_id=old_plan_id,
+                    sow_id=event.sow_id,
+                    cycle_id=old_cycle_id,
+                    status=VaccinationCycleModel.STATUS_COMPLETED,
+                ).update(completed_at=event.event_date)
+            else:
+                self._remove_completed_cycle(old_plan_id, event.sow_id, old_cycle_id)
+                event.cycle_id = ""
+                event.scheduled_date = None
+        else:
+            self._remove_completed_cycle(old_plan_id, event.sow_id, old_cycle_id)
+            event.vaccination_plan = None
+            event.vaccine_name = ""
+            event.cycle_id = ""
+            event.scheduled_date = None
         event.save()
         invalidate_farm_cache_on_commit(self.farm, groups=("sows",))
         return event
@@ -157,9 +202,21 @@ class SowEventActions:
             object_id=event.pk,
             object_repr=str(event),
         )
+        self._remove_completed_cycle(event.vaccination_plan_id, event.sow_id, event.cycle_id)
         event.delete()
         invalidate_farm_cache_on_commit(self.farm, groups=("sows",))
         return deleted_event
+
+    @staticmethod
+    def _remove_completed_cycle(plan_id, sow_id, cycle_id) -> None:
+        if not plan_id or not cycle_id:
+            return
+        VaccinationCycleModel.objects.filter(
+            plan_id=plan_id,
+            sow_id=sow_id,
+            cycle_id=cycle_id,
+            status=VaccinationCycleModel.STATUS_COMPLETED,
+        ).delete()
 
     @staticmethod
     def _selected_pregnancy_result(results_by_sow_id: dict, sow_id: int) -> str | None:
@@ -205,6 +262,8 @@ def record_bulk_vaccinations(
     cycle_id: str,
     event_date=None,
     note: str = "",
+    plan_id: int | None = None,
+    scheduled_date=None,
 ) -> list[SowEventModel]:
     return SowEventActions(farm=farm).bulk_create_vaccinations(
         sow_ids=sow_ids,
@@ -212,4 +271,6 @@ def record_bulk_vaccinations(
         cycle_id=cycle_id,
         event_date=event_date,
         note=note,
+        plan_id=plan_id,
+        scheduled_date=scheduled_date,
     )

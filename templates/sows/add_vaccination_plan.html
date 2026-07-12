@@ -7,7 +7,7 @@
         <div>
             <p class="eyebrow">Maciory</p>
             <h1>{% if is_edit %}Edytuj regułę szczepienia{% else %}Reguła szczepienia{% endif %}</h1>
-            <p class="page-subtitle">Wybierz jedną metodę wyzwalania przypomnienia.</p>
+            <p class="page-subtitle">Ustaw jawny pierwszy termin, interwał i zakres macior objętych planem.</p>
         </div>
         <a href="{% url 'vaccination_plans' %}" class="button button-secondary">Wróć</a>
     </section>
@@ -44,11 +44,34 @@
                 </div>
             </div>
 
+            <div class="form-section-heading">
+                <h2>Harmonogram okresowy</h2>
+                <p>Dni i tygodnie są liczone jako stały odstęp, a miesiące i lata kalendarzowo.</p>
+            </div>
             <div class="form-grid three-columns">
                 <div class="form-field">
-                    <label for="{{ form.interval_months.id_for_label }}">{{ form.interval_months.label }}</label>
-                    {{ form.interval_months }}
-                    {{ form.interval_months.errors }}
+                    <label for="{{ form.interval_value.id_for_label }}">{{ form.interval_value.label }}</label>
+                    {{ form.interval_value }}
+                    {{ form.interval_value.errors }}
+                </div>
+                <div class="form-field">
+                    <label for="{{ form.interval_unit.id_for_label }}">{{ form.interval_unit.label }}</label>
+                    {{ form.interval_unit }}
+                    {{ form.interval_unit.errors }}
+                </div>
+                <div class="form-field">
+                    <label for="{{ form.first_due_date.id_for_label }}">{{ form.first_due_date.label }}</label>
+                    {{ form.first_due_date }}
+                    {{ form.first_due_date.errors }}
+                </div>
+            </div>
+
+            <div class="form-grid two-columns">
+                <div class="form-field">
+                    <label for="{{ form.schedule_mode.id_for_label }}">{{ form.schedule_mode.label }}</label>
+                    {{ form.schedule_mode }}
+                    {{ form.schedule_mode.errors }}
+                    <p class="field-hint">Stały harmonogram nie przesuwa się po spóźnionym wykonaniu.</p>
                 </div>
                 <div class="form-field">
                     <label for="{{ form.reminder_days_ahead.id_for_label }}">{{ form.reminder_days_ahead.label }}</label>
@@ -56,6 +79,30 @@
                     {{ form.reminder_days_ahead.errors }}
                 </div>
             </div>
+
+            <div class="form-section-heading">
+                <h2>Zakres planu</h2>
+                <p>Plan dla wszystkich automatycznie obejmie także maciory dodane później.</p>
+            </div>
+            <div class="form-field">
+                <label for="{{ form.scope.id_for_label }}">{{ form.scope.label }}</label>
+                {{ form.scope }}
+                {{ form.scope.errors }}
+            </div>
+            <fieldset class="form-field">
+                <legend>{{ form.selected_sows.label }}</legend>
+                {{ form.selected_sows }}
+                {{ form.selected_sows.errors }}
+                <p class="field-hint">Wymagane tylko dla zakresu „Wybrane aktywne maciory”.</p>
+            </fieldset>
+            {% if form.reinclude_sows.field.queryset %}
+            <fieldset class="form-field">
+                <legend>{{ form.reinclude_sows.label }}</legend>
+                {{ form.reinclude_sows }}
+                {{ form.reinclude_sows.errors }}
+                <p class="field-hint">{{ form.reinclude_sows.help_text }}</p>
+            </fieldset>
+            {% endif %}
 
             <div class="form-actions">
                 <a href="{% url 'vaccination_plans' %}" class="button button-secondary">Anuluj</a>
@@ -70,14 +117,14 @@
     <section class="panel compact-panel">
         <div class="section-heading">
             <div>
-                <h2>Usuwanie reguły</h2>
-                <p>Usunięcie reguły zatrzyma przyszłe przypomnienia dla tego szczepienia.</p>
+                <h2>Usuwanie planu</h2>
+                <p>Plan zostanie wyłączony, ale wykonane i pominięte cykle oraz historia medyczna pozostaną.</p>
             </div>
         </div>
-        <form method="post" action="{% url 'delete_vaccination_plan' plan.id %}" class="responsive-form" data-confirm="Czy na pewno usunąć regułę szczepienia: {{ plan.name|escapejs }}?">
+        <form method="post" action="{% url 'delete_vaccination_plan' plan.id %}" class="responsive-form" data-confirm="Usunąć plan {{ plan.name|escapejs }}? Przyszłe przypomnienia zostaną zatrzymane, ale historia szczepień i pominięć pozostanie.">
             {% csrf_token %}
             <div class="form-actions">
-                <button type="submit" class="button button-danger">Usuń regułę</button>
+                <button type="submit" class="button button-danger">Usuń plan szczepienia</button>
             </div>
         </form>
     </section>

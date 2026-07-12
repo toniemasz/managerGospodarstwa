@@ -3,6 +3,7 @@ from datetime import date
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
 from django.http import HttpResponse
 from django.utils import timezone
 from django.contrib import messages
@@ -30,6 +31,7 @@ from farms.services.audit_log_service import log_action
 from farms.services.today_dashboard import TodayDashboardService
 from sows.actions.mortality import create_mortality_report
 from sows.actions.events import SowEventActions
+from sows.actions.vaccinations import VaccinationActionError, VaccinationActions
 from sows.domain.event_details import initial_data_from_event_details
 from sows.selectors.mortality import mortality_list_context
 
@@ -116,10 +118,11 @@ def add_vaccination_plan_view(request):
     if request.method == 'POST':
         form = VaccinationPlanForm(request.POST, farm=farm)
         if form.is_valid():
-            plan = form.save(commit=False)
-            plan.farm = farm
-            plan.save()
+            plan = form.save()
+            if plan.scope == plan.SCOPE_ALL:
+                plan.selected_sows.clear()
             invalidate_farm_cache_on_commit(farm, groups=("sows",))
+            log_action(farm=farm, user=request.user, action="CREATE", obj=plan)
             messages.success(request, "Reguła szczepienia została dodana.")
             return redirect('vaccination_plans')
     else:
@@ -136,8 +139,14 @@ def edit_vaccination_plan_view(request, plan_id):
     if request.method == 'POST':
         form = VaccinationPlanForm(request.POST, instance=plan, farm=farm)
         if form.is_valid():
-            form.save()
+            plan = form.save()
+            if plan.scope == plan.SCOPE_ALL:
+                plan.selected_sows.clear()
+            reinclude_sows = form.cleaned_data.get('reinclude_sows')
+            if reinclude_sows:
+                plan.excluded_sows.remove(*reinclude_sows)
             invalidate_farm_cache_on_commit(farm, groups=("sows",))
+            log_action(farm=farm, user=request.user, action="UPDATE", obj=plan)
             messages.success(request, "Reguła szczepienia została zaktualizowana.")
             return redirect('vaccination_plans')
     else:
@@ -151,14 +160,82 @@ def edit_vaccination_plan_view(request, plan_id):
 
 
 @login_required
+@require_POST
 def delete_vaccination_plan_view(request, plan_id):
     farm = get_current_farm(request)
-    plan = VaccinationPlanRepository(farm=farm).get_plan_model_by_id(plan_id)
-    if request.method == 'POST':
-        plan.delete()
-        invalidate_farm_cache_on_commit(farm, groups=("sows",))
-        messages.success(request, "Reguła szczepienia została usunięta.")
+    plan = VaccinationActions(farm, user=request.user).deactivate_plan(plan_id=plan_id)
+    log_action(farm=farm, user=request.user, action="UPDATE", obj=plan)
+    messages.success(request, "Plan szczepienia został wyłączony. Historia pozostała bez zmian.")
     return redirect('vaccination_plans')
+
+
+def _vaccination_cycle_post_data(request):
+    try:
+        return {
+            'plan_id': int(request.POST.get('plan_id', '')),
+            'sow_id': int(request.POST.get('sow_id', '')),
+            'cycle_id': request.POST.get('cycle_id', ''),
+            'scheduled_date': date.fromisoformat(request.POST.get('scheduled_date', '')),
+        }
+    except (TypeError, ValueError) as error:
+        raise VaccinationActionError("Nieprawidłowe dane cyklu szczepienia.") from error
+
+
+@login_required
+@require_POST
+def record_vaccination_view(request):
+    farm = get_current_farm(request)
+    try:
+        cycle = _vaccination_cycle_post_data(request)
+        events = VaccinationActions(farm, user=request.user).record_many(
+            plan_id=cycle['plan_id'],
+            sow_ids=[cycle['sow_id']],
+            cycle_id=cycle['cycle_id'],
+            scheduled_date=cycle['scheduled_date'],
+            note=request.POST.get('note', '').strip(),
+        )
+    except VaccinationActionError as error:
+        messages.error(request, error.messages[0])
+    else:
+        log_action(farm=farm, user=request.user, action="CREATE", obj=events[0])
+        messages.success(request, "Szczepienie zostało zarejestrowane.")
+    return redirect('bulk_vaccinate')
+
+
+@login_required
+@require_POST
+def skip_vaccination_view(request):
+    farm = get_current_farm(request)
+    try:
+        cycle = _vaccination_cycle_post_data(request)
+        state = VaccinationActions(farm, user=request.user).skip_cycle(
+            **cycle,
+            note=request.POST.get('note', '').strip(),
+        )
+    except VaccinationActionError as error:
+        messages.error(request, error.messages[0])
+    else:
+        log_action(farm=farm, user=request.user, action="CREATE", obj=state)
+        messages.success(request, "Bieżący cykl został pominięty.")
+    return redirect('bulk_vaccinate')
+
+
+@login_required
+@require_POST
+def exclude_sow_from_vaccination_view(request):
+    farm = get_current_farm(request)
+    try:
+        cycle = _vaccination_cycle_post_data(request)
+        plan = VaccinationActions(farm, user=request.user).exclude_sow(
+            plan_id=cycle['plan_id'],
+            sow_id=cycle['sow_id'],
+        )
+    except VaccinationActionError as error:
+        messages.error(request, error.messages[0])
+    else:
+        log_action(farm=farm, user=request.user, action="UPDATE", obj=plan)
+        messages.success(request, "Maciora została trwale wyłączona z tego planu.")
+    return redirect('bulk_vaccinate')
 
 
 @login_required
@@ -336,13 +413,22 @@ def bulk_vaccinate_view(request):
         sow_ids = request.POST.getlist('sow_ids')
         vaccine_name = request.POST.get('vaccine_name')
         cycle_id = request.POST.get('cycle_id')
+        plan_id = request.POST.get('plan_id')
+        scheduled_date_value = request.POST.get('scheduled_date')
 
         if request.POST.get('confirm') == 'yes':
-            events = SowEventActions(farm=farm, user=request.user).bulk_create_vaccinations(
-                sow_ids=sow_ids,
-                vaccine_name=vaccine_name,
-                cycle_id=cycle_id,
-            )
+            try:
+                events = SowEventActions(farm=farm, user=request.user).bulk_create_vaccinations(
+                    sow_ids=sow_ids,
+                    vaccine_name=vaccine_name,
+                    cycle_id=cycle_id,
+                    plan_id=int(plan_id) if plan_id else None,
+                    scheduled_date=(date.fromisoformat(scheduled_date_value) if scheduled_date_value else None),
+                )
+            except (VaccinationActionError, ValueError) as error:
+                message = error.messages[0] if isinstance(error, ValidationError) else str(error)
+                messages.error(request, message)
+                return redirect('bulk_vaccinate')
             for event in events:
                 log_action(farm=farm, user=request.user, action="CREATE", obj=event)
             messages.success(request, f"Zapisano szczepienie dla {len(events)} macior.")

@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from datetime import date
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -267,6 +268,8 @@ def _complete_today_tasks(*, farm, user, tasks, post_data, note):
                     sow_ids=[sow_id],
                     vaccine_name=metadata.get("vaccine_name") or "",
                     cycle_id=metadata.get("cycle_id") or "",
+                    plan_id=metadata.get("plan_id"),
+                    scheduled_date=date.fromisoformat(metadata["scheduled_date"]),
                     event_date=event_date,
                     note=note,
                 ))
@@ -288,8 +291,10 @@ def _validate_today_tasks(*, tasks, post_data):
         if not metadata.get("sow_id"):
             raise ValidationError("Nie można zatwierdzić zadania bez przypisanej maciory.")
         if kind == "vaccination":
-            if not metadata.get("vaccine_name") or not metadata.get("cycle_id"):
-                raise ValidationError("Nie można zatwierdzić szczepienia bez nazwy szczepionki albo cyklu.")
+            if not all(metadata.get(field) for field in (
+                "vaccine_name", "cycle_id", "plan_id", "scheduled_date"
+            )):
+                raise ValidationError("Nie można zatwierdzić szczepienia bez planu, terminu albo cyklu.")
         elif kind == "ultrasound":
             result = post_data.get(f"pregnancy_result_{task['task_id']}")
             if result not in PREGNANCY_CHECK_RESULTS:

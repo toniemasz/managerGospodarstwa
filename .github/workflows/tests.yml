@@ -24,9 +24,32 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
+    services:
+      postgres:
+        # Ustaw tę samą główną wersję PostgreSQL co na produkcji.
+        image: postgres:17
+
+        env:
+          POSTGRES_DB: manager_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+
+        ports:
+          - 5432:5432
+
+        options: >-
+          --health-cmd "pg_isready -U postgres -d manager_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
-      DEBUG: "True"
+      DEBUG: "False"
       SECRET_KEY: "github-actions-test-only-secret-key"
+
+      DATABASE_URL: "postgresql://postgres:postgres@127.0.0.1:5432/manager_ci"
+      TEST_DATABASE_URL: "postgresql://postgres:postgres@127.0.0.1:5432/manager_ci"
+
       PYTHONUNBUFFERED: "1"
       PYTHONDONTWRITEBYTECODE: "1"
 
@@ -34,7 +57,7 @@ jobs:
       - name: Pobranie kodu
         uses: actions/checkout@v6
 
-      - name: Setup Python
+      - name: Konfiguracja Pythona
         uses: actions/setup-python@v6
         with:
           python-version: "3.12.7"
@@ -46,11 +69,31 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Sprawdzenie połączenia z PostgreSQL
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql \
+            --host=127.0.0.1 \
+            --port=5432 \
+            --username=postgres \
+            --dbname=manager_ci \
+            --command="SELECT version();"
+
       - name: Sprawdzenie konfiguracji Django
         run: python manage.py check
 
       - name: Sprawdzenie brakujących migracji
         run: python manage.py makemigrations --check --dry-run
+
+      - name: Sprawdzenie silnika bazy testowej
+        run: |
+          python manage.py shell -c "
+          from django.db import connection
+          print('Database engine:', connection.vendor)
+          assert connection.vendor == 'postgresql', \
+              f'Testy używają {connection.vendor} zamiast PostgreSQL'
+          "
 
       - name: Uruchomienie wszystkich testów
         run: pytest --tb=short -ra

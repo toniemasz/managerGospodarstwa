@@ -24,52 +24,50 @@
         </div>
 
         <div class="table-scroll">
-            <table class="data-table">
+            <table class="data-table mobile-card-table">
                 <thead>
                     <tr>
                         <th>Nazwa</th>
-                        <th>Przed porodem</th>
-                        <th>Po zdarzeniu</th>
-                        <th>Cyklicznie</th>
+                        <th>Harmonogram</th>
+                        <th>Pierwszy termin</th>
+                        <th>Zakres</th>
                         <th>Przypomnienie</th>
+                        <th>Status</th>
                         <th class="text-right">Akcje</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for plan in plans %}
                     <tr>
-                        <td><strong>{{ plan.name }}</strong></td>
-                        <td>
-                            {% if plan.days_before_farrowing %}
-                                {{ plan.days_before_farrowing }} dni
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if plan.days_after_event %}
+                        <td data-label="Nazwa"><strong>{{ plan.name }}</strong></td>
+                        <td data-label="Harmonogram">
+                            {% if plan.interval_value %}
+                                co {{ plan.interval_value }} {{ plan.get_interval_unit_display }} · {{ plan.get_schedule_mode_display }}
+                            {% elif plan.days_before_farrowing %}
+                                {{ plan.days_before_farrowing }} dni przed oproszeniem
+                            {% elif plan.days_after_event %}
                                 {{ plan.days_after_event }} dni po {{ plan.get_event_source_display|default:"zdarzeniu" }}
-                            {% else %}
-                                -
-                            {% endif %}
+                            {% else %}-{% endif %}
                         </td>
-                        <td>
-                            {% if plan.interval_months %}
-                                co {{ plan.interval_months }} mies.
-                            {% else %}
-                                -
-                            {% endif %}
+                        <td data-label="Pierwszy termin">{{ plan.first_due_date|date:"d.m.Y"|default:"—" }}</td>
+                        <td data-label="Zakres">{{ plan.get_scope_display }}</td>
+                        <td data-label="Przypomnienie">{{ plan.reminder_days_ahead }} dni wcześniej</td>
+                        <td data-label="Status">
+                            {% if plan.requires_configuration %}Wymaga uzupełnienia{% elif plan.is_active %}Aktywny{% else %}Nieaktywny{% endif %}
                         </td>
-                        <td>{{ plan.reminder_days_ahead }} dni wcześniej</td>
-                        <td class="text-right">
+                        <td class="text-right" data-label="Akcje">
                             <div class="row-actions">
                                 <a href="{% url 'edit_vaccination_plan' plan.id %}" class="table-link">Edytuj</a>
+                                <form method="post" action="{% url 'delete_vaccination_plan' plan.id %}" data-confirm="Usunąć plan {{ plan.name|escapejs }}? Przyszłe przypomnienia zostaną zatrzymane, ale historia szczepień i pominięć pozostanie.">
+                                    {% csrf_token %}
+                                    <button type="submit" class="button button-danger button-small">Usuń plan szczepienia</button>
+                                </form>
                             </div>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="empty-table">Brak zdefiniowanych reguł szczepień.</td>
+                        <td colspan="7" class="empty-table">Brak zdefiniowanych reguł szczepień.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

@@ -35,7 +35,13 @@ from feed.models import (
     ReadyFeedDeliveryModel,
 )
 from sales.models import PigSaleModel, SaleClassRowModel
-from sows.models import MortalityReportModel, SowEventModel, SowModel, VaccinationPlanModel
+from sows.models import (
+    MortalityReportModel,
+    SowEventModel,
+    SowModel,
+    VaccinationCycleModel,
+    VaccinationPlanModel,
+)
 
 
 def _user_backup_fixture(user, farm):
@@ -157,6 +163,55 @@ def test_user_backup_restores_all_models_and_relationships():
 
 
 @pytest.mark.django_db
+def test_user_backup_restores_vaccination_scope_cycles_and_event_snapshot():
+    source_user = User.objects.create_user(username='vaccination-backup-source')
+    source_farm = get_or_create_user_farm(source_user)
+    sow = SowModel.objects.create(farm=source_farm, ear_tag='VAC-BACKUP')
+    plan = VaccinationPlanModel.objects.create(
+        farm=source_farm,
+        name='Różyca',
+        interval_value=1,
+        interval_unit='YEARS',
+        schedule_mode='FIXED',
+        first_due_date=date(2025, 2, 28),
+        scope='SELECTED',
+    )
+    plan.selected_sows.add(sow)
+    event = SowEventModel.objects.create(
+        sow=sow,
+        event_type='VACCINATION',
+        event_date=date(2025, 2, 28),
+        details={'vaccine_name': 'Różyca', 'cycle_id': 'periodic-old'},
+        vaccination_plan=plan,
+        vaccine_name='Różyca',
+        cycle_id='periodic-old',
+        scheduled_date=date(2025, 2, 28),
+    )
+    VaccinationCycleModel.objects.create(
+        plan=plan,
+        sow=sow,
+        cycle_id=event.cycle_id,
+        scheduled_date=event.scheduled_date,
+        status='COMPLETED',
+        completed_at=event.event_date,
+    )
+
+    target_user = User.objects.create_user(username='vaccination-backup-target')
+    target_farm = get_or_create_user_farm(target_user)
+    counts = import_user_backup(_user_backup_fixture(source_user, source_farm), target_farm)
+
+    restored_plan = VaccinationPlanModel.objects.get(farm=target_farm)
+    restored_event = SowEventModel.objects.get(sow__farm=target_farm)
+    restored_cycle = VaccinationCycleModel.objects.get(plan__farm=target_farm)
+    assert counts['cykle szczepień'] == 1
+    assert list(restored_plan.selected_sows.values_list('ear_tag', flat=True)) == ['VAC-BACKUP']
+    assert restored_event.vaccination_plan == restored_plan
+    assert restored_event.vaccine_name == 'Różyca'
+    assert restored_cycle.plan == restored_plan
+    assert restored_cycle.sow == restored_event.sow
+
+
+@pytest.mark.django_db
 def test_user_backup_refuses_existing_data_without_partial_import():
     source_user = User.objects.create_user(username='existing-source')
     source_farm = get_or_create_user_farm(source_user)
@@ -217,7 +272,7 @@ def test_version_2_backup_without_new_optional_sections_is_upgraded_safely():
     )
 
     analysis = analyze_user_backup(backup_file, target_farm)
-    assert analysis['format_version'] == 3
+    assert analysis['format_version'] == 4
     assert analysis['payload']['source_version'] == 2
 
     backup_file.seek(0)

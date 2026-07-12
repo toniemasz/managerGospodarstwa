@@ -11,24 +11,60 @@ from sows.domain.sow_state_machine import SowStateMachine
 
 
 class VaccinationPlanForm(forms.ModelForm):
+    reinclude_sows = forms.ModelMultipleChoiceField(
+        queryset=SowModel.objects.none(),
+        required=False,
+        label="Ponownie obejmij wykluczone maciory",
+        help_text="Wybrane maciory wrócą do planu po zapisaniu zmian.",
+    )
+
     class Meta:
         model = VaccinationPlanModel
-        fields = ['name', 'days_before_farrowing', 'days_after_event', 'event_source', 'interval_months',
-                  'reminder_days_ahead']
+        fields = [
+            'name',
+            'days_before_farrowing',
+            'days_after_event',
+            'event_source',
+            'interval_value',
+            'interval_unit',
+            'schedule_mode',
+            'first_due_date',
+            'scope',
+            'selected_sows',
+            'reminder_days_ahead',
+        ]
         labels = {
             'name': 'Nazwa szczepienia',
             'days_before_farrowing': 'Dni przed porodem',
             'days_after_event': 'Dni po zdarzeniu',
             'event_source': 'Typ zdarzenia (jeśli po zdarzeniu)',
-            'interval_months': 'Interwał cykliczny (w miesiącach)',
+            'interval_value': 'Interwał',
+            'interval_unit': 'Jednostka interwału',
+            'schedule_mode': 'Tryb harmonogramu',
+            'first_due_date': 'Data pierwszego terminu',
+            'scope': 'Zakres planu',
+            'selected_sows': 'Wybrane aktywne maciory',
             'reminder_days_ahead': 'Wyprzedzenie przypomnienia (dni)'
+        }
+        widgets = {
+            'first_due_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
+            'selected_sows': forms.CheckboxSelectMultiple(),
         }
 
     def __init__(self, *args, farm=None, **kwargs):
         self.farm = farm
         super().__init__(*args, **kwargs)
+        self.fields['scope'].required = False
+        self.fields['scope'].initial = VaccinationPlanModel.SCOPE_ALL
         if self.farm is not None:
             self.instance.farm = self.farm
+            active_sows = SowModel.objects.filter(farm=self.farm, is_archived=False).order_by('ear_tag')
+            self.fields['selected_sows'].queryset = active_sows
+            if self.instance.pk:
+                self.fields['reinclude_sows'].queryset = self.instance.excluded_sows.filter(
+                    farm=self.farm,
+                    is_archived=False,
+                ).order_by('ear_tag')
 
     def clean_name(self):
         name = self.cleaned_data['name']
@@ -40,14 +76,15 @@ class VaccinationPlanForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        cleaned_data['scope'] = cleaned_data.get('scope') or VaccinationPlanModel.SCOPE_ALL
         dbf = cleaned_data.get('days_before_farrowing')
         dae = cleaned_data.get('days_after_event')
         src = cleaned_data.get('event_source')
-        im = cleaned_data.get('interval_months')
+        interval_value = cleaned_data.get('interval_value')
 
         # Walidacja logiki biznesowej: przynajmniej jeden warunek musi być wybrany,
         # i nie mogą się one ze sobą logicznie wykluczać.
-        conditions = [bool(dbf), bool(dae), bool(im)]
+        conditions = [dbf is not None, dae is not None, interval_value is not None]
         if sum(conditions) > 1:
             raise ValidationError(
                 "Wybierz tylko jedną metodę wyzwalania szczepienia (albo przed porodem, albo po zdarzeniu, albo cyklicznie).")
@@ -58,7 +95,39 @@ class VaccinationPlanForm(forms.ModelForm):
         if dae and not src:
             self.add_error('event_source', "Podaj, od jakiego zdarzenia mają być liczone dni.")
 
+        if interval_value is not None:
+            for field, message in (
+                ('interval_unit', "Wybierz jednostkę interwału."),
+                ('schedule_mode', "Wybierz tryb harmonogramu."),
+                ('first_due_date', "Podaj jawną datę pierwszego terminu."),
+            ):
+                if not cleaned_data.get(field):
+                    self.add_error(field, message)
+
+        if cleaned_data.get('scope') == VaccinationPlanModel.SCOPE_SELECTED:
+            if not cleaned_data.get('selected_sows'):
+                self.add_error('selected_sows', "Wybierz co najmniej jedną aktywną maciorę.")
+
+        reminder_days = cleaned_data.get('reminder_days_ahead')
+        if reminder_days is not None and reminder_days < 0:
+            self.add_error('reminder_days_ahead', "Wyprzedzenie nie może być ujemne.")
+
         return cleaned_data
+
+    def save(self, commit=True):
+        plan = super().save(commit=False)
+        if plan.interval_value is not None:
+            plan.interval_months = (
+                plan.interval_value
+                if plan.interval_unit == VaccinationPlanModel.INTERVAL_MONTHS
+                else None
+            )
+            plan.requires_configuration = False
+            plan.is_active = True
+        if commit:
+            plan.save()
+            self._save_m2m()
+        return plan
 
 class SowForm(forms.ModelForm):
     class Meta:
@@ -140,6 +209,12 @@ class SowEventForm(forms.ModelForm):
         details = self._build_event_details(event_type)
 
         instance.details = details
+        if event_type == SowStateMachine.VACCINATION:
+            plan = VaccinationPlanRepository(self.farm).get_active_plan_by_name(
+                details.get('vaccine_name', '')
+            ) if self.farm is not None else None
+            instance.vaccination_plan = plan
+            instance.vaccine_name = details.get('vaccine_name', '')
         if commit:
             instance.save()
         return instance
@@ -227,7 +302,14 @@ class BulkSowEventRowForm(forms.Form):
         return cleaned_data
 
     def build_details(self) -> dict:
-        return build_event_details(self.cleaned_data)
+        details = build_event_details(self.cleaned_data)
+        if self.cleaned_data.get('event_type') == SowStateMachine.VACCINATION and self.farm is not None:
+            plan = VaccinationPlanRepository(self.farm).get_active_plan_by_name(
+                details.get('vaccine_name', '')
+            )
+            if plan:
+                details['vaccination_plan_id'] = plan.id
+        return details
 
 
 BulkSowEventFormSet = formset_factory(BulkSowEventRowForm, extra=0, can_delete=True)

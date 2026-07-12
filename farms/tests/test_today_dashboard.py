@@ -44,7 +44,10 @@ def test_today_dashboard_loads_task_cards_kpis_recent_events_and_is_farm_scoped(
     VaccinationPlanModel.objects.create(
         farm=farm,
         name="Parwo",
-        interval_months=1,
+        interval_value=1,
+        interval_unit="MONTHS",
+        schedule_mode="FIXED",
+        first_due_date=today,
         reminder_days_ahead=7,
     )
     IngredientModel.objects.create(
@@ -211,7 +214,10 @@ def test_complete_today_tasks_creates_real_sow_events_and_audit_logs(today_dashb
     VaccinationPlanModel.objects.create(
         farm=farm,
         name="Parwo",
-        interval_months=1,
+        interval_value=1,
+        interval_unit="MONTHS",
+        schedule_mode="FIXED",
+        first_due_date=today,
         reminder_days_ahead=7,
     )
     tasks = TodayDashboardService(farm).completable_tasks_by_id()

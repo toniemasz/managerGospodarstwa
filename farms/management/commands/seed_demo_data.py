@@ -80,7 +80,14 @@ class Command(BaseCommand):
             {"name": "Parwowiroza przed oproszeniem", "days_before_farrowing": 21},
             {"name": "E. coli po oproszeniu", "days_after_event": 7, "event_source": "FARROWING"},
             {"name": "Parwowiroza po inseminacji", "days_after_event": 14, "event_source": "INSEMINATION"},
-            {"name": "Różyca cykliczna", "interval_months": 4},
+            {
+                "name": "Różyca cykliczna",
+                "interval_months": 4,
+                "interval_value": 4,
+                "interval_unit": "MONTHS",
+                "schedule_mode": "FROM_LAST_COMPLETED",
+                "first_due_date": today,
+            },
         ]
         for data in plans:
             VaccinationPlanModel.objects.update_or_create(farm=farm, name=data["name"], defaults=data)

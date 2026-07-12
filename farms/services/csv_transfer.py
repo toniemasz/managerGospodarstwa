@@ -15,15 +15,16 @@ from farms.services.data_backup import BackupImportError, user_business_data_cou
 from feed.models import DeliveryModel, IngredientModel, ProductionModel, RecipeItemModel, RecipeModel
 from feed.actions.inventory import InventoryActions
 from sales.models import PigSaleModel, SaleClassRowModel
-from sows.models import SowEventModel, SowModel, VaccinationPlanModel
+from sows.models import SowEventModel, SowModel, VaccinationCycleModel, VaccinationPlanModel
 
 
 MAX_CSV_ARCHIVE_SIZE = 25 * 1024 * 1024
 
 SCHEMAS = {
     "sows.csv": ("id", "ear_tag", "entry_date", "is_archived", "archived_at"),
-    "sow_events.csv": ("id", "sow_id", "event_type", "event_date", "details"),
-    "vaccination_plans.csv": ("id", "name", "days_before_farrowing", "days_after_event", "event_source", "interval_months", "reminder_days_ahead"),
+    "sow_events.csv": ("id", "sow_id", "event_type", "event_date", "details", "vaccination_plan_id", "vaccine_name", "cycle_id", "scheduled_date"),
+    "vaccination_plans.csv": ("id", "name", "days_before_farrowing", "days_after_event", "event_source", "interval_months", "interval_value", "interval_unit", "schedule_mode", "first_due_date", "scope", "is_active", "requires_configuration", "selected_sow_ids", "excluded_sow_ids", "reminder_days_ahead"),
+    "vaccination_cycles.csv": ("id", "plan_id", "sow_id", "cycle_id", "scheduled_date", "status", "completed_at", "skipped_at", "note"),
     "ingredients.csv": ("id", "name", "description", "low_stock_threshold_kg", "is_in_bin"),
     "deliveries.csv": ("id", "ingredient_id", "date", "quantity_kg", "price_per_kg"),
     "recipes.csv": ("id", "name"),
@@ -35,7 +36,15 @@ SCHEMAS = {
     "costs.csv": ("id", "category_id", "production_id", "date", "amount", "description", "document_number", "supplier", "is_paid"),
 }
 
-OPTIONAL_COLUMNS = {"costs.csv": {"production_id"}}
+OPTIONAL_COLUMNS = {
+    "costs.csv": {"production_id"},
+    "sow_events.csv": {"vaccination_plan_id", "vaccine_name", "cycle_id", "scheduled_date"},
+    "vaccination_plans.csv": {
+        "interval_value", "interval_unit", "schedule_mode", "first_due_date", "scope",
+        "is_active", "requires_configuration", "selected_sow_ids", "excluded_sow_ids",
+    },
+}
+OPTIONAL_FILES = {"vaccination_cycles.csv"}
 
 
 def _value(value):
@@ -65,12 +74,46 @@ def build_csv_export(farm, *, year=None) -> tuple[bytes, str]:
             for obj in SowModel.objects.filter(farm=farm).order_by("id")
         ],
         "sow_events.csv": [
-            {"id": obj.pk, "sow_id": obj.sow_id, "event_type": obj.event_type, "event_date": obj.event_date, "details": obj.details}
+            {
+                "id": obj.pk,
+                "sow_id": obj.sow_id,
+                "event_type": obj.event_type,
+                "event_date": obj.event_date,
+                "details": obj.details,
+                "vaccination_plan_id": obj.vaccination_plan_id,
+                "vaccine_name": obj.vaccine_name,
+                "cycle_id": obj.cycle_id,
+                "scheduled_date": obj.scheduled_date,
+            }
             for obj in SowEventModel.objects.filter(sow__farm=farm).order_by("id")
         ],
         "vaccination_plans.csv": [
-            {column: getattr(obj, column) for column in SCHEMAS["vaccination_plans.csv"]}
-            for obj in VaccinationPlanModel.objects.filter(farm=farm).order_by("id")
+            {
+                **{
+                    column: getattr(obj, column)
+                    for column in SCHEMAS["vaccination_plans.csv"]
+                    if column not in {"selected_sow_ids", "excluded_sow_ids"}
+                },
+                "selected_sow_ids": [sow.id for sow in obj.selected_sows.all()],
+                "excluded_sow_ids": [sow.id for sow in obj.excluded_sows.all()],
+            }
+            for obj in VaccinationPlanModel.objects.filter(farm=farm)
+            .prefetch_related("selected_sows", "excluded_sows")
+            .order_by("id")
+        ],
+        "vaccination_cycles.csv": [
+            {
+                "id": obj.pk,
+                "plan_id": obj.plan_id,
+                "sow_id": obj.sow_id,
+                "cycle_id": obj.cycle_id,
+                "scheduled_date": obj.scheduled_date,
+                "status": obj.status,
+                "completed_at": obj.completed_at,
+                "skipped_at": obj.skipped_at,
+                "note": obj.note,
+            }
+            for obj in VaccinationCycleModel.objects.filter(plan__farm=farm).order_by("id")
         ],
         "ingredients.csv": [
             {"id": obj.pk, "name": obj.name, "description": obj.description, "low_stock_threshold_kg": obj.low_stock_threshold_kg, "is_in_bin": obj.is_in_bin}
@@ -103,11 +146,14 @@ def _read_archive(uploaded_file):
                 raise BackupImportError("Archiwum zawiera zduplikowane nazwy plików.")
             if sum(info.file_size for info in infos) > 100 * 1024 * 1024:
                 raise BackupImportError("Rozpakowane archiwum CSV jest zbyt duże.")
-            missing = set(SCHEMAS) - names
+            missing = set(SCHEMAS) - OPTIONAL_FILES - names
             if missing:
                 raise BackupImportError(f"Brak wymaganych plików: {', '.join(sorted(missing))}.")
             result = {}
             for filename, required in SCHEMAS.items():
+                if filename not in names and filename in OPTIONAL_FILES:
+                    result[filename] = []
+                    continue
                 try:
                     text = archive.read(filename).decode("utf-8-sig")
                 except UnicodeDecodeError as error:
@@ -225,6 +271,9 @@ def _validate_semantics(rows):
     event_types = {"INSEMINATION", "PREGNANCY_CHECK", "FARROWING", "WEANING", "VACCINATION"}
     if any(row["event_type"] not in event_types for row in rows["sow_events.csv"]):
         raise BackupImportError("sow_events.csv zawiera nieobsługiwany typ zdarzenia.")
+    cycle_statuses = {"COMPLETED", "SKIPPED"}
+    if any(row["status"] not in cycle_statuses for row in rows["vaccination_cycles.csv"]):
+        raise BackupImportError("vaccination_cycles.csv zawiera nieobsługiwany status.")
     statuses = {choice for choice, _ in ProductionModel.Statuses.choices}
     if any(row["status"] not in statuses for row in rows["productions.csv"]):
         raise BackupImportError("productions.csv zawiera nieobsługiwany status.")
@@ -253,24 +302,90 @@ def import_csv_archive(uploaded_file, farm) -> dict[str, int]:
             archived_at=_datetime(row["archived_at"]),
         )
     counts["maciory"] = len(sow_map)
-    for row in rows["sow_events.csv"]:
-        try:
-            details = json.loads(row["details"] or "{}")
-        except json.JSONDecodeError as error:
-            raise BackupImportError("Nieprawidłowy JSON w sow_events.csv.") from error
-        SowEventModel.objects.create(sow=_related(sow_map, row["sow_id"], "maciory"), event_type=row["event_type"], event_date=_date(row["event_date"]), details=details)
-    counts["zdarzenia macior"] = len(rows["sow_events.csv"])
+    plan_map = {}
+    plan_relation_rows = []
     for row in rows["vaccination_plans.csv"]:
-        VaccinationPlanModel.objects.create(
+        legacy_interval = _int(row.get("interval_months"), nullable=True)
+        interval_value = _int(row.get("interval_value"), nullable=True) or legacy_interval
+        first_due_date = _date(row.get("first_due_date"), nullable=True)
+        plan = VaccinationPlanModel.objects.create(
             farm=farm,
             name=row["name"],
             days_before_farrowing=_int(row["days_before_farrowing"], nullable=True),
             days_after_event=_int(row["days_after_event"], nullable=True),
             event_source=row["event_source"] or None,
-            interval_months=_int(row["interval_months"], nullable=True),
+            interval_months=legacy_interval,
+            interval_value=interval_value,
+            interval_unit=row.get("interval_unit") or ("MONTHS" if interval_value else None),
+            schedule_mode=row.get("schedule_mode") or ("FROM_LAST_COMPLETED" if interval_value else None),
+            first_due_date=first_due_date,
+            scope=row.get("scope") or "ALL",
+            is_active=_bool(row["is_active"]) if row.get("is_active") not in (None, "") else not (interval_value and not first_due_date),
+            requires_configuration=_bool(row["requires_configuration"]) if row.get("requires_configuration") not in (None, "") else bool(interval_value and not first_due_date),
             reminder_days_ahead=_int(row["reminder_days_ahead"] or 7),
         )
+        plan_map[row["id"]] = plan
+        plan_relation_rows.append((plan, row))
     counts["plany szczepień"] = len(rows["vaccination_plans.csv"])
+    for plan, row in plan_relation_rows:
+        for field_name, column in (
+            ("selected_sows", "selected_sow_ids"),
+            ("excluded_sows", "excluded_sow_ids"),
+        ):
+            try:
+                sow_ids = json.loads(row.get(column) or "[]")
+            except json.JSONDecodeError as error:
+                raise BackupImportError(f"Nieprawidłowy JSON w kolumnie {column}.") from error
+            getattr(plan, field_name).add(*[
+                _related(sow_map, str(sow_id), "maciory")
+                for sow_id in sow_ids
+            ])
+
+    matched_legacy_plan_ids = set()
+    plans_by_name = {}
+    for plan in plan_map.values():
+        plans_by_name.setdefault(plan.name.casefold(), []).append(plan)
+    for row in rows["sow_events.csv"]:
+        try:
+            details = json.loads(row["details"] or "{}")
+        except json.JSONDecodeError as error:
+            raise BackupImportError("Nieprawidłowy JSON w sow_events.csv.") from error
+        plan_id = row.get("vaccination_plan_id")
+        plan = _related(plan_map, plan_id, "plany szczepień") if plan_id else None
+        vaccine_name = row.get("vaccine_name") or details.get("vaccine_name", "")
+        if plan is None and vaccine_name:
+            candidates = plans_by_name.get(str(vaccine_name).casefold(), [])
+            plan = candidates[0] if len(candidates) == 1 else None
+        if plan:
+            matched_legacy_plan_ids.add(plan.id)
+        SowEventModel.objects.create(
+            sow=_related(sow_map, row["sow_id"], "maciory"),
+            event_type=row["event_type"],
+            event_date=_date(row["event_date"]),
+            details=details,
+            vaccination_plan=plan,
+            vaccine_name=vaccine_name,
+            cycle_id=row.get("cycle_id") or details.get("cycle_id", ""),
+            scheduled_date=_date(row.get("scheduled_date"), nullable=True),
+        )
+    counts["zdarzenia macior"] = len(rows["sow_events.csv"])
+    for plan in plan_map.values():
+        if plan.interval_value and plan.first_due_date is None and plan.id in matched_legacy_plan_ids:
+            plan.is_active = True
+            plan.requires_configuration = False
+            plan.save(update_fields=("is_active", "requires_configuration"))
+    for row in rows["vaccination_cycles.csv"]:
+        VaccinationCycleModel.objects.create(
+            plan=_related(plan_map, row["plan_id"], "plany szczepień"),
+            sow=_related(sow_map, row["sow_id"], "maciory"),
+            cycle_id=row["cycle_id"],
+            scheduled_date=_date(row["scheduled_date"]),
+            status=row["status"],
+            completed_at=_date(row["completed_at"], nullable=True),
+            skipped_at=_date(row["skipped_at"], nullable=True),
+            note=row["note"],
+        )
+    counts["cykle szczepień"] = len(rows["vaccination_cycles.csv"])
     ingredient_map = {}
     for row in rows["ingredients.csv"]:
         ingredient_map[row["id"]] = IngredientModel.objects.create(farm=farm, name=row["name"], description=row["description"] or None, low_stock_threshold_kg=_decimal(row["low_stock_threshold_kg"]), is_in_bin=_bool(row["is_in_bin"]))

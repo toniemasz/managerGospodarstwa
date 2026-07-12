@@ -34,11 +34,17 @@ from feed.models import (
     RecipeVersionModel,
 )
 from sales.models import PigSaleModel, SaleClassRowModel
-from sows.models import MortalityReportModel, SowEventModel, SowModel, VaccinationPlanModel
+from sows.models import (
+    MortalityReportModel,
+    SowEventModel,
+    SowModel,
+    VaccinationCycleModel,
+    VaccinationPlanModel,
+)
 
 
-BACKUP_FORMAT_VERSION = 3
-SUPPORTED_USER_BACKUP_VERSIONS = {1, 2, 3}
+BACKUP_FORMAT_VERSION = 4
+SUPPORTED_USER_BACKUP_VERSIONS = {1, 2, 3, 4}
 MAX_UPLOAD_SIZE = 25 * 1024 * 1024
 MAX_UNCOMPRESSED_SIZE = 100 * 1024 * 1024
 
@@ -48,6 +54,7 @@ USER_EXPORT_QUERYSETS = {
     'sows.VaccinationPlanModel': lambda farm: VaccinationPlanModel.objects.filter(farm=farm).order_by('id'),
     'sows.SowModel': lambda farm: SowModel.objects.filter(farm=farm).order_by('id'),
     'sows.SowEventModel': lambda farm: SowEventModel.objects.filter(sow__farm=farm).order_by('id'),
+    'sows.VaccinationCycleModel': lambda farm: VaccinationCycleModel.objects.filter(plan__farm=farm).order_by('id'),
     'sows.MortalityReportModel': lambda farm: MortalityReportModel.objects.filter(farm=farm).order_by('id'),
     'feed.IngredientModel': lambda farm: IngredientModel.objects.filter(farm=farm).order_by('id'),
     'feed.DeliveryModel': lambda farm: DeliveryModel.objects.filter(ingredient__farm=farm).order_by('id'),
@@ -72,6 +79,7 @@ BUSINESS_MODELS = (
     VaccinationPlanModel,
     SowModel,
     SowEventModel,
+    VaccinationCycleModel,
     MortalityReportModel,
     IngredientModel,
     DeliveryModel,
@@ -329,6 +337,7 @@ def _delete_farm_business_data(farm):
     DeliveryModel.objects.filter(ingredient__farm=farm).delete()
     IngredientPriceConfigModel.objects.filter(ingredient__farm=farm).delete()
     IngredientModel.objects.filter(farm=farm).delete()
+    VaccinationCycleModel.objects.filter(plan__farm=farm).delete()
     MortalityReportModel.objects.filter(farm=farm).delete()
     SowModel.objects.filter(farm=farm).delete()
     VaccinationPlanModel.objects.filter(farm=farm).delete()
@@ -337,9 +346,11 @@ def _delete_farm_business_data(farm):
 def _merge_user_records(payload, data, farm):
     """Bezpieczny merge: istniejące klucze biznesowe pozostają bez zmian."""
     counts = Counter()
+    plan_map = {}
     for record in _records(data, 'sows.VaccinationPlanModel'):
-        fields = _clean_fields(record['fields'], {'farm'})
-        _, created = VaccinationPlanModel.objects.get_or_create(farm=farm, name__iexact=fields['name'], defaults=fields)
+        fields = _clean_fields(record['fields'], {'farm', 'selected_sows', 'excluded_sows'})
+        plan, created = VaccinationPlanModel.objects.get_or_create(farm=farm, name__iexact=fields['name'], defaults=fields)
+        plan_map[str(record['pk'])] = plan
         counts['plany szczepień'] += int(created)
     sow_map = {}
     for record in _records(data, 'sows.SowModel'):
@@ -348,10 +359,27 @@ def _merge_user_records(payload, data, farm):
         sow_map[str(record['pk'])] = obj
         counts['maciory'] += int(created)
     for record in _records(data, 'sows.SowEventModel'):
-        fields = _clean_fields(record['fields'], {'sow', 'created_at'})
+        fields = _clean_fields(record['fields'], {'sow', 'created_at', 'vaccination_plan'})
         sow = _mapped(sow_map, record['fields'].get('sow'), 'maciory')
-        _, created = SowEventModel.objects.get_or_create(sow=sow, event_type=fields.pop('event_type'), event_date=fields.pop('event_date'), defaults=fields)
+        plan_id = record['fields'].get('vaccination_plan')
+        plan = _mapped(plan_map, plan_id, 'plany szczepień') if plan_id else None
+        event, created = SowEventModel.objects.get_or_create(sow=sow, event_type=fields.pop('event_type'), event_date=fields.pop('event_date'), defaults=fields)
         counts['zdarzenia macior'] += int(created)
+        if created and plan:
+            event.vaccination_plan = plan
+            event.save(update_fields=('vaccination_plan',))
+    _restore_plan_sow_relations(data, plan_map, sow_map)
+    for record in _records(data, 'sows.VaccinationCycleModel'):
+        fields = _clean_fields(record['fields'], {'plan', 'sow', 'created_at'})
+        plan = _mapped(plan_map, record['fields'].get('plan'), 'plany szczepień')
+        sow = _mapped(sow_map, record['fields'].get('sow'), 'maciory')
+        _, created = VaccinationCycleModel.objects.get_or_create(
+            plan=plan,
+            sow=sow,
+            cycle_id=fields.pop('cycle_id'),
+            defaults=fields,
+        )
+        counts['cykle szczepień'] += int(created)
     for record in _records(data, 'sows.MortalityReportModel'):
         fields = _clean_fields(record['fields'], {'farm', 'sow', 'created_by', 'created_at'})
         sow_id = record['fields'].get('sow')
@@ -455,6 +483,7 @@ def user_business_data_counts(farm: FarmModel) -> dict[str, int]:
         'plany szczepień': VaccinationPlanModel.objects.filter(farm=farm),
         'maciory': SowModel.objects.filter(farm=farm),
         'zdarzenia macior': SowEventModel.objects.filter(sow__farm=farm),
+        'cykle szczepień': VaccinationCycleModel.objects.filter(plan__farm=farm),
         'upadki': MortalityReportModel.objects.filter(farm=farm),
         'składniki': IngredientModel.objects.filter(farm=farm),
         'dostawy': DeliveryModel.objects.filter(ingredient__farm=farm),
@@ -513,6 +542,7 @@ def _restore_user_records(payload, data, farm):
 
     plan_map = _create_farm_models(data, 'sows.VaccinationPlanModel', VaccinationPlanModel, farm, counts)
     sow_map = _create_farm_models(data, 'sows.SowModel', SowModel, farm, counts)
+    _restore_plan_sow_relations(data, plan_map, sow_map)
     ingredient_map = _create_farm_models(data, 'feed.IngredientModel', IngredientModel, farm, counts)
     recipe_map = _create_farm_models(data, 'feed.RecipeModel', RecipeModel, farm, counts)
     sale_map = _create_farm_models(data, 'sales.PigSaleModel', PigSaleModel, farm, counts)
@@ -533,7 +563,23 @@ def _restore_user_records(payload, data, farm):
         product_map[str(record['pk'])] = obj
         counts['produkty gotowej paszy'] += 1
 
-    _create_related_models(data, 'sows.SowEventModel', SowEventModel, 'sow', sow_map, counts)
+    for record in _records(data, 'sows.SowEventModel'):
+        fields = _clean_fields(record['fields'], {'sow', 'vaccination_plan', 'created_at'})
+        plan_id = record['fields'].get('vaccination_plan')
+        SowEventModel.objects.create(
+            sow=_mapped(sow_map, record['fields'].get('sow'), 'zdarzenia macior'),
+            vaccination_plan=_mapped(plan_map, plan_id, 'plany szczepień') if plan_id else None,
+            **fields,
+        )
+        counts['zdarzenia macior'] += 1
+    for record in _records(data, 'sows.VaccinationCycleModel'):
+        fields = _clean_fields(record['fields'], {'plan', 'sow', 'created_at'})
+        VaccinationCycleModel.objects.create(
+            plan=_mapped(plan_map, record['fields'].get('plan'), 'plany szczepień'),
+            sow=_mapped(sow_map, record['fields'].get('sow'), 'maciory'),
+            **fields,
+        )
+        counts['cykle szczepień'] += 1
     for record in _records(data, 'sows.MortalityReportModel'):
         fields = _clean_fields(record['fields'], {'farm', 'sow', 'created_by', 'created_at'})
         sow_id = record['fields'].get('sow')
@@ -700,6 +746,7 @@ def _restore_user_records(payload, data, farm):
 def _create_farm_models(data, label, model, farm, counts):
     result = {}
     count_label = {
+        'sows.VaccinationPlanModel': 'plany szczepień',
         'sows.SowModel': 'maciory',
         'feed.IngredientModel': 'składniki',
         'feed.RecipeModel': 'receptury',
@@ -707,7 +754,8 @@ def _create_farm_models(data, label, model, farm, counts):
         'costs.CostCategoryModel': 'kategorie kosztów',
     }.get(label)
     for record in _records(data, label):
-        fields = _clean_fields(record['fields'], {'farm'})
+        many_to_many_fields = {field.name for field in model._meta.many_to_many}
+        fields = _clean_fields(record['fields'], {'farm', *many_to_many_fields})
         created_at = fields.pop('created_at', None)
         obj = model.objects.create(farm=farm, **fields)
         if created_at and hasattr(obj, 'created_at'):
@@ -718,9 +766,21 @@ def _create_farm_models(data, label, model, farm, counts):
     return result
 
 
+def _restore_plan_sow_relations(data, plan_map, sow_map):
+    for record in _records(data, 'sows.VaccinationPlanModel'):
+        plan = _mapped(plan_map, record['pk'], 'plany szczepień')
+        for field_name in ('selected_sows', 'excluded_sows'):
+            sow_ids = record['fields'].get(field_name) or []
+            getattr(plan, field_name).add(*[
+                _mapped(sow_map, sow_id, 'maciory')
+                for sow_id in sow_ids
+            ])
+
+
 def _create_related_models(data, label, model, relation_name, relation_map, counts):
     count_label = {
         'sows.SowEventModel': 'zdarzenia macior',
+        'sows.VaccinationCycleModel': 'cykle szczepień',
         'feed.DeliveryModel': 'dostawy',
         'feed.IngredientPriceConfigModel': 'ceny składników',
         'sales.SaleClassRowModel': 'wiersze sprzedaży',
@@ -768,6 +828,7 @@ def _validate_user_records(data):
     required_fields = {
         'sows.SowModel': {'ear_tag'},
         'sows.SowEventModel': {'sow', 'event_type', 'event_date'},
+        'sows.VaccinationCycleModel': {'plan', 'sow', 'cycle_id', 'scheduled_date', 'status'},
         'sows.MortalityReportModel': {'mortality_type', 'mortality_date', 'quantity'},
         'feed.IngredientModel': {'name'},
         'feed.DeliveryModel': {'ingredient', 'date', 'quantity_kg'},

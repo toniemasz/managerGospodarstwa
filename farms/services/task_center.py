@@ -149,6 +149,8 @@ class TaskCenterService:
                             "kind": "vaccination",
                             "vaccine_name": item["vaccine_name"],
                             "cycle_id": item["cycle_id"],
+                            "plan_id": item["plan_id"],
+                            "scheduled_date": item["scheduled_date"].isoformat(),
                         },
                     )
                 )
