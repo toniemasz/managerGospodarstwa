@@ -59,7 +59,7 @@ class FeedIntegrityService:
             status=ProductionModel.Statuses.COMPLETED,
         ).select_related("recipe", "cost_entry", "finished_feed_batch")
         if apply:
-            productions = productions.select_for_update()
+            productions = productions.select_for_update(of=("self",))
 
         for production in productions.order_by("date", "time", "id"):
             self._audit_production(production, result, apply=apply)

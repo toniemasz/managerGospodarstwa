@@ -155,19 +155,16 @@ WSGI_APPLICATION = 'managerGospodarstwa.wsgi.application'
 
 
 # Database
-# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-if DEBUG or TESTING:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': ':memory:' if TESTING else BASE_DIR / 'db.sqlite3',
-        }
-    }
-else:
-    DATABASES = {
-        'default': env.db('DATABASE_URL')
-    }
+database_variable = "TEST_DATABASE_URL" if TESTING else "DATABASE_URL"
+database_url = env(database_variable, default="")
+
+if not database_url:
+    raise RuntimeError(f"Brak wymaganej zmiennej {database_variable}.")
+
+DATABASES = {
+    "default": env.db(database_variable),
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators

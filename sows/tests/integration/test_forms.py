@@ -3,8 +3,9 @@ from datetime import date
 import pytest
 
 from sows.forms import SowEventForm, SowForm, VaccinationPlanForm
-from sows.models import VaccinationPlanModel
-from farms.services.farm_service import get_or_create_legacy_farm
+from sows.models import SowModel, VaccinationPlanModel
+from farms.services.farm_service import get_or_create_legacy_farm, get_or_create_user_farm
+from django.contrib.auth.models import User
 
 
 @pytest.mark.django_db
@@ -17,28 +18,70 @@ def test_sow_form_accepts_basic_data():
 @pytest.mark.django_db
 def test_vaccination_plan_form_requires_exactly_one_trigger():
     no_trigger = VaccinationPlanForm(data={'name': 'Pusta', 'reminder_days_ahead': 7})
-    many_triggers = VaccinationPlanForm(data={
-        'name': 'Za dużo',
-        'days_before_farrowing': 21,
-        'interval_months': 4,
-        'reminder_days_ahead': 7,
-    })
     missing_source = VaccinationPlanForm(data={
         'name': 'Po zdarzeniu',
+        'trigger_type': VaccinationPlanForm.TRIGGER_AFTER_EVENT,
         'days_after_event': 14,
         'reminder_days_ahead': 7,
     })
     valid = VaccinationPlanForm(data={
         'name': 'Cykliczna',
-        'interval_months': 4,
+        'trigger_type': VaccinationPlanForm.TRIGGER_INTERVAL,
+        'interval_value': 4,
+        'interval_unit': 'MONTHS',
+        'schedule_mode': 'FIXED',
+        'first_due_date': '2026-07-01',
         'reminder_days_ahead': 7,
     })
 
     assert no_trigger.is_valid() is False
-    assert many_triggers.is_valid() is False
     assert missing_source.is_valid() is False
     assert 'event_source' in missing_source.errors
     assert valid.is_valid() is True
+
+
+@pytest.mark.django_db
+def test_periodic_vaccination_plan_requires_explicit_first_due_date():
+    form = VaccinationPlanForm(data={
+        'name': 'Bez daty',
+        'trigger_type': VaccinationPlanForm.TRIGGER_INTERVAL,
+        'interval_value': 2,
+        'interval_unit': 'WEEKS',
+        'schedule_mode': 'FIXED',
+        'reminder_days_ahead': 7,
+    })
+
+    assert form.is_valid() is False
+    assert 'first_due_date' in form.errors
+
+
+@pytest.mark.django_db
+def test_selected_scope_rejects_archived_and_foreign_sows():
+    farm = get_or_create_user_farm(User.objects.create_user(username='form-scope'))
+    other_farm = get_or_create_user_farm(User.objects.create_user(username='form-scope-other'))
+    active = SowModel.objects.create(farm=farm, ear_tag='ACTIVE')
+    archived = SowModel.objects.create(farm=farm, ear_tag='ARCHIVED', is_archived=True)
+    foreign = SowModel.objects.create(farm=other_farm, ear_tag='FOREIGN')
+    common = {
+        'name': 'Zakres',
+        'trigger_type': VaccinationPlanForm.TRIGGER_INTERVAL,
+        'interval_value': 1,
+        'interval_unit': 'YEARS',
+        'schedule_mode': 'FIXED',
+        'first_due_date': '2026-07-01',
+        'scope': 'SELECTED',
+        'reminder_days_ahead': 7,
+    }
+
+    valid = VaccinationPlanForm(data={**common, 'selected_sows': [active.id]}, farm=farm)
+    archived_form = VaccinationPlanForm(data={**common, 'selected_sows': [archived.id]}, farm=farm)
+    foreign_form = VaccinationPlanForm(data={**common, 'selected_sows': [foreign.id]}, farm=farm)
+
+    assert valid.is_valid() is True
+    assert archived_form.is_valid() is False
+    assert foreign_form.is_valid() is False
+    assert 'selected_sows' in archived_form.errors
+    assert 'selected_sows' in foreign_form.errors
 
 
 @pytest.mark.django_db

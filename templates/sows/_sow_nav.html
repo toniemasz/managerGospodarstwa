@@ -1,0 +1,43 @@
+{% with active=request.resolver_match.url_name %}
+<nav class="subnav subnav--with-icons" aria-label="Nawigacja macior">
+    <a href="{% url 'dashboard' %}"
+       class="{% if active == 'dashboard' or active == 'add_sow' or active == 'edit_sow' or active == 'sow_detail' or active == 'add_event' or active == 'edit_event' or active == 'bulk_sow_events' or active == 'bulk_pregnancy_check' or active == 'farrowing_panel' %}is-active{% endif %}">
+        <span class="subnav-icon">
+            {% include 'components/app_icon.html' with name='sow' %}
+        </span>
+        <span>Maciory</span>
+    </a>
+
+    <a href="{% url 'mortality_list' %}"
+       class="{% if active == 'mortality_list' or active == 'report_mortality' %}is-active{% endif %}">
+        <span class="subnav-icon is-danger">
+            {% include 'components/app_icon.html' with name='warning' %}
+        </span>
+        <span>Upadki</span>
+    </a>
+
+    <a href="{% url 'general_statistics' %}"
+       class="{% if active == 'general_statistics' %}is-active{% endif %}">
+        <span class="subnav-icon">
+            {% include 'components/app_icon.html' with name='statistics' %}
+        </span>
+        <span>Statystyki</span>
+    </a>
+
+    <a href="{% url 'vaccination_plans' %}"
+       class="{% if active == 'vaccination_plans' or active == 'add_vaccination_plan' or active == 'edit_vaccination_plan' or active == 'bulk_vaccinate' %}is-active{% endif %}">
+        <span class="subnav-icon is-health">
+            {% include 'components/app_icon.html' with name='health' %}
+        </span>
+        <span>Szczepienia</span>
+    </a>
+
+    <a href="{% url 'archived_sows' %}"
+       class="{% if active == 'archived_sows' %}is-active{% endif %}">
+        <span class="subnav-icon">
+            {% include 'components/app_icon.html' with name='history' %}
+        </span>
+        <span>Archiwum</span>
+    </a>
+</nav>
+{% endwith %}

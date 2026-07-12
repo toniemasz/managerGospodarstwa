@@ -18,7 +18,7 @@ from feed.models import DeliveryModel, IngredientModel, ProductionModel, RecipeI
 from feed.actions.productions import complete_production
 from feed.actions.inventory import InventoryActions
 from sales.models import PigSaleModel
-from sows.models import SowModel
+from sows.models import SowModel, VaccinationCycleModel, VaccinationPlanModel
 
 
 @pytest.fixture
@@ -59,6 +59,25 @@ def test_task_center_and_audit_log_are_isolated(client, two_farms):
 def test_csv_export_and_atomic_import_round_trip(two_farms):
     _, source, _, target = two_farms
     sow = SowModel.objects.create(farm=source, ear_tag="CSV-1")
+    plan = VaccinationPlanModel.objects.create(
+        farm=source,
+        name="CSV szczepienie",
+        interval_value=6,
+        interval_unit="WEEKS",
+        schedule_mode="FIXED",
+        first_due_date=date.today(),
+        scope="SELECTED",
+    )
+    plan.selected_sows.add(sow)
+    VaccinationCycleModel.objects.create(
+        plan=plan,
+        sow=sow,
+        cycle_id="csv-cycle",
+        scheduled_date=date.today(),
+        status="SKIPPED",
+        skipped_at=date.today(),
+        note="CSV test",
+    )
     ingredient = IngredientModel.objects.create(farm=source, name="Pszenica")
     delivery = DeliveryModel.objects.create(ingredient=ingredient, date=date.today(), quantity_kg=1000, price_per_kg=1)
     InventoryActions(source).sync_delivery(delivery)
@@ -88,9 +107,14 @@ def test_csv_export_and_atomic_import_round_trip(two_farms):
     production.refresh_from_db()
 
     assert counts["maciory"] == 1
+    assert counts["cykle szczepień"] == 1
     assert SowModel.objects.filter(farm=target, ear_tag=sow.ear_tag).exists()
     assert IngredientModel.objects.filter(farm=target, name="Pszenica").exists()
     assert CostModel.objects.filter(farm=target, description="Koszt z CSV", amount=Decimal("123.45")).exists()
+    restored_plan = VaccinationPlanModel.objects.get(farm=target)
+    assert restored_plan.interval_value == 6
+    assert list(restored_plan.selected_sows.values_list("ear_tag", flat=True)) == ["CSV-1"]
+    assert VaccinationCycleModel.objects.get(plan=restored_plan).note == "CSV test"
     restored_production = ProductionModel.objects.get(recipe__farm=target, recipe__name=recipe.name)
     assert CostModel.objects.filter(
         farm=target,

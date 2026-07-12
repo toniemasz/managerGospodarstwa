@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:17.6
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: manager_local
+      POSTGRES_USER: manager
+      POSTGRES_PASSWORD: manager-local-password
+    ports:
+      - "5432:5432"
+    volumes:
+      - manager_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  manager_postgres_data:

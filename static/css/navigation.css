@@ -587,6 +587,42 @@
     color: var(--primary-dark);
 }
 
+.subnav--with-icons a {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: .4rem;
+}
+
+.subnav-icon {
+    display: inline-flex;
+    width: 1.35rem;
+    height: 1.35rem;
+    flex: 0 0 1.35rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    background: var(--surface-container);
+    color: var(--primary-dark);
+}
+
+.subnav-icon svg {
+    width: .95rem;
+    height: .95rem;
+}
+
+.subnav-icon.is-danger {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+.subnav-icon.is-health {
+    background: var(--secondary-soft);
+    color: var(--secondary);
+}
+
+
+
 
 .task-tabs {
     display: flex;

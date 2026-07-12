@@ -12,11 +12,19 @@ class SowEvent:
         details: Dict[str, Any],
         id: int = None,
         created_at=None,
+        vaccination_plan_id: int | None = None,
+        vaccine_name: str = "",
+        cycle_id: str = "",
+        scheduled_date: date | None = None,
     ):
         self.id = id
         self.event_type = event_type
         self.event_date = event_date
         self.created_at = created_at
+        self.vaccination_plan_id = vaccination_plan_id
+        self.vaccine_name = vaccine_name
+        self.cycle_id = cycle_id
+        self.scheduled_date = scheduled_date
         if isinstance(details, dict):
             self.details = details
         else:
@@ -151,79 +159,6 @@ class Sow:
             days_since_insemination = (current_date - self.last_insemination_date).days
             return days_since_insemination >= pregnancy_check_after_days
         return False
-
-    def get_vaccination_status(self, plan: Dict[str, Any], current_date: date) -> Dict[str, Any]:
-        """
-        Oblicza dynamicznie czy maciora kwalifikuje się do danego szczepienia
-        na podstawie przekazanej reguły planu szczepień i bieżącej daty.
-
-        Format struktury planu (plan):
-        {
-            'id': int,
-            'name': str,
-            'days_before_farrowing': Optional[int], # np. 21 (3 tygodnie przed porodem)
-            'days_after_event': Optional[int],       # np. 14 dni po porodzie/inseminacji
-            'event_source': Optional[str],           # "FARROWING" lub "INSEMINATION"
-            'interval_months': Optional[int],        # cyklicznie co X miesięcy dla stada
-            'reminder_days_ahead': int               # ile dni wcześniej pokazać przypomnienie
-        }
-        """
-        target_date: Optional[date] = None
-        cycle_id: str = "herd"
-
-        # Warunek 1: Szczepienie uzależnione od planowanego oproszenia
-        if plan.get('days_before_farrowing') is not None and self.expected_farrowing_date:
-            target_date = self.expected_farrowing_date - timedelta(days=plan['days_before_farrowing'])
-            cycle_id = f"farrowing_{self.expected_farrowing_date.strftime('%Y-%m-%d')}"
-
-        # Warunek 2: Szczepienie po konkretnym zdarzeniu (oproszenie lub inseminacja)
-        elif plan.get('days_after_event') is not None and plan.get('event_source'):
-            source = plan['event_source']
-            if source == "FARROWING" and self.last_farrowing_date:
-                target_date = self.last_farrowing_date + timedelta(days=plan['days_after_event'])
-                cycle_id = f"after_farrowing_{self.last_farrowing_date.strftime('%Y-%m-%d')}"
-            elif source == "INSEMINATION" and self.last_insemination_date:
-                target_date = self.last_insemination_date + timedelta(days=plan['days_after_event'])
-                cycle_id = f"after_insemination_{self.last_insemination_date.strftime('%Y-%m-%d')}"
-
-        # Warunek 3: Szczepienie cykliczne (np. co 4 miesiące od wprowadzenia do stada lub ostatniej dawki)
-        elif plan.get('interval_months') is not None:
-            base_date = self.entry_date or date.today()
-            # Szukamy ostatniego wykonanego szczepienia o tej samej nazwie
-            same_vaccinations = [v for v in self.vaccinations if v.details.get('vaccine_name') == plan['name']]
-            if same_vaccinations:
-                last_done = max(same_vaccinations, key=lambda x: x.event_date)
-                base_date = last_done.event_date
-
-            # Przybliżone wyliczenie kolejnego terminu (X miesięcy * 30 dni)
-            target_date = base_date + timedelta(days=plan['interval_months'] * 30)
-            cycle_id = f"cyclic_{target_date.strftime('%Y-%m-%d')}"
-
-        if not target_date:
-            return {'is_eligible': False, 'should_display': False, 'target_date': None, 'is_done': False}
-
-        # Sprawdzenie, czy szczepienie w tym konkretnym cyklu zostało już zarejestrowane
-        is_done = any(
-            v.details.get('vaccine_name') == plan['name'] and
-            (v.details.get('cycle_id') == cycle_id or abs((v.event_date - target_date).days) <= 7)
-            for v in self.vaccinations
-        )
-
-        reminder_days = plan.get('reminder_days_ahead', 7)
-        days_to_target = (target_date - current_date).days
-
-        # Kwalifikuje się, jeśli nadszedł czas okna przypomnienia i nie zostało jeszcze wykonane
-        should_display = (days_to_target <= reminder_days) and not is_done
-        is_eligible = (days_to_target <= 0) and not is_done
-
-        return {
-            'is_eligible': is_eligible,
-            'should_display': should_display,
-            'target_date': target_date,
-            'is_done': is_done,
-            'cycle_id': cycle_id,
-            'days_to_target': days_to_target
-        }
 
     def update_state_for_date(
         self,

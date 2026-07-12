@@ -18,28 +18,7 @@
         </div>
     </section>
 
-    <section class="management-module-grid sow-tools-grid" aria-label="Narzędzia macior">
-        <a href="{% url 'mortality_list' %}" class="management-module-tile">
-            <span class="module-icon danger">{% include 'components/app_icon.html' with name='warning' %}</span>
-            <strong>Upadki</strong>
-            <small>Zgłoszenia i historia</small>
-        </a>
-        <a href="{% url 'general_statistics' %}" class="management-module-tile">
-            <span class="module-icon">{% include 'components/app_icon.html' with name='statistics' %}</span>
-            <strong>Statystyki</strong>
-            <small>Wyniki rozrodu</small>
-        </a>
-        <a href="{% url 'vaccination_plans' %}" class="management-module-tile">
-            <span class="module-icon green">{% include 'components/app_icon.html' with name='health' %}</span>
-            <strong>Szczepienia</strong>
-            <small>Plany i terminy</small>
-        </a>
-        <a href="{% url 'archived_sows' %}" class="management-module-tile">
-            <span class="module-icon">{% include 'components/app_icon.html' with name='history' %}</span>
-            <strong>Archiwum</strong>
-            <small>Maciory wycofane</small>
-        </a>
-    </section>
+    {% include 'sows/_sow_nav.html' %}
 
     <section class="stats-grid featured-stats compact-stats">
         <div class="stat-tile is-success">

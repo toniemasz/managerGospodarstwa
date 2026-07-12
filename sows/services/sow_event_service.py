@@ -9,7 +9,7 @@ from django.db import transaction
 from farms.services.settings_service import get_farm_settings
 from sows.domain.event_details import build_event_details
 from sows.domain.sow_state_machine import SowStateMachine
-from sows.services.sow_repository import SowRepository
+from sows.services.sow_repository import SowRepository, VaccinationPlanRepository
 
 
 FARROWING_DECISION_WITHOUT_CHECK = 'without_check'
@@ -38,7 +38,14 @@ class SowEventService:
         self.settings = get_farm_settings(farm) if farm is not None else None
 
     def build_details(self, data: dict) -> dict:
-        return build_event_details(data)
+        details = build_event_details(data)
+        if data.get('event_type') == SowStateMachine.VACCINATION and self.farm is not None:
+            plan = VaccinationPlanRepository(self.farm).get_active_plan_by_name(
+                details.get('vaccine_name', '')
+            )
+            if plan:
+                details['vaccination_plan_id'] = plan.id
+        return details
 
     def needs_farrowing_confirmation(self, sow_status: str, data: dict) -> bool:
         event_type = data.get('event_type')

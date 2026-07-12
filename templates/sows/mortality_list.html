@@ -11,11 +11,10 @@
             <p class="page-subtitle">Zgłoszenia upadków macior i zwierząt po odsadzeniu w bieżącym gospodarstwie.</p>
         </div>
         <div class="header-actions">
-            <a href="{% url 'dashboard' %}" class="button button-secondary">Wróć do stada</a>
             <a href="{% url 'report_mortality' %}" class="button button-primary">Zgłoś upadek</a>
         </div>
     </section>
-
+    {% include 'sows/_sow_nav.html' %}
     {% url 'mortality_list' as mortality_filter_url %}
     {% include 'components/filter_panel.html' with filter_action=mortality_filter_url filter_clear_url=filter_clear_url filter_fields_template='sows/_mortality_filters.html' %}
 

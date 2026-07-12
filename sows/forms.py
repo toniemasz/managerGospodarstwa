@@ -11,24 +11,110 @@ from sows.domain.sow_state_machine import SowStateMachine
 
 
 class VaccinationPlanForm(forms.ModelForm):
+    TRIGGER_INTERVAL = "INTERVAL"
+    TRIGGER_BEFORE_FARROWING = "BEFORE_FARROWING"
+    TRIGGER_AFTER_EVENT = "AFTER_EVENT"
+
+    TRIGGER_TYPE_CHOICES = [
+        ("", "Wybierz sposób wyznaczania terminu"),
+        (TRIGGER_INTERVAL, "Cyklicznie co określony czas"),
+        (TRIGGER_BEFORE_FARROWING, "Przed oproszeniem"),
+        (TRIGGER_AFTER_EVENT, "Po zdarzeniu"),
+    ]
+
+    trigger_type = forms.ChoiceField(
+        label="Sposób wyznaczania terminu",
+        choices=TRIGGER_TYPE_CHOICES,
+        required=True,
+    )
+
+    reinclude_sows = forms.ModelMultipleChoiceField(
+        queryset=SowModel.objects.none(),
+        required=False,
+        label="Ponownie obejmij wykluczone maciory",
+        help_text="Wybrane maciory wrócą do planu po zapisaniu zmian.",
+    )
+
     class Meta:
         model = VaccinationPlanModel
-        fields = ['name', 'days_before_farrowing', 'days_after_event', 'event_source', 'interval_months',
-                  'reminder_days_ahead']
+        fields = [
+            'name',
+            'trigger_type',
+            'days_before_farrowing',
+            'days_after_event',
+            'event_source',
+            'interval_value',
+            'interval_unit',
+            'schedule_mode',
+            'first_due_date',
+            'scope',
+            'selected_sows',
+            'reminder_days_ahead',
+        ]
         labels = {
             'name': 'Nazwa szczepienia',
             'days_before_farrowing': 'Dni przed porodem',
             'days_after_event': 'Dni po zdarzeniu',
             'event_source': 'Typ zdarzenia (jeśli po zdarzeniu)',
-            'interval_months': 'Interwał cykliczny (w miesiącach)',
+            'interval_value': 'Interwał',
+            'interval_unit': 'Jednostka interwału',
+            'schedule_mode': 'Tryb harmonogramu',
+            'first_due_date': 'Data pierwszego terminu',
+            'scope': 'Zakres planu',
+            'selected_sows': 'Wybrane aktywne maciory',
             'reminder_days_ahead': 'Wyprzedzenie przypomnienia (dni)'
+        }
+        widgets = {
+            'first_due_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
+            'selected_sows': forms.CheckboxSelectMultiple(),
         }
 
     def __init__(self, *args, farm=None, **kwargs):
         self.farm = farm
         super().__init__(*args, **kwargs)
+        self.fields['scope'].required = False
+        self.fields['scope'].initial = VaccinationPlanModel.SCOPE_ALL
         if self.farm is not None:
             self.instance.farm = self.farm
+            active_sows = SowModel.objects.filter(farm=self.farm, is_archived=False).order_by('ear_tag')
+            self.fields['selected_sows'].queryset = active_sows
+            if self.instance.pk:
+                self.fields['reinclude_sows'].queryset = self.instance.excluded_sows.filter(
+                    farm=self.farm,
+                    is_archived=False,
+                ).order_by('ear_tag')
+                if not self.is_bound:
+                    self.initial['trigger_type'] = self._detect_trigger_type()
+
+                    if (
+                            self.instance.pk
+                            and self.instance.interval_value is None
+                            and self.instance.interval_months is not None
+                    ):
+                        self.initial['interval_value'] = self.instance.interval_months
+                        self.initial['interval_unit'] = VaccinationPlanModel.INTERVAL_MONTHS
+
+    def _detect_trigger_type(self) -> str:
+        """Rozpoznaje typ harmonogramu istniejącego planu."""
+
+        detected_types = []
+
+        if self.instance.days_before_farrowing is not None:
+            detected_types.append(self.TRIGGER_BEFORE_FARROWING)
+
+        if self.instance.days_after_event is not None:
+            detected_types.append(self.TRIGGER_AFTER_EVENT)
+
+        if (
+                self.instance.interval_value is not None
+                or self.instance.interval_months is not None
+        ):
+            detected_types.append(self.TRIGGER_INTERVAL)
+
+        if len(detected_types) == 1:
+            return detected_types[0]
+
+        return ""
 
     def clean_name(self):
         name = self.cleaned_data['name']
@@ -40,25 +126,103 @@ class VaccinationPlanForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        dbf = cleaned_data.get('days_before_farrowing')
-        dae = cleaned_data.get('days_after_event')
-        src = cleaned_data.get('event_source')
-        im = cleaned_data.get('interval_months')
 
-        # Walidacja logiki biznesowej: przynajmniej jeden warunek musi być wybrany,
-        # i nie mogą się one ze sobą logicznie wykluczać.
-        conditions = [bool(dbf), bool(dae), bool(im)]
-        if sum(conditions) > 1:
-            raise ValidationError(
-                "Wybierz tylko jedną metodę wyzwalania szczepienia (albo przed porodem, albo po zdarzeniu, albo cyklicznie).")
+        trigger_type = cleaned_data.get('trigger_type')
+        cleaned_data['scope'] = (
+                cleaned_data.get('scope')
+                or VaccinationPlanModel.SCOPE_ALL
+        )
 
-        if sum(conditions) == 0:
-            raise ValidationError("Musisz zdefiniować przynajmniej jeden warunek uruchomienia szczepienia.")
+        if trigger_type == self.TRIGGER_BEFORE_FARROWING:
+            if cleaned_data.get('days_before_farrowing') is None:
+                self.add_error(
+                    'days_before_farrowing',
+                    "Podaj, ile dni przed oproszeniem ma przypadać szczepienie.",
+                )
 
-        if dae and not src:
-            self.add_error('event_source', "Podaj, od jakiego zdarzenia mają być liczone dni.")
+            cleaned_data['days_after_event'] = None
+            cleaned_data['event_source'] = None
+            cleaned_data['interval_value'] = None
+            cleaned_data['interval_unit'] = None
+            cleaned_data['schedule_mode'] = None
+            cleaned_data['first_due_date'] = None
+
+        elif trigger_type == self.TRIGGER_AFTER_EVENT:
+            if cleaned_data.get('days_after_event') is None:
+                self.add_error(
+                    'days_after_event',
+                    "Podaj, ile dni po zdarzeniu ma przypadać szczepienie.",
+                )
+
+            if not cleaned_data.get('event_source'):
+                self.add_error(
+                    'event_source',
+                    "Wybierz zdarzenie, od którego ma być liczony termin.",
+                )
+
+            cleaned_data['days_before_farrowing'] = None
+            cleaned_data['interval_value'] = None
+            cleaned_data['interval_unit'] = None
+            cleaned_data['schedule_mode'] = None
+            cleaned_data['first_due_date'] = None
+
+        elif trigger_type == self.TRIGGER_INTERVAL:
+            required_interval_fields = (
+                ('interval_value', "Podaj wartość interwału."),
+                ('interval_unit', "Wybierz jednostkę interwału."),
+                ('schedule_mode', "Wybierz tryb harmonogramu."),
+                ('first_due_date', "Podaj datę pierwszego terminu."),
+            )
+
+            for field_name, error_message in required_interval_fields:
+                if cleaned_data.get(field_name) in (None, ''):
+                    self.add_error(field_name, error_message)
+
+            cleaned_data['days_before_farrowing'] = None
+            cleaned_data['days_after_event'] = None
+            cleaned_data['event_source'] = None
+
+        scope = cleaned_data.get('scope')
+
+        if scope == VaccinationPlanModel.SCOPE_SELECTED:
+            if not cleaned_data.get('selected_sows'):
+                self.add_error(
+                    'selected_sows',
+                    "Wybierz co najmniej jedną aktywną maciorę.",
+                )
+        else:
+            cleaned_data['selected_sows'] = (
+                self.fields['selected_sows'].queryset.none()
+            )
+
+        reminder_days = cleaned_data.get('reminder_days_ahead')
+        if reminder_days is not None and reminder_days < 0:
+            self.add_error(
+                'reminder_days_ahead',
+                "Wyprzedzenie nie może być ujemne.",
+            )
 
         return cleaned_data
+
+    def save(self, commit=True):
+        plan = super().save(commit=False)
+
+        if (
+                plan.interval_value is not None
+                and plan.interval_unit == VaccinationPlanModel.INTERVAL_MONTHS
+        ):
+            plan.interval_months = plan.interval_value
+        else:
+            plan.interval_months = None
+
+        plan.requires_configuration = False
+        plan.is_active = True
+
+        if commit:
+            plan.save()
+            self._save_m2m()
+
+        return plan
 
 class SowForm(forms.ModelForm):
     class Meta:
@@ -140,6 +304,12 @@ class SowEventForm(forms.ModelForm):
         details = self._build_event_details(event_type)
 
         instance.details = details
+        if event_type == SowStateMachine.VACCINATION:
+            plan = VaccinationPlanRepository(self.farm).get_active_plan_by_name(
+                details.get('vaccine_name', '')
+            ) if self.farm is not None else None
+            instance.vaccination_plan = plan
+            instance.vaccine_name = details.get('vaccine_name', '')
         if commit:
             instance.save()
         return instance
@@ -227,7 +397,14 @@ class BulkSowEventRowForm(forms.Form):
         return cleaned_data
 
     def build_details(self) -> dict:
-        return build_event_details(self.cleaned_data)
+        details = build_event_details(self.cleaned_data)
+        if self.cleaned_data.get('event_type') == SowStateMachine.VACCINATION and self.farm is not None:
+            plan = VaccinationPlanRepository(self.farm).get_active_plan_by_name(
+                details.get('vaccine_name', '')
+            )
+            if plan:
+                details['vaccination_plan_id'] = plan.id
+        return details
 
 
 BulkSowEventFormSet = formset_factory(BulkSowEventRowForm, extra=0, can_delete=True)
