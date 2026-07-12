@@ -18,22 +18,15 @@ def test_sow_form_accepts_basic_data():
 @pytest.mark.django_db
 def test_vaccination_plan_form_requires_exactly_one_trigger():
     no_trigger = VaccinationPlanForm(data={'name': 'Pusta', 'reminder_days_ahead': 7})
-    many_triggers = VaccinationPlanForm(data={
-        'name': 'Za dużo',
-        'days_before_farrowing': 21,
-        'interval_value': 4,
-        'interval_unit': 'MONTHS',
-        'schedule_mode': 'FIXED',
-        'first_due_date': '2026-07-01',
-        'reminder_days_ahead': 7,
-    })
     missing_source = VaccinationPlanForm(data={
         'name': 'Po zdarzeniu',
+        'trigger_type': VaccinationPlanForm.TRIGGER_AFTER_EVENT,
         'days_after_event': 14,
         'reminder_days_ahead': 7,
     })
     valid = VaccinationPlanForm(data={
         'name': 'Cykliczna',
+        'trigger_type': VaccinationPlanForm.TRIGGER_INTERVAL,
         'interval_value': 4,
         'interval_unit': 'MONTHS',
         'schedule_mode': 'FIXED',
@@ -42,7 +35,6 @@ def test_vaccination_plan_form_requires_exactly_one_trigger():
     })
 
     assert no_trigger.is_valid() is False
-    assert many_triggers.is_valid() is False
     assert missing_source.is_valid() is False
     assert 'event_source' in missing_source.errors
     assert valid.is_valid() is True
@@ -52,6 +44,7 @@ def test_vaccination_plan_form_requires_exactly_one_trigger():
 def test_periodic_vaccination_plan_requires_explicit_first_due_date():
     form = VaccinationPlanForm(data={
         'name': 'Bez daty',
+        'trigger_type': VaccinationPlanForm.TRIGGER_INTERVAL,
         'interval_value': 2,
         'interval_unit': 'WEEKS',
         'schedule_mode': 'FIXED',
@@ -71,6 +64,7 @@ def test_selected_scope_rejects_archived_and_foreign_sows():
     foreign = SowModel.objects.create(farm=other_farm, ear_tag='FOREIGN')
     common = {
         'name': 'Zakres',
+        'trigger_type': VaccinationPlanForm.TRIGGER_INTERVAL,
         'interval_value': 1,
         'interval_unit': 'YEARS',
         'schedule_mode': 'FIXED',
