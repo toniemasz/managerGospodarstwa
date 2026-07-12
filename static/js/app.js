@@ -311,6 +311,82 @@
         syncMortalityFields(false);
     }
 
+
+        function initVaccinationPlanForm(root = document) {
+        const form = (
+            root.getElementById?.('vaccination-plan-form')
+            || document.getElementById('vaccination-plan-form')
+        );
+
+        if (!form || form.dataset.vaccinationPlanBound === 'true') return;
+
+        const triggerType = form.querySelector('#id_trigger_type');
+        const scope = form.querySelector('#id_scope');
+
+        if (!triggerType || !scope) return;
+
+        const triggerSections = {
+            BEFORE_FARROWING: document.getElementById(
+                'vaccination-before-farrowing-section'
+            ),
+            AFTER_EVENT: document.getElementById(
+                'vaccination-after-event-section'
+            ),
+            INTERVAL: document.getElementById(
+                'vaccination-interval-section'
+            ),
+        };
+
+        const selectedSowsSection = document.getElementById(
+            'vaccination-selected-sows-section'
+        );
+
+        const setSectionState = (section, enabled, shouldClear = false) => {
+            if (!section) return;
+
+            section.hidden = !enabled;
+            section.setAttribute('aria-hidden', String(!enabled));
+
+            section.querySelectorAll('input, select, textarea').forEach((field) => {
+                setFieldState(field, enabled, shouldClear);
+            });
+        };
+
+        const syncTriggerSections = (shouldClear = false) => {
+            const selectedType = triggerType.value;
+
+            Object.entries(triggerSections).forEach(([type, section]) => {
+                setSectionState(
+                    section,
+                    type === selectedType,
+                    shouldClear,
+                );
+            });
+        };
+
+        const syncScopeSection = (shouldClear = false) => {
+            setSectionState(
+                selectedSowsSection,
+                scope.value === 'SELECTED',
+                shouldClear,
+            );
+        };
+
+        form.dataset.vaccinationPlanBound = 'true';
+
+        triggerType.addEventListener('change', () => {
+            syncTriggerSections(true);
+        });
+
+        scope.addEventListener('change', () => {
+            syncScopeSection(true);
+        });
+
+        syncTriggerSections(false);
+        syncScopeSection(false);
+    }
+
+
     function initTodayTaskForms(root = document) {
         root.querySelectorAll('.today-task-form').forEach((form) => {
             if (form.dataset.todayTasksBound === 'true') return;
@@ -662,6 +738,7 @@
         initSingleSowEventForm();
         initBulkEventForm();
         initMortalityForm();
+        initVaccinationPlanForm();
         initTodayTaskForms();
         initTodayTaskDialogs();
         initSaleFormset();

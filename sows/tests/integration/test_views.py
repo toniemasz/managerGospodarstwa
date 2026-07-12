@@ -60,43 +60,85 @@ class TestSowViews:
 
     def test_add_vaccination_plan_view_get_and_post(self, setup_client):
         get_response = setup_client.get(reverse('add_vaccination_plan'))
-        assert get_response.status_code == 200
+        content = get_response.content.decode()
 
-        post_response = setup_client.post(reverse('add_vaccination_plan'), {
-            'name': 'Parwowiroza',
-            'days_before_farrowing': '21',
-            'reminder_days_ahead': '7',
-        })
+        assert get_response.status_code == 200
+        assert 'id="vaccination-plan-form"' in content
+        assert 'id="id_trigger_type"' in content
+        assert 'id="vaccination-before-farrowing-section"' in content
+        assert 'id="vaccination-after-event-section"' in content
+        assert 'id="vaccination-interval-section"' in content
+        assert 'id="vaccination-selected-sows-section"' in content
+
+        post_response = setup_client.post(
+            reverse('add_vaccination_plan'),
+            {
+                'name': 'Parwowiroza',
+                'trigger_type': 'BEFORE_FARROWING',
+                'days_before_farrowing': '21',
+                'reminder_days_ahead': '7',
+                'scope': 'ALL',
+            },
+        )
 
         assert post_response.status_code == 302
-        assert VaccinationPlanModel.objects.filter(name='Parwowiroza', farm=setup_client.farm).exists()
+
+        plan = VaccinationPlanModel.objects.get(
+            name='Parwowiroza',
+            farm=setup_client.farm,
+        )
+
+        assert plan.days_before_farrowing == 21
+        assert plan.days_after_event is None
+        assert plan.event_source is None
+        assert plan.interval_value is None
+        assert plan.interval_unit is None
+        assert plan.schedule_mode is None
+        assert plan.first_due_date is None
+        assert plan.scope == VaccinationPlanModel.SCOPE_ALL
 
     def test_edit_plan_can_reinclude_excluded_sow(self, setup_client):
-        sow = SowModel.objects.create(farm=setup_client.farm, ear_tag='REINCLUDE')
+        sow = SowModel.objects.create(
+            farm=setup_client.farm,
+            ear_tag='REINCLUDE',
+        )
         plan = VaccinationPlanModel.objects.create(
             farm=setup_client.farm,
             name='Różyca',
             interval_value=1,
             interval_unit='YEARS',
+            interval_months=None,
             schedule_mode='FIXED',
             first_due_date=date(2026, 7, 1),
             scope='ALL',
+            reminder_days_ahead=7,
         )
         plan.excluded_sows.add(sow)
 
-        response = setup_client.post(reverse('edit_vaccination_plan', args=[plan.id]), {
-            'name': plan.name,
-            'interval_value': 1,
-            'interval_unit': 'YEARS',
-            'schedule_mode': 'FIXED',
-            'first_due_date': '2026-07-01',
-            'scope': 'ALL',
-            'reminder_days_ahead': 7,
-            'reinclude_sows': [sow.id],
-        })
+        response = setup_client.post(
+            reverse('edit_vaccination_plan', args=[plan.id]),
+            {
+                'name': plan.name,
+                'trigger_type': 'INTERVAL',
+                'interval_value': '1',
+                'interval_unit': 'YEARS',
+                'schedule_mode': 'FIXED',
+                'first_due_date': '2026-07-01',
+                'scope': 'ALL',
+                'reminder_days_ahead': '7',
+                'reinclude_sows': [str(sow.id)],
+            },
+        )
 
         assert response.status_code == 302
+
+        plan.refresh_from_db()
+
         assert not plan.excluded_sows.filter(id=sow.id).exists()
+        assert plan.interval_value == 1
+        assert plan.interval_unit == VaccinationPlanModel.INTERVAL_YEARS
+        assert plan.schedule_mode == VaccinationPlanModel.SCHEDULE_FIXED
+        assert plan.first_due_date == date(2026, 7, 1)
 
     def test_delete_plan_is_soft_and_farm_scoped(self, setup_client):
         plan = VaccinationPlanModel.objects.create(
@@ -119,6 +161,46 @@ class TestSowViews:
         assert response.status_code == 302
         plan.refresh_from_db()
         assert plan.is_active is False
+
+    def test_edit_vaccination_plan_changes_trigger_and_clears_old_schedule(
+            self,
+            setup_client,
+    ):
+        plan = VaccinationPlanModel.objects.create(
+            farm=setup_client.farm,
+            name='Różyca cykliczna',
+            interval_months=4,
+            interval_value=4,
+            interval_unit=VaccinationPlanModel.INTERVAL_MONTHS,
+            schedule_mode=VaccinationPlanModel.SCHEDULE_FIXED,
+            first_due_date=date(2026, 7, 12),
+            reminder_days_ahead=7,
+            scope=VaccinationPlanModel.SCOPE_ALL,
+        )
+
+        response = setup_client.post(
+            reverse('edit_vaccination_plan', args=[plan.id]),
+            {
+                'name': plan.name,
+                'trigger_type': 'BEFORE_FARROWING',
+                'days_before_farrowing': '21',
+                'reminder_days_ahead': '7',
+                'scope': 'ALL',
+            },
+        )
+
+        assert response.status_code == 302
+
+        plan.refresh_from_db()
+
+        assert plan.days_before_farrowing == 21
+        assert plan.days_after_event is None
+        assert plan.event_source is None
+        assert plan.interval_value is None
+        assert plan.interval_unit is None
+        assert plan.interval_months is None
+        assert plan.schedule_mode is None
+        assert plan.first_due_date is None
 
     def test_add_edit_and_delete_event_views(self, setup_client):
         sow = SowModel.objects.create(ear_tag="FLOW-1", farm=setup_client.farm)

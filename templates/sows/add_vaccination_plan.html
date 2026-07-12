@@ -1,133 +1,291 @@
 {% extends 'base.html' %}
-{% block title %}{% if is_edit %}Edycja Szczepienia{% else %}Konfiguracja Szczepienia{% endif %}{% endblock %}
+
+{% block title %}
+    {% if is_edit %}
+        Edycja szczepienia
+    {% else %}
+        Konfiguracja szczepienia
+    {% endif %}
+{% endblock %}
 
 {% block content %}
 <main class="app-page app-page-narrow">
     <section class="page-header">
         <div>
             <p class="eyebrow">Maciory</p>
-            <h1>{% if is_edit %}Edytuj regułę szczepienia{% else %}Reguła szczepienia{% endif %}</h1>
-            <p class="page-subtitle">Ustaw jawny pierwszy termin, interwał i zakres macior objętych planem.</p>
+            <h1>
+                {% if is_edit %}
+                    Edytuj regułę szczepienia
+                {% else %}
+                    Dodaj regułę szczepienia
+                {% endif %}
+            </h1>
+            <p class="page-subtitle">
+                Wybierz sposób wyznaczania terminu, przypomnienie i maciory objęte planem.
+            </p>
         </div>
-        <a href="{% url 'vaccination_plans' %}" class="button button-secondary">Wróć</a>
+
+        <a href="{% url 'vaccination_plans' %}"
+           class="button button-secondary">
+            Wróć
+        </a>
     </section>
 
     <section class="panel">
         {% if form.non_field_errors %}
-        <div class="alert alert-error">{{ form.non_field_errors }}</div>
+            <div class="alert alert-error" role="alert">
+                {{ form.non_field_errors }}
+            </div>
         {% endif %}
 
-        <form method="post" class="responsive-form">
+        <form
+            method="post"
+            class="responsive-form"
+            id="vaccination-plan-form"
+        >
             {% csrf_token %}
+
             <div class="form-field">
-                <label for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
+                <label for="{{ form.name.id_for_label }}">
+                    {{ form.name.label }}
+                </label>
+
                 {{ form.name }}
                 {{ form.name.errors }}
             </div>
 
-            <div class="form-grid three-columns">
+            <div class="form-field">
+                <label for="{{ form.trigger_type.id_for_label }}">
+                    {{ form.trigger_type.label }}
+                </label>
+
+                {{ form.trigger_type }}
+                {{ form.trigger_type.errors }}
+
+                <p class="field-hint">
+                    Po wyborze pokażą się tylko pola wymagane dla wybranego sposobu
+                    wyznaczania terminu.
+                </p>
+            </div>
+
+            <div id="vaccination-before-farrowing-section">
+                <div class="form-section-heading">
+                    <h2>Szczepienie przed oproszeniem</h2>
+                    <p>
+                        Termin zostanie obliczony osobno dla każdej maciory
+                        na podstawie przewidywanego terminu oproszenia.
+                    </p>
+                </div>
+
                 <div class="form-field">
-                    <label for="{{ form.days_before_farrowing.id_for_label }}">{{ form.days_before_farrowing.label }}</label>
+                    <label for="{{ form.days_before_farrowing.id_for_label }}">
+                        {{ form.days_before_farrowing.label }}
+                    </label>
+
                     {{ form.days_before_farrowing }}
                     {{ form.days_before_farrowing.errors }}
-                    <p class="field-hint">Np. 21 dni przed oproszeniem.</p>
+
+                    <p class="field-hint">
+                        Na przykład wartość 21 oznacza szczepienie 21 dni przed oproszeniem.
+                    </p>
                 </div>
-                <div class="form-field">
-                    <label for="{{ form.days_after_event.id_for_label }}">{{ form.days_after_event.label }}</label>
-                    {{ form.days_after_event }}
-                    {{ form.days_after_event.errors }}
+            </div>
+
+            <div id="vaccination-after-event-section">
+                <div class="form-section-heading">
+                    <h2>Szczepienie po zdarzeniu</h2>
+                    <p>
+                        Termin zostanie obliczony od zdarzenia zapisanego
+                        w historii konkretnej maciory.
+                    </p>
                 </div>
+
+                <div class="form-grid two-columns">
+                    <div class="form-field">
+                        <label for="{{ form.event_source.id_for_label }}">
+                            {{ form.event_source.label }}
+                        </label>
+
+                        {{ form.event_source }}
+                        {{ form.event_source.errors }}
+                    </div>
+
+                    <div class="form-field">
+                        <label for="{{ form.days_after_event.id_for_label }}">
+                            {{ form.days_after_event.label }}
+                        </label>
+
+                        {{ form.days_after_event }}
+                        {{ form.days_after_event.errors }}
+
+                        <p class="field-hint">
+                            Podaj liczbę dni, które mają upłynąć od wybranego zdarzenia.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="vaccination-interval-section">
+                <div class="form-section-heading">
+                    <h2>Harmonogram okresowy</h2>
+                    <p>
+                        Dni i tygodnie są liczone jako stały odstęp,
+                        a miesiące i lata kalendarzowo.
+                    </p>
+                </div>
+
+                <div class="form-grid three-columns">
+                    <div class="form-field">
+                        <label for="{{ form.interval_value.id_for_label }}">
+                            {{ form.interval_value.label }}
+                        </label>
+
+                        {{ form.interval_value }}
+                        {{ form.interval_value.errors }}
+                    </div>
+
+                    <div class="form-field">
+                        <label for="{{ form.interval_unit.id_for_label }}">
+                            {{ form.interval_unit.label }}
+                        </label>
+
+                        {{ form.interval_unit }}
+                        {{ form.interval_unit.errors }}
+                    </div>
+
+                    <div class="form-field">
+                        <label for="{{ form.first_due_date.id_for_label }}">
+                            {{ form.first_due_date.label }}
+                        </label>
+
+                        {{ form.first_due_date }}
+                        {{ form.first_due_date.errors }}
+                    </div>
+                </div>
+
                 <div class="form-field">
-                    <label for="{{ form.event_source.id_for_label }}">{{ form.event_source.label }}</label>
-                    {{ form.event_source }}
-                    {{ form.event_source.errors }}
+                    <label for="{{ form.schedule_mode.id_for_label }}">
+                        {{ form.schedule_mode.label }}
+                    </label>
+
+                    {{ form.schedule_mode }}
+                    {{ form.schedule_mode.errors }}
+
+                    <p class="field-hint">
+                        Stały harmonogram zachowuje pierwotne terminy.
+                        Harmonogram od ostatniego wykonania wyznacza kolejny termin
+                        od daty rzeczywistego szczepienia.
+                    </p>
                 </div>
             </div>
 
             <div class="form-section-heading">
-                <h2>Harmonogram okresowy</h2>
-                <p>Dni i tygodnie są liczone jako stały odstęp, a miesiące i lata kalendarzowo.</p>
-            </div>
-            <div class="form-grid three-columns">
-                <div class="form-field">
-                    <label for="{{ form.interval_value.id_for_label }}">{{ form.interval_value.label }}</label>
-                    {{ form.interval_value }}
-                    {{ form.interval_value.errors }}
-                </div>
-                <div class="form-field">
-                    <label for="{{ form.interval_unit.id_for_label }}">{{ form.interval_unit.label }}</label>
-                    {{ form.interval_unit }}
-                    {{ form.interval_unit.errors }}
-                </div>
-                <div class="form-field">
-                    <label for="{{ form.first_due_date.id_for_label }}">{{ form.first_due_date.label }}</label>
-                    {{ form.first_due_date }}
-                    {{ form.first_due_date.errors }}
-                </div>
+                <h2>Przypomnienie i zakres planu</h2>
+                <p>
+                    Określ, kiedy pokazać przypomnienie oraz które maciory
+                    mają zostać objęte regułą.
+                </p>
             </div>
 
             <div class="form-grid two-columns">
                 <div class="form-field">
-                    <label for="{{ form.schedule_mode.id_for_label }}">{{ form.schedule_mode.label }}</label>
-                    {{ form.schedule_mode }}
-                    {{ form.schedule_mode.errors }}
-                    <p class="field-hint">Stały harmonogram nie przesuwa się po spóźnionym wykonaniu.</p>
-                </div>
-                <div class="form-field">
-                    <label for="{{ form.reminder_days_ahead.id_for_label }}">{{ form.reminder_days_ahead.label }}</label>
+                    <label for="{{ form.reminder_days_ahead.id_for_label }}">
+                        {{ form.reminder_days_ahead.label }}
+                    </label>
+
                     {{ form.reminder_days_ahead }}
                     {{ form.reminder_days_ahead.errors }}
+
+                    <p class="field-hint">
+                        Liczba dni przed planowanym terminem szczepienia.
+                    </p>
+                </div>
+
+                <div class="form-field">
+                    <label for="{{ form.scope.id_for_label }}">
+                        {{ form.scope.label }}
+                    </label>
+
+                    {{ form.scope }}
+                    {{ form.scope.errors }}
+
+                    <p class="field-hint">
+                        Plan dla wszystkich aktywnych macior obejmie również
+                        maciory dodane w przyszłości.
+                    </p>
                 </div>
             </div>
 
-            <div class="form-section-heading">
-                <h2>Zakres planu</h2>
-                <p>Plan dla wszystkich automatycznie obejmie także maciory dodane później.</p>
+            <div id="vaccination-selected-sows-section">
+                <fieldset class="form-field">
+                    <legend>{{ form.selected_sows.label }}</legend>
+
+                    {{ form.selected_sows }}
+                    {{ form.selected_sows.errors }}
+
+                    <p class="field-hint">
+                        Zaznacz co najmniej jedną maciorę objętą tym planem.
+                    </p>
+                </fieldset>
             </div>
-            <div class="form-field">
-                <label for="{{ form.scope.id_for_label }}">{{ form.scope.label }}</label>
-                {{ form.scope }}
-                {{ form.scope.errors }}
-            </div>
-            <fieldset class="form-field">
-                <legend>{{ form.selected_sows.label }}</legend>
-                {{ form.selected_sows }}
-                {{ form.selected_sows.errors }}
-                <p class="field-hint">Wymagane tylko dla zakresu „Wybrane aktywne maciory”.</p>
-            </fieldset>
+
             {% if form.reinclude_sows.field.queryset %}
-            <fieldset class="form-field">
-                <legend>{{ form.reinclude_sows.label }}</legend>
-                {{ form.reinclude_sows }}
-                {{ form.reinclude_sows.errors }}
-                <p class="field-hint">{{ form.reinclude_sows.help_text }}</p>
-            </fieldset>
+                <fieldset class="form-field">
+                    <legend>{{ form.reinclude_sows.label }}</legend>
+
+                    {{ form.reinclude_sows }}
+                    {{ form.reinclude_sows.errors }}
+
+                    <p class="field-hint">
+                        {{ form.reinclude_sows.help_text }}
+                    </p>
+                </fieldset>
             {% endif %}
 
             <div class="form-actions">
-                <a href="{% url 'vaccination_plans' %}" class="button button-secondary">Anuluj</a>
+                <a href="{% url 'vaccination_plans' %}"
+                   class="button button-secondary">
+                    Anuluj
+                </a>
+
                 <button type="submit" class="button button-primary">
-                    {% if is_edit %}Zapisz zmiany{% else %}Zapisz regułę{% endif %}
+                    {% if is_edit %}
+                        Zapisz zmiany
+                    {% else %}
+                        Zapisz regułę
+                    {% endif %}
                 </button>
             </div>
         </form>
     </section>
 
     {% if is_edit %}
-    <section class="panel compact-panel">
-        <div class="section-heading">
-            <div>
-                <h2>Usuwanie planu</h2>
-                <p>Plan zostanie wyłączony, ale wykonane i pominięte cykle oraz historia medyczna pozostaną.</p>
+        <section class="panel compact-panel">
+            <div class="section-heading">
+                <div>
+                    <h2>Usuwanie planu</h2>
+                    <p>
+                        Plan zostanie wyłączony, ale wykonane i pominięte cykle
+                        oraz historia szczepień pozostaną bez zmian.
+                    </p>
+                </div>
             </div>
-        </div>
-        <form method="post" action="{% url 'delete_vaccination_plan' plan.id %}" class="responsive-form" data-confirm="Usunąć plan {{ plan.name|escapejs }}? Przyszłe przypomnienia zostaną zatrzymane, ale historia szczepień i pominięć pozostanie.">
-            {% csrf_token %}
-            <div class="form-actions">
-                <button type="submit" class="button button-danger">Usuń plan szczepienia</button>
-            </div>
-        </form>
-    </section>
+
+            <form
+                method="post"
+                action="{% url 'delete_vaccination_plan' plan.id %}"
+                class="responsive-form"
+                data-confirm="Usunąć plan {{ plan.name|escapejs }}? Przyszłe przypomnienia zostaną zatrzymane, ale historia szczepień i pominięć pozostanie."
+            >
+                {% csrf_token %}
+
+                <div class="form-actions">
+                    <button type="submit" class="button button-danger">
+                        Usuń plan szczepienia
+                    </button>
+                </div>
+            </form>
+        </section>
     {% endif %}
 </main>
 {% endblock %}

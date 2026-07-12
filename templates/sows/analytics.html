@@ -11,9 +11,8 @@
             <h1>Statystyki stada</h1>
             <p class="page-subtitle">Trend i ranking macior w wybranym zakresie dat.</p>
         </div>
-        <a href="{% url 'dashboard' %}" class="button button-secondary">Wróć</a>
     </section>
-
+    {% include 'sows/_sow_nav.html' %}
     {% url 'general_statistics' as statistics_filter_url %}
     {% include 'components/filter_panel.html' with filter_action=statistics_filter_url filter_clear_url=statistics_filter_url filter_fields_template='sows/_analytics_filters.html' %}
 

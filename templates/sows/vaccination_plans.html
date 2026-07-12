@@ -10,10 +10,11 @@
             <p class="page-subtitle">Konfiguracja przypomnień szczepień dla bieżącego gospodarstwa.</p>
         </div>
         <div class="header-actions">
-            <a href="{% url 'dashboard' %}" class="button button-secondary">Wróć</a>
             <a href="{% url 'add_vaccination_plan' %}" class="button button-primary">Dodaj regułę</a>
         </div>
     </section>
+
+    {% include 'sows/_sow_nav.html' %}
 
     <section class="panel table-panel">
         <div class="section-heading">
