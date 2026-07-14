@@ -1,12 +1,12 @@
 /* Legacy entrypoint. Prefer loading split files from templates/base.html.
    Kept so older deployments that still reference app.css continue to work. */
-@import url("variables.css");
-@import url("base.css");
-@import url("navigation.css");
-@import url("buttons.css");
-@import url("cards.css");
-@import url("messages.css");
-@import url("tables.css");
-@import url("forms.css");
-@import url("pages.css");
-@import url("responsive.css");
+@import url("base/variables.css");
+@import url("base/base.css");
+@import url("base/navigation.css");
+@import url("components/buttons.css");
+@import url("components/cards.css");
+@import url("components/messages.css");
+@import url("components/tables.css");
+@import url("components/forms.css");
+@import url("pages/app-pages.css");
+@import url("pages/responsive.css");
