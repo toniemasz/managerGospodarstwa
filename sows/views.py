@@ -10,6 +10,7 @@ from django.contrib import messages
 from django.core.exceptions import ValidationError
 
 from .services.sow_dashboard_service import SowDashboardService
+from .services.reporting import SowReportingService
 from .services.sow_repository import SowRepository, VaccinationPlanRepository
 from .services.bulk_event_service import BulkSowEventService
 from .services.sow_event_service import FARROWING_DECISION_CANCEL
@@ -610,8 +611,8 @@ def general_statistics_view(request):
         months_by_period = {'3m': 3, '6m': 6, '12m': 12, 'all': 0}
         months = months_by_period.get(date_range.period, 6)
 
-        service = SowDashboardService(farm=get_current_farm(request))
-        context = service.get_general_statistics(
+        service = SowReportingService(farm=get_current_farm(request))
+        context = service.metric_ranking(
             metric_key=metric_key,
             months_limit=months,
             order=order,

@@ -73,6 +73,12 @@ class CostReportingService:
             "additional": CostService.summarize(manual_costs),
             "monthly": self._monthly(costs),
             "additional_monthly": self._monthly(manual_costs),
+            "suppliers": list(
+                costs.exclude(supplier="")
+                .values("supplier")
+                .annotate(total=Sum("amount"), count=Count("id"))
+                .order_by("-total", "supplier")
+            ),
         })
         return result
 

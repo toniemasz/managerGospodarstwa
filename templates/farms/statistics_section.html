@@ -35,6 +35,31 @@
         <div class="section-heading"><div><h2>Receptury</h2><p>Produkcja i rzeczywisty koszt FIFO.</p></div></div>
         {% if section_rows %}<div class="table-scroll"><table class="data-table mobile-card-table"><thead><tr><th>Receptura</th><th class="text-right">Ilość</th><th class="text-right">Koszt/t</th></tr></thead><tbody>{% for row in section_rows %}<tr><td data-label="Receptura">{{ row.recipe_name }}</td><td data-label="Ilość" class="text-right">{{ row.quantity_kg|smart_unit:'kg' }}</td><td data-label="Koszt/t" class="text-right">{{ row.cost_per_ton|smart_unit:'zł/t' }}</td></tr>{% endfor %}</tbody></table></div>{% else %}{% include 'components/empty_state.html' with empty_message='Brak zakończonych śrutowań.' %}{% endif %}
     </section>
+    {% elif row_kind == 'sales' %}
+    <section class="panel table-panel">
+        <div class="section-heading"><div><h2>Sprzedaż miesięczna</h2><p>Wartości dokumentów w wybranym okresie.</p></div></div>
+        {% if section_rows %}<div class="table-scroll"><table class="data-table mobile-card-table"><thead><tr><th>Miesiąc</th><th class="text-right">Netto</th><th class="text-right">Brutto</th></tr></thead><tbody>{% for row in section_rows %}<tr><td data-label="Miesiąc">{{ row.month }}</td><td data-label="Netto" class="text-right">{{ row.sales_net|smart_unit:'zł' }}</td><td data-label="Brutto" class="text-right">{{ row.sales_gross|smart_unit:'zł' }}</td></tr>{% endfor %}</tbody></table></div>{% else %}{% include 'components/empty_state.html' with empty_message='Brak sprzedaży w wybranym okresie.' %}{% endif %}
+    </section>
+    {% elif row_kind == 'sows' %}
+    <section class="panel table-panel">
+        <div class="section-heading"><div><h2>Zdarzenia miesięczne</h2><p>Produkcja stada zagregowana według miesięcy.</p></div></div>
+        {% if section_rows %}<div class="table-scroll"><table class="data-table mobile-card-table"><thead><tr><th>Miesiąc</th><th class="text-right">Inseminacje</th><th class="text-right">Oproszenia</th><th class="text-right">Żywe</th><th class="text-right">Martwe</th><th class="text-right">Odsadzone</th><th class="text-right">Poronienia</th></tr></thead><tbody>{% for row in section_rows %}<tr><td data-label="Miesiąc">{{ row.month }}</td><td data-label="Inseminacje" class="text-right">{{ row.inseminations|default:0 }}</td><td data-label="Oproszenia" class="text-right">{{ row.farrowings|default:0 }}</td><td data-label="Żywe" class="text-right">{{ row.born_alive|default:0 }}</td><td data-label="Martwe" class="text-right">{{ row.born_dead|default:0 }}</td><td data-label="Odsadzone" class="text-right">{{ row.weaned|default:0 }}</td><td data-label="Poronienia" class="text-right">{{ row.miscarriages|default:0 }}</td></tr>{% endfor %}</tbody></table></div>{% else %}{% include 'components/empty_state.html' with empty_message='Brak zdarzeń rozrodczych w wybranym okresie.' %}{% endif %}
+    </section>
+    {% elif row_kind == 'mortality' %}
+    <section class="panel table-panel">
+        <div class="section-heading"><div><h2>Przyczyny upadków ręcznych</h2><p>Zestawienie zgłoszeń w wybranym okresie.</p></div></div>
+        {% if section_rows %}<div class="table-scroll"><table class="data-table mobile-card-table"><thead><tr><th>Przyczyna</th><th class="text-right">Zgłoszenia</th><th class="text-right">Sztuki</th></tr></thead><tbody>{% for row in section_rows %}<tr><td data-label="Przyczyna">{{ row.reason|default:'Nie podano' }}</td><td data-label="Zgłoszenia" class="text-right">{{ row.report_count }}</td><td data-label="Sztuki" class="text-right">{{ row.quantity }}</td></tr>{% endfor %}</tbody></table></div>{% else %}{% include 'components/empty_state.html' with empty_message='Brak ręcznych zgłoszeń upadków w wybranym okresie.' %}{% endif %}
+    </section>
+    {% elif row_kind == 'inventory' %}
+    <section class="panel table-panel">
+        <div class="section-heading"><div><h2>Stan składników</h2><p>Aktualny snapshot magazynu.</p></div></div>
+        {% if section_rows %}<div class="table-scroll"><table class="data-table mobile-card-table"><thead><tr><th>Składnik</th><th>Magazyn</th><th class="text-right">Dostarczono</th><th class="text-right">Zużyto</th><th class="text-right">Stan</th></tr></thead><tbody>{% for row in section_rows %}<tr><td data-label="Składnik">{{ row.name }}</td><td data-label="Magazyn">{% if row.is_in_bin %}Silos{% else %}Workowane / pozostałe{% endif %}</td><td data-label="Dostarczono" class="text-right">{{ row.total_delivered|smart_unit:'kg' }}</td><td data-label="Zużyto" class="text-right">{{ row.total_used|smart_unit:'kg' }}</td><td data-label="Stan" class="text-right">{{ row.current_stock|smart_unit:'kg' }}</td></tr>{% endfor %}</tbody></table></div>{% else %}{% include 'components/empty_state.html' with empty_message='Brak składników magazynowych.' %}{% endif %}
+    </section>
+    {% elif row_kind == 'costs' %}
+    <section class="panel table-panel">
+        <div class="section-heading"><div><h2>Koszty według kategorii</h2><p>Kwoty i liczba wpisów w wybranym okresie.</p></div></div>
+        {% if section_rows %}<div class="table-scroll"><table class="data-table mobile-card-table"><thead><tr><th>Kategoria</th><th class="text-right">Wpisy</th><th class="text-right">Kwota</th></tr></thead><tbody>{% for row in section_rows %}<tr><td data-label="Kategoria">{{ row.category__name|default:'Bez kategorii' }}</td><td data-label="Wpisy" class="text-right">{{ row.count }}</td><td data-label="Kwota" class="text-right">{{ row.total|smart_unit:'zł' }}</td></tr>{% endfor %}</tbody></table></div>{% else %}{% include 'components/empty_state.html' with empty_message='Brak kosztów w wybranym okresie.' %}{% endif %}
+    </section>
     {% endif %}
 </main>
 {% endblock %}

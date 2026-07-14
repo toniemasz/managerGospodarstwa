@@ -18,7 +18,7 @@ class ProfitabilityAnalyticsService:
         )
 
     def _calculate(self, *, date_from=None, date_to=None) -> dict:
-        stats = FarmStatisticsService(self.farm).calculate(date_from=date_from, date_to=date_to)
+        stats = FarmStatisticsService(self.farm).profitability_context(date_from=date_from, date_to=date_to)
         sales = stats["sales"]
         feed = stats["feed"]
         additional_costs = stats["additional_costs"]

@@ -59,6 +59,13 @@ class SowRepository:
         db_sows = SowModel.objects.prefetch_related('events').filter(**filters).order_by('ear_tag')
         return [self._map_to_sow(db_sow) for db_sow in db_sows]
 
+    def get_sows_for_statistics(self) -> list[Sow]:
+        """Zwraca aktywne i historyczne maciory dla raportów okresowych."""
+        db_sows = SowModel.objects.prefetch_related("events").filter(
+            farm=self.farm,
+        ).order_by("ear_tag")
+        return [self._map_to_sow(db_sow) for db_sow in db_sows]
+
     def get_sow_by_id(self, sow_id: int) -> Sow:
         filters = self._filter_for_farm(id=sow_id)
         db_sow = get_object_or_404(SowModel.objects.prefetch_related('events'), **filters)

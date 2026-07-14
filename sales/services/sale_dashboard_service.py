@@ -1,55 +1,43 @@
-from typing import Dict, Any
-from decimal import Decimal
-from sales.services.sale_repository import SaleRepository
+from farms.calculators.statistics import FeedEfficiencyCalculator
 from feed.services.reporting import FeedReportingService
+from sales.services.reporting import SalesReportingService
+from sales.services.sale_repository import SaleRepository
 
 
 class SaleDashboardService:
-    def __init__(self, farm=None, repository: SaleRepository = None):
-        if farm is None and repository is None:
-            raise ValueError("Dashboard sprzedaży wymaga jawnego gospodarstwa.")
+    """Przygotowuje listę sprzedaży, korzystając ze wspólnego raportu domenowego."""
+
+    def __init__(self, farm=None, repository=None, reporting_service=None, feed_reporting_service=None):
+        if farm is None and (repository is None or reporting_service is None):
+            raise ValueError("Dashboard sprzedaży wymaga gospodarstwa albo jawnych zależności testowych.")
         self.farm = farm
         self.repository = repository or SaleRepository(farm=farm)
+        self.reporting = reporting_service or SalesReportingService(farm)
+        self.feed_reporting = feed_reporting_service or FeedReportingService(farm)
 
-    def get_dashboard_summary(self, date_from=None, date_to=None) -> Dict[str, Any]:
+    def get_dashboard_summary(self, date_from=None, date_to=None) -> dict:
         if date_from is not None or date_to is not None:
             sales = self.repository.get_sales_between(date_from=date_from, date_to=date_to)
         else:
             sales = self.repository.get_all_sales()
 
-        total_pigs = sum(sale.quantity for sale in sales)
-        total_weight = sum(sale.total_weight for sale in sales)
-        total_live_weight = sum((sale.live_weight or Decimal('0.00')) for sale in sales)
-        total_net_revenue = sum(sale.net_price for sale in sales)
-        total_vat = sum(sale.vat_value for sale in sales)
-        total_gross_revenue = sum(sale.gross_value for sale in sales)
-        meatiness_values = [sale.avg_meatiness_seurop for sale in sales if sale.avg_meatiness_seurop is not None]
-
-        avg_price_per_kg = (total_net_revenue / total_weight) if total_weight > 0 else Decimal('0.00')
-        avg_weight_per_pig = (total_weight / total_pigs) if total_pigs > 0 else Decimal('0.00')
-        avg_meatiness = sum(meatiness_values) / len(meatiness_values) if meatiness_values else None
-
-        feed_kg = Decimal('0.00')
-        if self.farm is not None:
-            feed_kg = FeedReportingService(self.farm).summary(
-                date_from=date_from,
-                date_to=date_to,
-            )['quantity_kg']
-
+        report = self.reporting.summary(date_from=date_from, date_to=date_to)
+        feed = self.feed_reporting.summary(date_from=date_from, date_to=date_to)
+        efficiency = FeedEfficiencyCalculator.calculate(sales=report, feed=feed)
         return {
-            'sales': sales,
-            'stats': {
-                'sale_count': len(sales),
-                'total_pigs': total_pigs,
-                'total_weight': total_weight,
-                'total_live_weight': total_live_weight,
-                'total_net_revenue': total_net_revenue,
-                'total_vat': total_vat,
-                'total_gross_revenue': total_gross_revenue,
-                'avg_price_per_kg': round(avg_price_per_kg, 2),
-                'avg_weight_per_pig': round(avg_weight_per_pig, 2),
-                'avg_meatiness': round(avg_meatiness, 2) if avg_meatiness is not None else None,
-                'completed_feed_kg': feed_kg,
-                'feed_to_live_weight_ratio': feed_kg / total_live_weight if total_live_weight else None,
-            }
+            "sales": sales,
+            "stats": {
+                "sale_count": report["sale_count"],
+                "total_pigs": report["sold_quantity"],
+                "total_weight": report["slaughter_weight_kg"],
+                "total_live_weight": report["live_weight_kg"],
+                "total_net_revenue": report["net_sales"],
+                "total_vat": report["vat_sales"],
+                "total_gross_revenue": report["gross_sales"],
+                "avg_price_per_kg": report["average_price_per_kg"],
+                "avg_weight_per_pig": report["average_slaughter_weight_per_pig"],
+                "avg_meatiness": report["average_meatiness"],
+                "completed_feed_kg": feed["quantity_kg"],
+                "feed_to_live_weight_ratio": efficiency["feed_to_live_weight_ratio"],
+            },
         }
