@@ -155,7 +155,11 @@ class SowReportingService:
         if metric_key not in METRICS_REGISTRY:
             metric_key = next(iter(METRICS_REGISTRY))
         metric: MetricDescriptor = METRICS_REGISTRY[metric_key]
-        getter = getattr(self.repository, "get_sows_for_statistics", self.repository.get_all_sows)
+        getter = (
+            self.repository.get_sows_for_statistics
+            if self.farm is not None
+            else self.repository.get_all_sows
+        )
         sows = getter()
         cutoff_date, end_date = self._resolve_period(
             months_limit=months_limit,
