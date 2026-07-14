@@ -55,7 +55,7 @@ class TestSowDashboardService:
         assert len(result) == 1
         assert result[0] == mock_sow
 
-    def test_get_general_statistics_uses_metric_and_ordering(self):
+    def test_reporting_metric_ranking_uses_metric_and_ordering(self):
         sow1 = Sow(id=1, ear_tag="A", entry_date=date(2023, 1, 1), created_at=date(2023, 1, 1))
         sow1.status = "IDLE"
         sow1.load_history([

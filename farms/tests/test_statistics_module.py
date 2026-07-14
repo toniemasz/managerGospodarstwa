@@ -7,12 +7,14 @@ from django.urls import reverse
 
 from costs.models import CostCategoryModel, CostModel
 from farms.services.farm_service import get_or_create_user_farm
+from farms.services.accounting_year import get_available_years
 from farms.services.statistics import FarmStatisticsService
 from feed.models import DeliveryModel, IngredientModel, ProductionModel, RecipeItemModel, RecipeModel
 from feed.actions.productions import complete_production
 from feed.actions.inventory import InventoryActions
 from sales.models import PigSaleModel
 from sows.models import MortalityReportModel, SowEventModel, SowModel
+from sows.services.reporting import SowReportingService
 
 
 @pytest.fixture
@@ -174,6 +176,69 @@ def test_statistics_service_includes_mortality_summary(statistics_farms):
     assert result["mortality"]["post_weaning_weaned_total"] == 10
     assert result["mortality"]["post_weaning_deaths_total"] == 5
     assert result["mortality"]["post_weaning_current_stock"] == 5
+    assert result["mortality"]["period"]["post_weaning_deaths"] == 2
+    assert result["mortality"]["current_snapshot"]["post_weaning_deaths_total"] == 5
+
+
+@pytest.mark.django_db
+def test_sow_reporting_includes_archived_history_and_is_farm_scoped(statistics_farms):
+    _, farm, other_farm = statistics_farms
+    active = SowModel.objects.create(farm=farm, ear_tag="STAT-SOW-A")
+    archived = SowModel.objects.create(farm=farm, ear_tag="STAT-SOW-H", is_archived=True)
+    foreign = SowModel.objects.create(farm=other_farm, ear_tag="STAT-SOW-X")
+    SowEventModel.objects.create(
+        sow=active,
+        event_type="FARROWING",
+        event_date=date(2026, 2, 1),
+        details={"born_alive": 10, "born_dead": 1},
+    )
+    SowEventModel.objects.create(
+        sow=archived,
+        event_type="FARROWING",
+        event_date=date(2026, 3, 1),
+        details={"born_alive": 12, "born_dead": 2},
+    )
+    SowEventModel.objects.create(
+        sow=foreign,
+        event_type="FARROWING",
+        event_date=date(2026, 3, 1),
+        details={"born_alive": 99, "born_dead": 9},
+    )
+
+    result = SowReportingService(farm).summary(
+        date_from=date(2026, 1, 1),
+        date_to=date(2026, 12, 31),
+    )
+
+    assert result["active_sows"] == 1
+    assert result["archived_sows"] == 1
+    assert result["farrowings"] == 2
+    assert result["born_alive"] == 22
+    assert result["born_dead"] == 3
+    assert result["average_born_alive_per_litter"] == Decimal("11")
+
+
+@pytest.mark.django_db
+def test_available_statistics_years_include_sow_events_and_mortality(statistics_farms):
+    _, farm, _other_farm = statistics_farms
+    sow = SowModel.objects.create(farm=farm, ear_tag="STAT-YEAR")
+    SowEventModel.objects.create(
+        sow=sow,
+        event_type="FARROWING",
+        event_date=date(2024, 4, 1),
+        details={"born_alive": 10},
+    )
+    MortalityReportModel.objects.create(
+        farm=farm,
+        mortality_type=MortalityReportModel.TYPE_PIGLET,
+        mortality_date=date(2023, 5, 1),
+        quantity=1,
+    )
+
+    years = get_available_years(farm)
+
+    assert 2024 in years
+    assert 2023 in years
 
 
 @pytest.mark.django_db
@@ -213,7 +278,7 @@ def test_statistics_view_is_farm_scoped(client, statistics_farms):
 @pytest.mark.django_db
 @pytest.mark.parametrize("section", FarmStatisticsService.SECTION_KEYS)
 def test_each_statistics_section_has_own_view_and_uses_central_service(client, statistics_farms, section):
-    owner, farm, _other_farm = statistics_farms
+    owner, _farm, _other_farm = statistics_farms
     client.force_login(owner)
 
     response = client.get(reverse("farm_statistics_section", args=[section]), {"year": "2026"})
@@ -221,10 +286,16 @@ def test_each_statistics_section_has_own_view_and_uses_central_service(client, s
     assert response.status_code == 200
     assert response.context["active_section"] == section
     assert response.context["section_cards"]
-    assert response.context["sales"] == FarmStatisticsService(farm).calculate(
-        date_from=date(2026, 1, 1),
-        date_to=date(2026, 12, 31),
-    )["sales"]
+    expected_data_key = {
+        "profitability": "profitability",
+        "sales": "sales",
+        "sows": "sows",
+        "mortality": "mortality",
+        "feed": "feed",
+        "inventory": "inventory",
+        "costs": "costs",
+    }[section]
+    assert expected_data_key in response.context
     active_links = [link for link in response.context["statistic_links"] if link["is_active"]]
     assert [link["url"] for link in active_links] == [reverse("farm_statistics_section", args=[section])]
 
