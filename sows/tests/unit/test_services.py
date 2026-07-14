@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import Mock, patch, MagicMock
 from datetime import date
 from sows.services.sow_dashboard_service import SowDashboardService
+from sows.services.reporting import SowReportingService
 from sows.services.sow_lifecycle import Sow, SowEvent
 from sows.services.sow_repository import VaccinationPlanRepository
 
@@ -68,7 +69,7 @@ class TestSowDashboardService:
         mock_repo = Mock()
         mock_repo.get_all_sows.return_value = [sow1, sow2]
 
-        result = SowDashboardService(repository=mock_repo).get_general_statistics(
+        result = SowReportingService(repository=mock_repo).metric_ranking(
             metric_key="unknown",
             months_limit=0,
             order="asc",

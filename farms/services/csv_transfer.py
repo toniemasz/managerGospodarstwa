@@ -15,7 +15,7 @@ from farms.services.data_backup import BackupImportError, user_business_data_cou
 from feed.models import DeliveryModel, IngredientModel, ProductionModel, RecipeItemModel, RecipeModel
 from feed.actions.inventory import InventoryActions
 from sales.models import PigSaleModel, SaleClassRowModel
-from sows.models import SowEventModel, SowModel, VaccinationCycleModel, VaccinationPlanModel
+from sows.models import MortalityReportModel, SowEventModel, SowModel, VaccinationCycleModel, VaccinationPlanModel
 
 
 MAX_CSV_ARCHIVE_SIZE = 25 * 1024 * 1024
@@ -25,6 +25,7 @@ SCHEMAS = {
     "sow_events.csv": ("id", "sow_id", "event_type", "event_date", "details", "vaccination_plan_id", "vaccine_name", "cycle_id", "scheduled_date"),
     "vaccination_plans.csv": ("id", "name", "days_before_farrowing", "days_after_event", "event_source", "interval_months", "interval_value", "interval_unit", "schedule_mode", "first_due_date", "scope", "is_active", "requires_configuration", "selected_sow_ids", "excluded_sow_ids", "reminder_days_ahead"),
     "vaccination_cycles.csv": ("id", "plan_id", "sow_id", "cycle_id", "scheduled_date", "status", "completed_at", "skipped_at", "note"),
+    "mortality.csv": ("id", "mortality_type", "sow_id", "mortality_date", "quantity", "reason", "note", "source"),
     "ingredients.csv": ("id", "name", "description", "low_stock_threshold_kg", "is_in_bin"),
     "deliveries.csv": ("id", "ingredient_id", "date", "quantity_kg", "price_per_kg"),
     "recipes.csv": ("id", "name"),
@@ -44,7 +45,7 @@ OPTIONAL_COLUMNS = {
         "is_active", "requires_configuration", "selected_sow_ids", "excluded_sow_ids",
     },
 }
-OPTIONAL_FILES = {"vaccination_cycles.csv"}
+OPTIONAL_FILES = {"vaccination_cycles.csv", "mortality.csv"}
 
 
 def _value(value):
@@ -68,6 +69,7 @@ def _write_csv(columns, rows):
 
 def build_csv_export(farm, *, year=None) -> tuple[bytes, str]:
     selected_year = year or timezone.localdate().year
+    from sows.selectors.mortality import pre_weaning_mortality_cycles
     datasets = {
         "sows.csv": [
             {"id": obj.pk, "ear_tag": obj.ear_tag, "entry_date": obj.entry_date, "is_archived": obj.is_archived, "archived_at": obj.archived_at}
@@ -114,6 +116,31 @@ def build_csv_export(farm, *, year=None) -> tuple[bytes, str]:
                 "note": obj.note,
             }
             for obj in VaccinationCycleModel.objects.filter(plan__farm=farm).order_by("id")
+        ],
+        "mortality.csv": [
+            {
+                "id": obj.pk,
+                "mortality_type": obj.mortality_type,
+                "sow_id": obj.sow_id,
+                "mortality_date": obj.mortality_date,
+                "quantity": obj.quantity,
+                "reason": obj.reason,
+                "note": obj.note,
+                "source": "manual",
+            }
+            for obj in MortalityReportModel.objects.filter(farm=farm).order_by("id")
+        ] + [
+            {
+                "id": f"AUTO-{row.farrowing.id}",
+                "mortality_type": "PRZED_ODSADZENIEM",
+                "sow_id": row.sow.id,
+                "mortality_date": row.mortality_date,
+                "quantity": row.quantity if row.quantity is not None else "",
+                "reason": "Wyliczone automatycznie z oproszenia i odsadzenia",
+                "note": row.unavailable_reason,
+                "source": "automatic",
+            }
+            for row in pre_weaning_mortality_cycles(farm)
         ],
         "ingredients.csv": [
             {"id": obj.pk, "name": obj.name, "description": obj.description, "low_stock_threshold_kg": obj.low_stock_threshold_kg, "is_in_bin": obj.is_in_bin}
@@ -386,6 +413,28 @@ def import_csv_archive(uploaded_file, farm) -> dict[str, int]:
             note=row["note"],
         )
     counts["cykle szczepień"] = len(rows["vaccination_cycles.csv"])
+    mortality_types = {value for value, _label in MortalityReportModel.TYPE_CHOICES}
+    for row in rows["mortality.csv"]:
+        if row.get("source") == "automatic":
+            continue
+        mortality_type = {
+            "sow": MortalityReportModel.TYPE_SOW,
+            "post_weaning": MortalityReportModel.TYPE_UNSPECIFIED_POST_WEANING,
+            "": MortalityReportModel.TYPE_UNSPECIFIED_POST_WEANING,
+        }.get(row.get("mortality_type"), row.get("mortality_type"))
+        if mortality_type not in mortality_types:
+            raise BackupImportError("mortality.csv zawiera nieobsługiwany typ upadku.")
+        sow = _related(sow_map, row["sow_id"], "maciory") if row.get("sow_id") else None
+        MortalityReportModel.objects.create(
+            farm=farm,
+            mortality_type=mortality_type,
+            sow=sow,
+            mortality_date=_date(row["mortality_date"]),
+            quantity=_int(row["quantity"]),
+            reason=row.get("reason") or "",
+            note=row.get("note") or "",
+        )
+    counts["upadki"] = sum(row.get("source") != "automatic" for row in rows["mortality.csv"])
     ingredient_map = {}
     for row in rows["ingredients.csv"]:
         ingredient_map[row["id"]] = IngredientModel.objects.create(farm=farm, name=row["name"], description=row["description"] or None, low_stock_threshold_kg=_decimal(row["low_stock_threshold_kg"]), is_in_bin=_bool(row["is_in_bin"]))

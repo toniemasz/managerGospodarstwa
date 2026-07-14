@@ -447,7 +447,21 @@ class MortalityReportForm(forms.ModelForm):
 
     def __init__(self, *args, farm=None, **kwargs):
         self.farm = farm
+        if args and args[0] is not None:
+            data = args[0].copy()
+            if data.get('mortality_type') == 'sow':
+                data['mortality_type'] = MortalityReportModel.TYPE_SOW
+            args = (data, *args[1:])
         super().__init__(*args, **kwargs)
+        choices = list(MortalityReportModel.MANUAL_TYPE_CHOICES)
+        if self.instance.pk and self.instance.mortality_type != MortalityReportModel.TYPE_SOW:
+            choices = list(MortalityReportModel.TYPE_CHOICES[1:4])
+            if self.instance.mortality_type == MortalityReportModel.TYPE_UNSPECIFIED_POST_WEANING:
+                choices.append((
+                    MortalityReportModel.TYPE_UNSPECIFIED_POST_WEANING,
+                    'Nieokreślone po odsadzeniu',
+                ))
+        self.fields['mortality_type'].choices = choices
         self.sow_suggestions = []
         if self.farm is not None:
             self.sow_suggestions = list(SowModel.objects.filter(
@@ -479,9 +493,11 @@ class MortalityReportForm(forms.ModelForm):
             cleaned_data['sow'] = sow
             cleaned_data['quantity'] = 1
 
-        elif mortality_type == MortalityReportModel.TYPE_POST_WEANING:
+        elif mortality_type in MortalityReportModel.POST_WEANING_TYPES:
             if quantity is None:
                 self.add_error('quantity', "Podaj liczbę sztuk.")
+            if self.instance.pk and mortality_type == MortalityReportModel.TYPE_UNSPECIFIED_POST_WEANING:
+                self.add_error('mortality_type', "Wybierz docelowy typ: Prosiak, Warchlak albo Tucznik.")
             cleaned_data['sow'] = None
         else:
             cleaned_data['sow'] = None

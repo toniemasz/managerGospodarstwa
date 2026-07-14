@@ -28,6 +28,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('szukaj/', global_search_view, name='global_search'),
     path('statystyki/', statistics_view, name='farm_statistics'),
+    path('statystyki/<str:section>/', statistics_view, name='farm_statistics_section'),
     path('', include('sows.urls')),
     path('ustawienia/', include('farms.urls')),
     path('sprzedaz/', include('sales.urls')),

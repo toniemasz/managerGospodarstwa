@@ -1,44 +1,45 @@
 {% extends 'base.html' %}
+
 {% block title %}Wszystkie moduły{% endblock %}
+
 {% block content %}
 <main class="app-page modules-catalog-page">
     <section class="page-header">
         <div>
             <p class="eyebrow">Moduły</p>
             <h1>Wszystkie moduły</h1>
-            <p class="page-subtitle">Pełny katalog funkcji dostępnych w systemie gospodarstwa.</p>
+
+            <p class="page-subtitle">
+                Przejdź do wybranego obszaru aplikacji lub przypnij najczęściej
+                używane moduły do głównego paska nawigacji.
+            </p>
         </div>
+
         <div class="header-actions">
-            <a href="{% url 'farm_settings' %}#settings-modules" class="button button-secondary">Widoczność</a>
-            <a href="{% url 'modules_home' %}" class="button button-primary">Centrala</a>
+            <a
+                href="{% url 'farm_settings' %}#settings-modules"
+                class="button button-secondary"
+            >
+                Widoczność modułów
+            </a>
+
+            <a
+                href="{% url 'modules_home' %}"
+                class="button button-primary"
+            >
+                Centrala
+            </a>
         </div>
     </section>
 
-    <section class="module-catalog-list">
+    <section
+        class="module-catalog-list"
+        aria-label="Katalog modułów"
+    >
         {% for group in module_groups %}
-        <div class="module-group-section">
-            <div class="section-heading">
-                <div>
-                    <h2>{{ group.title }}</h2>
-                </div>
-            </div>
-            <div class="module-grid">
-                {% for module in group.modules %}
-                <a href="{% if module.is_visible %}{{ module.url }}{% else %}{% url 'farm_settings' %}#settings-modules{% endif %}" class="module-card catalog-module-card{% if not module.is_visible %} is-muted{% endif %}">
-                    <span class="module-icon {{ module.tone }}">{% include 'components/app_icon.html' with name=module.icon_name %}</span>
-                    <div>
-                        <h2>{{ module.title }}</h2>
-                        <p>{{ module.description }}</p>
-                        {% if not module.is_visible %}
-                        <small>Ukryty w ustawieniach</small>
-                        {% endif %}
-                    </div>
-                </a>
-                {% endfor %}
-            </div>
-        </div>
+            {% include 'farms/_nav_farms.html' with group=group %}
         {% empty %}
-        {% include 'components/empty_state.html' with title='Brak modułów' message='Nie znaleziono definicji modułów.' %}
+            {% include 'components/empty_state.html' with title='Brak modułów' message='Nie znaleziono definicji modułów.' %}
         {% endfor %}
     </section>
 </main>

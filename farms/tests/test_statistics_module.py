@@ -208,3 +208,35 @@ def test_statistics_view_is_farm_scoped(client, statistics_farms):
     assert "Stado i upadki" in content
     assert "Aplikacja nie ma jeszcze ewidencji obsady grup tuczowych i upadków" not in content
     assert "TAJNE-STAT" not in content
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("section", FarmStatisticsService.SECTION_KEYS)
+def test_each_statistics_section_has_own_view_and_uses_central_service(client, statistics_farms, section):
+    owner, farm, _other_farm = statistics_farms
+    client.force_login(owner)
+
+    response = client.get(reverse("farm_statistics_section", args=[section]), {"year": "2026"})
+
+    assert response.status_code == 200
+    assert response.context["active_section"] == section
+    assert response.context["section_cards"]
+    assert response.context["sales"] == FarmStatisticsService(farm).calculate(
+        date_from=date(2026, 1, 1),
+        date_to=date(2026, 12, 31),
+    )["sales"]
+    active_links = [link for link in response.context["statistic_links"] if link["is_active"]]
+    assert [link["url"] for link in active_links] == [reverse("farm_statistics_section", args=[section])]
+
+
+@pytest.mark.django_db
+def test_unknown_statistics_section_returns_404(client, statistics_farms):
+    owner, _farm, _other_farm = statistics_farms
+    client.force_login(owner)
+    assert client.get(reverse("farm_statistics_section", args=["nie-istnieje"])).status_code == 404
+
+
+def test_statistics_navigation_points_only_to_statistics_views():
+    links = FarmStatisticsService.statistic_links()
+    assert links[0]["url"] == reverse("farm_statistics")
+    assert all(link["url"].startswith("/statystyki/") for link in links)

@@ -5,18 +5,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Manager Gospodarstwa{% endblock %}</title>
-    <link rel="stylesheet" href="{% static 'css/variables.css' %}">
-    <link rel="stylesheet" href="{% static 'css/base.css' %}">
-    <link rel="stylesheet" href="{% static 'css/navigation.css' %}">
-    <link rel="stylesheet" href="{% static 'css/buttons.css' %}">
-    <link rel="stylesheet" href="{% static 'css/cards.css' %}">
-    <link rel="stylesheet" href="{% static 'css/messages.css' %}">
-    <link rel="stylesheet" href="{% static 'css/tables.css' %}">
-    <link rel="stylesheet" href="{% static 'css/forms.css' %}">
-    <link rel="stylesheet" href="{% static 'css/pages.css' %}">
-    <link rel="stylesheet" href="{% static 'css/responsive.css' %}">
-    <script src="{% static 'js/table_manager.js' %}" defer></script>
-    <script src="{% static 'js/app.js' %}?v=20260712-delivery-formset" defer></script>
+    <link rel="stylesheet" href="{% static 'css/base/variables.css' %}">
+    <link rel="stylesheet" href="{% static 'css/base/base.css' %}">
+    <link rel="stylesheet" href="{% static 'css/base/navigation.css' %}">
+    <link rel="stylesheet" href="{% static 'css/components/buttons.css' %}">
+    <link rel="stylesheet" href="{% static 'css/components/cards.css' %}">
+    <link rel="stylesheet" href="{% static 'css/components/messages.css' %}">
+    <link rel="stylesheet" href="{% static 'css/components/tables.css' %}">
+    <link rel="stylesheet" href="{% static 'css/components/forms.css' %}">
+    <link rel="stylesheet" href="{% static 'css/pages/app-pages.css' %}">
+    <link rel="stylesheet" href="{% static 'css/pages/responsive.css' %}">
+    <script src="{% static 'js/core/table-manager.js' %}" defer></script>
+    <script src="{% static 'js/core/app.js' %}?v=20260712-delivery-formset" defer></script>
     {% block extra_head %}{% endblock %}
 </head>
 <body class="ui-scale-{{ ui_interface_scale|default:'standard' }}">

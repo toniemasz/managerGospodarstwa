@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 {% load feed_format %}
 {% block title %}Śrutowanie{% endblock %}
 
@@ -116,53 +117,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const form = document.querySelector('[data-bulk-production-form]');
-    if (!form) return;
-
-    const selectAll = form.querySelector('[data-select-all-productions]');
-    const checkboxes = Array.from(form.querySelectorAll('[data-production-checkbox]'));
-    const counter = form.querySelector('[data-selected-production-count]');
-    const submitButton = form.querySelector('[data-bulk-complete-button]');
-
-    function selectedCheckboxes() {
-        return checkboxes.filter(function (checkbox) { return checkbox.checked; });
-    }
-
-    function updateState() {
-        const selectedCount = selectedCheckboxes().length;
-        counter.textContent = 'Wybrano: ' + selectedCount;
-        submitButton.disabled = selectedCount === 0;
-        selectAll.disabled = checkboxes.length === 0;
-        selectAll.checked = checkboxes.length > 0 && selectedCount === checkboxes.length;
-        selectAll.indeterminate = selectedCount > 0 && selectedCount < checkboxes.length;
-    }
-
-    selectAll.addEventListener('change', function () {
-        checkboxes.forEach(function (checkbox) {
-            checkbox.checked = selectAll.checked;
-        });
-        updateState();
-    });
-
-    checkboxes.forEach(function (checkbox) {
-        checkbox.addEventListener('change', updateState);
-    });
-
-    form.addEventListener('submit', function (event) {
-        const selectedCount = selectedCheckboxes().length;
-        if (!selectedCount) {
-            event.preventDefault();
-            updateState();
-            return;
-        }
-        if (!window.confirm('Zakończyć zaznaczone śrutowania (' + selectedCount + ')?')) {
-            event.preventDefault();
-        }
-    });
-
-    updateState();
-});
-</script>
+<script src="{% static 'js/pages/productions.js' %}" defer></script>
 {% endblock %}

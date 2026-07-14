@@ -45,6 +45,15 @@ from sows.models import (
 
 BACKUP_FORMAT_VERSION = 4
 SUPPORTED_USER_BACKUP_VERSIONS = {1, 2, 3, 4}
+
+
+def _normalize_mortality_type(value):
+    return {
+        'sow': MortalityReportModel.TYPE_SOW,
+        'post_weaning': MortalityReportModel.TYPE_UNSPECIFIED_POST_WEANING,
+        None: MortalityReportModel.TYPE_UNSPECIFIED_POST_WEANING,
+        '': MortalityReportModel.TYPE_UNSPECIFIED_POST_WEANING,
+    }.get(value, value)
 MAX_UPLOAD_SIZE = 25 * 1024 * 1024
 MAX_UNCOMPRESSED_SIZE = 100 * 1024 * 1024
 
@@ -387,7 +396,7 @@ def _merge_user_records(payload, data, farm):
         _, created = MortalityReportModel.objects.get_or_create(
             farm=farm,
             sow=sow,
-            mortality_type=fields.pop('mortality_type'),
+            mortality_type=_normalize_mortality_type(fields.pop('mortality_type', None)),
             mortality_date=fields.pop('mortality_date'),
             quantity=fields.pop('quantity'),
             defaults={**fields, 'created_by': None},
@@ -582,6 +591,7 @@ def _restore_user_records(payload, data, farm):
         counts['cykle szczepień'] += 1
     for record in _records(data, 'sows.MortalityReportModel'):
         fields = _clean_fields(record['fields'], {'farm', 'sow', 'created_by', 'created_at'})
+        fields['mortality_type'] = _normalize_mortality_type(fields.get('mortality_type'))
         sow_id = record['fields'].get('sow')
         MortalityReportModel.objects.create(
             farm=farm,
@@ -829,7 +839,7 @@ def _validate_user_records(data):
         'sows.SowModel': {'ear_tag'},
         'sows.SowEventModel': {'sow', 'event_type', 'event_date'},
         'sows.VaccinationCycleModel': {'plan', 'sow', 'cycle_id', 'scheduled_date', 'status'},
-        'sows.MortalityReportModel': {'mortality_type', 'mortality_date', 'quantity'},
+        'sows.MortalityReportModel': {'mortality_date', 'quantity'},
         'feed.IngredientModel': {'name'},
         'feed.DeliveryModel': {'ingredient', 'date', 'quantity_kg'},
         'feed.RecipeModel': {'name'},

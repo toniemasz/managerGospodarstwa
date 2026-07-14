@@ -51,7 +51,14 @@ def smart_number(value, max_decimals=6):
 def smart_unit(value, unit):
     if unit == "kg":
         return format_mass(value)
-    number = smart_number_value(value)
+    max_decimals_by_unit = {
+        "%": 2,
+        "t/t": 3,
+        "zł": 2,
+        "zł/kg": 2,
+        "zł/t": 2,
+    }
+    number = smart_number_value(value, max_decimals=max_decimals_by_unit.get(unit, 3))
     if number == "-":
         return "-"
     return f"{number} {unit}".strip()

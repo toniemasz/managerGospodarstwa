@@ -704,3 +704,313 @@
     background: var(--danger);
     color: #fff;
 }
+
+/* =========================================================
+   Katalog wszystkich modułów
+   templates/farms/_nav_farms.html
+   ========================================================= */
+
+.modules-catalog-page {
+    min-width: 0;
+}
+
+.module-catalog-list {
+    display: grid;
+    min-width: 0;
+    gap: var(--section-gap);
+}
+
+.module-catalog-group {
+    display: grid;
+    min-width: 0;
+    gap: var(--space-md);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: var(--panel-padding);
+    box-shadow: var(--shadow-soft);
+}
+
+.module-catalog-group .section-heading {
+    margin: 0;
+}
+
+.module-catalog-primary-wrapper {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-soft);
+}
+
+.module-catalog-primary-nav {
+    display: flex;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    align-items: stretch;
+    padding: 0;
+    scrollbar-width: thin;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+}
+
+.module-catalog-primary-item {
+    display: flex;
+    flex: 0 0 auto;
+    min-width: 0;
+    align-items: stretch;
+    border-right: 1px solid var(--border);
+    background: transparent;
+    scroll-snap-align: start;
+}
+
+.module-catalog-primary-item:last-child {
+    border-right: 0;
+}
+
+.module-catalog-primary-item.is-active {
+    background: var(--primary-soft);
+}
+
+.module-catalog-primary-item.is-muted {
+    opacity: .68;
+}
+
+.module-catalog-primary-link {
+    display: grid;
+    min-width: 9.5rem;
+    min-height: var(--control-height);
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: .55rem;
+    align-items: center;
+    padding: .55rem .7rem;
+    color: var(--text);
+    text-decoration: none;
+    transition:
+        background .18s ease,
+        color .18s ease;
+}
+
+.module-catalog-primary-link:hover {
+    background: var(--primary-soft);
+    color: var(--primary-dark);
+}
+
+.module-catalog-primary-item.is-active .module-catalog-primary-link {
+    color: var(--primary-dark);
+}
+
+.module-catalog-primary-icon {
+    display: inline-flex;
+    width: 1.9rem;
+    height: 1.9rem;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius);
+    background: var(--primary-soft);
+    color: var(--primary-dark);
+}
+
+.module-catalog-primary-icon.amber {
+    background: var(--warning-soft);
+    color: var(--warning);
+}
+
+.module-catalog-primary-icon.green {
+    background: var(--secondary-soft);
+    color: var(--secondary);
+}
+
+.module-catalog-primary-icon svg {
+    display: block;
+    width: var(--icon-size);
+    height: var(--icon-size);
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.module-catalog-primary-link > strong {
+    min-width: 0;
+    overflow: hidden;
+    font-size: .84rem;
+    font-weight: 900;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.module-pin-form {
+    display: flex;
+    flex: 0 0 auto;
+    margin: 0;
+    border-left: 1px solid var(--border);
+}
+
+.module-pin-button {
+    display: inline-flex;
+    width: var(--control-height);
+    min-width: var(--control-height);
+    min-height: var(--control-height);
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--muted);
+    padding: 0;
+    box-shadow: none;
+    cursor: pointer;
+    transition:
+        background .18s ease,
+        color .18s ease;
+}
+
+.module-pin-button:hover {
+    background: var(--surface-soft);
+    color: var(--text);
+}
+
+.module-pin-button.is-pinned {
+    background: transparent;
+    color: var(--danger);
+}
+
+.module-pin-button:focus-visible {
+    position: relative;
+    z-index: 2;
+    outline: 2px solid var(--primary);
+    outline-offset: -2px;
+}
+
+.module-pin-button:disabled {
+    background: transparent;
+    color: var(--muted);
+    cursor: not-allowed;
+    opacity: .45;
+}
+
+.module-pin-button span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.module-pin-button svg {
+    display: block;
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transform: rotate(180deg);
+    transform-origin: center;
+    transition: transform .18s ease, color .18s ease;
+}
+
+.module-pin-button .pin-head {
+    fill: var(--surface);
+    stroke: currentColor;
+}
+
+.module-pin-button.is-pinned svg {
+    transform: rotate(0deg);
+}
+
+.module-pin-button.is-pinned .pin-head {
+    fill: var(--danger);
+}
+
+/* Ukryty tekst dla czytników ekranu. */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    margin: -1px;
+    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
+    border: 0;
+    padding: 0;
+    white-space: nowrap;
+}
+
+/* Tablet */
+@media (max-width: 900px) {
+    .module-catalog-group {
+        padding: var(--card-padding);
+    }
+
+    .module-catalog-primary-link {
+        min-width: 8.75rem;
+    }
+
+}
+
+/* Telefon */
+@media (max-width: 640px) {
+    .modules-catalog-page .page-header {
+        align-items: stretch;
+    }
+
+    .modules-catalog-page .header-actions {
+        display: grid;
+        width: 100%;
+        grid-template-columns: 1fr;
+    }
+
+    .modules-catalog-page .header-actions .button {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .module-catalog-list {
+        gap: var(--space-md);
+    }
+
+    .module-catalog-group {
+        gap: var(--space-sm);
+        padding: var(--card-padding);
+    }
+
+    .module-catalog-primary-wrapper {
+        margin-inline: calc(var(--card-padding) * -1);
+        border-right: 0;
+        border-left: 0;
+        border-radius: 0;
+    }
+
+    .module-catalog-primary-link {
+        min-width: 8.25rem;
+        padding: .5rem .6rem;
+    }
+
+    .module-catalog-primary-link > strong {
+        font-size: .8rem;
+    }
+
+    .module-pin-button {
+        width: 2.7rem;
+        min-width: 2.7rem;
+    }
+
+}
+
+/* Bardzo mały telefon */
+@media (max-width: 380px) {
+    .module-catalog-primary-link {
+        min-width: 7.75rem;
+    }
+
+    .module-catalog-primary-icon {
+        width: 1.7rem;
+        height: 1.7rem;
+    }
+
+}

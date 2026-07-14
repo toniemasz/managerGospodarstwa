@@ -332,7 +332,7 @@ class TodayDashboardService:
                 self._kpi("Karmiące", summary["lactating_count"], "szt.", "Maciory po oproszeniu.", "sow", "green", reverse("dashboard")),
                 self._kpi("Do kontroli", len(summary["sows_to_check_usg"]), "szt.", "Wymagają USG.", "tasks", "warning", reverse("bulk_pregnancy_check")),
                 self._kpi("Do porodu", summary["farrowing_due_count"], "szt.", "W oknie alertu.", "calendar", "warning", reverse("farrowing_panel")),
-                self._kpi("Upadki w miesiącu", self._mortality_month_total(), "szt.", "Macior i zwierząt po odsadzeniu.", "warning", "danger", reverse("mortality_list")),
+                self._kpi("Upadki w miesiącu", self._mortality_month_total(), "szt.", "Ręczne i wyliczone przed odsadzeniem.", "warning", "danger", reverse("mortality_list")),
             ])
         if self._module_visible("inventory"):
             cards.append(self._kpi("Niskie stany paszy", len(self._inventory_summary()["low_stock_alerts"]), "skł.", "Poniżej progu.", "warning", "danger", reverse("feed_inventory")))
@@ -543,7 +543,7 @@ class TodayDashboardService:
     def _mortality_description(report) -> str:
         if report.sow_id:
             return f"Maciora {report.sow.ear_tag} · {report.quantity} szt."
-        return f"{report.quantity} szt. po odsadzeniu"
+        return f"{report.quantity} szt. · {report.get_mortality_type_display()}"
 
     @staticmethod
     def _sort_key(value) -> datetime:

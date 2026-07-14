@@ -582,7 +582,7 @@ class TestSowViews:
 
     def test_report_post_weaning_mortality_validates_quantity_and_future_date(self, setup_client):
         valid_response = setup_client.post(reverse('report_mortality'), {
-            'mortality_type': 'post_weaning',
+            'mortality_type': MortalityReportModel.TYPE_PIGLET,
             'mortality_date': date.today().isoformat(),
             'quantity': '3',
             'reason': 'Choroba',
@@ -590,12 +590,12 @@ class TestSowViews:
 
         assert valid_response.status_code == 302
         report = MortalityReportModel.objects.get(farm=setup_client.farm)
-        assert report.mortality_type == MortalityReportModel.TYPE_POST_WEANING
+        assert report.mortality_type == MortalityReportModel.TYPE_PIGLET
         assert report.sow is None
         assert report.quantity == 3
 
         invalid_response = setup_client.post(reverse('report_mortality'), {
-            'mortality_type': 'post_weaning',
+            'mortality_type': MortalityReportModel.TYPE_PIGLET,
             'mortality_date': (date.today() + timedelta(days=1)).isoformat(),
             'quantity': '0',
         })

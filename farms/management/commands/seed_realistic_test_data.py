@@ -548,7 +548,7 @@ class Command(BaseCommand):
             if report_date <= end_date:
                 reports.append(MortalityReportModel.objects.create(
                     farm=farm,
-                    mortality_type=MortalityReportModel.TYPE_POST_WEANING,
+                    mortality_type=MortalityReportModel.TYPE_UNSPECIFIED_POST_WEANING,
                     mortality_date=report_date,
                     quantity=1 + index % 3,
                     reason="Straty po odsadzeniu",

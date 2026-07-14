@@ -1,10 +1,8 @@
 import logging
-from datetime import date, timedelta
-from collections import defaultdict
+from datetime import date
 
 from farms.services.settings_service import get_farm_settings
 from sows.domain.rules import FARROWING_ALERT_DAYS_AHEAD, PREGNANCY_CHECK_AFTER_DAYS
-from sows.services.sow_metrics import METRICS_REGISTRY, MetricDescriptor
 from sows.services.sow_repository import SowRepository
 from sows.services.sow_notification_service import SowNotificationService
 
@@ -189,68 +187,3 @@ class SowDashboardService:
                 })
         priority_order = {"urgent": 0, "today": 1, "upcoming": 2}
         return sorted(items, key=lambda item: (priority_order.get(item["priority"], 9), item["title"]))[:5]
-
-    def get_general_statistics(
-        self,
-        metric_key: str,
-        months_limit: int = 6,
-        order: str = 'desc',
-        date_from=None,
-        date_to=None,
-    ) -> dict:
-        """Generuje modularne statystyki okresowe oraz ranking dla wybranej metryki."""
-        if metric_key not in METRICS_REGISTRY:
-            metric_key = list(METRICS_REGISTRY.keys())[0]
-
-        metric: MetricDescriptor = METRICS_REGISTRY[metric_key]
-        sows = self.repository.get_all_sows()
-
-        monthly_data = defaultdict(int)
-        top_sows_list = []
-
-        if date_from is not None or date_to is not None:
-            cutoff_date = date_from or date.min
-            end_date = date_to or date.max
-        elif months_limit == 0:
-            cutoff_date = date.min
-            end_date = date.max
-        else:
-            cutoff_date = date.today() - timedelta(days=months_limit * 30)
-            end_date = date.today()
-
-        for sow in sows:
-            sow_total = 0
-            for event in sow.all_events:
-                if event.event_type == metric.event_type and cutoff_date <= event.event_date <= end_date:
-                    val = metric.value_extractor(event.details)
-                    sow_total += val
-
-                    month_key = event.event_date.strftime('%Y-%m')
-                    monthly_data[month_key] += val
-
-            # Wrzucamy do rankingu tylko jeśli były jakieś dane
-            if sow_total > 0 or sow.status != "ARCHIVED":
-                top_sows_list.append({
-                    'id': sow.id,
-                    'ear_tag': sow.ear_tag,
-                    'total_value': sow_total,
-                    'status': sow.dynamic_status_display
-                })
-
-        # Sortowanie na podstawie wybranego trybu
-        reverse_sort = True if order == 'desc' else False
-        top_sows_list = sorted(top_sows_list, key=lambda x: x['total_value'], reverse=reverse_sort)[:10]
-
-        sorted_months = sorted(monthly_data.keys())
-        chart_labels = sorted_months
-        chart_values = [monthly_data[m] for m in sorted_months]
-
-        return {
-            'current_metric': metric,
-            'available_metrics': METRICS_REGISTRY.values(),
-            'current_months_limit': months_limit,
-            'current_order': order,
-            'top_sows': top_sows_list,
-            'chart_labels': chart_labels,
-            'chart_values': chart_values,
-        }

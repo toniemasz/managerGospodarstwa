@@ -10,6 +10,7 @@ from django.contrib import messages
 from django.core.exceptions import ValidationError
 
 from .services.sow_dashboard_service import SowDashboardService
+from .services.reporting import SowReportingService
 from .services.sow_repository import SowRepository, VaccinationPlanRepository
 from .services.bulk_event_service import BulkSowEventService
 from .services.sow_event_service import FARROWING_DECISION_CANCEL
@@ -29,7 +30,7 @@ from farms.services.current_farm import get_current_farm
 from farms.services.module_navigation import ModuleNavigationService
 from farms.services.audit_log_service import log_action
 from farms.services.today_dashboard import TodayDashboardService
-from sows.actions.mortality import create_mortality_report
+from sows.actions.mortality import create_mortality_report, delete_mortality_report, update_mortality_report
 from sows.actions.events import SowEventActions
 from sows.actions.vaccinations import VaccinationActionError, VaccinationActions
 from sows.domain.event_details import initial_data_from_event_details
@@ -559,6 +560,48 @@ def report_mortality_view(request):
 
 
 @login_required
+def edit_mortality_view(request, report_id):
+    farm = get_current_farm(request)
+    report = get_object_or_404(MortalityReportModel.objects.filter(farm=farm), pk=report_id)
+    if report.mortality_type == MortalityReportModel.TYPE_SOW:
+        messages.error(request, "Upadku maciory nie można zmieniać po zarchiwizowaniu maciory.")
+        return redirect('mortality_list')
+    if request.method == 'POST':
+        form = MortalityReportForm(request.POST, farm=farm, instance=report)
+        if form.is_valid():
+            try:
+                updated = update_mortality_report(farm=farm, report_id=report.id, data=form.cleaned_data)
+            except ValidationError as error:
+                form.add_error(None, error)
+            else:
+                log_action(farm=farm, user=request.user, action="UPDATE", obj=updated)
+                messages.success(request, "Zaktualizowano zgłoszenie upadku.")
+                return redirect('mortality_list')
+    else:
+        form = MortalityReportForm(farm=farm, instance=report)
+    return render(request, 'sows/mortality_form.html', {'form': form, 'is_edit': True})
+
+
+@require_POST
+@login_required
+def delete_mortality_view(request, report_id):
+    farm = get_current_farm(request)
+    report = get_object_or_404(MortalityReportModel.objects.filter(farm=farm), pk=report_id)
+    object_repr = str(report)
+    try:
+        delete_mortality_report(farm=farm, report_id=report.id)
+    except ValidationError as error:
+        messages.error(request, error.messages[0])
+    else:
+        log_action(
+            farm=farm, user=request.user, action="DELETE",
+            model_label="sows.MortalityReportModel", object_id=report_id, object_repr=object_repr,
+        )
+        messages.success(request, "Usunięto zgłoszenie upadku.")
+    return redirect('mortality_list')
+
+
+@login_required
 def general_statistics_view(request):
     try:
         metric_key = request.GET.get('metric', 'born_alive')
@@ -568,8 +611,8 @@ def general_statistics_view(request):
         months_by_period = {'3m': 3, '6m': 6, '12m': 12, 'all': 0}
         months = months_by_period.get(date_range.period, 6)
 
-        service = SowDashboardService(farm=get_current_farm(request))
-        context = service.get_general_statistics(
+        service = SowReportingService(farm=get_current_farm(request))
+        context = service.metric_ranking(
             metric_key=metric_key,
             months_limit=months,
             order=order,

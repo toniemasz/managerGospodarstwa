@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from decimal import Decimal
 
-from django.db.models import Avg, Count, Sum
+from django.db.models import Avg, Count, Q, Sum
 
 from sales.models import PigSaleModel
 
@@ -32,6 +32,8 @@ class SalesReportingService:
             quantity=Sum("quantity"), slaughter_weight=Sum("total_weight"),
             live_weight=Sum("live_weight"), vat=Sum("vat_value"),
             avg_meatiness=Avg("avg_meatiness_seurop"),
+            avg_dressing=Avg("dressing_percentage"),
+            unsettled_count=Count("id", filter=Q(no_settlement=True)),
         )
         sold_quantity = totals["quantity"] or 0
         slaughter_weight = totals["slaughter_weight"] or ZERO
@@ -44,6 +46,11 @@ class SalesReportingService:
                 row = monthly[sale.sale_date.strftime("%Y-%m")]
                 row["sales_net"] += sale.net_value or ZERO
                 row["sales_gross"] += sale.gross_value or ZERO
+        class_distribution = list(
+            sales.values("meat_class")
+            .annotate(quantity=Sum("quantity"), weight_kg=Sum("total_weight"), net_sales=Sum("net_value"))
+            .order_by("meat_class")
+        )
         return {
             "sale_count": totals["sale_count"] or 0,
             "sold_quantity": sold_quantity,
@@ -57,5 +64,8 @@ class SalesReportingService:
             "average_slaughter_weight_per_pig": _safe_divide(slaughter_weight, sold_quantity) or ZERO,
             "average_live_weight_per_pig": _safe_divide(live_weight, sold_quantity),
             "average_meatiness": totals["avg_meatiness"],
+            "average_dressing_percentage": totals["avg_dressing"],
+            "unsettled_count": totals["unsettled_count"] or 0,
+            "class_distribution": class_distribution,
             "monthly": dict(monthly),
         }

@@ -1,0 +1,95 @@
+<section
+    class="module-catalog-group"
+    aria-labelledby="module-group-{{ group.key }}"
+>
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Obszar</p>
+            <h2 id="module-group-{{ group.key }}">
+                {{ group.title }}
+            </h2>
+        </div>
+    </div>
+
+    <div class="module-catalog-primary-wrapper">
+        <nav
+            class="subnav module-catalog-primary-nav"
+            aria-label="{{ group.title }}"
+        >
+            {% for module in group.modules %}
+                <div
+                    class="
+                        module-catalog-primary-item
+                        {% if module.is_active %}is-active{% endif %}
+                        {% if not module.is_visible %}is-muted{% endif %}
+                    "
+                >
+                    <a
+                        href="{% if module.is_visible %}{{ module.url }}{% else %}{% url 'farm_settings' %}#settings-modules{% endif %}"
+                        class="module-catalog-primary-link"
+                        {% if module.is_active %}
+                            aria-current="page"
+                        {% endif %}
+                    >
+                        <span
+                            class="module-catalog-primary-icon {{ module.tone }}"
+                            aria-hidden="true"
+                        >
+                            {% include 'components/app_icon.html' with name=module.icon_name %}
+                        </span>
+
+                        <strong>{{ module.title }}</strong>
+                    </a>
+
+                    {% if module.key != 'settings' %}
+                        <form
+                            method="post"
+                            action="{% url 'set_module_pin' %}"
+                            class="module-pin-form"
+                        >
+                            {% csrf_token %}
+
+                            <input
+                                type="hidden"
+                                name="module_key"
+                                value="{{ module.key }}"
+                            >
+
+                            {% if not module.is_pinned %}
+                                <input
+                                    type="hidden"
+                                    name="is_pinned"
+                                    value="on"
+                                >
+                            {% endif %}
+
+                            <button
+                                type="submit"
+                                class="module-pin-button{% if module.is_pinned %} is-pinned{% endif %}"
+                                {% if not module.is_visible %}
+                                    disabled
+                                {% endif %}
+                                aria-pressed="{% if module.is_pinned %}true{% else %}false{% endif %}"
+                                aria-label="{% if not module.is_visible %}Najpierw włącz moduł w ustawieniach{% elif module.is_pinned %}Odepnij moduł {{ module.title }} od paska nawigacji{% else %}Przypnij moduł {{ module.title }} do paska nawigacji{% endif %}"
+                                title="{% if not module.is_visible %}Najpierw włącz moduł w ustawieniach{% elif module.is_pinned %}Odepnij od paska nawigacji{% else %}Przypnij do paska nawigacji{% endif %}"
+                            >
+                                <span aria-hidden="true">
+                                    {% include 'components/app_icon.html' with name='pin' %}
+                                </span>
+
+                                <span class="sr-only">
+                                    {% if module.is_pinned %}
+                                        Odepnij
+                                    {% else %}
+                                        Przypnij
+                                    {% endif %}
+                                </span>
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </nav>
+    </div>
+
+</section>

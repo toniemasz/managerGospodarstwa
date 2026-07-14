@@ -300,7 +300,7 @@
         if (!typeSelect) return;
 
         const syncMortalityFields = (shouldClear = false) => {
-            const isSow = typeSelect.value === 'sow';
+            const isSow = typeSelect.value === 'MACIORA';
 
             sowSection?.classList.toggle('hidden', !isSow);
             setFieldState(sowField, isSow, shouldClear);

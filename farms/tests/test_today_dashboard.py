@@ -120,7 +120,7 @@ def test_today_dashboard_loads_task_cards_kpis_recent_events_and_is_farm_scoped(
     assert "Niski stan: TODAY-WHEAT" in content
     assert "dashboard-alert-list" not in content
     assert "Upadek" in content
-    assert "2 szt. po odsadzeniu" in content
+    assert "2 szt. · Nieokreślone po odsadzeniu" in content
     assert "Sprzedaż netto" in content
     assert "TODAY-SALE" in content
     assert "TODAY-COST" in content
