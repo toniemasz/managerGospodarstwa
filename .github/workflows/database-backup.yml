@@ -1,0 +1,446 @@
+name: Database backup
+
+on:
+  schedule:
+    # Codziennie o 02:15 UTC
+    - cron: "15 2 * * *"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-database-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Backup production database
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      PRODUCTION_DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+
+      PGCONNECT_TIMEOUT: "20"
+
+    steps:
+      - name: Instalacja PostgreSQL 17
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          sudo apt-get update
+          sudo apt-get install -y \
+            curl \
+            ca-certificates \
+            gnupg \
+            lsb-release
+
+          sudo install -d /usr/share/postgresql-common/pgdg
+
+          curl -fsSL \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --dearmor \
+            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg
+
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+
+          pg_dump --version
+          pg_restore --version
+
+      - name: Instalacja AWS CLI
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          if ! command -v aws >/dev/null 2>&1; then
+            curl \
+              --fail \
+              --silent \
+              --show-error \
+              "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" \
+              -o /tmp/awscliv2.zip
+
+            unzip -q /tmp/awscliv2.zip -d /tmp
+            sudo /tmp/aws/install
+          fi
+
+          aws --version
+
+      - name: Sprawdzenie sekretów
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          REQUIRED_VARIABLES=(
+            PRODUCTION_DATABASE_URL
+            AWS_ACCESS_KEY_ID
+            AWS_SECRET_ACCESS_KEY
+            R2_ENDPOINT
+            R2_BUCKET_NAME
+          )
+
+          for VARIABLE_NAME in "${REQUIRED_VARIABLES[@]}"; do
+            if [ -z "${!VARIABLE_NAME:-}" ]; then
+              echo "Brak wymaganej zmiennej: $VARIABLE_NAME"
+              exit 1
+            fi
+          done
+
+          echo "Wszystkie wymagane sekrety są dostępne."
+
+      - name: Przygotowanie metadanych
+        id: metadata
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          TIMESTAMP="$(date -u +'%Y-%m-%d_%H-%M-%S_UTC')"
+          DATE="$(date -u +'%Y-%m-%d')"
+          WEEK="$(date -u +'%G-W%V')"
+          MONTH="$(date -u +'%Y-%m')"
+          DAY_OF_WEEK="$(date -u +'%u')"
+          DAY_OF_MONTH="$(date -u +'%d')"
+
+          BACKUP_DIR="$GITHUB_WORKSPACE/backups"
+          BACKUP_FILENAME="manager-gospodarstwa_${TIMESTAMP}.dump"
+          BACKUP_FILE="$BACKUP_DIR/$BACKUP_FILENAME"
+
+          mkdir -p "$BACKUP_DIR"
+
+          echo "timestamp=$TIMESTAMP" >> "$GITHUB_OUTPUT"
+          echo "date=$DATE" >> "$GITHUB_OUTPUT"
+          echo "week=$WEEK" >> "$GITHUB_OUTPUT"
+          echo "month=$MONTH" >> "$GITHUB_OUTPUT"
+          echo "day_of_week=$DAY_OF_WEEK" >> "$GITHUB_OUTPUT"
+          echo "day_of_month=$DAY_OF_MONTH" >> "$GITHUB_OUTPUT"
+          echo "backup_filename=$BACKUP_FILENAME" >> "$GITHUB_OUTPUT"
+          echo "backup_file=$BACKUP_FILE" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=database-backup-$TIMESTAMP" >> "$GITHUB_OUTPUT"
+
+      - name: Sprawdzenie połączenia z bazą
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          psql \
+            "$PRODUCTION_DATABASE_URL" \
+            --no-psqlrc \
+            --tuples-only \
+            --command="SELECT current_database(), current_user;" \
+            > /dev/null
+
+          echo "Połączenie z produkcyjną bazą działa."
+
+      - name: Utworzenie backupu
+        shell: bash
+        env:
+          BACKUP_FILE: ${{ steps.metadata.outputs.backup_file }}
+        run: |
+          set -Eeuo pipefail
+
+          pg_dump \
+            "$PRODUCTION_DATABASE_URL" \
+            --format=custom \
+            --compress=9 \
+            --no-owner \
+            --no-acl \
+            --verbose \
+            --file="$BACKUP_FILE"
+
+          test -s "$BACKUP_FILE"
+
+          echo "Backup został utworzony."
+          ls -lh "$BACKUP_FILE"
+
+      - name: Sprawdzenie poprawności backupu
+        shell: bash
+        env:
+          BACKUP_FILE: ${{ steps.metadata.outputs.backup_file }}
+        run: |
+          set -Eeuo pipefail
+
+          pg_restore \
+            --list \
+            "$BACKUP_FILE" \
+            > /tmp/backup-contents.txt
+
+          test -s /tmp/backup-contents.txt
+
+          OBJECT_COUNT="$(
+            grep -vcE '^;|^[[:space:]]*$' \
+              /tmp/backup-contents.txt \
+              || true
+          )"
+
+          if [ "$OBJECT_COUNT" -lt 1 ]; then
+            echo "Backup nie zawiera obiektów bazy."
+            exit 1
+          fi
+
+          echo "Backup przeszedł kontrolę."
+          echo "Liczba zapisanych obiektów: $OBJECT_COUNT"
+
+      - name: Utworzenie sumy kontrolnej
+        shell: bash
+        env:
+          BACKUP_FILE: ${{ steps.metadata.outputs.backup_file }}
+        run: |
+          set -Eeuo pipefail
+
+          sha256sum "$BACKUP_FILE" > "$BACKUP_FILE.sha256"
+
+          cat "$BACKUP_FILE.sha256"
+
+      - name: Zapisanie backupu w GitHub Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.metadata.outputs.artifact_name }}
+          path: |
+            ${{ steps.metadata.outputs.backup_file }}
+            ${{ steps.metadata.outputs.backup_file }}.sha256
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Sprawdzenie dostępu do Cloudflare R2
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          aws s3api head-bucket \
+            --bucket "$R2_BUCKET_NAME" \
+            --endpoint-url "$R2_ENDPOINT"
+
+          echo "Dostęp do Cloudflare R2 działa."
+
+      - name: Wysłanie kopii dziennej do R2
+        shell: bash
+        env:
+          BACKUP_FILE: ${{ steps.metadata.outputs.backup_file }}
+          BACKUP_FILENAME: ${{ steps.metadata.outputs.backup_filename }}
+          DATE: ${{ steps.metadata.outputs.date }}
+        run: |
+          set -Eeuo pipefail
+
+          DAILY_KEY="daily/${DATE}_${BACKUP_FILENAME}"
+
+          aws s3 cp \
+            "$BACKUP_FILE" \
+            "s3://${R2_BUCKET_NAME}/${DAILY_KEY}" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --only-show-errors
+
+          aws s3 cp \
+            "$BACKUP_FILE.sha256" \
+            "s3://${R2_BUCKET_NAME}/${DAILY_KEY}.sha256" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --only-show-errors
+
+          echo "Kopia dzienna została wysłana do R2."
+
+      - name: Wysłanie kopii tygodniowej do R2
+        if: steps.metadata.outputs.day_of_week == '7'
+        shell: bash
+        env:
+          BACKUP_FILE: ${{ steps.metadata.outputs.backup_file }}
+          BACKUP_FILENAME: ${{ steps.metadata.outputs.backup_filename }}
+          WEEK: ${{ steps.metadata.outputs.week }}
+        run: |
+          set -Eeuo pipefail
+
+          WEEKLY_KEY="weekly/${WEEK}_${BACKUP_FILENAME}"
+
+          aws s3 cp \
+            "$BACKUP_FILE" \
+            "s3://${R2_BUCKET_NAME}/${WEEKLY_KEY}" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --only-show-errors
+
+          aws s3 cp \
+            "$BACKUP_FILE.sha256" \
+            "s3://${R2_BUCKET_NAME}/${WEEKLY_KEY}.sha256" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --only-show-errors
+
+          echo "Kopia tygodniowa została wysłana do R2."
+
+      - name: Wysłanie kopii miesięcznej do R2
+        if: steps.metadata.outputs.day_of_month == '01'
+        shell: bash
+        env:
+          BACKUP_FILE: ${{ steps.metadata.outputs.backup_file }}
+          BACKUP_FILENAME: ${{ steps.metadata.outputs.backup_filename }}
+          MONTH: ${{ steps.metadata.outputs.month }}
+        run: |
+          set -Eeuo pipefail
+
+          MONTHLY_KEY="monthly/${MONTH}_${BACKUP_FILENAME}"
+
+          aws s3 cp \
+            "$BACKUP_FILE" \
+            "s3://${R2_BUCKET_NAME}/${MONTHLY_KEY}" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --only-show-errors
+
+          aws s3 cp \
+            "$BACKUP_FILE.sha256" \
+            "s3://${R2_BUCKET_NAME}/${MONTHLY_KEY}.sha256" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --only-show-errors
+
+          echo "Kopia miesięczna została wysłana do R2."
+
+      - name: Czyszczenie starych kopii w R2
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          cleanup_prefix() {
+            local PREFIX="$1"
+            local KEEP_COUNT="$2"
+
+            echo "Czyszczenie prefiksu: $PREFIX"
+            echo "Pozostawianych zestawów: $KEEP_COUNT"
+
+            mapfile -t DUMP_KEYS < <(
+              aws s3api list-objects-v2 \
+                --bucket "$R2_BUCKET_NAME" \
+                --prefix "$PREFIX/" \
+                --endpoint-url "$R2_ENDPOINT" \
+                --query "Contents[?ends_with(Key, '.dump')].Key" \
+                --output text \
+                | tr '\t' '\n' \
+                | sed '/^[[:space:]]*$/d' \
+                | sort -r
+            )
+
+            TOTAL_COUNT="${#DUMP_KEYS[@]}"
+
+            if [ "$TOTAL_COUNT" -le "$KEEP_COUNT" ]; then
+              echo "Brak plików do usunięcia."
+              return
+            fi
+
+            for (( INDEX=KEEP_COUNT; INDEX<TOTAL_COUNT; INDEX++ )); do
+              KEY="${DUMP_KEYS[$INDEX]}"
+
+              echo "Usuwanie: $KEY"
+
+              aws s3 rm \
+                "s3://${R2_BUCKET_NAME}/${KEY}" \
+                --endpoint-url "$R2_ENDPOINT" \
+                --only-show-errors
+
+              aws s3 rm \
+                "s3://${R2_BUCKET_NAME}/${KEY}.sha256" \
+                --endpoint-url "$R2_ENDPOINT" \
+                --only-show-errors
+            done
+          }
+
+          cleanup_prefix "daily" 14
+          cleanup_prefix "weekly" 4
+          cleanup_prefix "monthly" 6
+
+      - name: Kontrola liczby backupów w R2
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          count_dumps() {
+            local PREFIX="$1"
+
+            aws s3api list-objects-v2 \
+              --bucket "$R2_BUCKET_NAME" \
+              --prefix "$PREFIX/" \
+              --endpoint-url "$R2_ENDPOINT" \
+              --query "length(Contents[?ends_with(Key, '.dump')])" \
+              --output text
+          }
+
+          DAILY_COUNT="$(count_dumps daily)"
+          WEEKLY_COUNT="$(count_dumps weekly)"
+          MONTHLY_COUNT="$(count_dumps monthly)"
+
+          echo "Kopie dzienne: $DAILY_COUNT"
+          echo "Kopie tygodniowe: $WEEKLY_COUNT"
+          echo "Kopie miesięczne: $MONTHLY_COUNT"
+
+          if [ "$DAILY_COUNT" -gt 14 ]; then
+            echo "Za dużo kopii dziennych."
+            exit 1
+          fi
+
+          if [ "$WEEKLY_COUNT" -gt 4 ]; then
+            echo "Za dużo kopii tygodniowych."
+            exit 1
+          fi
+
+          if [ "$MONTHLY_COUNT" -gt 6 ]; then
+            echo "Za dużo kopii miesięcznych."
+            exit 1
+          fi
+
+      - name: Kontrola rozmiaru bucketa
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          TOTAL_BYTES="$(
+            aws s3api list-objects-v2 \
+              --bucket "$R2_BUCKET_NAME" \
+              --endpoint-url "$R2_ENDPOINT" \
+              --query "sum(Contents[].Size)" \
+              --output text
+          )"
+
+          if [ "$TOTAL_BYTES" = "None" ]; then
+            TOTAL_BYTES=0
+          fi
+
+          LIMIT_BYTES=$((5 * 1024 * 1024 * 1024))
+
+          echo "Rozmiar bucketa: $TOTAL_BYTES bajtów"
+          echo "Limit bezpieczeństwa: $LIMIT_BYTES bajtów"
+
+          if [ "$TOTAL_BYTES" -gt "$LIMIT_BYTES" ]; then
+            echo "Bucket przekroczył limit bezpieczeństwa 5 GB."
+            exit 1
+          fi
+
+      - name: Podsumowanie
+        shell: bash
+        env:
+          BACKUP_FILE: ${{ steps.metadata.outputs.backup_file }}
+        run: |
+          set -Eeuo pipefail
+
+          FILE_SIZE="$(du -h "$BACKUP_FILE" | cut -f1)"
+
+          {
+            echo "## Backup bazy zakończony"
+            echo ""
+            echo "- Data UTC: ${{ steps.metadata.outputs.timestamp }}"
+            echo "- Rozmiar backupu: $FILE_SIZE"
+            echo "- GitHub Artifacts: 14 dni"
+            echo "- R2 daily: 14 kopii"
+            echo "- R2 weekly: 4 kopie"
+            echo "- R2 monthly: 6 kopii"
+            echo "- Limit bezpieczeństwa R2: 5 GB"
+            echo "- Format: PostgreSQL custom dump"
+            echo "- Kontrola: pg_restore --list i SHA-256"
+          } >> "$GITHUB_STEP_SUMMARY"
