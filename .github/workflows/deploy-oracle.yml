@@ -32,7 +32,7 @@ jobs:
       - name: Przygotowanie SSH
         shell: bash
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.ORACLE_SSH_KEY }}
+          SSH_PRIVATE_KEY_B64: ${{ secrets.ORACLE_SSH_KEY_B64 }}
           SSH_KNOWN_HOSTS: ${{ secrets.ORACLE_KNOWN_HOSTS }}
         run: |
           set -Eeuo pipefail
@@ -40,7 +40,7 @@ jobs:
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
-          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/oracle_deploy_key
+          printf '%s' "$SSH_PRIVATE_KEY_B64" | base64 --decode > ~/.ssh/oracle_deploy_key
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
           chmod 600 ~/.ssh/oracle_deploy_key
