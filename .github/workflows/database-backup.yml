@@ -31,6 +31,7 @@ jobs:
       R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
       R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
+      PG_BIN: /usr/lib/postgresql/17/bin
       PGCONNECT_TIMEOUT: "20"
 
     steps:
@@ -81,9 +82,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client-17
 
-          pg_dump --version
-          pg_restore --version
-          psql --version
+          test -x "$PG_BIN/psql"
+          test -x "$PG_BIN/pg_dump"
+          test -x "$PG_BIN/pg_restore"
+
+          "$PG_BIN/psql" --version
+          "$PG_BIN/pg_dump" --version
+          "$PG_BIN/pg_restore" --version
 
       - name: Instalacja AWS CLI
         shell: bash
@@ -135,7 +140,8 @@ jobs:
               ;;
             *)
               echo "R2_ENDPOINT ma niepoprawny format."
-              echo "Powinien wyglądać jak https://ACCOUNT_ID.r2.cloudflarestorage.com"
+              echo "Powinien wyglądać jak:"
+              echo "https://ACCOUNT_ID.r2.cloudflarestorage.com"
               exit 1
               ;;
           esac
@@ -176,12 +182,12 @@ jobs:
         run: |
           set -Eeuo pipefail
 
-          psql \
+          "$PG_BIN/psql" \
             "$PRODUCTION_DATABASE_URL" \
             --no-psqlrc \
             --set=ON_ERROR_STOP=1 \
             --tuples-only \
-            --command="SELECT current_database(), current_user;" \
+            --command="SELECT current_database(), current_user, version();" \
             > /dev/null
 
           echo "Połączenie z produkcyjną bazą działa."
@@ -193,7 +199,7 @@ jobs:
         run: |
           set -Eeuo pipefail
 
-          pg_dump \
+          "$PG_BIN/pg_dump" \
             "$PRODUCTION_DATABASE_URL" \
             --format=custom \
             --compress=9 \
@@ -214,7 +220,7 @@ jobs:
         run: |
           set -Eeuo pipefail
 
-          pg_restore \
+          "$PG_BIN/pg_restore" \
             --list \
             "$BACKUP_FILE" \
             > /tmp/backup-contents.txt
@@ -250,7 +256,7 @@ jobs:
             "$BACKUP_FILE.sha256"
 
       - name: Zapisanie backupu w GitHub Artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.metadata.outputs.artifact_name }}
           path: |
@@ -265,9 +271,11 @@ jobs:
         run: |
           set -Eeuo pipefail
 
-          aws s3api head-bucket \
+          aws s3api list-objects-v2 \
             --bucket "$R2_BUCKET_NAME" \
-            --endpoint-url "$R2_ENDPOINT"
+            --endpoint-url "$R2_ENDPOINT" \
+            --max-items 1 \
+            > /dev/null
 
           echo "Dostęp do Cloudflare R2 działa."
 
@@ -394,7 +402,8 @@ jobs:
               aws s3 rm \
                 "s3://${R2_BUCKET_NAME}/${KEY}.sha256" \
                 --endpoint-url "$R2_ENDPOINT" \
-                --only-show-errors
+                --only-show-errors \
+                || true
             done
           }
 
@@ -435,20 +444,9 @@ jobs:
           echo "Kopie tygodniowe: $WEEKLY_COUNT"
           echo "Kopie miesięczne: $MONTHLY_COUNT"
 
-          if [ "$DAILY_COUNT" -gt 14 ]; then
-            echo "Za dużo kopii dziennych."
-            exit 1
-          fi
-
-          if [ "$WEEKLY_COUNT" -gt 4 ]; then
-            echo "Za dużo kopii tygodniowych."
-            exit 1
-          fi
-
-          if [ "$MONTHLY_COUNT" -gt 6 ]; then
-            echo "Za dużo kopii miesięcznych."
-            exit 1
-          fi
+          test "$DAILY_COUNT" -le 14
+          test "$WEEKLY_COUNT" -le 4
+          test "$MONTHLY_COUNT" -le 6
 
       - name: Kontrola rozmiaru bucketa
         shell: bash
@@ -491,6 +489,7 @@ jobs:
             echo ""
             echo "- Data UTC: ${{ steps.metadata.outputs.timestamp }}"
             echo "- Rozmiar backupu: $FILE_SIZE"
+            echo "- PostgreSQL client: 17"
             echo "- GitHub Artifacts: 14 dni"
             echo "- R2 daily: maksymalnie 14 kopii"
             echo "- R2 weekly: maksymalnie 4 kopie"
