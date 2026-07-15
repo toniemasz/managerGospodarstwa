@@ -26,6 +26,7 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: auto
+      AWS_EC2_METADATA_DISABLED: "true"
 
       R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
       R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
@@ -35,31 +36,54 @@ jobs:
     steps:
       - name: Instalacja PostgreSQL 17
         shell: bash
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
           set -Eeuo pipefail
 
           sudo apt-get update
+
           sudo apt-get install -y \
             curl \
             ca-certificates \
             gnupg \
-            lsb-release
+            lsb-release \
+            unzip
 
-          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo install -d \
+            -m 0755 \
+            /usr/share/postgresql-common/pgdg
 
-          curl -fsSL \
-            https://www.postgresql.org/media/keys/ACCC4CF8.asc \
-            | sudo gpg --dearmor \
-            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --location \
+            "https://www.postgresql.org/media/keys/ACCC4CF8.asc" \
+            --output /tmp/postgresql-signing-key.asc
 
-          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
-            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo gpg \
+            --batch \
+            --yes \
+            --dearmor \
+            --output /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg \
+            /tmp/postgresql-signing-key.asc
+
+          sudo chmod 644 \
+            /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg
+
+          CODENAME="$(lsb_release -cs)"
+
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt ${CODENAME}-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list \
+            > /dev/null
 
           sudo apt-get update
           sudo apt-get install -y postgresql-client-17
 
           pg_dump --version
           pg_restore --version
+          psql --version
 
       - name: Instalacja AWS CLI
         shell: bash
@@ -71,10 +95,16 @@ jobs:
               --fail \
               --silent \
               --show-error \
+              --location \
               "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" \
-              -o /tmp/awscliv2.zip
+              --output /tmp/awscliv2.zip
 
-            unzip -q /tmp/awscliv2.zip -d /tmp
+            rm -rf /tmp/aws
+
+            unzip -q \
+              /tmp/awscliv2.zip \
+              -d /tmp
+
             sudo /tmp/aws/install
           fi
 
@@ -100,6 +130,16 @@ jobs:
             fi
           done
 
+          case "$R2_ENDPOINT" in
+            https://*.r2.cloudflarestorage.com)
+              ;;
+            *)
+              echo "R2_ENDPOINT ma niepoprawny format."
+              echo "Powinien wyglądać jak https://ACCOUNT_ID.r2.cloudflarestorage.com"
+              exit 1
+              ;;
+          esac
+
           echo "Wszystkie wymagane sekrety są dostępne."
 
       - name: Przygotowanie metadanych
@@ -109,9 +149,9 @@ jobs:
           set -Eeuo pipefail
 
           TIMESTAMP="$(date -u +'%Y-%m-%d_%H-%M-%S_UTC')"
-          DATE="$(date -u +'%Y-%m-%d')"
-          WEEK="$(date -u +'%G-W%V')"
-          MONTH="$(date -u +'%Y-%m')"
+          BACKUP_DATE="$(date -u +'%Y-%m-%d')"
+          BACKUP_WEEK="$(date -u +'%G-W%V')"
+          BACKUP_MONTH="$(date -u +'%Y-%m')"
           DAY_OF_WEEK="$(date -u +'%u')"
           DAY_OF_MONTH="$(date -u +'%d')"
 
@@ -122,9 +162,9 @@ jobs:
           mkdir -p "$BACKUP_DIR"
 
           echo "timestamp=$TIMESTAMP" >> "$GITHUB_OUTPUT"
-          echo "date=$DATE" >> "$GITHUB_OUTPUT"
-          echo "week=$WEEK" >> "$GITHUB_OUTPUT"
-          echo "month=$MONTH" >> "$GITHUB_OUTPUT"
+          echo "backup_date=$BACKUP_DATE" >> "$GITHUB_OUTPUT"
+          echo "backup_week=$BACKUP_WEEK" >> "$GITHUB_OUTPUT"
+          echo "backup_month=$BACKUP_MONTH" >> "$GITHUB_OUTPUT"
           echo "day_of_week=$DAY_OF_WEEK" >> "$GITHUB_OUTPUT"
           echo "day_of_month=$DAY_OF_MONTH" >> "$GITHUB_OUTPUT"
           echo "backup_filename=$BACKUP_FILENAME" >> "$GITHUB_OUTPUT"
@@ -139,6 +179,7 @@ jobs:
           psql \
             "$PRODUCTION_DATABASE_URL" \
             --no-psqlrc \
+            --set=ON_ERROR_STOP=1 \
             --tuples-only \
             --command="SELECT current_database(), current_user;" \
             > /dev/null
@@ -187,7 +228,7 @@ jobs:
           )"
 
           if [ "$OBJECT_COUNT" -lt 1 ]; then
-            echo "Backup nie zawiera obiektów bazy."
+            echo "Backup nie zawiera żadnych obiektów bazy."
             exit 1
           fi
 
@@ -201,12 +242,15 @@ jobs:
         run: |
           set -Eeuo pipefail
 
-          sha256sum "$BACKUP_FILE" > "$BACKUP_FILE.sha256"
+          sha256sum "$BACKUP_FILE" \
+            > "$BACKUP_FILE.sha256"
 
-          cat "$BACKUP_FILE.sha256"
+          sha256sum \
+            --check \
+            "$BACKUP_FILE.sha256"
 
       - name: Zapisanie backupu w GitHub Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.metadata.outputs.artifact_name }}
           path: |
@@ -232,11 +276,11 @@ jobs:
         env:
           BACKUP_FILE: ${{ steps.metadata.outputs.backup_file }}
           BACKUP_FILENAME: ${{ steps.metadata.outputs.backup_filename }}
-          DATE: ${{ steps.metadata.outputs.date }}
+          BACKUP_DATE: ${{ steps.metadata.outputs.backup_date }}
         run: |
           set -Eeuo pipefail
 
-          DAILY_KEY="daily/${DATE}_${BACKUP_FILENAME}"
+          DAILY_KEY="daily/${BACKUP_DATE}_${BACKUP_FILENAME}"
 
           aws s3 cp \
             "$BACKUP_FILE" \
@@ -258,11 +302,11 @@ jobs:
         env:
           BACKUP_FILE: ${{ steps.metadata.outputs.backup_file }}
           BACKUP_FILENAME: ${{ steps.metadata.outputs.backup_filename }}
-          WEEK: ${{ steps.metadata.outputs.week }}
+          BACKUP_WEEK: ${{ steps.metadata.outputs.backup_week }}
         run: |
           set -Eeuo pipefail
 
-          WEEKLY_KEY="weekly/${WEEK}_${BACKUP_FILENAME}"
+          WEEKLY_KEY="weekly/${BACKUP_WEEK}_${BACKUP_FILENAME}"
 
           aws s3 cp \
             "$BACKUP_FILE" \
@@ -284,11 +328,11 @@ jobs:
         env:
           BACKUP_FILE: ${{ steps.metadata.outputs.backup_file }}
           BACKUP_FILENAME: ${{ steps.metadata.outputs.backup_filename }}
-          MONTH: ${{ steps.metadata.outputs.month }}
+          BACKUP_MONTH: ${{ steps.metadata.outputs.backup_month }}
         run: |
           set -Eeuo pipefail
 
-          MONTHLY_KEY="monthly/${MONTH}_${BACKUP_FILENAME}"
+          MONTHLY_KEY="monthly/${BACKUP_MONTH}_${BACKUP_FILENAME}"
 
           aws s3 cp \
             "$BACKUP_FILE" \
@@ -314,12 +358,12 @@ jobs:
             local KEEP_COUNT="$2"
 
             echo "Czyszczenie prefiksu: $PREFIX"
-            echo "Pozostawianych zestawów: $KEEP_COUNT"
+            echo "Pozostawianych kopii: $KEEP_COUNT"
 
             mapfile -t DUMP_KEYS < <(
               aws s3api list-objects-v2 \
                 --bucket "$R2_BUCKET_NAME" \
-                --prefix "$PREFIX/" \
+                --prefix "${PREFIX}/" \
                 --endpoint-url "$R2_ENDPOINT" \
                 --query "Contents[?ends_with(Key, '.dump')].Key" \
                 --output text \
@@ -330,12 +374,14 @@ jobs:
 
             TOTAL_COUNT="${#DUMP_KEYS[@]}"
 
+            echo "Aktualna liczba kopii: $TOTAL_COUNT"
+
             if [ "$TOTAL_COUNT" -le "$KEEP_COUNT" ]; then
-              echo "Brak plików do usunięcia."
+              echo "Brak starych kopii do usunięcia."
               return
             fi
 
-            for (( INDEX=KEEP_COUNT; INDEX<TOTAL_COUNT; INDEX++ )); do
+            for ((INDEX=KEEP_COUNT; INDEX<TOTAL_COUNT; INDEX++)); do
               KEY="${DUMP_KEYS[$INDEX]}"
 
               echo "Usuwanie: $KEY"
@@ -363,13 +409,22 @@ jobs:
 
           count_dumps() {
             local PREFIX="$1"
+            local RESULT
 
-            aws s3api list-objects-v2 \
-              --bucket "$R2_BUCKET_NAME" \
-              --prefix "$PREFIX/" \
-              --endpoint-url "$R2_ENDPOINT" \
-              --query "length(Contents[?ends_with(Key, '.dump')])" \
-              --output text
+            RESULT="$(
+              aws s3api list-objects-v2 \
+                --bucket "$R2_BUCKET_NAME" \
+                --prefix "${PREFIX}/" \
+                --endpoint-url "$R2_ENDPOINT" \
+                --query "length(Contents[?ends_with(Key, '.dump')])" \
+                --output text
+            )"
+
+            if [ "$RESULT" = "None" ] || [ -z "$RESULT" ]; then
+              RESULT=0
+            fi
+
+            printf '%s' "$RESULT"
           }
 
           DAILY_COUNT="$(count_dumps daily)"
@@ -408,7 +463,7 @@ jobs:
               --output text
           )"
 
-          if [ "$TOTAL_BYTES" = "None" ]; then
+          if [ "$TOTAL_BYTES" = "None" ] || [ -z "$TOTAL_BYTES" ]; then
             TOTAL_BYTES=0
           fi
 
@@ -437,9 +492,9 @@ jobs:
             echo "- Data UTC: ${{ steps.metadata.outputs.timestamp }}"
             echo "- Rozmiar backupu: $FILE_SIZE"
             echo "- GitHub Artifacts: 14 dni"
-            echo "- R2 daily: 14 kopii"
-            echo "- R2 weekly: 4 kopie"
-            echo "- R2 monthly: 6 kopii"
+            echo "- R2 daily: maksymalnie 14 kopii"
+            echo "- R2 weekly: maksymalnie 4 kopie"
+            echo "- R2 monthly: maksymalnie 6 kopii"
             echo "- Limit bezpieczeństwa R2: 5 GB"
             echo "- Format: PostgreSQL custom dump"
             echo "- Kontrola: pg_restore --list i SHA-256"
