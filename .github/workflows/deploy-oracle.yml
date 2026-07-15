@@ -37,14 +37,35 @@ jobs:
         run: |
           set -Eeuo pipefail
 
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
+          if [ -z "$SSH_PRIVATE_KEY_B64" ]; then
+            echo "Brak sekretu ORACLE_SSH_KEY_B64."
+            exit 1
+          fi
 
-          printf '%s' "$SSH_PRIVATE_KEY_B64" | base64 --decode > ~/.ssh/oracle_deploy_key
-          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          if [ -z "$SSH_KNOWN_HOSTS" ]; then
+            echo "Brak sekretu ORACLE_KNOWN_HOSTS."
+            exit 1
+          fi
 
-          chmod 600 ~/.ssh/oracle_deploy_key
-          chmod 600 ~/.ssh/known_hosts
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+
+          printf '%s' "$SSH_PRIVATE_KEY_B64" \
+            | tr -d '[:space:]' \
+            | base64 --decode \
+            > "$HOME/.ssh/oracle_deploy_key"
+
+          printf '%s\n' "$SSH_KNOWN_HOSTS" \
+            > "$HOME/.ssh/known_hosts"
+
+          chmod 600 "$HOME/.ssh/oracle_deploy_key"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+          ssh-keygen -y \
+            -f "$HOME/.ssh/oracle_deploy_key" \
+            > /dev/null
+
+          echo "Klucz SSH został poprawnie odczytany."
 
       - name: Sprawdzenie połączenia
         shell: bash
@@ -54,12 +75,22 @@ jobs:
         run: |
           set -Eeuo pipefail
 
+          if [ -z "$ORACLE_HOST" ]; then
+            echo "Brak sekretu ORACLE_HOST."
+            exit 1
+          fi
+
+          if [ -z "$ORACLE_USER" ]; then
+            echo "Brak sekretu ORACLE_USER."
+            exit 1
+          fi
+
           ssh \
             -o BatchMode=yes \
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             -o ConnectTimeout=15 \
-            -i ~/.ssh/oracle_deploy_key \
+            -i "$HOME/.ssh/oracle_deploy_key" \
             "$ORACLE_USER@$ORACLE_HOST" \
             "echo 'Połączenie SSH działa.'"
 
@@ -75,8 +106,25 @@ jobs:
             -o BatchMode=yes \
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
             -o ServerAliveInterval=15 \
             -o ServerAliveCountMax=4 \
-            -i ~/.ssh/oracle_deploy_key \
+            -i "$HOME/.ssh/oracle_deploy_key" \
             "$ORACLE_USER@$ORACLE_HOST" \
             "sudo /usr/local/bin/deploy-manager-gospodarstwa"
+
+      - name: Sprawdzenie strony produkcyjnej
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --location \
+            --max-time 30 \
+            "https://managergospodarstwa.duckdns.org/login/" \
+            > /dev/null
+
+          echo "Strona produkcyjna odpowiada poprawnie."
