@@ -1,6 +1,4 @@
-Poniżej masz gotowy, uporządkowany `README.md` do wklejenia w całości.
 
-```markdown
 # Manager Gospodarstwa
 
 Aplikacja webowa do zarządzania gospodarstwem trzody chlewnej.
@@ -480,4 +478,3 @@ docs/PRODUCTION.md
 Projekt jest aktywnie rozwijany.
 
 Nowe funkcje, zmiany modeli i migracje powinny zachowywać zgodność z istniejącymi danymi produkcyjnymi i nie mogą powodować ich utraty.
-```
