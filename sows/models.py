@@ -165,6 +165,96 @@ class SowEventModel(models.Model):
         return f"{self.event_type} - {self.event_date} (Maciora: {self.sow.ear_tag})"
 
 
+class PigletTransferModel(models.Model):
+    """Jedno zdarzenie przeniesienia prosiąt pomiędzy dwoma odchowami."""
+
+    farm = models.ForeignKey(
+        'farms.FarmModel',
+        on_delete=models.CASCADE,
+        related_name='piglet_transfers',
+        db_index=False,
+        verbose_name="Gospodarstwo",
+    )
+    source_farrowing = models.ForeignKey(
+        SowEventModel,
+        on_delete=models.PROTECT,
+        related_name='outgoing_piglet_transfers',
+        db_index=False,
+        verbose_name="Oproszenie źródłowe",
+    )
+    target_farrowing = models.ForeignKey(
+        SowEventModel,
+        on_delete=models.PROTECT,
+        related_name='incoming_piglet_transfers',
+        db_index=False,
+        verbose_name="Oproszenie docelowe",
+    )
+    quantity = models.PositiveIntegerField(
+        validators=[MinValueValidator(1)],
+        verbose_name="Liczba prosiąt",
+    )
+    transfer_date = models.DateField(verbose_name="Data przeniesienia")
+    note = models.TextField(blank=True, verbose_name="Notatka lub przyczyna")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='created_piglet_transfers',
+        null=True,
+        blank=True,
+        verbose_name="Utworzył",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Utworzono")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Zaktualizowano")
+    canceled_at = models.DateTimeField(null=True, blank=True, verbose_name="Anulowano")
+    canceled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='canceled_piglet_transfers',
+        null=True,
+        blank=True,
+        verbose_name="Anulował",
+    )
+    cancellation_note = models.TextField(blank=True, verbose_name="Powód anulowania")
+
+    class Meta:
+        ordering = ('-transfer_date', '-created_at', '-id')
+        indexes = [
+            models.Index(fields=('farm', '-transfer_date'), name='piglet_transfer_farm_date_idx'),
+            models.Index(fields=('source_farrowing', 'transfer_date'), name='piglet_transfer_source_idx'),
+            models.Index(fields=('target_farrowing', 'transfer_date'), name='piglet_transfer_target_idx'),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(quantity__gt=0),
+                name='piglet_transfer_quantity_positive',
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(source_farrowing=models.F('target_farrowing')),
+                name='piglet_transfer_different_cycles',
+            ),
+        ]
+        verbose_name = "Przeniesienie prosiąt"
+        verbose_name_plural = "Przeniesienia prosiąt"
+
+    @property
+    def source_sow(self):
+        return self.source_farrowing.sow
+
+    @property
+    def target_sow(self):
+        return self.target_farrowing.sow
+
+    @property
+    def is_canceled(self) -> bool:
+        return self.canceled_at is not None
+
+    def __str__(self):
+        return (
+            f"{self.quantity} prosiąt: {self.source_farrowing.sow.ear_tag} → "
+            f"{self.target_farrowing.sow.ear_tag} ({self.transfer_date})"
+        )
+
+
 class VaccinationCycleModel(models.Model):
     """Trwały zapis zamkniętego cyklu szczepienia konkretnej maciory."""
 
@@ -235,6 +325,7 @@ class MortalityReportModel(models.Model):
     TYPE_WEANER = 'WARCHLAK'
     TYPE_FINISHER = 'TUCZNIK'
     TYPE_UNSPECIFIED_POST_WEANING = 'NIEOKRESLONY_PO_ODSADZENIU'
+    TYPE_PRE_WEANING = 'PRZED_ODSADZENIEM'
     TYPE_POST_WEANING = TYPE_UNSPECIFIED_POST_WEANING  # zgodność kodu i importów sprzed migracji
     POST_WEANING_TYPES = (
         TYPE_PIGLET,
@@ -244,12 +335,19 @@ class MortalityReportModel(models.Model):
     )
     TYPE_CHOICES = [
         (TYPE_SOW, 'Maciora'),
+        (TYPE_PRE_WEANING, 'Prosięta przed odsadzeniem'),
         (TYPE_PIGLET, 'Prosiak'),
         (TYPE_WEANER, 'Warchlak'),
         (TYPE_FINISHER, 'Tucznik'),
         (TYPE_UNSPECIFIED_POST_WEANING, 'Nieokreślone po odsadzeniu'),
     ]
-    MANUAL_TYPE_CHOICES = TYPE_CHOICES[:4]
+    MANUAL_TYPE_CHOICES = (
+        (TYPE_SOW, 'Maciora'),
+        (TYPE_PRE_WEANING, 'Prosięta przed odsadzeniem'),
+        (TYPE_PIGLET, 'Prosiak'),
+        (TYPE_WEANER, 'Warchlak'),
+        (TYPE_FINISHER, 'Tucznik'),
+    )
 
     farm = models.ForeignKey(
         'farms.FarmModel',
@@ -269,6 +367,14 @@ class MortalityReportModel(models.Model):
         null=True,
         blank=True,
         verbose_name="Maciora",
+    )
+    farrowing = models.ForeignKey(
+        SowEventModel,
+        on_delete=models.PROTECT,
+        related_name='pre_weaning_mortality_reports',
+        null=True,
+        blank=True,
+        verbose_name="Cykl odchowu",
     )
     mortality_date = models.DateField(verbose_name="Data upadku")
     quantity = models.PositiveIntegerField(
@@ -296,7 +402,7 @@ class MortalityReportModel(models.Model):
         constraints = [
             models.CheckConstraint(
                 condition=models.Q(mortality_type__in=(
-                    'MACIORA', 'PROSIAK', 'WARCHLAK', 'TUCZNIK',
+                    'MACIORA', 'PRZED_ODSADZENIEM', 'PROSIAK', 'WARCHLAK', 'TUCZNIK',
                     'NIEOKRESLONY_PO_ODSADZENIU',
                 )),
                 name='mortality_type_valid',
@@ -304,13 +410,23 @@ class MortalityReportModel(models.Model):
             models.CheckConstraint(condition=models.Q(quantity__gt=0), name='mortality_quantity_positive'),
             models.CheckConstraint(
                 condition=(
-                    models.Q(mortality_type='MACIORA', sow__isnull=False)
+                    models.Q(
+                        mortality_type='MACIORA',
+                        sow__isnull=False,
+                        farrowing__isnull=True,
+                    )
+                    | models.Q(
+                        mortality_type='PRZED_ODSADZENIEM',
+                        sow__isnull=False,
+                        farrowing__isnull=False,
+                    )
                     | models.Q(
                         mortality_type__in=(
                             'PROSIAK', 'WARCHLAK', 'TUCZNIK',
                             'NIEOKRESLONY_PO_ODSADZENIU',
                         ),
                         sow__isnull=True,
+                        farrowing__isnull=True,
                     )
                 ),
                 name='mortality_sow_matches_type',

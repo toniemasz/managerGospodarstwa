@@ -5,6 +5,7 @@ from farms.services.settings_service import get_farm_settings
 from sows.domain.rules import FARROWING_ALERT_DAYS_AHEAD, PREGNANCY_CHECK_AFTER_DAYS
 from sows.services.sow_repository import SowRepository
 from sows.services.sow_notification_service import SowNotificationService
+from sows.services.piglet_care import PigletCareService
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,17 @@ class SowDashboardService:
     def get_dashboard_summary(self) -> dict:
         today = date.today()
         sows = self.repository.get_all_sows()
+        balances_by_sow = (
+            {
+                balance.farrowing.sow_id: balance
+                for balance in PigletCareService(self.farm).active_balances(as_of=today)
+            }
+            if self.farm is not None
+            else {}
+        )
+        for sow in sows:
+            sow.piglet_care = balances_by_sow.get(sow.id)
+            sow.piglets_in_care = sow.piglet_care.available if sow.piglet_care else None
 
         status_counts = self._empty_status_counts()
         pregnancy_check_after_days = self._pregnancy_check_after_days()

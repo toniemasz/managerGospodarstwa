@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+
+{% block title %}Przeniesienia prosiąt{% endblock %}
+
+{% block content %}
+<main class="app-page">
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Maciory</p>
+            <h1>Przeniesienia prosiąt</h1>
+            <p class="page-subtitle">Historia przesunięć pomiędzy konkretnymi cyklami odchowu.</p>
+        </div>
+        <a href="{% url 'add_piglet_transfer' %}" class="button button-primary">Dodaj przeniesienie</a>
+    </section>
+    {% include 'sows/_sow_nav.html' %}
+
+    {% url 'piglet_transfer_list' as piglet_transfer_filter_url %}
+    {% include 'components/filter_panel.html' with filter_action=piglet_transfer_filter_url filter_clear_url=piglet_transfer_filter_url filter_fields_template='sows/_piglet_transfer_filters.html' %}
+
+    <section class="panel table-panel">
+        <div class="section-heading">
+            <div>
+                <h2>Historia przeniesień</h2>
+                <p>Każdy wiersz jest jednym rekordem wspólnym dla obu macior.</p>
+            </div>
+        </div>
+        {% if transfers %}
+        <div class="table-scroll">
+            <table class="data-table mobile-card-table" data-mobile-cards="true">
+                <thead><tr><th>Data</th><th>Źródło</th><th>Cel</th><th class="text-right">Liczba</th><th>Notatka</th><th>Status</th><th>Akcje</th></tr></thead>
+                <tbody>
+                    {% for transfer in transfers %}
+                    <tr>
+                        <td data-label="Data"><strong>{{ transfer.transfer_date|date:'d.m.Y' }}</strong></td>
+                        <td data-label="Źródło"><a href="{% url 'sow_detail' transfer.source_farrowing.sow_id %}" class="table-link">{{ transfer.source_farrowing.sow.ear_tag }}</a><br><small>Oproszenie {{ transfer.source_farrowing.event_date|date:'d.m.Y' }}</small></td>
+                        <td data-label="Cel"><a href="{% url 'sow_detail' transfer.target_farrowing.sow_id %}" class="table-link">{{ transfer.target_farrowing.sow.ear_tag }}</a><br><small>Oproszenie {{ transfer.target_farrowing.event_date|date:'d.m.Y' }}</small></td>
+                        <td data-label="Liczba" class="text-right"><strong>{{ transfer.quantity }} szt.</strong></td>
+                        <td data-label="Notatka">{{ transfer.note|default:'—' }}</td>
+                        <td data-label="Status">{% if transfer.is_canceled %}<span class="status-pill status-red">Anulowane</span>{% else %}<span class="status-pill status-green">Aktywne</span>{% endif %}</td>
+                        <td data-label="Akcje">
+                            {% if transfer.is_canceled %}
+                                <span class="muted-small">{{ transfer.cancellation_note|default:'Bez podanej przyczyny' }}</span>
+                            {% else %}
+                                <div class="row-actions">
+                                    <a href="{% url 'edit_piglet_transfer' transfer.id %}" class="table-link">Edytuj</a>
+                                    <form method="post" action="{% url 'cancel_piglet_transfer' transfer.id %}" data-confirm="Anulować transfer? System sprawdzi całą późniejszą historię obu odchowów.">
+                                        {% csrf_token %}
+                                        <button type="submit" class="table-link button-link danger-link">Anuluj transfer</button>
+                                    </form>
+                                </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if transfers.paginator.num_pages > 1 %}
+        <nav class="pagination-controls" aria-label="Stronicowanie przeniesień">
+            {% if transfers.has_previous %}<a class="button button-secondary" href="?page={{ transfers.previous_page_number }}&source={{ selected_source|urlencode }}&target={{ selected_target|urlencode }}&status={{ selected_status }}">Poprzednia</a>{% endif %}
+            <span>Strona {{ transfers.number }} z {{ transfers.paginator.num_pages }}</span>
+            {% if transfers.has_next %}<a class="button button-secondary" href="?page={{ transfers.next_page_number }}&source={{ selected_source|urlencode }}&target={{ selected_target|urlencode }}&status={{ selected_status }}">Następna</a>{% endif %}
+        </nav>
+        {% endif %}
+        {% else %}
+            {% url 'add_piglet_transfer' as add_transfer_url %}
+            {% include 'components/empty_state.html' with empty_title='Brak przeniesień' empty_message='Nie znaleziono przeniesień dla wybranych filtrów.' empty_action_url=add_transfer_url empty_action_label='Dodaj przeniesienie' %}
+        {% endif %}
+    </section>
+</main>
+{% endblock %}

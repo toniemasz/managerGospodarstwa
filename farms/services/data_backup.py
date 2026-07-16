@@ -36,6 +36,7 @@ from feed.models import (
 from sales.models import PigSaleModel, SaleClassRowModel
 from sows.models import (
     MortalityReportModel,
+    PigletTransferModel,
     SowEventModel,
     SowModel,
     VaccinationCycleModel,
@@ -43,8 +44,8 @@ from sows.models import (
 )
 
 
-BACKUP_FORMAT_VERSION = 4
-SUPPORTED_USER_BACKUP_VERSIONS = {1, 2, 3, 4}
+BACKUP_FORMAT_VERSION = 5
+SUPPORTED_USER_BACKUP_VERSIONS = {1, 2, 3, 4, 5}
 
 
 def _normalize_mortality_type(value):
@@ -63,6 +64,7 @@ USER_EXPORT_QUERYSETS = {
     'sows.VaccinationPlanModel': lambda farm: VaccinationPlanModel.objects.filter(farm=farm).order_by('id'),
     'sows.SowModel': lambda farm: SowModel.objects.filter(farm=farm).order_by('id'),
     'sows.SowEventModel': lambda farm: SowEventModel.objects.filter(sow__farm=farm).order_by('id'),
+    'sows.PigletTransferModel': lambda farm: PigletTransferModel.objects.filter(farm=farm).order_by('id'),
     'sows.VaccinationCycleModel': lambda farm: VaccinationCycleModel.objects.filter(plan__farm=farm).order_by('id'),
     'sows.MortalityReportModel': lambda farm: MortalityReportModel.objects.filter(farm=farm).order_by('id'),
     'feed.IngredientModel': lambda farm: IngredientModel.objects.filter(farm=farm).order_by('id'),
@@ -88,6 +90,7 @@ BUSINESS_MODELS = (
     VaccinationPlanModel,
     SowModel,
     SowEventModel,
+    PigletTransferModel,
     VaccinationCycleModel,
     MortalityReportModel,
     IngredientModel,
@@ -348,6 +351,7 @@ def _delete_farm_business_data(farm):
     IngredientModel.objects.filter(farm=farm).delete()
     VaccinationCycleModel.objects.filter(plan__farm=farm).delete()
     MortalityReportModel.objects.filter(farm=farm).delete()
+    PigletTransferModel.objects.filter(farm=farm).delete()
     SowModel.objects.filter(farm=farm).delete()
     VaccinationPlanModel.objects.filter(farm=farm).delete()
 
@@ -367,6 +371,7 @@ def _merge_user_records(payload, data, farm):
         obj, created = SowModel.objects.get_or_create(farm=farm, ear_tag=fields.pop('ear_tag'), defaults=fields)
         sow_map[str(record['pk'])] = obj
         counts['maciory'] += int(created)
+    event_map = {}
     for record in _records(data, 'sows.SowEventModel'):
         fields = _clean_fields(record['fields'], {'sow', 'created_at', 'vaccination_plan'})
         sow = _mapped(sow_map, record['fields'].get('sow'), 'maciory')
@@ -377,6 +382,21 @@ def _merge_user_records(payload, data, farm):
         if created and plan:
             event.vaccination_plan = plan
             event.save(update_fields=('vaccination_plan',))
+        event_map[str(record['pk'])] = event
+    for record in _records(data, 'sows.PigletTransferModel'):
+        fields = _clean_fields(record['fields'], {
+            'farm', 'source_farrowing', 'target_farrowing', 'created_by', 'canceled_by',
+            'created_at', 'updated_at',
+        })
+        _, created = PigletTransferModel.objects.get_or_create(
+            farm=farm,
+            source_farrowing=_mapped(event_map, record['fields'].get('source_farrowing'), 'oproszenia źródłowe'),
+            target_farrowing=_mapped(event_map, record['fields'].get('target_farrowing'), 'oproszenia docelowe'),
+            transfer_date=fields.pop('transfer_date'),
+            quantity=fields.pop('quantity'),
+            defaults={**fields, 'created_by': None, 'canceled_by': None},
+        )
+        counts['przeniesienia prosiąt'] += int(created)
     _restore_plan_sow_relations(data, plan_map, sow_map)
     for record in _records(data, 'sows.VaccinationCycleModel'):
         fields = _clean_fields(record['fields'], {'plan', 'sow', 'created_at'})
@@ -390,12 +410,14 @@ def _merge_user_records(payload, data, farm):
         )
         counts['cykle szczepień'] += int(created)
     for record in _records(data, 'sows.MortalityReportModel'):
-        fields = _clean_fields(record['fields'], {'farm', 'sow', 'created_by', 'created_at'})
+        fields = _clean_fields(record['fields'], {'farm', 'sow', 'farrowing', 'created_by', 'created_at'})
         sow_id = record['fields'].get('sow')
+        farrowing_id = record['fields'].get('farrowing')
         sow = _mapped(sow_map, sow_id, 'maciory') if sow_id else None
         _, created = MortalityReportModel.objects.get_or_create(
             farm=farm,
             sow=sow,
+            farrowing=_mapped(event_map, farrowing_id, 'cykle odchowu') if farrowing_id else None,
             mortality_type=_normalize_mortality_type(fields.pop('mortality_type', None)),
             mortality_date=fields.pop('mortality_date'),
             quantity=fields.pop('quantity'),
@@ -492,6 +514,7 @@ def user_business_data_counts(farm: FarmModel) -> dict[str, int]:
         'plany szczepień': VaccinationPlanModel.objects.filter(farm=farm),
         'maciory': SowModel.objects.filter(farm=farm),
         'zdarzenia macior': SowEventModel.objects.filter(sow__farm=farm),
+        'przeniesienia prosiąt': PigletTransferModel.objects.filter(farm=farm),
         'cykle szczepień': VaccinationCycleModel.objects.filter(plan__farm=farm),
         'upadki': MortalityReportModel.objects.filter(farm=farm),
         'składniki': IngredientModel.objects.filter(farm=farm),
@@ -572,15 +595,31 @@ def _restore_user_records(payload, data, farm):
         product_map[str(record['pk'])] = obj
         counts['produkty gotowej paszy'] += 1
 
+    event_map = {}
     for record in _records(data, 'sows.SowEventModel'):
         fields = _clean_fields(record['fields'], {'sow', 'vaccination_plan', 'created_at'})
         plan_id = record['fields'].get('vaccination_plan')
-        SowEventModel.objects.create(
+        event = SowEventModel.objects.create(
             sow=_mapped(sow_map, record['fields'].get('sow'), 'zdarzenia macior'),
             vaccination_plan=_mapped(plan_map, plan_id, 'plany szczepień') if plan_id else None,
             **fields,
         )
+        event_map[str(record['pk'])] = event
         counts['zdarzenia macior'] += 1
+    for record in _records(data, 'sows.PigletTransferModel'):
+        fields = _clean_fields(record['fields'], {
+            'farm', 'source_farrowing', 'target_farrowing', 'created_by', 'canceled_by',
+            'created_at', 'updated_at',
+        })
+        PigletTransferModel.objects.create(
+            farm=farm,
+            source_farrowing=_mapped(event_map, record['fields'].get('source_farrowing'), 'oproszenia źródłowe'),
+            target_farrowing=_mapped(event_map, record['fields'].get('target_farrowing'), 'oproszenia docelowe'),
+            created_by=None,
+            canceled_by=None,
+            **fields,
+        )
+        counts['przeniesienia prosiąt'] += 1
     for record in _records(data, 'sows.VaccinationCycleModel'):
         fields = _clean_fields(record['fields'], {'plan', 'sow', 'created_at'})
         VaccinationCycleModel.objects.create(
@@ -590,12 +629,14 @@ def _restore_user_records(payload, data, farm):
         )
         counts['cykle szczepień'] += 1
     for record in _records(data, 'sows.MortalityReportModel'):
-        fields = _clean_fields(record['fields'], {'farm', 'sow', 'created_by', 'created_at'})
+        fields = _clean_fields(record['fields'], {'farm', 'sow', 'farrowing', 'created_by', 'created_at'})
         fields['mortality_type'] = _normalize_mortality_type(fields.get('mortality_type'))
         sow_id = record['fields'].get('sow')
+        farrowing_id = record['fields'].get('farrowing')
         MortalityReportModel.objects.create(
             farm=farm,
             sow=_mapped(sow_map, sow_id, 'maciory') if sow_id else None,
+            farrowing=_mapped(event_map, farrowing_id, 'cykle odchowu') if farrowing_id else None,
             created_by=None,
             **fields,
         )
@@ -838,6 +879,7 @@ def _validate_user_records(data):
     required_fields = {
         'sows.SowModel': {'ear_tag'},
         'sows.SowEventModel': {'sow', 'event_type', 'event_date'},
+        'sows.PigletTransferModel': {'source_farrowing', 'target_farrowing', 'quantity', 'transfer_date'},
         'sows.VaccinationCycleModel': {'plan', 'sow', 'cycle_id', 'scheduled_date', 'status'},
         'sows.MortalityReportModel': {'mortality_date', 'quantity'},
         'feed.IngredientModel': {'name'},

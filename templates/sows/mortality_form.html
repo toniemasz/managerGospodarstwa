@@ -8,15 +8,15 @@
         <div>
             <p class="eyebrow">Maciory</p>
             <h1>{% if is_edit %}Edytuj upadek{% else %}Zgłoś upadek{% endif %}</h1>
-            <p class="page-subtitle">Rejestruj upadek maciory, prosiaka, warchlaka albo tucznika.</p>
+            <p class="page-subtitle">Rejestruj upadki przy aktywnym odchowie oraz straty po odsadzeniu.</p>
         </div>
         <a href="{% url 'mortality_list' %}" class="button button-secondary">Lista upadków</a>
     </section>
 
-    <section class="notice notice-warning">
+    <section class="notice notice-info">
         <div>
             <h2>Zakres zgłoszenia</h2>
-            <p>Upadki przed odsadzeniem są wyliczane automatycznie z oproszenia i odsadzenia. Ich liczby nie można wpisywać ręcznie.</p>
+            <p>Upadek przed odsadzeniem przypisz do maciory, przy której prosięta znajdowały się w dniu zdarzenia. Nie zmienia to liczby biologicznie urodzonych.</p>
         </div>
     </section>
 
@@ -38,7 +38,7 @@
             <div id="sec_mortality_sow" class="form-section dynamic-form-section hidden">
                 <div class="form-section-heading">
                     <h2>Maciora</h2>
-                    <p>Wpisz początek numeru kolczyka i wybierz właściwą maciorę z podpowiedzi.</p>
+                    <p>Dla upadku maciory wybierz aktywną maciorę. Dla upadku przed odsadzeniem wybierz maciorę z aktywnym odchowem.</p>
                 </div>
                 {% include 'components/form_field.html' with field=form.sow %}
                 <datalist id="mortality-sow-options">
@@ -46,13 +46,13 @@
                         <option value="{{ sow.ear_tag }}">Maciora {{ sow.ear_tag }}</option>
                     {% endfor %}
                 </datalist>
-                <p class="field-hint">Po zapisie wybrana maciora zostanie zarchiwizowana z powodu upadku.</p>
+                <p class="field-hint">Archiwizacja nastąpi wyłącznie po wybraniu typu „Maciora”.</p>
             </div>
 
             <div id="sec_mortality_quantity" class="form-section dynamic-form-section">
                 <div class="form-section-heading">
                     <h2>Liczba sztuk</h2>
-                    <p>Dla zwierząt po odsadzeniu podaj liczbę, która pomniejszy bieżący stan. Dla maciory zapis zostanie ustawiony na 1 sztukę.</p>
+                    <p>Dla prosiąt przed odsadzeniem liczba pomniejszy stan aktywnego odchowu. Dla maciory zapis zostanie ustawiony na 1 sztukę.</p>
                 </div>
                 {% include 'components/form_field.html' with field=form.quantity %}
             </div>

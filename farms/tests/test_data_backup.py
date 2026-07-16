@@ -37,6 +37,7 @@ from feed.models import (
 from sales.models import PigSaleModel, SaleClassRowModel
 from sows.models import (
     MortalityReportModel,
+    PigletTransferModel,
     SowEventModel,
     SowModel,
     VaccinationCycleModel,
@@ -163,6 +164,55 @@ def test_user_backup_restores_all_models_and_relationships():
 
 
 @pytest.mark.django_db
+def test_user_backup_restores_piglet_transfer_and_pre_weaning_mortality_cycles():
+    source_user = User.objects.create_user(username='piglet-backup-source')
+    source_farm = get_or_create_user_farm(source_user)
+    source_sow = SowModel.objects.create(farm=source_farm, ear_tag='BACKUP-A')
+    target_sow = SowModel.objects.create(farm=source_farm, ear_tag='BACKUP-B')
+    source_farrowing = SowEventModel.objects.create(
+        sow=source_sow,
+        event_type='FARROWING',
+        event_date=date(2026, 1, 1),
+        details={'born_alive': 12},
+    )
+    target_farrowing = SowEventModel.objects.create(
+        sow=target_sow,
+        event_type='FARROWING',
+        event_date=date(2026, 1, 2),
+        details={'born_alive': 8},
+    )
+    PigletTransferModel.objects.create(
+        farm=source_farm,
+        source_farrowing=source_farrowing,
+        target_farrowing=target_farrowing,
+        quantity=3,
+        transfer_date=date(2026, 1, 5),
+        note='Przeniesienie z kopii',
+    )
+    MortalityReportModel.objects.create(
+        farm=source_farm,
+        sow=target_sow,
+        farrowing=target_farrowing,
+        mortality_type=MortalityReportModel.TYPE_PRE_WEANING,
+        mortality_date=date(2026, 1, 6),
+        quantity=1,
+    )
+
+    backup_file = _user_backup_fixture(source_user, source_farm)
+    target_user = User.objects.create_user(username='piglet-backup-target')
+    target_farm = get_or_create_user_farm(target_user)
+
+    counts = import_user_backup(backup_file, target_farm)
+
+    restored_transfer = PigletTransferModel.objects.get(farm=target_farm)
+    assert counts['przeniesienia prosiąt'] == 1
+    assert restored_transfer.source_sow.ear_tag == 'BACKUP-A'
+    assert restored_transfer.target_sow.ear_tag == 'BACKUP-B'
+    restored_mortality = MortalityReportModel.objects.get(farm=target_farm)
+    assert restored_mortality.farrowing == restored_transfer.target_farrowing
+
+
+@pytest.mark.django_db
 def test_user_backup_restores_vaccination_scope_cycles_and_event_snapshot():
     source_user = User.objects.create_user(username='vaccination-backup-source')
     source_farm = get_or_create_user_farm(source_user)
@@ -261,6 +311,7 @@ def test_version_2_backup_without_new_optional_sections_is_upgraded_safely():
     payload = _payload_from_archive(archive)
     payload['version'] = 2
     payload['data'].pop('sows.MortalityReportModel')
+    payload['data'].pop('sows.PigletTransferModel')
     payload['data'].pop('feed.FeedServingAllocationModel')
 
     target_user = User.objects.create_user(username='legacy-backup-target')
@@ -272,7 +323,7 @@ def test_version_2_backup_without_new_optional_sections_is_upgraded_safely():
     )
 
     analysis = analyze_user_backup(backup_file, target_farm)
-    assert analysis['format_version'] == 4
+    assert analysis['format_version'] == 5
     assert analysis['payload']['source_version'] == 2
 
     backup_file.seek(0)

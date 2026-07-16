@@ -50,12 +50,32 @@
                     <strong>{{ sow.avg_weaned }} szt.</strong>
                     <small>Średnia liczba prosiąt po odsadzeniu.</small>
                 </div>
-                <div class="stat-tile{% if sow.avg_loss_before_weaning %} is-warning{% endif %}">
-                    <span>Upadki przed odsadzeniem</span>
-                    <strong>{{ sow.avg_loss_before_weaning }} szt.</strong>
-                    <small>Wskaźnik do bieżącej kontroli dobrostanu.</small>
+                <div class="stat-tile{% if sow.recorded_pre_weaning_deaths %} is-warning{% endif %}">
+                    <span>Zarejestrowane upadki przed odsadzeniem</span>
+                    <strong>{{ sow.recorded_pre_weaning_deaths }} szt.</strong>
+                    <small>Jawne zgłoszenia przypisane do cykli odchowu.</small>
                 </div>
             </section>
+
+            {% if sow.piglet_care %}
+            <section class="panel compact-panel">
+                <div class="section-heading">
+                    <div>
+                        <h2>Aktywny odchów</h2>
+                        <p>Bilans od oproszenia {{ sow.piglet_care.farrowing.event_date|date:'d.m.Y' }}.</p>
+                    </div>
+                    <strong class="status-pill status-green">Aktualnie w odchowie: {{ sow.piglet_care.available }} szt.</strong>
+                </div>
+                <div class="stats-grid compact-stats">
+                    <div class="stat-tile"><span>Urodzone żywe</span><strong>{{ sow.piglet_care.born_alive }} szt.</strong></div>
+                    <div class="stat-tile"><span>Przyjęte</span><strong>{{ sow.piglet_care.received }} szt.</strong></div>
+                    <div class="stat-tile"><span>Przekazane</span><strong>{{ sow.piglet_care.transferred }} szt.</strong></div>
+                    <div class="stat-tile"><span>Upadki przed odsadzeniem</span><strong>{{ sow.piglet_care.deaths }} szt.</strong></div>
+                    <div class="stat-tile"><span>Już odsadzone</span><strong>{{ sow.piglet_care.weaned }} szt.</strong></div>
+                    <div class="stat-tile is-success"><span>Aktualnie w odchowie</span><strong>{{ sow.piglet_care.available }} szt.</strong></div>
+                </div>
+            </section>
+            {% endif %}
 
             <section class="panel table-panel">
                 <div class="section-heading">
@@ -73,6 +93,7 @@
                             <option value="WEANING">Odsadzenia</option>
                             <option value="MISCARRIAGE">Poronienia</option>
                             <option value="VACCINATION">Szczepienia</option>
+                            <option value="PIGLET_TRANSFER">Przeniesienia prosiąt</option>
                         </select>
                     </div>
                 </div>
@@ -89,7 +110,7 @@
                         </thead>
                         <tbody>
                             {% for event in sow.all_events %}
-                            <tr class="event-row" data-filter="{{ event.event_type }}" data-search="{{ event.event_date }} {{ event.get_event_type_display }}">
+                            <tr class="event-row" data-filter="{% if event.is_piglet_transfer %}PIGLET_TRANSFER{% else %}{{ event.event_type }}{% endif %}" data-search="{{ event.event_date }} {{ event.get_event_type_display }}">
                                 <td><strong>{{ event.event_date|date:"d.m.Y" }}</strong></td>
                                 <td>
                                     {% if event.event_type == 'INSEMINATION' %}
@@ -104,6 +125,10 @@
                                         <span class="status-pill status-red">Poronienie</span>
                                     {% elif event.event_type == 'VACCINATION' %}
                                         <span class="status-pill status-green">Szczepienie</span>
+                                    {% elif event.event_type == 'PIGLET_TRANSFER_OUT' %}
+                                        <span class="status-pill status-amber">Przekazanie prosiąt</span>
+                                    {% elif event.event_type == 'PIGLET_TRANSFER_IN' %}
+                                        <span class="status-pill status-blue">Przyjęcie prosiąt</span>
                                     {% else %}
                                         <span class="status-pill">{{ event.get_event_type_display }}</span>
                                     {% endif %}
@@ -135,12 +160,24 @@
                                         {% elif event.event_type == 'VACCINATION' %}
                                             <span>Szczepionka: <strong>{{ event.details.vaccine_name|default:"Brak nazwy" }}</strong></span>
                                             {% if event.details.note %}<span>Notatka: <strong>{{ event.details.note }}</strong></span>{% endif %}
+                                        {% elif event.event_type == 'PIGLET_TRANSFER_OUT' %}
+                                            <span>Przekazano <strong>{{ event.details.quantity }} prosiąt</strong> do maciory <a href="{% url 'sow_detail' event.details.other_sow_id %}" class="table-link">{{ event.details.other_sow_ear_tag }}</a>.</span>
+                                            {% if event.details.note %}<span>Notatka: {{ event.details.note }}</span>{% endif %}
+                                            {% if event.details.is_canceled %}<span class="status-pill status-red">Transfer anulowany</span>{% endif %}
+                                        {% elif event.event_type == 'PIGLET_TRANSFER_IN' %}
+                                            <span>Przyjęto <strong>{{ event.details.quantity }} prosiąt</strong> od maciory <a href="{% url 'sow_detail' event.details.other_sow_id %}" class="table-link">{{ event.details.other_sow_ear_tag }}</a>.</span>
+                                            {% if event.details.note %}<span>Notatka: {{ event.details.note }}</span>{% endif %}
+                                            {% if event.details.is_canceled %}<span class="status-pill status-red">Transfer anulowany</span>{% endif %}
                                         {% endif %}
                                     </div>
                                 </td>
                                 <td class="text-right">
                                     <div class="row-actions">
-                                        <a href="{% url 'edit_event' event.id %}" class="table-link">Edytuj</a>
+                                        {% if event.is_piglet_transfer %}
+                                            <a href="{% url 'edit_piglet_transfer' event.transfer_id %}" class="table-link">Transfer</a>
+                                        {% else %}
+                                            <a href="{% url 'edit_event' event.id %}" class="table-link">Edytuj</a>
+                                        {% endif %}
                                     </div>
                                 </td>
                             </tr>
@@ -218,6 +255,10 @@
                             {% elif event.event_type == 'VACCINATION' %}
                                 <span>Szczepionka: <strong>{{ event.details.vaccine_name|default:"Brak nazwy" }}</strong></span>
                                 {% if event.details.note %}<span>Notatka: <strong>{{ event.details.note }}</strong></span>{% endif %}
+                            {% elif event.event_type == 'PIGLET_TRANSFER_OUT' %}
+                                <span>Przekazano <strong>{{ event.details.quantity }} szt.</strong> do {{ event.details.other_sow_ear_tag }}.</span>
+                            {% elif event.event_type == 'PIGLET_TRANSFER_IN' %}
+                                <span>Przyjęto <strong>{{ event.details.quantity }} szt.</strong> od {{ event.details.other_sow_ear_tag }}.</span>
                             {% else %}
                                 <span>{{ event.get_event_type_display }}</span>
                             {% endif %}

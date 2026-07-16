@@ -1,6 +1,7 @@
 from django.contrib import admin
 from .models import (
     MortalityReportModel,
+    PigletTransferModel,
     SowEventModel,
     SowModel,
     VaccinationCycleModel,
@@ -20,6 +21,13 @@ class SowEventAdmin(admin.ModelAdmin):
     list_display = ('sow', 'event_type', 'event_date')
     list_filter = ('sow__farm', 'event_type')
     search_fields = ('sow__ear_tag', 'sow__farm__name')
+
+
+@admin.register(PigletTransferModel)
+class PigletTransferAdmin(admin.ModelAdmin):
+    list_display = ('transfer_date', 'source_farrowing', 'target_farrowing', 'quantity', 'farm', 'canceled_at')
+    list_filter = ('farm', 'transfer_date', 'canceled_at')
+    search_fields = ('source_farrowing__sow__ear_tag', 'target_farrowing__sow__ear_tag', 'note')
 
 
 @admin.register(VaccinationPlanModel)

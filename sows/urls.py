@@ -30,6 +30,10 @@ from .views import (
     delete_mortality_view,
     general_statistics_view,
     farrowing_panel_view,
+    piglet_transfer_list_view,
+    add_piglet_transfer_view,
+    edit_piglet_transfer_view,
+    cancel_piglet_transfer_view,
 )
 
 urlpatterns = [
@@ -47,6 +51,10 @@ urlpatterns = [
     path('maciory/upadki/zglos/', report_mortality_view, name='report_mortality'),
     path('maciory/upadki/<int:report_id>/edytuj/', edit_mortality_view, name='edit_mortality'),
     path('maciory/upadki/<int:report_id>/usun/', delete_mortality_view, name='delete_mortality'),
+    path('maciory/przeniesienia-prosiat/', piglet_transfer_list_view, name='piglet_transfer_list'),
+    path('maciory/przeniesienia-prosiat/dodaj/', add_piglet_transfer_view, name='add_piglet_transfer'),
+    path('maciory/przeniesienia-prosiat/<int:transfer_id>/edytuj/', edit_piglet_transfer_view, name='edit_piglet_transfer'),
+    path('maciory/przeniesienia-prosiat/<int:transfer_id>/anuluj/', cancel_piglet_transfer_view, name='cancel_piglet_transfer'),
     path('maciory/<int:sow_id>/', sow_detail_view, name='sow_detail'),
     path('maciory/szczepienie-grupowe/', bulk_vaccinate_view, name='bulk_vaccinate'),
     path('maciory/szczepienie/zarejestruj/', record_vaccination_view, name='record_vaccination'),

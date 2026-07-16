@@ -8,7 +8,7 @@
         <div>
             <p class="eyebrow">Maciory</p>
             <h1>Upadki</h1>
-            <p class="page-subtitle">Ręczne zgłoszenia oraz automatyczne straty przed odsadzeniem w bieżącym gospodarstwie.</p>
+            <p class="page-subtitle">Jawne zgłoszenia upadków oraz oznaczone historyczne szacunki ze starszych cykli.</p>
         </div>
         <div class="header-actions">
             <a href="{% url 'report_mortality' %}" class="button button-primary">Zgłoś upadek</a>
@@ -20,7 +20,7 @@
 
     <section class="stats-grid compact-stats">
         <div class="stat-tile"><span>Upadki macior</span><strong>{{ summary.sow }} szt.</strong></div>
-        <div class="stat-tile"><span>Przed odsadzeniem</span><strong>{{ summary.pre_weaning }} szt.</strong><small>Wyliczone per cykl.</small></div>
+        <div class="stat-tile"><span>Przed odsadzeniem</span><strong>{{ summary.pre_weaning }} szt.</strong><small>Zgłoszenia i historyczne szacunki.</small></div>
         <div class="stat-tile"><span>Upadki prosiąt</span><strong>{{ summary.piglet }} szt.</strong></div>
         <div class="stat-tile"><span>Upadki warchlaków</span><strong>{{ summary.weaner }} szt.</strong></div>
         <div class="stat-tile"><span>Upadki tuczników</span><strong>{{ summary.finisher }} szt.</strong></div>
@@ -71,7 +71,7 @@
                                 —
                             {% endif %}
                         </td>
-                        <td data-label="Cykl">—</td>
+                        <td data-label="Cykl">{% if report.farrowing %}Oproszenie {{ report.farrowing.event_date|date:'d.m.Y' }}{% else %}—{% endif %}</td>
                         <td data-label="Liczba" class="text-right"><strong>{{ report.quantity }}</strong> szt.</td>
                         <td data-label="Przyczyna">{{ report.reason|default:"—" }}</td>
                         <td data-label="Notatka">{{ report.note|default:"—" }}</td>
@@ -84,11 +84,11 @@
                     <tr>
                         <td data-label="Data"><strong>{{ row.mortality_date|date:"d.m.Y" }}</strong></td>
                         <td data-label="Typ"><span class="status-pill status-blue">Przed odsadzeniem</span></td>
-                        <td data-label="Źródło">Wyliczone automatycznie z oproszenia i odsadzenia</td>
+                        <td data-label="Źródło">Historyczny szacunek: urodzone minus odsadzone</td>
                         <td data-label="Maciora"><a href="{% url 'sow_detail' row.sow.id %}" class="table-link">{{ row.sow.ear_tag }}</a></td>
                         <td data-label="Cykl">{{ row.cycle_label }}</td>
                         <td data-label="Liczba" class="text-right"><strong>{% if row.quantity != None %}{{ row.quantity }} szt.{% else %}—{% endif %}</strong></td>
-                        <td data-label="Przyczyna">{% if row.is_inconsistent %}Niespójność: odsadzono więcej niż urodzono{% else %}—{% endif %}</td>
+                        <td data-label="Przyczyna">{% if row.is_inconsistent %}Niejednoznaczne dane historyczne: możliwy transfer{% else %}—{% endif %}</td>
                         <td data-label="Notatka">{% if row.unavailable_reason %}Nie można obliczyć — {{ row.unavailable_reason|lower }}{% else %}—{% endif %}</td>
                         <td data-label="Utworzył">System</td><td data-label="Utworzono">—</td>
                         <td data-label="Akcje"><a href="{% url 'sow_detail' row.sow.id %}" class="table-link">Zdarzenia maciory</a></td>

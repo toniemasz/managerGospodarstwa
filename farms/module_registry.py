@@ -79,6 +79,9 @@ MODULE_DEFINITIONS = (
             "archived_sows",
             "mortality_list",
             "report_mortality",
+            "piglet_transfer_list",
+            "add_piglet_transfer",
+            "edit_piglet_transfer",
             "vaccination_plans",
             "add_vaccination_plan",
             "edit_vaccination_plan",
@@ -98,6 +101,16 @@ MODULE_DEFINITIONS = (
                     "bulk_sow_events",
                     "bulk_pregnancy_check",
                     "farrowing_panel",
+                ),
+            },
+            {
+                "title": "Przeniesienia prosiąt",
+                "url_name": "piglet_transfer_list",
+                "icon_name": "history",
+                "active_urls": (
+                    "piglet_transfer_list",
+                    "add_piglet_transfer",
+                    "edit_piglet_transfer",
                 ),
             },
             {

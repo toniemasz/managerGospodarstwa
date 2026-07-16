@@ -9,6 +9,7 @@ from sows.actions.events import SowEventActions
 from sows.domain.sow_state_machine import SowStateMachine
 from sows.services.sow_lifecycle import SowEvent
 from sows.services.sow_repository import SowRepository
+from sows.services.piglet_care import PigletCareError, PigletCareService
 
 
 @dataclass
@@ -86,6 +87,17 @@ class BulkSowEventService:
                 if not self._is_event_allowed(simulated_sow.status, row.event_type):
                     result.add_error(row.form_index, SowStateMachine.get_error_message(simulated_sow.status))
                     continue
+
+                if row.event_type == SowStateMachine.WEANING:
+                    try:
+                        PigletCareService(self.farm).validate_weaning(
+                            sow=row.sow,
+                            weaning_date=row.event_date,
+                            quantity=int(row.details.get("count") or 0),
+                        )
+                    except PigletCareError as error:
+                        result.add_error(row.form_index, error.messages[0])
+                        continue
 
                 pending_events.append(SowEvent(
                     event_type=row.event_type,
