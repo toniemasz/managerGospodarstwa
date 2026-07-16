@@ -130,7 +130,13 @@
 
             {{ row_formset.management_form }}
             {% if row_formset.non_form_errors %}
-                <div class="notice notice-danger">{{ row_formset.non_form_errors }}</div>
+                <div
+                    data-notification-source
+                    data-notification-form-errors="true"
+                    data-notification-type="error"
+                    data-notification-title="Nie zapisano rozliczenia"
+                    hidden
+                >{{ row_formset.non_form_errors }}</div>
             {% endif %}
             <div class="table-scroll">
                 <table class="data-table settlement-table" data-no-pagination="true">

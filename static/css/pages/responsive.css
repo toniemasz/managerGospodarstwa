@@ -166,8 +166,7 @@
     }
 
     .app-page,
-    .container,
-    .message-stack {
+    .container {
         width: min(100% - 1rem, 80rem);
     }
 

@@ -681,6 +681,172 @@
         });
     }
 
+    function initNotificationCenter(root = document) {
+        const center = root.querySelector('[data-notification-center]');
+        if (!center || center.dataset.notificationBound === 'true') return;
+
+        const dialog = center.querySelector('[data-notification-dialog]');
+        const title = center.querySelector('[data-notification-title]');
+        const message = center.querySelector('[data-notification-message]');
+        const confirmButton = center.querySelector('[data-notification-confirm]');
+        const timerBar = center.querySelector('.notification-timer');
+        if (!dialog || !title || !message || !confirmButton) return;
+
+        const typeSettings = {
+            success: {
+                title: 'Operacja zakończona pomyślnie',
+                timeout: Number(center.dataset.successTimeout) || 3200
+            },
+            info: {
+                title: 'Informacja',
+                timeout: Number(center.dataset.infoTimeout) || 4500
+            },
+            warning: {
+                title: 'Wymagana uwaga',
+                timeout: Number(center.dataset.warningTimeout) || 6000
+            },
+            error: {
+                title: 'Nie udało się wykonać operacji',
+                timeout: Number(center.dataset.errorTimeout) || 8000
+            }
+        };
+        const normalizeText = (value) => value.replace(/\s+/g, ' ').trim();
+        const entries = [];
+        const seen = new Set();
+
+        const addEntry = (element, origin) => {
+            const text = normalizeText(element.textContent || '');
+            if (!text) return;
+
+            const requestedType = element.dataset.notificationType || 'success';
+            const type = typeSettings[requestedType] ? requestedType : 'success';
+            const entryTitle = normalizeText(element.dataset.notificationTitle || '');
+            const key = `${type}:${entryTitle}:${text}`;
+            if (seen.has(key)) return;
+
+            seen.add(key);
+            entries.push({ type, title: entryTitle, text, origin });
+        };
+
+        center.querySelectorAll('[data-notification-entry]').forEach((element) => addEntry(element, 'message'));
+        root.querySelectorAll('[data-notification-source]').forEach((element) => addEntry(element, 'form'));
+
+        const inlineErrorDetails = [];
+        root.querySelectorAll('.errorlist').forEach((errorList) => {
+            if (errorList.closest('[data-notification-source]')) return;
+
+            const container = errorList.closest('.form-field, td');
+            const label = normalizeText(
+                container?.querySelector('label')?.textContent || container?.dataset.label || ''
+            );
+            const errors = Array.from(errorList.querySelectorAll('li'));
+            const errorTexts = errors.length ? errors : [errorList];
+
+            errorTexts.forEach((error) => {
+                const errorText = normalizeText(error.textContent || '');
+                if (!errorText) return;
+                const detail = label ? `${label}: ${errorText}` : errorText;
+                if (!inlineErrorDetails.includes(detail)) inlineErrorDetails.push(detail);
+            });
+        });
+
+        if (inlineErrorDetails.length) {
+            const visibleDetails = inlineErrorDetails.slice(0, 4).map((detail) => `• ${detail}`);
+            if (inlineErrorDetails.length > visibleDetails.length) {
+                visibleDetails.push(`• Pozostałe błędy: ${inlineErrorDetails.length - visibleDetails.length}.`);
+            }
+            const detailText = visibleDetails.join('\n');
+            const formEntry = entries.find((entry) => entry.origin === 'form' && entry.type === 'error');
+
+            if (formEntry) {
+                formEntry.text = `${formEntry.text}\n${detailText}`;
+            } else {
+                entries.push({
+                    type: 'error',
+                    title: 'Nie zapisano zmian',
+                    text: `Popraw oznaczone pola.\n${detailText}`,
+                    origin: 'form'
+                });
+            }
+        }
+
+        if (!entries.length) return;
+
+        center.dataset.notificationBound = 'true';
+        let activeIndex = -1;
+        let closeTimer = null;
+        let nextTimer = null;
+        let isClosing = false;
+        const previouslyFocused = document.activeElement;
+
+        const finishQueue = () => {
+            center.hidden = true;
+            document.body.classList.remove('notification-open');
+            if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected) {
+                previouslyFocused.focus({ preventScroll: true });
+            }
+        };
+
+        const showNext = () => {
+            activeIndex += 1;
+            const entry = entries[activeIndex];
+            if (!entry) {
+                finishQueue();
+                return;
+            }
+
+            const settings = typeSettings[entry.type];
+            isClosing = false;
+            dialog.dataset.type = entry.type;
+            dialog.style.setProperty('--notification-timeout', `${settings.timeout}ms`);
+            title.textContent = entry.title || settings.title;
+            message.textContent = entry.text;
+            center.hidden = false;
+            document.body.classList.add('notification-open');
+
+            if (timerBar) {
+                timerBar.style.animation = 'none';
+                void timerBar.offsetWidth;
+                timerBar.style.animation = '';
+            }
+
+            window.requestAnimationFrame(() => confirmButton.focus({ preventScroll: true }));
+            closeTimer = window.setTimeout(closeCurrent, settings.timeout);
+        };
+
+        const closeCurrent = () => {
+            if (isClosing) return;
+            isClosing = true;
+            window.clearTimeout(closeTimer);
+            center.hidden = true;
+            document.body.classList.remove('notification-open');
+
+            if (activeIndex < entries.length - 1) {
+                nextTimer = window.setTimeout(showNext, 150);
+            } else {
+                finishQueue();
+            }
+        };
+
+        confirmButton.addEventListener('click', closeCurrent);
+        center.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                closeCurrent();
+            }
+            if (event.key === 'Tab') {
+                event.preventDefault();
+                confirmButton.focus();
+            }
+        });
+        window.addEventListener('pagehide', () => {
+            window.clearTimeout(closeTimer);
+            window.clearTimeout(nextTimer);
+        }, { once: true });
+
+        showNext();
+    }
+
     function initDisclosureMenus(root = document) {
         const menus = Array.from(root.querySelectorAll('.account-menu'));
         if (!menus.length) return;
@@ -734,6 +900,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+        initNotificationCenter();
         initDateRangeFilters();
         initSingleSowEventForm();
         initBulkEventForm();

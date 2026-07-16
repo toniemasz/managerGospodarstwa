@@ -544,10 +544,6 @@ input[type="date"] {
     to { opacity: 1; transform: translateY(0); }
 }
 
-.form-error-summary ul {
-    margin: .45rem 0 0;
-}
-
 .empty-inline {
     margin: .65rem 0 0;
     border: 1px dashed var(--border);

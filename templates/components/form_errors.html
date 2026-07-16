@@ -1,6 +1,12 @@
 {% if form.errors %}
-<div class="alert alert-error form-error-summary" role="alert">
-    <strong>Popraw oznaczone pola.</strong>
+<div
+    data-notification-source
+    data-notification-form-errors="true"
+    data-notification-type="error"
+    data-notification-title="Nie zapisano zmian"
+    hidden
+>
+    Popraw oznaczone pola.
     {% if form.non_field_errors %}{{ form.non_field_errors }}{% endif %}
 </div>
 {% endif %}
