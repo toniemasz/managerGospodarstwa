@@ -2,6 +2,7 @@ import json
 import re
 
 import pytest
+from django.contrib.messages import get_messages
 from django.urls import reverse
 from django.contrib.auth.models import User
 from django.test import override_settings
@@ -11,6 +12,11 @@ from farms.models import AuditLogModel
 from sows.models import MortalityReportModel, SowEventModel, SowModel, VaccinationPlanModel
 from farms.services.farm_service import get_or_create_user_farm
 from sows.services.sow_repository import SowRepository
+
+
+def response_messages(response):
+    return [str(message) for message in get_messages(response.wsgi_request)]
+
 
 @pytest.mark.django_db
 class TestSowViews:
@@ -51,6 +57,7 @@ class TestSowViews:
         })
         assert response.status_code == 302 # Przekierowanie po sukcesie
         assert SowModel.objects.filter(ear_tag='NEW-SOW-99', farm=setup_client.farm).exists()
+        assert "Maciora została dodana." in response_messages(response)
 
     def test_sow_detail_view(self, setup_client):
         sow = SowModel.objects.create(ear_tag="DETAIL-1", farm=setup_client.farm)
@@ -214,6 +221,7 @@ class TestSowViews:
             'technician': 'Jan',
         })
         assert add_post.status_code == 302
+        assert "Zdarzenie zostało dodane." in response_messages(add_post)
         event = SowEventModel.objects.get(sow=sow)
         assert event.details == {'technician': 'Jan'}
 
@@ -226,12 +234,14 @@ class TestSowViews:
             'pregnancy_result': 'TAK',
         })
         assert edit_post.status_code == 302
+        assert "Zdarzenie zostało zaktualizowane." in response_messages(edit_post)
         event.refresh_from_db()
         assert event.event_type == 'PREGNANCY_CHECK'
         assert event.details == {'result': 'TAK'}
 
         delete_post = setup_client.post(reverse('delete_event', args=[event.id]))
         assert delete_post.status_code == 302
+        assert "Zdarzenie zostało usunięte." in response_messages(delete_post)
         assert not SowEventModel.objects.filter(id=event.id).exists()
 
     def test_bulk_pregnancy_check_view_creates_events(self, setup_client):
@@ -251,6 +261,7 @@ class TestSowViews:
         })
 
         assert post_response.status_code == 302
+        assert "Zapisano wyniki badań macior: 1." in response_messages(post_response)
         assert SowEventModel.objects.filter(
             sow=sow,
             event_type='PREGNANCY_CHECK',
@@ -307,6 +318,7 @@ class TestSowViews:
 
         archive_response = setup_client.post(reverse('delete_sow', args=[sow.id]), {'archive': 'on'})
         assert archive_response.status_code == 302
+        assert "Maciora została zarchiwizowana." in response_messages(archive_response)
         sow.refresh_from_db()
         assert sow.is_archived is True
         assert sow.archived_at is not None

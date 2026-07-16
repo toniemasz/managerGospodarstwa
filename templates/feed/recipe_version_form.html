@@ -26,8 +26,13 @@
 
     <section class="panel">
         {% if formset.non_form_errors %}
-        <div class="alert alert-error">
-            <strong>Błąd weryfikacji wersji:</strong>
+        <div
+            data-notification-source
+            data-notification-form-errors="true"
+            data-notification-type="error"
+            data-notification-title="Błąd weryfikacji wersji"
+            hidden
+        >
             {{ formset.non_form_errors }}
         </div>
         {% endif %}

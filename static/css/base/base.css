@@ -103,27 +103,6 @@ input[type="radio"] {
 }
 
 
-.message-stack {
-    position: relative;
-    z-index: 35;
-    display: grid;
-    width: min(100% - 2rem, 80rem);
-    margin: .75rem auto 0;
-    gap: .5rem;
-}
-
-.has-app-nav .message-stack {
-    width: min(100% - 2rem, var(--content-max));
-}
-
-@media (min-width: 901px) {
-    .has-app-nav .message-stack {
-        margin-left: calc(var(--sidebar-width) + max(1rem, (100vw - var(--sidebar-width) - var(--content-max)) / 2));
-        margin-right: max(1rem, (100vw - var(--sidebar-width) - var(--content-max)) / 2);
-        width: auto;
-    }
-}
-
 .app-page,
 .container {
     width: min(100% - 2rem, var(--content-max));

@@ -17,8 +17,13 @@
             {% csrf_token %}
 
             {% if formset.non_form_errors %}
-            <div class="alert alert-error" role="alert">
-                <strong>Nie można przyjąć dostaw:</strong>
+            <div
+                data-notification-source
+                data-notification-form-errors="true"
+                data-notification-type="error"
+                data-notification-title="Nie można przyjąć dostaw"
+                hidden
+            >
                 {{ formset.non_form_errors }}
             </div>
             {% endif %}

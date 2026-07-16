@@ -76,6 +76,7 @@ def add_sow_view(request):
             sow.save()
             invalidate_farm_cache_on_commit(farm, groups=("sows",))
             log_action(farm=farm, user=request.user, action="CREATE", obj=sow)
+            messages.success(request, "Maciora została dodana.")
             return redirect('dashboard')
     else:
         form = SowForm()
@@ -250,6 +251,7 @@ def sow_detail_view(request, sow_id):
             sow_model = form.save()
             invalidate_farm_cache_on_commit(farm, groups=("sows",))
             log_action(farm=farm, user=request.user, action="UPDATE", obj=sow_model)
+            messages.success(request, "Dane maciory zostały zaktualizowane.")
             return redirect('sow_detail', sow_id=db_sow.id)
     else:
         form = SowForm(instance=db_sow)
@@ -296,6 +298,7 @@ def add_event_view(request, sow_id):
                 return redirect('sow_detail', sow_id=sow_id)
             for event in result.created_events:
                 log_action(farm=farm, user=request.user, action="CREATE", obj=event)
+            messages.success(request, "Zdarzenie zostało dodane.")
             return redirect('sow_detail', sow_id=sow_id)
     else:
         requested_event_type = request.GET.get('event_type', '')
@@ -392,6 +395,10 @@ def bulk_pregnancy_check_view(request):
         )
         for event in events:
             log_action(farm=farm, user=request.user, action="CREATE", obj=event)
+        if events:
+            messages.success(request, f"Zapisano wyniki badań macior: {len(events)}.")
+        else:
+            messages.warning(request, "Nie zapisano wyników. Wybierz wynik badania przynajmniej dla jednej maciory.")
         return redirect('dashboard')
 
     return render(request, 'sows/bulk_pregnancy.html', {'sows': sows_to_check})
@@ -464,6 +471,7 @@ def edit_event_view(request, event_id):
                 data=form.cleaned_data,
             )
             log_action(farm=farm, user=request.user, action="UPDATE", obj=event)
+            messages.success(request, "Zdarzenie zostało zaktualizowane.")
             return redirect('sow_detail', sow_id=sow_id)
     else:
         try:
@@ -495,12 +503,14 @@ def delete_sow_view(request, sow_id):
             db_sow.save()
             invalidate_farm_cache_on_commit(farm, groups=("sows",))
             log_action(farm=farm, user=request.user, action="ARCHIVE", obj=db_sow)
+            messages.success(request, "Maciora została zarchiwizowana.")
         else:
             representation = str(db_sow)
             object_id = db_sow.pk
             db_sow.delete()
             invalidate_farm_cache_on_commit(farm, groups=("sows",))
             log_action(farm=farm, user=request.user, action="DELETE", model_label="sows.SowModel", object_id=object_id, object_repr=representation)
+            messages.success(request, "Maciora została usunięta.")
 
         return redirect('dashboard')
     return redirect('sow_detail', sow_id=sow_id)
@@ -644,6 +654,7 @@ def delete_event_view(request, event_id):
             object_id=deleted_event.object_id,
             object_repr=deleted_event.object_repr,
         )
+        messages.success(request, "Zdarzenie zostało usunięte.")
         return redirect('sow_detail', sow_id=deleted_event.sow_id)
     return redirect('dashboard')
 

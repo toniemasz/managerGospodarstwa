@@ -1,9 +1,51 @@
-{% if messages %}
-<section class="message-stack" aria-live="polite" aria-label="Komunikaty systemowe">
-    {% for message in messages %}
-        <div class="alert {% if 'error' in message.tags %}alert-error{% elif 'warning' in message.tags %}alert-warning{% else %}alert-success{% endif %}" role="{% if 'error' in message.tags %}alert{% else %}status{% endif %}">
-            {{ message }}
+<section
+    class="notification-center"
+    data-notification-center
+    data-success-timeout="3200"
+    data-info-timeout="4500"
+    data-warning-timeout="6000"
+    data-error-timeout="8000"
+    aria-live="assertive"
+    hidden
+>
+    <div class="notification-backdrop" aria-hidden="true"></div>
+    <div
+        class="notification-dialog"
+        data-notification-dialog
+        data-type="success"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="notification-title"
+        aria-describedby="notification-message"
+    >
+        <div class="notification-icon" aria-hidden="true">
+            <svg class="notification-icon-success" viewBox="0 0 24 24" focusable="false">
+                <path d="m5 12.5 4.2 4.2L19 7" />
+            </svg>
+            <svg class="notification-icon-error" viewBox="0 0 24 24" focusable="false">
+                <path d="m7 7 10 10M17 7 7 17" />
+            </svg>
+            <svg class="notification-icon-warning" viewBox="0 0 24 24" focusable="false">
+                <path d="M12 7v6m0 4h.01" />
+            </svg>
+            <svg class="notification-icon-info" viewBox="0 0 24 24" focusable="false">
+                <path d="M12 11v6m0-10h.01" />
+            </svg>
         </div>
-    {% endfor %}
+        <div class="notification-content">
+            <h2 id="notification-title" data-notification-title>Operacja zakończona pomyślnie</h2>
+            <p id="notification-message" data-notification-message></p>
+        </div>
+        <button type="button" class="notification-confirm" data-notification-confirm>OK</button>
+        <span class="notification-timer" aria-hidden="true"></span>
+    </div>
+
+    <div data-notification-queue hidden>
+        {% for message in messages %}
+            <div
+                data-notification-entry
+                data-notification-type="{% if 'error' in message.tags %}error{% elif 'warning' in message.tags %}warning{% elif 'info' in message.tags %}info{% else %}success{% endif %}"
+            >{{ message }}</div>
+        {% endfor %}
+    </div>
 </section>
-{% endif %}

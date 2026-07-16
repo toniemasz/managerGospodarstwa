@@ -63,7 +63,7 @@ def test_add_delivery_get_uses_formset_template_and_initial_row(delivery_client)
     assert other not in response.context["formset"].forms[0].fields["ingredient"].queryset
     assert b'id_deliveries-TOTAL_FORMS' in response.content
     assert b'delivery-row-template' in response.content
-    assert b'app.js?v=20260712-delivery-formset' in response.content
+    assert b'app.js?v=20260716-notification-center' in response.content
 
 
 @pytest.mark.django_db

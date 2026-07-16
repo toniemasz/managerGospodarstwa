@@ -67,28 +67,196 @@
     line-height: 1.45;
 }
 
-.alert {
-    border: 1px solid;
-    border-radius: var(--radius);
-    padding: var(--space-sm) var(--panel-padding);
-    font-weight: 800;
-    line-height: 1.45;
+.notification-center {
+    position: fixed;
+    z-index: 1000;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: clamp(.75rem, 3vw, 2rem);
 }
 
-.alert-success {
-    border-color: var(--success);
+.notification-center[hidden] {
+    display: none;
+}
+
+.notification-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(9, 18, 15, .48);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+}
+
+.notification-dialog {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: .85rem 1rem;
+    width: min(100%, 29rem);
+    max-height: min(80vh, 34rem);
+    overflow: auto;
+    border: 1px solid var(--border-strong);
+    border-radius: max(var(--radius), .55rem);
+    background: var(--surface);
+    color: var(--text);
+    padding: clamp(1rem, 4vw, 1.35rem);
+    box-shadow: 0 20px 55px rgba(9, 18, 15, .28);
+    animation: notification-enter .18s ease-out;
+}
+
+.notification-icon {
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 50%;
     background: var(--success-soft);
     color: var(--success);
 }
 
-.alert-error {
-    border-color: var(--danger);
+.notification-icon svg {
+    display: none;
+    width: 1.65rem;
+    height: 1.65rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.notification-dialog[data-type="success"] .notification-icon-success,
+.notification-dialog[data-type="error"] .notification-icon-error,
+.notification-dialog[data-type="warning"] .notification-icon-warning,
+.notification-dialog[data-type="info"] .notification-icon-info {
+    display: block;
+}
+
+.notification-dialog[data-type="error"] .notification-icon {
     background: var(--danger-soft);
     color: var(--danger);
 }
 
-.alert-warning {
-    border-color: var(--warning);
+.notification-dialog[data-type="warning"] .notification-icon {
     background: var(--warning-soft);
     color: var(--warning);
+}
+
+.notification-dialog[data-type="info"] .notification-icon {
+    background: var(--surface-container);
+    color: var(--primary);
+}
+
+.notification-content {
+    min-width: 0;
+    align-self: center;
+}
+
+.notification-content h2,
+.notification-content p {
+    overflow-wrap: anywhere;
+}
+
+.notification-content h2 {
+    margin: 0;
+    font-size: clamp(1rem, 3vw, 1.12rem);
+    font-weight: 950;
+    line-height: 1.3;
+}
+
+.notification-content p {
+    margin: .3rem 0 0;
+    color: var(--muted);
+    font-size: .9rem;
+    font-weight: 700;
+    line-height: 1.55;
+    white-space: pre-line;
+}
+
+.notification-confirm {
+    grid-column: 1 / -1;
+    justify-self: end;
+    min-width: 3.2rem;
+    min-height: 2.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--muted);
+    padding: .45rem .8rem;
+    font: inherit;
+    font-size: .8rem;
+    font-weight: 850;
+    cursor: pointer;
+}
+
+.notification-confirm:hover {
+    border-color: var(--border-strong);
+    background: var(--surface-muted);
+    color: var(--text);
+}
+
+.notification-confirm:focus-visible {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 2px;
+}
+
+.notification-timer {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: var(--success);
+    transform-origin: left;
+    animation: notification-timeout var(--notification-timeout, 3200ms) linear forwards;
+}
+
+.notification-dialog[data-type="error"] .notification-timer {
+    background: var(--danger);
+}
+
+.notification-dialog[data-type="warning"] .notification-timer {
+    background: var(--warning);
+}
+
+.notification-dialog[data-type="info"] .notification-timer {
+    background: var(--primary);
+}
+
+body.notification-open {
+    overflow: hidden;
+}
+
+@keyframes notification-enter {
+    from { opacity: 0; transform: translateY(.7rem) scale(.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes notification-timeout {
+    from { transform: scaleX(1); }
+    to { transform: scaleX(0); }
+}
+
+@media (max-width: 480px) {
+    .notification-dialog {
+        grid-template-columns: 1fr;
+        justify-items: center;
+        text-align: center;
+    }
+
+    .notification-confirm {
+        justify-self: stretch;
+        min-height: 2.75rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .notification-dialog {
+        animation: none;
+    }
+
+    .notification-timer {
+        animation: none;
+    }
 }
