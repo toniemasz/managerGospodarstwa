@@ -1,0 +1,130 @@
+name: Deploy to Oracle
+
+on:
+  workflow_run:
+    workflows:
+      - Main pull request tests
+    types:
+      - completed
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-oracle-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy production
+    runs-on: ubuntu-latest
+
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main'
+      )
+
+    steps:
+      - name: Przygotowanie SSH
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY_B64: ${{ secrets.ORACLE_SSH_KEY_B64 }}
+          SSH_KNOWN_HOSTS: ${{ secrets.ORACLE_KNOWN_HOSTS }}
+        run: |
+          set -Eeuo pipefail
+
+          if [ -z "$SSH_PRIVATE_KEY_B64" ]; then
+            echo "Brak sekretu ORACLE_SSH_KEY_B64."
+            exit 1
+          fi
+
+          if [ -z "$SSH_KNOWN_HOSTS" ]; then
+            echo "Brak sekretu ORACLE_KNOWN_HOSTS."
+            exit 1
+          fi
+
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+
+          printf '%s' "$SSH_PRIVATE_KEY_B64" \
+            | tr -d '[:space:]' \
+            | base64 --decode \
+            > "$HOME/.ssh/oracle_deploy_key"
+
+          printf '%s\n' "$SSH_KNOWN_HOSTS" \
+            > "$HOME/.ssh/known_hosts"
+
+          chmod 600 "$HOME/.ssh/oracle_deploy_key"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+          ssh-keygen -y \
+            -f "$HOME/.ssh/oracle_deploy_key" \
+            > /dev/null
+
+          echo "Klucz SSH został poprawnie odczytany."
+
+      - name: Sprawdzenie połączenia
+        shell: bash
+        env:
+          ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+          ORACLE_USER: ${{ secrets.ORACLE_USER }}
+        run: |
+          set -Eeuo pipefail
+
+          if [ -z "$ORACLE_HOST" ]; then
+            echo "Brak sekretu ORACLE_HOST."
+            exit 1
+          fi
+
+          if [ -z "$ORACLE_USER" ]; then
+            echo "Brak sekretu ORACLE_USER."
+            exit 1
+          fi
+
+          ssh \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            -i "$HOME/.ssh/oracle_deploy_key" \
+            "$ORACLE_USER@$ORACLE_HOST" \
+            "echo 'Połączenie SSH działa.'"
+
+      - name: Wdrożenie aplikacji
+        shell: bash
+        env:
+          ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+          ORACLE_USER: ${{ secrets.ORACLE_USER }}
+        run: |
+          set -Eeuo pipefail
+
+          ssh \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            -o ServerAliveInterval=15 \
+            -o ServerAliveCountMax=4 \
+            -i "$HOME/.ssh/oracle_deploy_key" \
+            "$ORACLE_USER@$ORACLE_HOST" \
+            "sudo /usr/local/bin/deploy-manager-gospodarstwa"
+
+      - name: Sprawdzenie strony produkcyjnej
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --location \
+            --max-time 30 \
+            "https://managergospodarstwa.duckdns.org/login/" \
+            > /dev/null
+
+          echo "Strona produkcyjna odpowiada poprawnie."

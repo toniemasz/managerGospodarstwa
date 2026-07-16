@@ -1,6 +1,23 @@
+
 # Manager Gospodarstwa
 
-## Opis projektu
+Aplikacja webowa do zarządzania gospodarstwem trzody chlewnej.
+
+Projekt wspiera najważniejsze procesy związane z:
+
+- maciorami i rozrodem,
+- szczepieniami,
+- oproszeniami i odsadzeniami,
+- upadkami,
+- sprzedażą,
+- kosztami,
+- magazynem,
+- paszami i recepturami,
+- śrutowaniem,
+- zadaniami i powiadomieniami,
+- statystykami oraz opłacalnością produkcji.
+
+Aplikacja jest rozwijana jako praktyczny system odwzorowujący rzeczywiste procesy gospodarstwa.
 
 Manager Gospodarstwa to aplikacja webowa wspierająca zarządzanie gospodarstwem trzody chlewnej. Łączy ewidencję macior i zdarzeń produkcyjnych z obsługą pasz, magazynu, sprzedaży, kosztów, zadań oraz raportów gospodarstwa.
 
