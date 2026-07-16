@@ -11,7 +11,7 @@ class PreWeaningMortalityCalculation:
 
 
 def calculate_pre_weaning_deaths(born_alive, weaned_count) -> PreWeaningMortalityCalculation:
-    """Oblicza straty cyklu bez traktowania brakujących danych jak zera."""
+    """Oblicza wyłącznie historyczny szacunek dla cykli sprzed jawnego rejestru upadków."""
     if born_alive in (None, ""):
         return PreWeaningMortalityCalculation(None, unavailable_reason="Brak liczby urodzonych żywych")
     if weaned_count in (None, ""):

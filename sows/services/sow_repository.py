@@ -47,28 +47,81 @@ class SowRepository:
             for e in db_sow.events.all()
         ]
         sow.load_history(events, gestation_days=self.gestation_days)
+        transfer_events = []
+        recorded_pre_weaning_deaths = 0
+        for db_event in db_sow.events.all():
+            for transfer in db_event.outgoing_piglet_transfers.all():
+                history_event = SowEvent(
+                    event_type="PIGLET_TRANSFER_OUT",
+                    event_date=transfer.transfer_date,
+                    details={
+                        "quantity": transfer.quantity,
+                        "other_sow_id": transfer.target_farrowing.sow_id,
+                        "other_sow_ear_tag": transfer.target_farrowing.sow.ear_tag,
+                        "note": transfer.note,
+                        "is_canceled": transfer.is_canceled,
+                    },
+                    id=None,
+                    created_at=transfer.created_at,
+                )
+                history_event.is_piglet_transfer = True
+                history_event.transfer_id = transfer.id
+                transfer_events.append(history_event)
+            for transfer in db_event.incoming_piglet_transfers.all():
+                history_event = SowEvent(
+                    event_type="PIGLET_TRANSFER_IN",
+                    event_date=transfer.transfer_date,
+                    details={
+                        "quantity": transfer.quantity,
+                        "other_sow_id": transfer.source_farrowing.sow_id,
+                        "other_sow_ear_tag": transfer.source_farrowing.sow.ear_tag,
+                        "note": transfer.note,
+                        "is_canceled": transfer.is_canceled,
+                    },
+                    id=None,
+                    created_at=transfer.created_at,
+                )
+                history_event.is_piglet_transfer = True
+                history_event.transfer_id = transfer.id
+                transfer_events.append(history_event)
+            recorded_pre_weaning_deaths += sum(
+                report.quantity for report in db_event.pre_weaning_mortality_reports.all()
+            )
+        sow.all_events.extend(transfer_events)
+        sow.all_events.sort(
+            key=lambda event: (event.event_date, event.created_at or db_sow.created_at),
+            reverse=True,
+        )
+        sow.recorded_pre_weaning_deaths = recorded_pre_weaning_deaths
         return sow
+
+    def _sows_with_history(self):
+        return SowModel.objects.prefetch_related(
+            'events__outgoing_piglet_transfers__target_farrowing__sow',
+            'events__incoming_piglet_transfers__source_farrowing__sow',
+            'events__pre_weaning_mortality_reports',
+        )
 
     def get_all_sows(self) -> list[Sow]:
         filters = self._filter_for_farm(is_archived=False)
-        db_sows = SowModel.objects.prefetch_related('events').filter(**filters).order_by('ear_tag')
+        db_sows = self._sows_with_history().filter(**filters).order_by('ear_tag')
         return [self._map_to_sow(db_sow) for db_sow in db_sows]
 
     def get_archived_sows(self) -> list[Sow]:
         filters = self._filter_for_farm(is_archived=True)
-        db_sows = SowModel.objects.prefetch_related('events').filter(**filters).order_by('ear_tag')
+        db_sows = self._sows_with_history().filter(**filters).order_by('ear_tag')
         return [self._map_to_sow(db_sow) for db_sow in db_sows]
 
     def get_sows_for_statistics(self) -> list[Sow]:
         """Zwraca aktywne i historyczne maciory dla raportów okresowych."""
-        db_sows = SowModel.objects.prefetch_related("events").filter(
+        db_sows = self._sows_with_history().filter(
             farm=self.farm,
         ).order_by("ear_tag")
         return [self._map_to_sow(db_sow) for db_sow in db_sows]
 
     def get_sow_by_id(self, sow_id: int) -> Sow:
         filters = self._filter_for_farm(id=sow_id)
-        db_sow = get_object_or_404(SowModel.objects.prefetch_related('events'), **filters)
+        db_sow = get_object_or_404(self._sows_with_history(), **filters)
         return self._map_to_sow(db_sow)
 
     def get_sow_model_by_id(self, sow_id: int) -> SowModel:

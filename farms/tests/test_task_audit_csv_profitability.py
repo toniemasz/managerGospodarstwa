@@ -18,7 +18,14 @@ from feed.models import DeliveryModel, IngredientModel, ProductionModel, RecipeI
 from feed.actions.productions import complete_production
 from feed.actions.inventory import InventoryActions
 from sales.models import PigSaleModel
-from sows.models import SowModel, VaccinationCycleModel, VaccinationPlanModel
+from sows.models import (
+    MortalityReportModel,
+    PigletTransferModel,
+    SowEventModel,
+    SowModel,
+    VaccinationCycleModel,
+    VaccinationPlanModel,
+)
 
 
 @pytest.fixture
@@ -122,6 +129,51 @@ def test_csv_export_and_atomic_import_round_trip(two_farms):
         amount=production.feed_cost_total,
     ).exists()
     assert not SowModel.objects.filter(farm=source).exclude(pk=sow.pk).exists()
+
+
+@pytest.mark.django_db
+def test_csv_round_trip_preserves_piglet_care_relationships(two_farms):
+    _, source, _, target = two_farms
+    source_sow = SowModel.objects.create(farm=source, ear_tag="CSV-A")
+    target_sow = SowModel.objects.create(farm=source, ear_tag="CSV-B")
+    source_farrowing = SowEventModel.objects.create(
+        sow=source_sow,
+        event_type="FARROWING",
+        event_date=date(2026, 2, 1),
+        details={"born_alive": 12},
+    )
+    target_farrowing = SowEventModel.objects.create(
+        sow=target_sow,
+        event_type="FARROWING",
+        event_date=date(2026, 2, 2),
+        details={"born_alive": 8},
+    )
+    PigletTransferModel.objects.create(
+        farm=source,
+        source_farrowing=source_farrowing,
+        target_farrowing=target_farrowing,
+        quantity=3,
+        transfer_date=date(2026, 2, 5),
+    )
+    MortalityReportModel.objects.create(
+        farm=source,
+        sow=target_sow,
+        farrowing=target_farrowing,
+        mortality_type=MortalityReportModel.TYPE_PRE_WEANING,
+        mortality_date=date(2026, 2, 6),
+        quantity=1,
+    )
+
+    payload, _ = build_csv_export(source)
+    uploaded = SimpleUploadedFile("piglet-care.zip", payload, content_type="application/zip")
+    counts = import_csv_archive(uploaded, target)
+
+    restored_transfer = PigletTransferModel.objects.get(farm=target)
+    assert counts["przeniesienia prosiąt"] == 1
+    assert restored_transfer.source_sow.ear_tag == "CSV-A"
+    assert restored_transfer.target_sow.ear_tag == "CSV-B"
+    restored_mortality = MortalityReportModel.objects.get(farm=target)
+    assert restored_mortality.farrowing == restored_transfer.target_farrowing
 
 
 @pytest.mark.django_db

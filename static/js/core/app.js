@@ -301,9 +301,10 @@
 
         const syncMortalityFields = (shouldClear = false) => {
             const isSow = typeSelect.value === 'MACIORA';
+            const requiresSow = isSow || typeSelect.value === 'PRZED_ODSADZENIEM';
 
-            sowSection?.classList.toggle('hidden', !isSow);
-            setFieldState(sowField, isSow, shouldClear);
+            sowSection?.classList.toggle('hidden', !requiresSow);
+            setFieldState(sowField, requiresSow, shouldClear);
         };
 
         form.dataset.mortalityBound = 'true';

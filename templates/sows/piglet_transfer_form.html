@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if is_edit %}Edytuj przeniesienie prosiąt{% else %}Nowe przeniesienie prosiąt{% endif %}{% endblock %}
+
+{% block content %}
+<main class="app-page app-page-narrow">
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Maciory</p>
+            <h1>{% if is_edit %}Edytuj przeniesienie{% else %}Przenieś prosięta{% endif %}</h1>
+            <p class="page-subtitle">Jedno zdarzenie zostanie pokazane w historii maciory źródłowej i docelowej.</p>
+        </div>
+        <a href="{% url 'piglet_transfer_list' %}" class="button button-secondary">Lista przeniesień</a>
+    </section>
+
+    {% if is_edit %}
+    <section class="notice notice-warning">
+        <div>
+            <h2>Zmiana danych historycznych</h2>
+            <p>System ponownie sprawdzi bilans obu odchowów oraz wszystkie późniejsze transfery, upadki i odsadzenia.</p>
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="panel">
+        <form method="post" class="responsive-form">
+            {% csrf_token %}
+            {% include 'components/form_errors.html' with form=form %}
+            <div class="form-section-heading">
+                <h2>Dane przeniesienia</h2>
+                <p>Wpisz numer maciory i wybierz pasującą podpowiedź. System sprawdzi istnienie maciory i aktywność odchowu.</p>
+            </div>
+            {% include 'components/form_field.html' with field=form.source_farrowing %}
+            <datalist id="piglet-transfer-source-options">
+                {% for suggestion in form.source_suggestions %}
+                    <option value="{{ suggestion.ear_tag }}">Oproszenie {{ suggestion.farrowing_date|date:'d.m.Y' }}{% if suggestion.available != None %} · dostępne {{ suggestion.available }} szt.{% endif %}</option>
+                {% endfor %}
+            </datalist>
+            {% include 'components/form_field.html' with field=form.target_farrowing %}
+            <datalist id="piglet-transfer-target-options">
+                {% for suggestion in form.target_suggestions %}
+                    <option value="{{ suggestion.ear_tag }}">Oproszenie {{ suggestion.farrowing_date|date:'d.m.Y' }}{% if suggestion.available != None %} · w odchowie {{ suggestion.available }} szt.{% endif %}</option>
+                {% endfor %}
+            </datalist>
+            <div class="form-grid two-columns">
+                {% include 'components/form_field.html' with field=form.quantity %}
+                {% include 'components/form_field.html' with field=form.transfer_date %}
+            </div>
+            {% include 'components/form_field.html' with field=form.note wide=True %}
+            <div class="form-actions">
+                <a href="{% url 'piglet_transfer_list' %}" class="button button-secondary">Anuluj</a>
+                <button type="submit" class="button button-primary">{% if is_edit %}Zapisz zmiany{% else %}Zapisz przeniesienie{% endif %}</button>
+            </div>
+        </form>
+    </section>
+</main>
+{% endblock %}

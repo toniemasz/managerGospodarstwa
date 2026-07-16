@@ -1,0 +1,16 @@
+<div class="filter-field">
+    <label for="source">Maciora źródłowa</label>
+    <input type="search" name="source" id="source" value="{{ selected_source }}" placeholder="Numer kolczyka">
+</div>
+<div class="filter-field">
+    <label for="target">Maciora docelowa</label>
+    <input type="search" name="target" id="target" value="{{ selected_target }}" placeholder="Numer kolczyka">
+</div>
+<div class="filter-field">
+    <label for="status">Status</label>
+    <select name="status" id="status">
+        <option value="">Wszystkie</option>
+        <option value="active"{% if selected_status == 'active' %} selected{% endif %}>Aktywne</option>
+        <option value="canceled"{% if selected_status == 'canceled' %} selected{% endif %}>Anulowane</option>
+    </select>
+</div>

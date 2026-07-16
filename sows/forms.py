@@ -4,10 +4,17 @@ from django.utils import timezone
 from django.forms import formset_factory
 
 from .services.sow_repository import VaccinationPlanRepository
-from .models import MortalityReportModel, SowModel, SowEventModel, VaccinationPlanModel
+from .models import (
+    MortalityReportModel,
+    PigletTransferModel,
+    SowModel,
+    SowEventModel,
+    VaccinationPlanModel,
+)
 from django.core.exceptions import ValidationError
 from sows.domain.event_details import build_event_details
 from sows.domain.sow_state_machine import SowStateMachine
+from sows.services.piglet_care import PigletCareError, PigletCareService
 
 
 class VaccinationPlanForm(forms.ModelForm):
@@ -270,6 +277,7 @@ class SowEventForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.sow_status = kwargs.pop('sow_status', None)
         self.farm = kwargs.pop('farm', None)
+        self.sow = kwargs.pop('sow', None)
         super().__init__(*args, **kwargs)
 
 
@@ -289,6 +297,24 @@ class SowEventForm(forms.ModelForm):
 
         if event_type == 'VACCINATION' and not vaccine_name:
             self.add_error('vaccine_name', "Dla zdarzenia szczepienia wymagane jest podanie nazwy szczepionki.")
+
+        if (
+            event_type == 'WEANING'
+            and self.farm is not None
+            and self.sow is not None
+            and cleaned_data.get('event_date') is not None
+            and cleaned_data.get('count') is not None
+        ):
+            replaced_weaning = self.instance if self.instance.pk and self.instance.event_type == 'WEANING' else None
+            try:
+                PigletCareService(self.farm).validate_weaning(
+                    sow=self.sow,
+                    weaning_date=cleaned_data['event_date'],
+                    quantity=cleaned_data['count'],
+                    replaced_weaning=replaced_weaning,
+                )
+            except PigletCareError as error:
+                self.add_error('count', error.messages[0])
 
         # 2. Walidacja maszyny stanów cyklu produkcyjnego maciory
         if not self.instance.pk and self.sow_status and event_type:
@@ -417,6 +443,129 @@ def empty_bulk_event_initials(count: int = 8, *, event_type: str = '', event_dat
     return [initial.copy() for _ in range(count)]
 
 
+class PigletTransferForm(forms.ModelForm):
+    source_farrowing = forms.CharField(
+        label="Numer maciory źródłowej",
+        max_length=50,
+        widget=forms.TextInput(attrs={
+            "list": "piglet-transfer-source-options",
+            "autocomplete": "off",
+            "placeholder": "Wpisz numer maciory",
+        }),
+    )
+    target_farrowing = forms.CharField(
+        label="Numer maciory docelowej",
+        max_length=50,
+        widget=forms.TextInput(attrs={
+            "list": "piglet-transfer-target-options",
+            "autocomplete": "off",
+            "placeholder": "Wpisz numer maciory",
+        }),
+    )
+
+    class Meta:
+        model = PigletTransferModel
+        fields = ("source_farrowing", "target_farrowing", "quantity", "transfer_date", "note")
+        labels = {
+            "quantity": "Liczba przenoszonych prosiąt",
+            "transfer_date": "Data przeniesienia",
+            "note": "Notatka lub przyczyna (opcjonalnie)",
+        }
+        widgets = {
+            "transfer_date": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+            "note": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def __init__(self, *args, farm=None, **kwargs):
+        self.farm = farm
+        super().__init__(*args, **kwargs)
+        balances = PigletCareService(farm).active_balances() if farm is not None else []
+        balance_map = {balance.farrowing.id: balance for balance in balances}
+        source_ids = [balance.farrowing.id for balance in balances if balance.available > 0]
+        target_ids = [balance.farrowing.id for balance in balances]
+        if self.instance.pk:
+            source_ids.append(self.instance.source_farrowing_id)
+            target_ids.append(self.instance.target_farrowing_id)
+        base_queryset = SowEventModel.objects.filter(
+            sow__farm=farm,
+            event_type="FARROWING",
+        ).select_related("sow").order_by("sow__ear_tag", "-event_date")
+        self.source_farrowings = base_queryset.filter(pk__in=set(source_ids))
+        self.target_farrowings = base_queryset.filter(pk__in=set(target_ids))
+        self.source_suggestions = self._suggestions(self.source_farrowings, balance_map)
+        self.target_suggestions = self._suggestions(self.target_farrowings, balance_map)
+        self.fields["source_farrowing"].help_text = (
+            "Wpisz numer i wybierz maciorę z aktywnym odchowem oraz dostępnymi prosiętami."
+        )
+        self.fields["target_farrowing"].help_text = (
+            "Wpisz numer i wybierz inną maciorę z aktywnym odchowem."
+        )
+        if farm is not None:
+            self.instance.farm = farm
+        if self.instance.pk and not self.is_bound:
+            self.initial["source_farrowing"] = self.instance.source_farrowing.sow.ear_tag
+            self.initial["target_farrowing"] = self.instance.target_farrowing.sow.ear_tag
+
+    def clean(self):
+        cleaned_data = super().clean()
+        source = self._resolve_farrowing(
+            field_name="source_farrowing",
+            value=cleaned_data.get("source_farrowing"),
+            queryset=self.source_farrowings,
+            unavailable_message="Ta maciora nie ma aktywnego odchowu z dostępnymi prosiętami.",
+        )
+        target = self._resolve_farrowing(
+            field_name="target_farrowing",
+            value=cleaned_data.get("target_farrowing"),
+            queryset=self.target_farrowings,
+            unavailable_message="Ta maciora nie ma aktywnego odchowu.",
+        )
+        if source is not None:
+            cleaned_data["source_farrowing"] = source
+        if target is not None:
+            cleaned_data["target_farrowing"] = target
+        transfer_date = cleaned_data.get("transfer_date")
+        if source and target and source.sow_id == target.sow_id:
+            self.add_error("target_farrowing", "Maciora docelowa musi być inna niż źródłowa.")
+        if transfer_date and transfer_date > timezone.localdate():
+            self.add_error("transfer_date", "Data przeniesienia nie może być z przyszłości.")
+        return cleaned_data
+
+    def _resolve_farrowing(self, *, field_name, value, queryset, unavailable_message):
+        ear_tag = (value or "").strip()
+        if not ear_tag or self.farm is None:
+            return None
+
+        matches = list(queryset.filter(sow__ear_tag__iexact=ear_tag)[:2])
+        if len(matches) == 1:
+            return matches[0]
+        if len(matches) > 1:
+            self.add_error(field_name, "W gospodarstwie jest więcej macior o takim numerze.")
+            return None
+
+        sow_exists = SowModel.objects.filter(
+            farm=self.farm,
+            ear_tag__iexact=ear_tag,
+        ).exists()
+        if sow_exists:
+            self.add_error(field_name, unavailable_message)
+        else:
+            self.add_error(field_name, f"Nie znaleziono maciory o numerze {ear_tag} w bieżącym gospodarstwie.")
+        return None
+
+    @staticmethod
+    def _suggestions(queryset, balance_map):
+        suggestions = []
+        for farrowing in queryset:
+            balance = balance_map.get(farrowing.id)
+            suggestions.append({
+                "ear_tag": farrowing.sow.ear_tag,
+                "farrowing_date": farrowing.event_date,
+                "available": balance.available if balance is not None else None,
+            })
+        return suggestions
+
+
 class MortalityReportForm(forms.ModelForm):
     sow = forms.CharField(
         label="Maciora",
@@ -455,7 +604,12 @@ class MortalityReportForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         choices = list(MortalityReportModel.MANUAL_TYPE_CHOICES)
         if self.instance.pk and self.instance.mortality_type != MortalityReportModel.TYPE_SOW:
-            choices = list(MortalityReportModel.TYPE_CHOICES[1:4])
+            choices = [
+                (MortalityReportModel.TYPE_PRE_WEANING, 'Prosięta przed odsadzeniem'),
+                (MortalityReportModel.TYPE_PIGLET, 'Prosiak'),
+                (MortalityReportModel.TYPE_WEANER, 'Warchlak'),
+                (MortalityReportModel.TYPE_FINISHER, 'Tucznik'),
+            ]
             if self.instance.mortality_type == MortalityReportModel.TYPE_UNSPECIFIED_POST_WEANING:
                 choices.append((
                     MortalityReportModel.TYPE_UNSPECIFIED_POST_WEANING,
@@ -469,8 +623,10 @@ class MortalityReportForm(forms.ModelForm):
                 is_archived=False,
             ).order_by('ear_tag').values('id', 'ear_tag'))
             self.instance.farm = self.farm
+        if self.instance.pk and self.instance.sow_id and not self.is_bound:
+            self.initial['sow'] = self.instance.sow.ear_tag
         self.fields['sow'].help_text = "Wpisz numer, np. 12, i wybierz maciorę z podpowiedzi albo wpisz pełny numer."
-        self.fields['quantity'].help_text = "Dla maciory system zapisuje 1 sztukę; dla zwierząt po odsadzeniu wpisz liczbę."
+        self.fields['quantity'].help_text = "Dla maciory system zapisuje 1 sztukę; dla prosiąt i zwierząt po odsadzeniu wpisz liczbę."
 
     def clean(self):
         cleaned_data = super().clean()
@@ -493,14 +649,41 @@ class MortalityReportForm(forms.ModelForm):
             cleaned_data['sow'] = sow
             cleaned_data['quantity'] = 1
 
+        elif mortality_type == MortalityReportModel.TYPE_PRE_WEANING:
+            sow = self._find_active_sow(sow_value)
+            if sow is None and not self.errors.get('sow'):
+                self.add_error('sow', "Wybierz maciorę z aktywnym odchowem.")
+            elif mortality_date and quantity is not None:
+                try:
+                    farrowing = PigletCareService(self.farm).cycle_for_sow(
+                        sow=sow,
+                        on_date=mortality_date,
+                        require_active=True,
+                    )
+                    PigletCareService(self.farm).validate_pre_weaning_mortality(
+                        farrowing=farrowing,
+                        mortality_date=mortality_date,
+                        quantity=quantity,
+                        replaced_report=self.instance if self.instance.pk else None,
+                    )
+                except PigletCareError as error:
+                    self.add_error('quantity', error.messages[0])
+                else:
+                    cleaned_data['farrowing'] = farrowing
+            cleaned_data['sow'] = sow
+            if quantity is None:
+                self.add_error('quantity', "Podaj liczbę upadków.")
+
         elif mortality_type in MortalityReportModel.POST_WEANING_TYPES:
             if quantity is None:
                 self.add_error('quantity', "Podaj liczbę sztuk.")
             if self.instance.pk and mortality_type == MortalityReportModel.TYPE_UNSPECIFIED_POST_WEANING:
                 self.add_error('mortality_type', "Wybierz docelowy typ: Prosiak, Warchlak albo Tucznik.")
             cleaned_data['sow'] = None
+            cleaned_data['farrowing'] = None
         else:
             cleaned_data['sow'] = None
+            cleaned_data['farrowing'] = None
 
         return cleaned_data
 

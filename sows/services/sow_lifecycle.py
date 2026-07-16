@@ -29,6 +29,21 @@ class SowEvent:
             self.details = details
         else:
             self.details = {}
+        self.is_piglet_transfer = False
+        self.transfer_id = None
+
+    def get_event_type_display(self) -> str:
+        labels = {
+            "INSEMINATION": "Inseminacja",
+            "PREGNANCY_CHECK": "Badanie",
+            "FARROWING": "Oproszenie",
+            "WEANING": "Odsadzenie",
+            "MISCARRIAGE": "Poronienie",
+            "VACCINATION": "Szczepienie",
+            "PIGLET_TRANSFER_OUT": "Przekazanie prosiąt",
+            "PIGLET_TRANSFER_IN": "Przyjęcie prosiąt",
+        }
+        return labels.get(self.event_type, self.event_type)
 
 
 class Sow:
@@ -67,6 +82,7 @@ class Sow:
         self.total_weaned = 0
         self.farrowing_count = 0
         self.weaning_count = 0
+        self.recorded_pre_weaning_deaths = 0
 
         # Listy zdarzeń pogrupowane według typów
         self.inseminations: List[SowEvent] = []
@@ -205,16 +221,7 @@ class Sow:
 
     @property
     def avg_loss_before_weaning(self) -> float:
-        if self.weaning_count == 0:
+        """Średnia jawnie zarejestrowanych upadków na zarejestrowany cykl odchowu."""
+        if self.farrowing_count == 0:
             return 0.0
-
-        completed_born_alive = self.total_born_alive
-
-        if self.status == "LACTATING" and self.farrowing_count > self.weaning_count:
-            if self.last_farrowing_date:
-                last_farrow = next((f for f in self.farrowings if f.event_date == self.last_farrowing_date), None)
-                if last_farrow:
-                    completed_born_alive -= int(last_farrow.details.get("born_alive", 0))
-
-        total_loss = completed_born_alive - self.total_weaned
-        return round(max(0, total_loss) / self.weaning_count, 2)
+        return round(self.recorded_pre_weaning_deaths / self.farrowing_count, 2)

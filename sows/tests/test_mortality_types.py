@@ -36,6 +36,35 @@ def test_pre_weaning_mortality_is_calculated_per_cycle(mortality_farm):
 
 
 @pytest.mark.django_db
+def test_pre_weaning_mortality_sums_partial_weanings_in_one_cycle(mortality_farm):
+    sow = SowModel.objects.create(farm=mortality_farm, ear_tag="M-PARTIAL")
+    SowEventModel.objects.create(
+        sow=sow,
+        event_type="FARROWING",
+        event_date=date(2026, 1, 1),
+        details={"born_alive": 12},
+    )
+    SowEventModel.objects.create(
+        sow=sow,
+        event_type="WEANING",
+        event_date=date(2026, 1, 20),
+        details={"count": 4},
+    )
+    last_weaning = SowEventModel.objects.create(
+        sow=sow,
+        event_type="WEANING",
+        event_date=date(2026, 1, 25),
+        details={"count": 3},
+    )
+
+    row = pre_weaning_mortality_cycles(mortality_farm)[0]
+
+    assert row.quantity == 5
+    assert row.weaning == last_weaning
+    assert row.mortality_date == date(2026, 1, 25)
+
+
+@pytest.mark.django_db
 def test_missing_weaning_is_unavailable_not_zero(mortality_farm):
     farm = mortality_farm
     sow = SowModel.objects.create(farm=farm, ear_tag="M-2")

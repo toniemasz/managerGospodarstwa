@@ -6,7 +6,7 @@ from decimal import Decimal
 
 from django.db.models import Count, Sum
 
-from sows.models import MortalityReportModel, SowEventModel, SowModel
+from sows.models import MortalityReportModel, PigletTransferModel, SowEventModel, SowModel
 from sows.selectors.mortality import mortality_summary, post_weaning_stock_summary
 from sows.services.sow_metrics import METRICS_REGISTRY, MetricDescriptor
 from sows.services.sow_repository import SowRepository
@@ -113,6 +113,22 @@ class SowReportingService:
                 totals["miscarriages"] += 1
                 month["miscarriages"] += 1
 
+        transfers = PigletTransferModel.objects.filter(
+            farm=self.farm,
+            canceled_at__isnull=True,
+        )
+        if date_from:
+            transfers = transfers.filter(transfer_date__gte=date_from)
+        if date_to:
+            transfers = transfers.filter(transfer_date__lte=date_to)
+        for transfer_date, quantity in transfers.values_list("transfer_date", "quantity"):
+            month = monthly[transfer_date.strftime("%Y-%m")]
+            month["month"] = transfer_date.strftime("%Y-%m")
+            totals["piglets_received"] += quantity
+            totals["piglets_transferred"] += quantity
+            month["piglets_received"] += quantity
+            month["piglets_transferred"] += quantity
+
         active_sows = SowModel.objects.filter(farm=self.farm, is_archived=False).count()
         archived_sows = SowModel.objects.filter(farm=self.farm, is_archived=True).count()
         farrowings = totals["farrowings"]
@@ -136,6 +152,8 @@ class SowReportingService:
             ),
             "weanings": weanings,
             "weaned": totals["weaned"],
+            "piglets_received": totals["piglets_received"],
+            "piglets_transferred": totals["piglets_transferred"],
             "average_weaned_per_litter": (
                 Decimal(totals["weaned"]) / Decimal(weanings) if weanings else None
             ),

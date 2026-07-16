@@ -11,6 +11,7 @@ from common.cache import invalidate_farm_cache_on_commit
 from sows.domain.sow_state_machine import SowStateMachine
 from sows.models import SowEventModel, SowModel, VaccinationCycleModel
 from sows.services.sow_event_service import SowEventService
+from sows.services.piglet_care import PigletCareError, PigletCareService
 from sows.services.sow_repository import SowRepository
 
 
@@ -52,6 +53,13 @@ class SowEventActions:
         data: dict,
         farrowing_decision: str | None = None,
     ):
+        if data.get("event_type") == SowStateMachine.WEANING:
+            PigletCareService(self.farm).validate_weaning(
+                sow=sow,
+                weaning_date=data["event_date"],
+                quantity=data.get("count") or 0,
+                lock_for_update=True,
+            )
         result = self.event_service.create_event(
             sow=sow,
             sow_status=sow_status,
@@ -139,17 +147,23 @@ class SowEventActions:
 
     @transaction.atomic
     def bulk_create_events(self, rows) -> list[SowEventModel]:
-        events = [
-            SowEventModel(
-                sow=self._get_row_sow(row.sow.id),
+        created_events = []
+        care = PigletCareService(self.farm)
+        for row in rows:
+            sow = self._get_row_sow(row.sow.id)
+            if row.event_type == SowStateMachine.WEANING:
+                care.validate_weaning(
+                    sow=sow,
+                    weaning_date=row.event_date,
+                    quantity=int(row.details.get("count") or 0),
+                    lock_for_update=True,
+                )
+            created_events.append(self.repository.create_event(
+                sow=sow,
                 event_type=row.event_type,
                 event_date=row.event_date,
                 details=row.details,
-                vaccine_name=(row.details.get("vaccine_name", "") if row.event_type == "VACCINATION" else ""),
-            )
-            for row in rows
-        ]
-        created_events = self.repository.bulk_create_events(events)
+            ))
         if created_events:
             invalidate_farm_cache_on_commit(self.farm, groups=("sows",))
         return created_events
@@ -157,6 +171,35 @@ class SowEventActions:
     @transaction.atomic
     def update_event(self, *, event_id: int, data: dict) -> SowEventModel:
         event = self._get_event(event_id, lock_for_update=True)
+        care = PigletCareService(self.farm)
+        if event.event_type == SowStateMachine.FARROWING:
+            has_care_history = (
+                event.outgoing_piglet_transfers.exists()
+                or event.incoming_piglet_transfers.exists()
+                or event.pre_weaning_mortality_reports.exists()
+                or care.weanings_for_cycle(event).exists()
+            )
+            if has_care_history and (
+                data["event_type"] != SowStateMachine.FARROWING
+                or data["event_date"] != event.event_date
+            ):
+                raise PigletCareError(
+                    "Nie można zmienić typu ani daty oproszenia powiązanego z odchowem. "
+                    "Najpierw skoryguj późniejsze operacje."
+                )
+            if data["event_type"] == SowStateMachine.FARROWING:
+                care.validate_cycle_history(
+                    event,
+                    born_alive_override=int(data.get("born_alive") or 0),
+                )
+        if data["event_type"] == SowStateMachine.WEANING:
+            PigletCareService(self.farm).validate_weaning(
+                sow=event.sow,
+                weaning_date=data["event_date"],
+                quantity=data.get("count") or 0,
+                replaced_weaning=event if event.event_type == SowStateMachine.WEANING else None,
+                lock_for_update=True,
+            )
         old_plan_id = event.vaccination_plan_id
         old_cycle_id = event.cycle_id
         old_scheduled_date = event.scheduled_date
@@ -196,6 +239,17 @@ class SowEventActions:
     @transaction.atomic
     def delete_event(self, event_id: int) -> DeletedSowEvent:
         event = self._get_event(event_id, lock_for_update=True)
+        if event.event_type == SowStateMachine.FARROWING:
+            care = PigletCareService(self.farm)
+            if (
+                event.outgoing_piglet_transfers.exists()
+                or event.incoming_piglet_transfers.exists()
+                or event.pre_weaning_mortality_reports.exists()
+                or care.weanings_for_cycle(event).exists()
+            ):
+                raise PigletCareError(
+                    "Nie można usunąć oproszenia powiązanego z transferem, upadkiem lub odsadzeniem."
+                )
         deleted_event = DeletedSowEvent(
             sow_id=event.sow_id,
             model_label=event._meta.label,

@@ -82,6 +82,7 @@
                     <tr>
                         <th>Nr kolczyka</th>
                         <th>Status</th>
+                        <th class="text-right">W odchowie</th>
                         <th>Następna czynność</th>
                         <th>W stadzie od</th>
                         <th>Przewidywany poród</th>
@@ -109,6 +110,9 @@
                                 <span class="status-pill">{{ sow.dynamic_status_display }}</span>
                             {% endif %}
                         </td>
+                        <td data-label="Aktualnie w odchowie" class="text-right">
+                            {% if sow.piglets_in_care != None %}<strong>{{ sow.piglets_in_care }}</strong> szt.{% else %}—{% endif %}
+                        </td>
                         <td>
                             <span class="status-pill{% if sow.operational_priority == 'urgent' %} status-red{% elif sow.operational_priority == 'today' %} status-amber{% endif %}">{{ sow.operational_label }}</span>
                             {% if sow.operational_date %}<br><span class="muted-small">{{ sow.operational_date|date:"d.m.Y" }}</span>{% endif %}
@@ -124,7 +128,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="empty-table">Brak macior. Dodaj pierwszą maciorę, aby zacząć prowadzić cykl produkcyjny.</td>
+                        <td colspan="7" class="empty-table">Brak macior. Dodaj pierwszą maciorę, aby zacząć prowadzić cykl produkcyjny.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

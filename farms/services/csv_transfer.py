@@ -15,7 +15,14 @@ from farms.services.data_backup import BackupImportError, user_business_data_cou
 from feed.models import DeliveryModel, IngredientModel, ProductionModel, RecipeItemModel, RecipeModel
 from feed.actions.inventory import InventoryActions
 from sales.models import PigSaleModel, SaleClassRowModel
-from sows.models import MortalityReportModel, SowEventModel, SowModel, VaccinationCycleModel, VaccinationPlanModel
+from sows.models import (
+    MortalityReportModel,
+    PigletTransferModel,
+    SowEventModel,
+    SowModel,
+    VaccinationCycleModel,
+    VaccinationPlanModel,
+)
 
 
 MAX_CSV_ARCHIVE_SIZE = 25 * 1024 * 1024
@@ -25,7 +32,8 @@ SCHEMAS = {
     "sow_events.csv": ("id", "sow_id", "event_type", "event_date", "details", "vaccination_plan_id", "vaccine_name", "cycle_id", "scheduled_date"),
     "vaccination_plans.csv": ("id", "name", "days_before_farrowing", "days_after_event", "event_source", "interval_months", "interval_value", "interval_unit", "schedule_mode", "first_due_date", "scope", "is_active", "requires_configuration", "selected_sow_ids", "excluded_sow_ids", "reminder_days_ahead"),
     "vaccination_cycles.csv": ("id", "plan_id", "sow_id", "cycle_id", "scheduled_date", "status", "completed_at", "skipped_at", "note"),
-    "mortality.csv": ("id", "mortality_type", "sow_id", "mortality_date", "quantity", "reason", "note", "source"),
+    "piglet_transfers.csv": ("id", "source_farrowing_id", "target_farrowing_id", "quantity", "transfer_date", "note", "canceled_at", "cancellation_note"),
+    "mortality.csv": ("id", "mortality_type", "sow_id", "farrowing_id", "mortality_date", "quantity", "reason", "note", "source"),
     "ingredients.csv": ("id", "name", "description", "low_stock_threshold_kg", "is_in_bin"),
     "deliveries.csv": ("id", "ingredient_id", "date", "quantity_kg", "price_per_kg"),
     "recipes.csv": ("id", "name"),
@@ -44,8 +52,9 @@ OPTIONAL_COLUMNS = {
         "interval_value", "interval_unit", "schedule_mode", "first_due_date", "scope",
         "is_active", "requires_configuration", "selected_sow_ids", "excluded_sow_ids",
     },
+    "mortality.csv": {"farrowing_id"},
 }
-OPTIONAL_FILES = {"vaccination_cycles.csv", "mortality.csv"}
+OPTIONAL_FILES = {"vaccination_cycles.csv", "piglet_transfers.csv", "mortality.csv"}
 
 
 def _value(value):
@@ -117,11 +126,25 @@ def build_csv_export(farm, *, year=None) -> tuple[bytes, str]:
             }
             for obj in VaccinationCycleModel.objects.filter(plan__farm=farm).order_by("id")
         ],
+        "piglet_transfers.csv": [
+            {
+                "id": obj.pk,
+                "source_farrowing_id": obj.source_farrowing_id,
+                "target_farrowing_id": obj.target_farrowing_id,
+                "quantity": obj.quantity,
+                "transfer_date": obj.transfer_date,
+                "note": obj.note,
+                "canceled_at": obj.canceled_at,
+                "cancellation_note": obj.cancellation_note,
+            }
+            for obj in PigletTransferModel.objects.filter(farm=farm).order_by("id")
+        ],
         "mortality.csv": [
             {
                 "id": obj.pk,
                 "mortality_type": obj.mortality_type,
                 "sow_id": obj.sow_id,
+                "farrowing_id": obj.farrowing_id,
                 "mortality_date": obj.mortality_date,
                 "quantity": obj.quantity,
                 "reason": obj.reason,
@@ -134,6 +157,7 @@ def build_csv_export(farm, *, year=None) -> tuple[bytes, str]:
                 "id": f"AUTO-{row.farrowing.id}",
                 "mortality_type": "PRZED_ODSADZENIEM",
                 "sow_id": row.sow.id,
+                "farrowing_id": row.farrowing.id,
                 "mortality_date": row.mortality_date,
                 "quantity": row.quantity if row.quantity is not None else "",
                 "reason": "Wyliczone automatycznie z oproszenia i odsadzenia",
@@ -372,6 +396,7 @@ def import_csv_archive(uploaded_file, farm) -> dict[str, int]:
     plans_by_name = {}
     for plan in plan_map.values():
         plans_by_name.setdefault(plan.name.casefold(), []).append(plan)
+    event_map = {}
     for row in rows["sow_events.csv"]:
         try:
             details = json.loads(row["details"] or "{}")
@@ -385,7 +410,7 @@ def import_csv_archive(uploaded_file, farm) -> dict[str, int]:
             plan = candidates[0] if len(candidates) == 1 else None
         if plan:
             matched_legacy_plan_ids.add(plan.id)
-        SowEventModel.objects.create(
+        event = SowEventModel.objects.create(
             sow=_related(sow_map, row["sow_id"], "maciory"),
             event_type=row["event_type"],
             event_date=_date(row["event_date"]),
@@ -395,7 +420,20 @@ def import_csv_archive(uploaded_file, farm) -> dict[str, int]:
             cycle_id=row.get("cycle_id") or details.get("cycle_id", ""),
             scheduled_date=_date(row.get("scheduled_date"), nullable=True),
         )
+        event_map[row["id"]] = event
     counts["zdarzenia macior"] = len(rows["sow_events.csv"])
+    for row in rows["piglet_transfers.csv"]:
+        PigletTransferModel.objects.create(
+            farm=farm,
+            source_farrowing=_related(event_map, row["source_farrowing_id"], "oproszenia źródłowe"),
+            target_farrowing=_related(event_map, row["target_farrowing_id"], "oproszenia docelowe"),
+            quantity=_int(row["quantity"]),
+            transfer_date=_date(row["transfer_date"]),
+            note=row.get("note") or "",
+            canceled_at=_datetime(row.get("canceled_at")),
+            cancellation_note=row.get("cancellation_note") or "",
+        )
+    counts["przeniesienia prosiąt"] = len(rows["piglet_transfers.csv"])
     for plan in plan_map.values():
         if plan.interval_value and plan.first_due_date is None and plan.id in matched_legacy_plan_ids:
             plan.is_active = True
@@ -425,10 +463,12 @@ def import_csv_archive(uploaded_file, farm) -> dict[str, int]:
         if mortality_type not in mortality_types:
             raise BackupImportError("mortality.csv zawiera nieobsługiwany typ upadku.")
         sow = _related(sow_map, row["sow_id"], "maciory") if row.get("sow_id") else None
+        farrowing = _related(event_map, row["farrowing_id"], "cykle odchowu") if row.get("farrowing_id") else None
         MortalityReportModel.objects.create(
             farm=farm,
             mortality_type=mortality_type,
             sow=sow,
+            farrowing=farrowing,
             mortality_date=_date(row["mortality_date"]),
             quantity=_int(row["quantity"]),
             reason=row.get("reason") or "",

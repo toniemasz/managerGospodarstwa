@@ -8,6 +8,14 @@
         <span>Maciory</span>
     </a>
 
+    <a href="{% url 'piglet_transfer_list' %}"
+       class="{% if active == 'piglet_transfer_list' or active == 'add_piglet_transfer' or active == 'edit_piglet_transfer' %}is-active{% endif %}">
+        <span class="subnav-icon">
+            {% include 'components/app_icon.html' with name='history' %}
+        </span>
+        <span>Przeniesienia prosiąt</span>
+    </a>
+
     <a href="{% url 'mortality_list' %}"
        class="{% if active == 'mortality_list' or active == 'report_mortality' %}is-active{% endif %}">
         <span class="subnav-icon is-danger">

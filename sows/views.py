@@ -8,6 +8,7 @@ from django.http import HttpResponse
 from django.utils import timezone
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.db.models.deletion import ProtectedError
 
 from .services.sow_dashboard_service import SowDashboardService
 from .services.reporting import SowReportingService
@@ -17,12 +18,13 @@ from .services.sow_event_service import FARROWING_DECISION_CANCEL
 from .forms import (
     BulkSowEventFormSet,
     MortalityReportForm,
+    PigletTransferForm,
     SowForm,
     SowEventForm,
     VaccinationPlanForm,
     empty_bulk_event_initials,
 )
-from .models import MortalityReportModel, SowModel, SowEventModel
+from .models import MortalityReportModel, PigletTransferModel, SowModel, SowEventModel
 from common.date_range import PERIOD_OPTIONS, parse_date_range
 from common.filter_ui import filter_ui_state
 from common.cache import invalidate_farm_cache_on_commit
@@ -31,10 +33,13 @@ from farms.services.module_navigation import ModuleNavigationService
 from farms.services.audit_log_service import log_action
 from farms.services.today_dashboard import TodayDashboardService
 from sows.actions.mortality import create_mortality_report, delete_mortality_report, update_mortality_report
+from sows.actions.piglet_transfers import PigletTransferActions
 from sows.actions.events import SowEventActions
 from sows.actions.vaccinations import VaccinationActionError, VaccinationActions
 from sows.domain.event_details import initial_data_from_event_details
 from sows.selectors.mortality import mortality_list_context
+from sows.selectors.piglet_transfers import piglet_transfer_list
+from sows.services.piglet_care import PigletCareError, PigletCareService
 
 logger = logging.getLogger(__name__)
 
@@ -258,6 +263,7 @@ def sow_detail_view(request, sow_id):
 
     repo = SowRepository(farm=farm)
     sow = repo.get_sow_by_id(sow_id)
+    sow.piglet_care = PigletCareService(farm).current_balance_for_sow(db_sow)
 
     return render(request, 'sows/sow_detail.html', {'sow': sow, 'form': form})
 
@@ -273,7 +279,7 @@ def add_event_view(request, sow_id):
     actions = SowEventActions(farm=farm, user=request.user, repository=repo)
 
     if request.method == 'POST':
-        form = SowEventForm(request.POST, sow_status=sow.status, farm=farm)
+        form = SowEventForm(request.POST, sow_status=sow.status, farm=farm, sow=db_sow)
         if form.is_valid():
             decision = request.POST.get('farrowing_decision')
             try:
@@ -285,13 +291,18 @@ def add_event_view(request, sow_id):
                 )
             except ValidationError as error:
                 form.add_error('event_type', error.messages[0])
-                return render(request, 'sows/add_event.html', {'form': form, 'sow': db_sow})
+                return render(request, 'sows/add_event.html', {
+                    'form': form,
+                    'sow': db_sow,
+                    'piglet_care': _piglet_care_for_event_form(farm, db_sow),
+                })
             if result.confirmation_required:
                 return render(request, 'sows/add_event.html', {
                     'form': form,
                     'sow': db_sow,
                     'requires_farrowing_confirmation': True,
                     'farrowing_confirmation_message': result.message,
+                    'piglet_care': _piglet_care_for_event_form(farm, db_sow),
                 })
             if result.cancelled or decision == FARROWING_DECISION_CANCEL:
                 messages.info(request, "Dodawanie oproszenia zostało anulowane.")
@@ -306,9 +317,13 @@ def add_event_view(request, sow_id):
         initial = {'event_date': date.today()}
         if requested_event_type in allowed_event_types:
             initial['event_type'] = requested_event_type
-        form = SowEventForm(sow_status=sow.status, farm=farm, initial=initial)
+        form = SowEventForm(sow_status=sow.status, farm=farm, sow=db_sow, initial=initial)
 
-    return render(request, 'sows/add_event.html', {'form': form, 'sow': db_sow})
+    return render(request, 'sows/add_event.html', {
+        'form': form,
+        'sow': db_sow,
+        'piglet_care': _piglet_care_for_event_form(farm, db_sow),
+    })
 
 
 @login_required
@@ -464,28 +479,122 @@ def edit_event_view(request, event_id):
     sow_id = db_event.sow.id
 
     if request.method == 'POST':
-        form = SowEventForm(request.POST, instance=db_event, farm=farm)
+        form = SowEventForm(request.POST, instance=db_event, farm=farm, sow=db_event.sow)
         if form.is_valid():
-            event = SowEventActions(farm=farm, user=request.user).update_event(
-                event_id=event_id,
-                data=form.cleaned_data,
-            )
-            log_action(farm=farm, user=request.user, action="UPDATE", obj=event)
-            messages.success(request, "Zdarzenie zostało zaktualizowane.")
-            return redirect('sow_detail', sow_id=sow_id)
+            try:
+                event = SowEventActions(farm=farm, user=request.user).update_event(
+                    event_id=event_id,
+                    data=form.cleaned_data,
+                )
+            except ValidationError as error:
+                form.add_error(None, error.messages[0])
+            else:
+                log_action(farm=farm, user=request.user, action="UPDATE", obj=event)
+                messages.success(request, "Zdarzenie zostało zaktualizowane.")
+                return redirect('sow_detail', sow_id=sow_id)
     else:
         try:
             initial_data = _get_event_initial_data(db_event)
         except ValidationError as error:
             messages.error(request, error.messages[0])
             initial_data = {}
-        form = SowEventForm(instance=db_event, initial=initial_data, farm=farm)
+        form = SowEventForm(instance=db_event, initial=initial_data, farm=farm, sow=db_event.sow)
 
     return render(request, 'sows/add_event.html', {
         'form': form,
         'event': db_event,
-        'sow': db_event.sow
+        'sow': db_event.sow,
+        'piglet_care': _piglet_care_for_event_form(farm, db_event.sow, db_event),
     })
+
+
+@login_required
+def piglet_transfer_list_view(request):
+    farm = get_current_farm(request)
+    context = {
+        'transfers': piglet_transfer_list(farm=farm, params=request.GET),
+        'selected_source': request.GET.get('source', ''),
+        'selected_target': request.GET.get('target', ''),
+        'selected_status': request.GET.get('status', ''),
+    }
+    context.update(filter_ui_state(request.GET, {
+        'source': 'Maciora źródłowa',
+        'target': 'Maciora docelowa',
+        'status': 'Status',
+    }))
+    return render(request, 'sows/piglet_transfer_list.html', context)
+
+
+@login_required
+def add_piglet_transfer_view(request):
+    farm = get_current_farm(request)
+    if request.method == 'POST':
+        form = PigletTransferForm(request.POST, farm=farm)
+        if form.is_valid():
+            try:
+                transfer = PigletTransferActions(farm, request.user).create(**form.cleaned_data)
+            except ValidationError as error:
+                form.add_error(None, error.messages[0])
+            else:
+                log_action(farm=farm, user=request.user, action="CREATE", obj=transfer)
+                messages.success(request, "Przeniesienie prosiąt zostało zapisane.")
+                return redirect('piglet_transfer_list')
+    else:
+        form = PigletTransferForm(farm=farm, initial={'transfer_date': date.today()})
+    return render(request, 'sows/piglet_transfer_form.html', {'form': form})
+
+
+@login_required
+def edit_piglet_transfer_view(request, transfer_id):
+    farm = get_current_farm(request)
+    transfer = get_object_or_404(PigletTransferModel.objects.filter(farm=farm), pk=transfer_id)
+    if transfer.is_canceled:
+        messages.error(request, "Anulowanego transferu nie można edytować.")
+        return redirect('piglet_transfer_list')
+    if request.method == 'POST':
+        form = PigletTransferForm(request.POST, farm=farm, instance=transfer)
+        if form.is_valid():
+            try:
+                updated = PigletTransferActions(farm, request.user).update(
+                    transfer_id=transfer.id,
+                    **form.cleaned_data,
+                )
+            except ValidationError as error:
+                form.add_error(None, error.messages[0])
+            else:
+                log_action(farm=farm, user=request.user, action="UPDATE", obj=updated)
+                messages.success(request, "Przeniesienie prosiąt zostało zaktualizowane.")
+                return redirect('piglet_transfer_list')
+    else:
+        form = PigletTransferForm(farm=farm, instance=transfer)
+    return render(request, 'sows/piglet_transfer_form.html', {
+        'form': form,
+        'transfer': transfer,
+        'is_edit': True,
+    })
+
+
+@require_POST
+@login_required
+def cancel_piglet_transfer_view(request, transfer_id):
+    farm = get_current_farm(request)
+    try:
+        transfer = PigletTransferActions(farm, request.user).cancel(
+            transfer_id=transfer_id,
+            reason=request.POST.get('reason', ''),
+        )
+    except ValidationError as error:
+        messages.error(request, error.messages[0])
+    else:
+        log_action(
+            farm=farm,
+            user=request.user,
+            action="CANCEL",
+            obj=transfer,
+            metadata={'reason': transfer.cancellation_note},
+        )
+        messages.success(request, "Transfer został anulowany, a historia zachowana.")
+    return redirect('piglet_transfer_list')
 
 
 @login_required
@@ -507,7 +616,15 @@ def delete_sow_view(request, sow_id):
         else:
             representation = str(db_sow)
             object_id = db_sow.pk
-            db_sow.delete()
+            try:
+                db_sow.delete()
+            except ProtectedError:
+                messages.error(
+                    request,
+                    "Nie można usunąć maciory powiązanej z historią odchowu. "
+                    "Zamiast tego zarchiwizuj maciorę.",
+                )
+                return redirect('sow_detail', sow_id=sow_id)
             invalidate_farm_cache_on_commit(farm, groups=("sows",))
             log_action(farm=farm, user=request.user, action="DELETE", model_label="sows.SowModel", object_id=object_id, object_repr=representation)
             messages.success(request, "Maciora została usunięta.")
@@ -554,6 +671,8 @@ def report_mortality_view(request):
                         request,
                         "Zgłoszono upadek maciory. Maciora została zarchiwizowana z powodu upadku.",
                     )
+                elif result.report.mortality_type == MortalityReportModel.TYPE_PRE_WEANING:
+                    messages.success(request, "Zgłoszono upadek prosiąt przed odsadzeniem.")
                 else:
                     messages.success(request, "Zgłoszono upadek zwierząt po odsadzeniu.")
                 return redirect('mortality_list')
@@ -645,17 +764,23 @@ def general_statistics_view(request):
 def delete_event_view(request, event_id):
     if request.method == 'POST':
         farm = get_current_farm(request)
-        deleted_event = SowEventActions(farm=farm, user=request.user).delete_event(event_id)
-        log_action(
-            farm=farm,
-            user=request.user,
-            action="DELETE",
-            model_label=deleted_event.model_label,
-            object_id=deleted_event.object_id,
-            object_repr=deleted_event.object_repr,
-        )
-        messages.success(request, "Zdarzenie zostało usunięte.")
-        return redirect('sow_detail', sow_id=deleted_event.sow_id)
+        event = get_object_or_404(SowEventModel.objects.filter(sow__farm=farm), pk=event_id)
+        try:
+            deleted_event = SowEventActions(farm=farm, user=request.user).delete_event(event_id)
+        except ValidationError as error:
+            messages.error(request, error.messages[0])
+            return redirect('sow_detail', sow_id=event.sow_id)
+        else:
+            log_action(
+                farm=farm,
+                user=request.user,
+                action="DELETE",
+                model_label=deleted_event.model_label,
+                object_id=deleted_event.object_id,
+                object_repr=deleted_event.object_repr,
+            )
+            messages.success(request, "Zdarzenie zostało usunięte.")
+            return redirect('sow_detail', sow_id=deleted_event.sow_id)
     return redirect('dashboard')
 
 
@@ -671,6 +796,7 @@ def _log_mortality_report(*, farm, user, result) -> None:
         "mortality_date": report.mortality_date.isoformat(),
         "quantity": report.quantity,
         "sow_id": report.sow_id,
+        "farrowing_id": report.farrowing_id,
         "reason": report.reason,
         "note": report.note,
     }
@@ -687,3 +813,23 @@ def _log_mortality_report(*, farm, user, result) -> None:
                 "mortality_report_id": report.id,
             },
         )
+
+
+def _piglet_care_for_event_form(farm, sow, event=None):
+    care = PigletCareService(farm)
+    if event is not None and event.event_type == "WEANING":
+        try:
+            farrowing = care.cycle_for_sow(
+                sow=sow,
+                on_date=event.event_date,
+                require_active=True,
+                excluded_weaning_id=event.id,
+            )
+        except PigletCareError:
+            return None
+        return care.balance(
+            farrowing,
+            as_of=event.event_date,
+            excluded_weaning_id=event.id,
+        )
+    return care.current_balance_for_sow(sow)
