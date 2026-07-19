@@ -55,6 +55,14 @@ def _normalize_mortality_type(value):
         None: MortalityReportModel.TYPE_UNSPECIFIED_POST_WEANING,
         '': MortalityReportModel.TYPE_UNSPECIFIED_POST_WEANING,
     }.get(value, value)
+
+
+def _is_true(value):
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
 MAX_UPLOAD_SIZE = 25 * 1024 * 1024
 MAX_UNCOMPRESSED_SIZE = 100 * 1024 * 1024
 
@@ -362,13 +370,46 @@ def _merge_user_records(payload, data, farm):
     plan_map = {}
     for record in _records(data, 'sows.VaccinationPlanModel'):
         fields = _clean_fields(record['fields'], {'farm', 'selected_sows', 'excluded_sows'})
+        fields['name'] = fields['name'].strip()
         plan, created = VaccinationPlanModel.objects.get_or_create(farm=farm, name__iexact=fields['name'], defaults=fields)
         plan_map[str(record['pk'])] = plan
         counts['plany szczepień'] += int(created)
     sow_map = {}
+    matched_archived_sow_ids = set()
     for record in _records(data, 'sows.SowModel'):
         fields = _clean_fields(record['fields'], {'farm', 'created_at'})
-        obj, created = SowModel.objects.get_or_create(farm=farm, ear_tag=fields.pop('ear_tag'), defaults=fields)
+        ear_tag = fields.pop('ear_tag').strip()
+        if fields.get('is_archived'):
+            archived_match = (
+                SowModel.objects.filter(
+                    farm=farm,
+                    is_archived=True,
+                    ear_tag__iexact=ear_tag,
+                    entry_date=fields.get('entry_date'),
+                    archived_at=fields.get('archived_at'),
+                )
+                .exclude(pk__in=matched_archived_sow_ids)
+                .order_by('id')
+                .first()
+            )
+            if archived_match is None:
+                obj = SowModel.objects.create(farm=farm, ear_tag=ear_tag, **fields)
+                created = True
+            else:
+                obj = archived_match
+                created = False
+            matched_archived_sow_ids.add(obj.pk)
+        else:
+            obj = SowModel.objects.filter(
+                farm=farm,
+                is_archived=False,
+                ear_tag__iexact=ear_tag,
+            ).first()
+            if obj is None:
+                obj = SowModel.objects.create(farm=farm, ear_tag=ear_tag, **fields)
+                created = True
+            else:
+                created = False
         sow_map[str(record['pk'])] = obj
         counts['maciory'] += int(created)
     event_map = {}
@@ -427,12 +468,14 @@ def _merge_user_records(payload, data, farm):
     ingredient_map = {}
     for record in _records(data, 'feed.IngredientModel'):
         fields = _clean_fields(record['fields'], {'farm', 'created_at'})
+        fields['name'] = fields['name'].strip()
         obj, created = IngredientModel.objects.get_or_create(farm=farm, name__iexact=fields['name'], defaults=fields)
         ingredient_map[str(record['pk'])] = obj
         counts['składniki'] += int(created)
     recipe_map = {}
     for record in _records(data, 'feed.RecipeModel'):
         fields = _clean_fields(record['fields'], {'farm', 'created_at'})
+        fields['name'] = fields['name'].strip()
         obj, created = RecipeModel.objects.get_or_create(farm=farm, name__iexact=fields['name'], defaults={'name': fields['name']})
         recipe_map[str(record['pk'])] = obj
         counts['receptury'] += int(created)
@@ -453,6 +496,7 @@ def _merge_user_records(payload, data, farm):
     product_map = {}
     for record in _records(data, 'feed.FeedProductModel'):
         fields = _clean_fields(record['fields'], {'farm', 'recipe', 'created_at'})
+        fields['name'] = fields['name'].strip()
         recipe_id = record['fields'].get('recipe')
         obj, created = FeedProductModel.objects.get_or_create(
             farm=farm,
@@ -486,6 +530,7 @@ def _merge_user_records(payload, data, farm):
     category_map = {}
     for record in _records(data, 'costs.CostCategoryModel'):
         fields = _clean_fields(record['fields'], {'farm', 'created_at', 'updated_at'})
+        fields['name'] = fields['name'].strip()
         obj, created = CostCategoryModel.objects.get_or_create(farm=farm, name__iexact=fields['name'], defaults=fields)
         category_map[str(record['pk'])] = obj
         counts['kategorie kosztów'] += int(created)
@@ -583,6 +628,7 @@ def _restore_user_records(payload, data, farm):
     product_map = {}
     for record in _records(data, 'feed.FeedProductModel'):
         fields = _clean_fields(record['fields'], {'farm', 'recipe'})
+        fields['name'] = fields['name'].strip()
         created_at = fields.pop('created_at', None)
         recipe_id = record['fields'].get('recipe')
         obj = FeedProductModel.objects.create(
@@ -807,6 +853,16 @@ def _create_farm_models(data, label, model, farm, counts):
     for record in _records(data, label):
         many_to_many_fields = {field.name for field in model._meta.many_to_many}
         fields = _clean_fields(record['fields'], {'farm', *many_to_many_fields})
+        identifier_field = {
+            'sows.VaccinationPlanModel': 'name',
+            'sows.SowModel': 'ear_tag',
+            'feed.IngredientModel': 'name',
+            'feed.RecipeModel': 'name',
+            'sales.PigSaleModel': 'document_number',
+            'costs.CostCategoryModel': 'name',
+        }.get(label)
+        if identifier_field and identifier_field in fields:
+            fields[identifier_field] = fields[identifier_field].strip()
         created_at = fields.pop('created_at', None)
         obj = model.objects.create(farm=farm, **fields)
         if created_at and hasattr(obj, 'created_at'):
@@ -862,10 +918,9 @@ def _validate_user_records(data):
 
     unique_names = {
         'sows.VaccinationPlanModel': 'name',
-        'sows.SowModel': 'ear_tag',
         'feed.IngredientModel': 'name',
         'feed.RecipeModel': 'name',
-        'sales.PigSaleModel': 'document_number',
+        'feed.FeedProductModel': 'name',
         'costs.CostCategoryModel': 'name',
     }
     for label, field_name in unique_names.items():
@@ -875,6 +930,51 @@ def _validate_user_records(data):
             raise BackupImportError(
                 f'Import zatrzymany: duplikaty w sekcji {label}: {", ".join(duplicates)}.'
             )
+
+    active_sow_tags = set()
+    for record in _records(data, 'sows.SowModel'):
+        fields = record['fields']
+        if _is_true(fields.get('is_archived')):
+            continue
+        ear_tag = str(fields.get('ear_tag', '')).strip().casefold()
+        if ear_tag in active_sow_tags:
+            raise BackupImportError(
+                f'Import zatrzymany: zduplikowany numer aktywnej maciory: {ear_tag}.'
+            )
+        active_sow_tags.add(ear_tag)
+
+    sale_documents = set()
+    for record in _records(data, 'sales.PigSaleModel'):
+        fields = record['fields']
+        document_number = str(fields.get('document_number', '')).strip().casefold()
+        sale_date = str(fields.get('sale_date') or '').strip()
+        if not document_number:
+            continue
+        if not sale_date:
+            raise BackupImportError(
+                'Import zatrzymany: sprzedaż z numerem dokumentu nie ma daty sprzedaży.'
+            )
+        key = (sale_date[:4], document_number)
+        if key in sale_documents:
+            raise BackupImportError(
+                f'Import zatrzymany: zduplikowany numer dokumentu sprzedaży w roku {key[0]}: '
+                f'{document_number}.'
+            )
+        sale_documents.add(key)
+
+    composite_keys = {
+        'feed.RecipeItemModel': ('recipe', 'ingredient'),
+        'sales.SaleClassRowModel': ('sale', 'line_no'),
+    }
+    for label, field_names in composite_keys.items():
+        seen = set()
+        for record in _records(data, label):
+            key = tuple(str(record['fields'].get(field_name, '')) for field_name in field_names)
+            if key in seen:
+                raise BackupImportError(
+                    f'Import zatrzymany: zduplikowany klucz w sekcji {label}: {", ".join(key)}.'
+                )
+            seen.add(key)
 
     required_fields = {
         'sows.SowModel': {'ear_tag'},

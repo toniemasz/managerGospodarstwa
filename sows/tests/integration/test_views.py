@@ -65,6 +65,21 @@ class TestSowViews:
         response = setup_client.get(url)
         assert response.status_code == 200
 
+    def test_sow_detail_edit_rejects_another_active_sow_number(self, setup_client):
+        existing = SowModel.objects.create(ear_tag='DETAIL-EXISTING', farm=setup_client.farm)
+        edited = SowModel.objects.create(ear_tag='DETAIL-EDITED', farm=setup_client.farm)
+
+        response = setup_client.post(reverse('sow_detail', args=[edited.id]), {
+            'edit_sow': '1',
+            'ear_tag': f' {existing.ear_tag.lower()} ',
+            'entry_date': edited.entry_date.isoformat(),
+        })
+
+        edited.refresh_from_db()
+        assert response.status_code == 200
+        assert edited.ear_tag == 'DETAIL-EDITED'
+        assert 'Aktywna maciora o tym numerze' in response.context['form'].errors['ear_tag'][0]
+
     def test_add_vaccination_plan_view_get_and_post(self, setup_client):
         get_response = setup_client.get(reverse('add_vaccination_plan'))
         content = get_response.content.decode()

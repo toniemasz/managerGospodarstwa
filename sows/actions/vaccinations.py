@@ -22,6 +22,30 @@ class VaccinationActionError(ValidationError):
     pass
 
 
+class VaccinationPlanNameConflictError(ValidationError):
+    pass
+
+
+@transaction.atomic
+def save_vaccination_plan(*, farm, form) -> VaccinationPlanModel:
+    """Zapisuje plan po ponownym sprawdzeniu nazwy pod blokadą gospodarstwa."""
+
+    farm.__class__.objects.select_for_update().get(pk=farm.pk)
+    plan = form.save(commit=False)
+    plan.farm = farm
+    plan.name = plan.name.strip()
+    if VaccinationPlanModel.objects.filter(
+        farm=farm,
+        name__iexact=plan.name,
+    ).exclude(pk=plan.pk).exists():
+        raise VaccinationPlanNameConflictError(
+            "Taki plan szczepienia istnieje już w tym gospodarstwie."
+        )
+    plan.save()
+    form.save_m2m()
+    return plan
+
+
 class VaccinationActions:
     """Atomowe operacje zamykające cykle i zmieniające zakres planu."""
 

@@ -132,6 +132,24 @@ def test_csv_export_and_atomic_import_round_trip(two_farms):
 
 
 @pytest.mark.django_db
+def test_csv_import_allows_reused_number_only_when_previous_sow_is_archived(two_farms):
+    _, source, _, target = two_farms
+    SowModel.objects.create(farm=source, ear_tag='CSV-REUSED', is_archived=True)
+    SowModel.objects.create(farm=source, ear_tag='CSV-REUSED', is_archived=False)
+    payload, _ = build_csv_export(source)
+
+    counts = import_csv_archive(
+        SimpleUploadedFile('reused.zip', payload, content_type='application/zip'),
+        target,
+    )
+
+    restored = SowModel.objects.filter(farm=target, ear_tag='CSV-REUSED')
+    assert counts['maciory'] == 2
+    assert restored.filter(is_archived=True).count() == 1
+    assert restored.filter(is_archived=False).count() == 1
+
+
+@pytest.mark.django_db
 def test_csv_round_trip_preserves_piglet_care_relationships(two_farms):
     _, source, _, target = two_farms
     source_sow = SowModel.objects.create(farm=source, ear_tag="CSV-A")

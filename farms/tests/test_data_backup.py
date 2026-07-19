@@ -164,6 +164,46 @@ def test_user_backup_restores_all_models_and_relationships():
 
 
 @pytest.mark.django_db
+def test_user_backup_keeps_active_and_archived_sows_with_same_number_separate():
+    source_user = User.objects.create_user(username='backup-reused-tag-source')
+    source_farm = get_or_create_user_farm(source_user)
+    archived = SowModel.objects.create(
+        farm=source_farm,
+        ear_tag='REUSED-1',
+        entry_date=date(2020, 1, 1),
+        is_archived=True,
+    )
+    active = SowModel.objects.create(
+        farm=source_farm,
+        ear_tag='REUSED-1',
+        entry_date=date(2026, 1, 1),
+    )
+    SowEventModel.objects.create(
+        sow=archived,
+        event_type='INSEMINATION',
+        event_date=date(2020, 2, 1),
+    )
+    SowEventModel.objects.create(
+        sow=active,
+        event_type='FARROWING',
+        event_date=date(2026, 2, 1),
+    )
+    backup_file = _user_backup_fixture(source_user, source_farm)
+
+    target_user = User.objects.create_user(username='backup-reused-tag-target')
+    target_farm = get_or_create_user_farm(target_user)
+    import_user_backup(backup_file, target_farm)
+
+    restored = SowModel.objects.filter(farm=target_farm, ear_tag='REUSED-1')
+    assert restored.count() == 2
+    restored_archived = restored.get(is_archived=True)
+    restored_active = restored.get(is_archived=False)
+    assert restored_archived.pk != restored_active.pk
+    assert restored_archived.events.get().event_type == 'INSEMINATION'
+    assert restored_active.events.get().event_type == 'FARROWING'
+
+
+@pytest.mark.django_db
 def test_user_backup_restores_piglet_transfer_and_pre_weaning_mortality_cycles():
     source_user = User.objects.create_user(username='piglet-backup-source')
     source_farm = get_or_create_user_farm(source_user)

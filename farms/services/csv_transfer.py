@@ -291,7 +291,6 @@ def _related(mapping, old_id, label):
 
 def _validate_duplicates(rows):
     unique_fields = {
-        "sows.csv": ("ear_tag",),
         "vaccination_plans.csv": ("name",),
         "ingredients.csv": ("name",),
         "recipes.csv": ("name",),
@@ -306,6 +305,34 @@ def _validate_duplicates(rows):
             if key in seen:
                 raise BackupImportError(f"Plik {filename} zawiera zduplikowany rekord ({', '.join(key)}).")
             seen.add(key)
+
+    active_sow_tags = set()
+    for row in rows["sows.csv"]:
+        if _bool(row["is_archived"]):
+            continue
+        ear_tag = row["ear_tag"].strip().casefold()
+        if ear_tag in active_sow_tags:
+            raise BackupImportError(
+                f"Plik sows.csv zawiera zduplikowany numer aktywnej maciory ({ear_tag})."
+            )
+        active_sow_tags.add(ear_tag)
+
+    sale_documents = set()
+    for row in rows["sales.csv"]:
+        document_number = row["document_number"].strip().casefold()
+        sale_date = row["sale_date"].strip()
+        if not document_number:
+            continue
+        if not sale_date:
+            raise BackupImportError(
+                "Sprzedaż z numerem dokumentu musi zawierać datę sprzedaży."
+            )
+        key = (sale_date[:4], document_number)
+        if key in sale_documents:
+            raise BackupImportError(
+                f"Plik sales.csv zawiera zduplikowany numer dokumentu w roku {key[0]} ({document_number})."
+            )
+        sale_documents.add(key)
 
 
 def _validate_semantics(rows):
@@ -347,7 +374,7 @@ def import_csv_archive(uploaded_file, farm) -> dict[str, int]:
     for row in rows["sows.csv"]:
         sow_map[row["id"]] = SowModel.objects.create(
             farm=farm,
-            ear_tag=row["ear_tag"],
+            ear_tag=row["ear_tag"].strip(),
             entry_date=_date(row["entry_date"]),
             is_archived=_bool(row["is_archived"]),
             archived_at=_datetime(row["archived_at"]),
@@ -361,7 +388,7 @@ def import_csv_archive(uploaded_file, farm) -> dict[str, int]:
         first_due_date = _date(row.get("first_due_date"), nullable=True)
         plan = VaccinationPlanModel.objects.create(
             farm=farm,
-            name=row["name"],
+            name=row["name"].strip(),
             days_before_farrowing=_int(row["days_before_farrowing"], nullable=True),
             days_after_event=_int(row["days_after_event"], nullable=True),
             event_source=row["event_source"] or None,
@@ -477,8 +504,8 @@ def import_csv_archive(uploaded_file, farm) -> dict[str, int]:
     counts["upadki"] = sum(row.get("source") != "automatic" for row in rows["mortality.csv"])
     ingredient_map = {}
     for row in rows["ingredients.csv"]:
-        ingredient_map[row["id"]] = IngredientModel.objects.create(farm=farm, name=row["name"], description=row["description"] or None, low_stock_threshold_kg=_decimal(row["low_stock_threshold_kg"]), is_in_bin=_bool(row["is_in_bin"]))
-    recipe_map = {row["id"]: RecipeModel.objects.create(farm=farm, name=row["name"]) for row in rows["recipes.csv"]}
+        ingredient_map[row["id"]] = IngredientModel.objects.create(farm=farm, name=row["name"].strip(), description=row["description"] or None, low_stock_threshold_kg=_decimal(row["low_stock_threshold_kg"]), is_in_bin=_bool(row["is_in_bin"]))
+    recipe_map = {row["id"]: RecipeModel.objects.create(farm=farm, name=row["name"].strip()) for row in rows["recipes.csv"]}
     for row in rows["recipe_items.csv"]:
         RecipeItemModel.objects.create(recipe=_related(recipe_map, row["recipe_id"], "receptury"), ingredient=_related(ingredient_map, row["ingredient_id"], "składniki"), percentage=_decimal(row["percentage"]))
     for row in rows["deliveries.csv"]:
@@ -512,14 +539,14 @@ def import_csv_archive(uploaded_file, farm) -> dict[str, int]:
     decimal_fields = ("total_weight", "price_per_kg", "avg_meatiness_seurop", "live_weight", "dressing_percentage", "net_value", "vat_value", "gross_value")
     for row in rows["sales.csv"]:
         values = {name: _decimal(row[name], nullable=name in {"avg_meatiness_seurop", "live_weight", "dressing_percentage"}) for name in decimal_fields}
-        sale_map[row["id"]] = PigSaleModel.objects.create(farm=farm, sale_date=_date(row["sale_date"], nullable=True), document_number=row["document_number"], tattoo=row["tattoo"], no_settlement=_bool(row["no_settlement"]), quantity=_int(row["quantity"] or 0), meat_class=row["meat_class"], **values)
+        sale_map[row["id"]] = PigSaleModel.objects.create(farm=farm, sale_date=_date(row["sale_date"], nullable=True), document_number=row["document_number"].strip(), tattoo=row["tattoo"], no_settlement=_bool(row["no_settlement"]), quantity=_int(row["quantity"] or 0), meat_class=row["meat_class"], **values)
     for row in rows["sale_rows.csv"]:
         SaleClassRowModel.objects.create(sale=_related(sale_map, row["sale_id"], "sprzedaże"), line_no=_int(row["line_no"]), meat_class=row["meat_class"], quantity=_int(row["quantity"], nullable=True), **{name: _decimal(row[name], nullable=True) for name in ("weight", "avg_weight", "avg_meatiness", "price_per_kg", "net_value", "vat_value", "gross_value")})
     category_map = {}
     for row in rows["cost_categories.csv"]:
         category_map[row["id"]] = CostCategoryModel.objects.create(
             farm=farm,
-            name=row["name"],
+            name=row["name"].strip(),
             description=row["description"],
             is_active=_bool(row["is_active"]),
         )

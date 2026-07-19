@@ -25,7 +25,12 @@ from common.units import format_mass
 from farms.services.current_farm import get_current_farm
 from farms.services.audit_log_service import log_action
 from feed.actions.deliveries import create_deliveries, delete_delivery, update_delivery
-from feed.actions.ingredients import create_ingredient, delete_ingredient, update_ingredient
+from feed.actions.ingredients import (
+    IngredientNameConflictError,
+    create_ingredient,
+    delete_ingredient,
+    update_ingredient,
+)
 from feed.actions.inventory import InventoryActions
 from feed.actions.productions import (
     complete_production,
@@ -34,7 +39,12 @@ from feed.actions.productions import (
     update_production,
 )
 from feed.models import RecipeVersionModel
-from feed.actions.recipes import create_recipe, delete_recipe as delete_recipe_action, update_recipe
+from feed.actions.recipes import (
+    RecipeNameConflictError,
+    create_recipe,
+    delete_recipe as delete_recipe_action,
+    update_recipe,
+)
 from feed.actions.recipe_versions import (
     RecipeVersionActions,
     recipe_version_items_from_formset,
@@ -78,10 +88,14 @@ def add_ingredient_view(request):
     if request.method == 'POST':
         form = IngredientForm(request.POST, farm=farm)
         if form.is_valid():
-            ingredient = create_ingredient(form, farm=farm)
-            log_action(farm=farm, user=request.user, action="CREATE", obj=ingredient)
-            messages.success(request, "Składnik został dodany.")
-            return redirect('ingredient_list')
+            try:
+                ingredient = create_ingredient(form, farm=farm)
+            except IngredientNameConflictError as error:
+                form.add_error('name', error.messages[0])
+            else:
+                log_action(farm=farm, user=request.user, action="CREATE", obj=ingredient)
+                messages.success(request, "Składnik został dodany.")
+                return redirect('ingredient_list')
     else:
         form = IngredientForm(farm=farm)
     return render(request, 'feed/form_generic.html',
@@ -95,10 +109,14 @@ def edit_ingredient_view(request, pk):
     if request.method == 'POST':
         form = IngredientForm(request.POST, instance=ingredient, farm=farm)
         if form.is_valid():
-            ingredient = update_ingredient(form)
-            log_action(farm=farm, user=request.user, action="UPDATE", obj=ingredient)
-            messages.success(request, "Zaktualizowano pomyślnie.")
-            return redirect('ingredient_list')
+            try:
+                ingredient = update_ingredient(form)
+            except IngredientNameConflictError as error:
+                form.add_error('name', error.messages[0])
+            else:
+                log_action(farm=farm, user=request.user, action="UPDATE", obj=ingredient)
+                messages.success(request, "Zaktualizowano pomyślnie.")
+                return redirect('ingredient_list')
     else:
         form = IngredientForm(instance=ingredient, farm=farm)
     return render(request, 'feed/form_generic.html',
@@ -262,10 +280,14 @@ def add_recipe_view(request):
         recipe.farm = farm
         formset = RecipeItemFormSet(request.POST, instance=recipe, form_kwargs={'farm': farm})
         if form.is_valid() and formset.is_valid():
-            recipe = create_recipe(form, formset, farm=farm, user=request.user)
-            log_action(farm=farm, user=request.user, action="CREATE", obj=recipe)
-            messages.success(request, "Receptura została utworzona.")
-            return redirect('feed_recipes')
+            try:
+                recipe = create_recipe(form, formset, farm=farm, user=request.user)
+            except RecipeNameConflictError as error:
+                form.add_error('name', error.messages[0])
+            else:
+                log_action(farm=farm, user=request.user, action="CREATE", obj=recipe)
+                messages.success(request, "Receptura została utworzona.")
+                return redirect('feed_recipes')
     else:
         form = RecipeForm(instance=recipe, farm=farm)
         formset = RecipeItemFormSet(instance=recipe, form_kwargs={'farm': farm})
@@ -280,16 +302,20 @@ def edit_recipe_view(request, pk):
         form = RecipeForm(request.POST, instance=recipe, farm=farm)
         formset = RecipeItemFormSet(request.POST, instance=recipe, form_kwargs={'farm': farm})
         if form.is_valid() and formset.is_valid():
-            recipe, version_created = update_recipe(form, formset, farm=farm, user=request.user)
-            log_action(farm=farm, user=request.user, action="UPDATE", obj=recipe)
-            if version_created:
-                messages.success(
-                    request,
-                    "Zapisano nową wersję receptury. Wcześniejsze śrutowania nie zostały zmienione.",
-                )
+            try:
+                recipe, version_created = update_recipe(form, formset, farm=farm, user=request.user)
+            except RecipeNameConflictError as error:
+                form.add_error('name', error.messages[0])
             else:
-                messages.success(request, "Receptura zaktualizowana.")
-            return redirect('feed_recipes')
+                log_action(farm=farm, user=request.user, action="UPDATE", obj=recipe)
+                if version_created:
+                    messages.success(
+                        request,
+                        "Zapisano nową wersję receptury. Wcześniejsze śrutowania nie zostały zmienione.",
+                    )
+                else:
+                    messages.success(request, "Receptura zaktualizowana.")
+                return redirect('feed_recipes')
     else:
         form = RecipeForm(instance=recipe, farm=farm)
         formset = RecipeItemFormSet(instance=recipe, form_kwargs={'farm': farm})

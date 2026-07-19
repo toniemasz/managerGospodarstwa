@@ -124,7 +124,7 @@ class VaccinationPlanForm(forms.ModelForm):
         return ""
 
     def clean_name(self):
-        name = self.cleaned_data['name']
+        name = self.cleaned_data['name'].strip()
         if self.farm is not None:
             exists = VaccinationPlanModel.objects.filter(farm=self.farm, name__iexact=name).exclude(pk=self.instance.pk).exists()
             if exists:
@@ -242,6 +242,28 @@ class SowForm(forms.ModelForm):
         widgets = {
             'entry_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
         }
+
+    def __init__(self, *args, farm=None, **kwargs):
+        self.farm = farm or getattr(kwargs.get('instance'), 'farm', None)
+        super().__init__(*args, **kwargs)
+        if self.farm is not None:
+            self.instance.farm = self.farm
+
+    def clean_ear_tag(self):
+        ear_tag = self.cleaned_data['ear_tag'].strip()
+        if not ear_tag:
+            raise ValidationError("Podaj numer kolczyka maciory.")
+        if self.farm is not None and not self.instance.is_archived:
+            duplicate = SowModel.objects.filter(
+                farm=self.farm,
+                is_archived=False,
+                ear_tag__iexact=ear_tag,
+            ).exclude(pk=self.instance.pk)
+            if duplicate.exists():
+                raise ValidationError(
+                    "Aktywna maciora o tym numerze kolczyka już istnieje w tym gospodarstwie."
+                )
+        return ear_tag
 
 
 class SowEventForm(forms.ModelForm):

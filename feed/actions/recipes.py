@@ -1,7 +1,12 @@
+from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from common.cache import invalidate_farm_cache_on_commit
 from feed.actions.recipe_versions import RecipeVersionActions
+
+
+class RecipeNameConflictError(ValidationError):
+    pass
 
 
 def _deleted_recipe_data(recipe) -> dict:
@@ -14,8 +19,12 @@ def _deleted_recipe_data(recipe) -> dict:
 
 def create_recipe(form, formset, *, farm, user=None):
     with transaction.atomic():
+        farm.__class__.objects.select_for_update().get(pk=farm.pk)
         recipe = form.save(commit=False)
         recipe.farm = farm
+        recipe.name = recipe.name.strip()
+        if recipe.__class__.objects.filter(farm=farm, name__iexact=recipe.name).exists():
+            raise RecipeNameConflictError("Taka receptura istnieje już w tym gospodarstwie.")
         recipe.save()
         formset.instance = recipe
         formset.save()
@@ -29,7 +38,15 @@ def create_recipe(form, formset, *, farm, user=None):
 
 def update_recipe(form, formset, *, farm, user=None):
     with transaction.atomic():
-        recipe = form.save()
+        farm.__class__.objects.select_for_update().get(pk=farm.pk)
+        recipe = form.save(commit=False)
+        recipe.name = recipe.name.strip()
+        if recipe.__class__.objects.filter(
+            farm=farm,
+            name__iexact=recipe.name,
+        ).exclude(pk=recipe.pk).exists():
+            raise RecipeNameConflictError("Taka receptura istnieje już w tym gospodarstwie.")
+        recipe.save()
         formset.save()
         _, version_created = RecipeVersionActions(farm=farm, user=user).ensure_current_version(
             recipe,
