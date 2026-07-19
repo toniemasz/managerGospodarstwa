@@ -109,7 +109,13 @@ class PigSaleForm(KilogramStorageFormMixin, forms.ModelForm):
     def clean(self):
         data = super().clean()
         document_number = (data.get('document_number') or '').strip()
+        data['document_number'] = document_number
         sale_date = data.get('sale_date')
+        if document_number and sale_date is None:
+            self.add_error(
+                'sale_date',
+                'Podaj datę sprzedaży, aby można było sprawdzić unikalność numeru dokumentu.',
+            )
         if self.farm and document_number and sale_date:
             duplicate = PigSaleModel.objects.filter(
                 farm=self.farm,
@@ -238,7 +244,32 @@ class SaleClassRowForm(KilogramStorageFormMixin, forms.Form):
         return any(self.cleaned_data.get(field) not in (None, '') for field in self.meaningful_fields)
 
 
-SaleClassRowFormSet = formset_factory(SaleClassRowForm, extra=0, can_delete=True)
+class BaseSaleClassRowFormSet(forms.BaseFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        used_line_numbers = set()
+        active_row_count = 0
+        for form in self.forms:
+            if form.cleaned_data.get('DELETE') or not form.has_row_data():
+                continue
+            active_row_count += 1
+            line_no = form.cleaned_data.get('line_no') or active_row_count
+            if line_no in used_line_numbers:
+                raise forms.ValidationError(
+                    f"Numer wiersza {line_no} występuje w rozliczeniu więcej niż raz."
+                )
+            used_line_numbers.add(line_no)
+
+
+SaleClassRowFormSet = formset_factory(
+    SaleClassRowForm,
+    formset=BaseSaleClassRowFormSet,
+    extra=0,
+    can_delete=True,
+)
 
 
 def empty_sale_row_initials(count: int = 8) -> list[dict]:

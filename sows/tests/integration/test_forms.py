@@ -16,6 +16,33 @@ def test_sow_form_accepts_basic_data():
 
 
 @pytest.mark.django_db
+def test_sow_number_is_unique_only_for_active_sows_in_same_farm():
+    farm = get_or_create_user_farm(User.objects.create_user(username='sow-unique'))
+    other_farm = get_or_create_user_farm(User.objects.create_user(username='sow-unique-other'))
+    SowModel.objects.create(farm=farm, ear_tag='ARCH-1', is_archived=True)
+    SowModel.objects.create(farm=farm, ear_tag='ACTIVE-1')
+
+    archived_reuse = SowForm(
+        data={'ear_tag': ' arch-1 ', 'entry_date': '2026-07-01'},
+        farm=farm,
+    )
+    active_duplicate = SowForm(
+        data={'ear_tag': ' active-1 ', 'entry_date': '2026-07-01'},
+        farm=farm,
+    )
+    other_farm_form = SowForm(
+        data={'ear_tag': 'ACTIVE-1', 'entry_date': '2026-07-01'},
+        farm=other_farm,
+    )
+
+    assert archived_reuse.is_valid() is True
+    assert archived_reuse.cleaned_data['ear_tag'] == 'arch-1'
+    assert active_duplicate.is_valid() is False
+    assert 'ear_tag' in active_duplicate.errors
+    assert other_farm_form.is_valid() is True
+
+
+@pytest.mark.django_db
 def test_vaccination_plan_form_requires_exactly_one_trigger():
     no_trigger = VaccinationPlanForm(data={'name': 'Pusta', 'reminder_days_ahead': 7})
     missing_source = VaccinationPlanForm(data={

@@ -2,6 +2,7 @@ import pytest
 from decimal import Decimal
 from datetime import date
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from feed.models import (
     DeliveryModel,
     IngredientModel,
@@ -34,6 +35,25 @@ def test_recipe_item_percentage_validation():
     # W Django walidatory modelu uruchamiają się przez full_clean(), a nie samo save()
     with pytest.raises(ValidationError):
         item.full_clean()
+
+
+@pytest.mark.django_db
+def test_recipe_cannot_contain_the_same_ingredient_twice_at_database_level():
+    farm = get_or_create_legacy_farm()
+    ingredient = IngredientModel.objects.create(farm=farm, name='Unikalny składnik')
+    recipe = RecipeModel.objects.create(farm=farm, name='Unikalna receptura')
+    RecipeItemModel.objects.create(
+        recipe=recipe,
+        ingredient=ingredient,
+        percentage=Decimal('50.00'),
+    )
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        RecipeItemModel.objects.create(
+            recipe=recipe,
+            ingredient=ingredient,
+            percentage=Decimal('50.00'),
+        )
 
 
 @pytest.mark.django_db

@@ -35,7 +35,13 @@ from farms.services.today_dashboard import TodayDashboardService
 from sows.actions.mortality import create_mortality_report, delete_mortality_report, update_mortality_report
 from sows.actions.piglet_transfers import PigletTransferActions
 from sows.actions.events import SowEventActions
-from sows.actions.vaccinations import VaccinationActionError, VaccinationActions
+from sows.actions.sows import SowEarTagConflictError, save_sow
+from sows.actions.vaccinations import (
+    VaccinationActionError,
+    VaccinationActions,
+    VaccinationPlanNameConflictError,
+    save_vaccination_plan,
+)
 from sows.domain.event_details import initial_data_from_event_details
 from sows.selectors.mortality import mortality_list_context
 from sows.selectors.piglet_transfers import piglet_transfer_list
@@ -74,17 +80,18 @@ def dashboard_view(request):
 def add_sow_view(request):
     farm = get_current_farm(request)
     if request.method == 'POST':
-        form = SowForm(request.POST)
+        form = SowForm(request.POST, farm=farm)
         if form.is_valid():
-            sow = form.save(commit=False)
-            sow.farm = farm
-            sow.save()
-            invalidate_farm_cache_on_commit(farm, groups=("sows",))
-            log_action(farm=farm, user=request.user, action="CREATE", obj=sow)
-            messages.success(request, "Maciora została dodana.")
-            return redirect('dashboard')
+            try:
+                sow = save_sow(farm=farm, form=form)
+            except SowEarTagConflictError as error:
+                form.add_error('ear_tag', error.messages[0])
+            else:
+                log_action(farm=farm, user=request.user, action="CREATE", obj=sow)
+                messages.success(request, "Maciora została dodana.")
+                return redirect('dashboard')
     else:
-        form = SowForm()
+        form = SowForm(farm=farm)
     return render(request, 'sows/add_sow.html', {'form': form})
 
 
@@ -94,15 +101,18 @@ def edit_sow_view(request, sow_id):
     db_sow = get_object_or_404(SowModel, id=sow_id, farm=farm)
 
     if request.method == 'POST':
-        form = SowForm(request.POST, instance=db_sow)
+        form = SowForm(request.POST, instance=db_sow, farm=farm)
         if form.is_valid():
-            sow = form.save()
-            invalidate_farm_cache_on_commit(farm, groups=("sows",))
-            log_action(farm=farm, user=request.user, action="UPDATE", obj=sow)
-            messages.success(request, "Dane maciory zostały zaktualizowane.")
-            return redirect('sow_detail', sow_id=db_sow.id)
+            try:
+                sow = save_sow(farm=farm, form=form)
+            except SowEarTagConflictError as error:
+                form.add_error('ear_tag', error.messages[0])
+            else:
+                log_action(farm=farm, user=request.user, action="UPDATE", obj=sow)
+                messages.success(request, "Dane maciory zostały zaktualizowane.")
+                return redirect('sow_detail', sow_id=db_sow.id)
     else:
-        form = SowForm(instance=db_sow)
+        form = SowForm(instance=db_sow, farm=farm)
 
     return render(request, 'sows/add_sow.html', {
         'form': form,
@@ -125,13 +135,17 @@ def add_vaccination_plan_view(request):
     if request.method == 'POST':
         form = VaccinationPlanForm(request.POST, farm=farm)
         if form.is_valid():
-            plan = form.save()
-            if plan.scope == plan.SCOPE_ALL:
-                plan.selected_sows.clear()
-            invalidate_farm_cache_on_commit(farm, groups=("sows",))
-            log_action(farm=farm, user=request.user, action="CREATE", obj=plan)
-            messages.success(request, "Reguła szczepienia została dodana.")
-            return redirect('vaccination_plans')
+            try:
+                plan = save_vaccination_plan(farm=farm, form=form)
+            except VaccinationPlanNameConflictError as error:
+                form.add_error('name', error.messages[0])
+            else:
+                if plan.scope == plan.SCOPE_ALL:
+                    plan.selected_sows.clear()
+                invalidate_farm_cache_on_commit(farm, groups=("sows",))
+                log_action(farm=farm, user=request.user, action="CREATE", obj=plan)
+                messages.success(request, "Reguła szczepienia została dodana.")
+                return redirect('vaccination_plans')
     else:
         form = VaccinationPlanForm(farm=farm)
 
@@ -146,16 +160,20 @@ def edit_vaccination_plan_view(request, plan_id):
     if request.method == 'POST':
         form = VaccinationPlanForm(request.POST, instance=plan, farm=farm)
         if form.is_valid():
-            plan = form.save()
-            if plan.scope == plan.SCOPE_ALL:
-                plan.selected_sows.clear()
-            reinclude_sows = form.cleaned_data.get('reinclude_sows')
-            if reinclude_sows:
-                plan.excluded_sows.remove(*reinclude_sows)
-            invalidate_farm_cache_on_commit(farm, groups=("sows",))
-            log_action(farm=farm, user=request.user, action="UPDATE", obj=plan)
-            messages.success(request, "Reguła szczepienia została zaktualizowana.")
-            return redirect('vaccination_plans')
+            try:
+                plan = save_vaccination_plan(farm=farm, form=form)
+            except VaccinationPlanNameConflictError as error:
+                form.add_error('name', error.messages[0])
+            else:
+                if plan.scope == plan.SCOPE_ALL:
+                    plan.selected_sows.clear()
+                reinclude_sows = form.cleaned_data.get('reinclude_sows')
+                if reinclude_sows:
+                    plan.excluded_sows.remove(*reinclude_sows)
+                invalidate_farm_cache_on_commit(farm, groups=("sows",))
+                log_action(farm=farm, user=request.user, action="UPDATE", obj=plan)
+                messages.success(request, "Reguła szczepienia została zaktualizowana.")
+                return redirect('vaccination_plans')
     else:
         form = VaccinationPlanForm(instance=plan, farm=farm)
 
@@ -251,15 +269,18 @@ def sow_detail_view(request, sow_id):
     db_sow = get_object_or_404(SowModel, id=sow_id, farm=farm)
 
     if request.method == 'POST' and 'edit_sow' in request.POST:
-        form = SowForm(request.POST, instance=db_sow)
+        form = SowForm(request.POST, instance=db_sow, farm=farm)
         if form.is_valid():
-            sow_model = form.save()
-            invalidate_farm_cache_on_commit(farm, groups=("sows",))
-            log_action(farm=farm, user=request.user, action="UPDATE", obj=sow_model)
-            messages.success(request, "Dane maciory zostały zaktualizowane.")
-            return redirect('sow_detail', sow_id=db_sow.id)
+            try:
+                sow_model = save_sow(farm=farm, form=form)
+            except SowEarTagConflictError as error:
+                form.add_error('ear_tag', error.messages[0])
+            else:
+                log_action(farm=farm, user=request.user, action="UPDATE", obj=sow_model)
+                messages.success(request, "Dane maciory zostały zaktualizowane.")
+                return redirect('sow_detail', sow_id=db_sow.id)
     else:
-        form = SowForm(instance=db_sow)
+        form = SowForm(instance=db_sow, farm=farm)
 
     repo = SowRepository(farm=farm)
     sow = repo.get_sow_by_id(sow_id)

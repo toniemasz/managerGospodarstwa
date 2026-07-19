@@ -45,7 +45,7 @@ class IngredientForm(KilogramStorageFormMixin, forms.ModelForm):
             _apply_widget_class(field)
 
     def clean_name(self):
-        name = self.cleaned_data['name']
+        name = self.cleaned_data['name'].strip()
         if self.farm is not None:
             exists = IngredientModel.objects.filter(farm=self.farm, name__iexact=name).exclude(pk=self.instance.pk).exists()
             if exists:
@@ -68,7 +68,7 @@ class RecipeForm(forms.ModelForm):
             self.instance.farm = self.farm
 
     def clean_name(self):
-        name = self.cleaned_data['name']
+        name = self.cleaned_data['name'].strip()
         if self.farm is not None:
             exists = RecipeModel.objects.filter(farm=self.farm, name__iexact=name).exclude(pk=self.instance.pk).exists()
             if exists:
@@ -89,6 +89,11 @@ class RecipeItemForm(forms.ModelForm):
 
 class BaseIngredientPercentageFormSet(forms.BaseInlineFormSet):
     duplicate_context = "receptury"
+
+    def validate_unique(self):
+        # Duplikaty składników są walidowane poniżej z komunikatem domenowym.
+        # Constraint bazy pozostaje ostatnią ochroną przed zapisem wyścigowym.
+        return
 
     def clean(self):
         super().clean()

@@ -7,6 +7,7 @@ from costs.forms import CostCategoryForm, CostFilterForm, CostForm
 from costs.models import CostCategoryModel, CostModel
 from costs.services import CostService
 from costs.actions import (
+    CostCategoryNameConflictError,
     deactivate_cost_category,
     delete_manual_cost,
     save_cost_category,
@@ -96,10 +97,14 @@ def _category_form_view(request, *, category, is_edit):
     if request.method == "POST":
         form = CostCategoryForm(request.POST, instance=category, farm=farm)
         if form.is_valid():
-            saved = save_cost_category(farm=farm, form=form)
-            log_action(farm=farm, user=request.user, action="UPDATE" if is_edit else "CREATE", obj=saved)
-            messages.success(request, "Kategoria kosztów została zapisana.")
-            return redirect("cost_categories")
+            try:
+                saved = save_cost_category(farm=farm, form=form)
+            except CostCategoryNameConflictError as error:
+                form.add_error('name', error.messages[0])
+            else:
+                log_action(farm=farm, user=request.user, action="UPDATE" if is_edit else "CREATE", obj=saved)
+                messages.success(request, "Kategoria kosztów została zapisana.")
+                return redirect("cost_categories")
     else:
         form = CostCategoryForm(instance=category, farm=farm)
     return render(request, "costs/category_form.html", {"form": form, "category": category, "is_edit": is_edit})

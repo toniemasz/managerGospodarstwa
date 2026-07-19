@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models.functions import ExtractYear, Lower, Trim
 from datetime import date
 from decimal import Decimal
 
@@ -38,6 +39,15 @@ class PigSaleModel(models.Model):
 
     class Meta:
         ordering = ['-sale_date', '-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                models.F('farm'),
+                ExtractYear('sale_date'),
+                Lower(Trim('document_number')),
+                condition=models.Q(document_number__gt='', sale_date__isnull=False),
+                name='unique_sale_document_per_farm_year_ci',
+            ),
+        ]
 
     def __str__(self):
         sale_date = self.sale_date or "bez daty"
@@ -99,6 +109,12 @@ class SaleClassRowModel(models.Model):
 
     class Meta:
         ordering = ['line_no', 'id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=('sale', 'line_no'),
+                name='unique_sale_line_number',
+            ),
+        ]
         verbose_name = "Wiersz klasy sprzedaży"
         verbose_name_plural = "Wiersze klas sprzedaży"
 

@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.db.models.functions import Lower, Trim
 
 
 class CostCategoryModel(models.Model):
@@ -21,8 +22,9 @@ class CostCategoryModel(models.Model):
         ordering = ("name", "id")
         constraints = [
             models.UniqueConstraint(
-                fields=("farm", "name"),
-                name="unique_cost_category_name_per_farm",
+                Lower(Trim("name")),
+                models.F("farm"),
+                name="unique_cost_category_name_per_farm_ci",
             ),
         ]
         verbose_name = "Kategoria kosztu"

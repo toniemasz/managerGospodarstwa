@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from django.db import transaction
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
 
 from common.cache import invalidate_farm_cache_on_commit
@@ -22,7 +23,17 @@ def save_sale(*, farm, form, row_formset, sale, user=None) -> PigSaleModel:
         raise ValueError("Sprzedaż nie należy do wskazanego gospodarstwa.")
     saved_sale = form.save(commit=False)
     saved_sale.farm = farm
-    saved_sale.save()
+    saved_sale.document_number = saved_sale.document_number.strip()
+    try:
+        with transaction.atomic():
+            saved_sale.save()
+    except IntegrityError as error:
+        constraint_name = getattr(getattr(error.__cause__, "diag", None), "constraint_name", None)
+        if constraint_name == "unique_sale_document_per_farm_year_ci":
+            raise ValidationError({
+                "document_number": "Numer dokumentu jest już używany w tym roku rozliczeniowym."
+            }) from error
+        raise
     replace_sale_rows(saved_sale, row_formset)
     invalidate_farm_cache_on_commit(farm, groups=("sales",))
     return saved_sale

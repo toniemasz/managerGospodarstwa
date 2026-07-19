@@ -5,6 +5,7 @@ from unittest.mock import patch
 import pytest
 from django.contrib import admin
 from django.contrib.auth.models import User
+from django.db import IntegrityError, transaction
 from django.test import Client
 from django.urls import reverse
 
@@ -251,6 +252,54 @@ def test_sales_year_filter_and_document_number_uniqueness_per_year(auth_client):
     )
     assert not same_year.is_valid()
     assert other_year.is_valid()
+
+
+@pytest.mark.django_db
+def test_sale_document_requires_date_and_database_enforces_normalized_year_scope(auth_client):
+    PigSaleModel.objects.create(
+        farm=auth_client.farm,
+        sale_date=date(2026, 1, 10),
+        document_number='FV/DB/1',
+    )
+
+    missing_date = PigSaleForm(
+        data={'sale_date': '', 'document_number': 'FV/DB/2'},
+        farm=auth_client.farm,
+    )
+    assert missing_date.is_valid() is False
+    assert 'sale_date' in missing_date.errors
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        PigSaleModel.objects.create(
+            farm=auth_client.farm,
+            sale_date=date(2026, 12, 31),
+            document_number='  fv/db/1  ',
+        )
+
+    PigSaleModel.objects.create(
+        farm=auth_client.farm,
+        sale_date=date(2027, 1, 1),
+        document_number='FV/DB/1',
+    )
+
+
+@pytest.mark.django_db
+def test_sale_row_formset_rejects_duplicate_effective_line_numbers():
+    formset = SaleClassRowFormSet(data={
+        'rows-TOTAL_FORMS': '2',
+        'rows-INITIAL_FORMS': '0',
+        'rows-MIN_NUM_FORMS': '0',
+        'rows-MAX_NUM_FORMS': '1000',
+        'rows-0-line_no': '',
+        'rows-0-meat_class': 'E',
+        'rows-0-quantity': '2',
+        'rows-1-line_no': '1',
+        'rows-1-meat_class': 'U',
+        'rows-1-quantity': '3',
+    }, prefix='rows')
+
+    assert formset.is_valid() is False
+    assert 'Numer wiersza 1' in formset.non_form_errors()[0]
 
 
 @pytest.mark.django_db

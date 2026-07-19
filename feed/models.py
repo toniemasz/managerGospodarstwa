@@ -4,6 +4,7 @@ from decimal import Decimal
 from django.db import models
 from django.conf import settings
 from django.db.models import JSONField, Q
+from django.db.models.functions import Lower, Trim
 from django.core.validators import MinValueValidator, MaxValueValidator
 
 from feed.domain.rules import LOW_STOCK_THRESHOLD_KG
@@ -32,7 +33,11 @@ class IngredientModel(models.Model):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['farm', 'name'], name='unique_ingredient_name_per_farm')
+            models.UniqueConstraint(
+                Lower(Trim('name')),
+                models.F('farm'),
+                name='unique_ingredient_name_per_farm_ci',
+            ),
         ]
 
     def __str__(self):
@@ -84,7 +89,11 @@ class RecipeModel(models.Model):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['farm', 'name'], name='unique_recipe_name_per_farm')
+            models.UniqueConstraint(
+                Lower(Trim('name')),
+                models.F('farm'),
+                name='unique_recipe_name_per_farm_ci',
+            ),
         ]
 
     def __str__(self):
@@ -99,6 +108,14 @@ class RecipeItemModel(models.Model):
         verbose_name="Procentowy udział (%)",
         validators=[MinValueValidator(Decimal('0.01')), MaxValueValidator(Decimal('100.00'))]
     )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=('recipe', 'ingredient'),
+                name='unique_ingredient_per_recipe',
+            ),
+        ]
 
     def __str__(self):
         return f"{self.recipe.name} - {self.ingredient.name} ({self.percentage}%)"
@@ -301,7 +318,13 @@ class FeedProductModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=('farm', 'name'), name='unique_feed_product_name_per_farm')]
+        constraints = [
+            models.UniqueConstraint(
+                Lower(Trim('name')),
+                models.F('farm'),
+                name='unique_feed_product_name_per_farm_ci',
+            ),
+        ]
 
     def clean(self):
         from django.core.exceptions import ValidationError

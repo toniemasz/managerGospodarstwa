@@ -92,15 +92,24 @@ def _sale_form_view(request, sale: PigSaleModel, template_context: dict):
     if request.method == 'POST':
         form, row_formset = _sale_forms_from_post(request, sale, service)
         if form.is_valid() and row_formset.is_valid():
-            saved_sale = service.save_sale(form, row_formset, sale)
-            log_action(
-                farm=saved_sale.farm,
-                user=request.user,
-                action="UPDATE" if template_context.get('is_edit') else "CREATE",
-                obj=saved_sale,
-            )
-            messages.success(request, "Sprzedaż została zapisana.")
-            return redirect('sales_list')
+            try:
+                saved_sale = service.save_sale(form, row_formset, sale)
+            except ValidationError as error:
+                if hasattr(error, 'message_dict'):
+                    for field_name, field_errors in error.message_dict.items():
+                        for field_error in field_errors:
+                            form.add_error(field_name if field_name in form.fields else None, field_error)
+                else:
+                    form.add_error(None, error.messages[0])
+            else:
+                log_action(
+                    farm=saved_sale.farm,
+                    user=request.user,
+                    action="UPDATE" if template_context.get('is_edit') else "CREATE",
+                    obj=saved_sale,
+                )
+                messages.success(request, "Sprzedaż została zapisana.")
+                return redirect('sales_list')
     else:
         form, row_formset = _sale_forms_from_instance(sale, service)
 

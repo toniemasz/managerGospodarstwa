@@ -5,6 +5,7 @@ from datetime import date
 from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.db.models.functions import Lower, Trim
 
 
 class VaccinationPlanModel(models.Model):
@@ -97,7 +98,11 @@ class VaccinationPlanModel(models.Model):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['farm', 'name'], name='unique_vaccination_plan_name_per_farm')
+            models.UniqueConstraint(
+                Lower(Trim('name')),
+                models.F('farm'),
+                name='unique_vacc_plan_name_per_farm_ci',
+            ),
         ]
 
     def __str__(self):
@@ -130,6 +135,16 @@ class SowModel(models.Model):
     )
     death_date = models.DateField(null=True, blank=True, verbose_name="Data upadku")
     death_note = models.TextField(blank=True, verbose_name="Notatka o upadku")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                Lower(Trim('ear_tag')),
+                models.F('farm'),
+                condition=models.Q(is_archived=False),
+                name='unique_active_sow_ear_tag_per_farm_ci',
+            ),
+        ]
 
     def __str__(self):
         return f"Maciora {self.ear_tag}"

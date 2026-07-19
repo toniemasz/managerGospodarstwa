@@ -17,6 +17,10 @@ FEED_COST_CATEGORY_NAME = "Pasza"
 FEED_COST_CATEGORY_DESCRIPTION = "Automatyczne koszty zakończonych śrutowań rozliczone według FIFO."
 
 
+class CostCategoryNameConflictError(ValidationError):
+    pass
+
+
 @transaction.atomic
 def save_manual_cost(*, farm, form, user=None):
     cost = form.save(commit=False)
@@ -50,10 +54,17 @@ def delete_manual_cost(*, farm, cost_id: int):
 
 @transaction.atomic
 def save_cost_category(*, farm, form):
+    farm.__class__.objects.select_for_update().get(pk=farm.pk)
     category = form.save(commit=False)
     if category.farm_id and category.farm_id != farm.id:
         raise ValidationError("Kategoria nie należy do wskazanego gospodarstwa.")
     category.farm = farm
+    category.name = category.name.strip()
+    if CostCategoryModel.objects.filter(
+        farm=farm,
+        name__iexact=category.name,
+    ).exclude(pk=category.pk).exists():
+        raise CostCategoryNameConflictError("Kategoria o tej nazwie już istnieje.")
     category.full_clean()
     category.save()
     invalidate_farm_cache_on_commit(farm, groups=("costs",))
