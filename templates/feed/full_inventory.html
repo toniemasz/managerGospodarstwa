@@ -1,17 +1,38 @@
 {% extends 'base.html' %}
 {% load feed_format %}
-{% block title %}Pełny stan magazynu{% endblock %}
+{% block title %}Stany surowców{% endblock %}
 
 {% block content %}
 <main class="app-page">
     <section class="page-header">
         <div>
             <p class="eyebrow">Pasze</p>
-            <h1>Pełny stan magazynu</h1>
+            <h1>Stany surowców</h1>
             <p class="page-subtitle">Bieżąca ilość każdego składnika z podziałem na silosy i składniki workowane.</p>
         </div>
         <a href="{% url 'feed_inventory' %}" class="button button-secondary">Wróć do magazynu</a>
     </section>
+
+    <form method="get" class="filter-bar inventory-state-filters" role="search">
+        <label class="table-control">
+            <span>Szukaj składnika</span>
+            <input type="search" name="q" value="{{ inventory_query }}" placeholder="Nazwa składnika">
+        </label>
+        <label class="table-control">
+            <span>Typ przechowywania</span>
+            <select name="storage">
+                <option value="">Wszystkie</option>
+                <option value="bin"{% if inventory_storage == "bin" %} selected{% endif %}>Silosy</option>
+                <option value="bag"{% if inventory_storage == "bag" %} selected{% endif %}>Workowane</option>
+            </select>
+        </label>
+        <label class="checkbox-row">
+            <input type="checkbox" name="low" value="1"{% if inventory_low_only %} checked{% endif %}>
+            <span>Tylko niskie stany</span>
+        </label>
+        <button type="submit" class="button button-primary">Zastosuj filtry</button>
+        {% if inventory_has_filters %}<a href="{% url 'feed_full_inventory' %}" class="button button-secondary">Wyczyść</a>{% endif %}
+    </form>
 
     <section class="inventory-grid">
         {% for item in inventory %}
@@ -23,8 +44,13 @@
                 {% else %}
                     <span class="status-pill status-amber">Worek</span>
                 {% endif %}
-                <p>Próg alertu: <strong>{{ item.low_stock_threshold_kg|feed_quantity }}</strong></p>
-                <p><a href="{% url 'edit_ingredient' item.ingredient_id %}" class="table-link">Edytuj składnik</a></p>
+                <p>Próg: <strong>{{ item.low_stock_threshold_kg|feed_quantity }}</strong></p>
+                <p>Różnica do progu: <strong>{{ item.threshold_difference|feed_quantity }}</strong></p>
+                <div class="row-actions">
+                    <a href="{% url 'add_delivery' %}?ingredient={{ item.ingredient_id }}" class="table-link">Przyjmij dostawę</a>
+                    <a href="{% url 'inventory_adjustment' %}?ingredient={{ item.ingredient_id }}" class="table-link">Skoryguj stan</a>
+                    <a href="{% url 'edit_ingredient' item.ingredient_id %}" class="table-link">Zmień próg alertu</a>
+                </div>
             </div>
             <div class="inventory-stock {% if item.is_low_stock %}is-low{% endif %}">
                 <strong>{{ item.current_stock|feed_quantity }}</strong>
@@ -32,7 +58,7 @@
         </article>
         {% empty %}
         <section class="panel empty-state">
-            Brak zdefiniowanych składników. Dodaj je w module "Składniki".
+            {% if inventory_has_filters %}Brak surowców pasujących do filtrów.{% else %}Brak zdefiniowanych składników. Dodaj je w module „Składniki”.{% endif %}
         </section>
         {% endfor %}
     </section>

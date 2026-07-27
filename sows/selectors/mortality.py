@@ -9,6 +9,7 @@ from django.urls import reverse
 from common.filter_ui import filter_ui_state, parse_filter_date
 from sows.domain.mortality import calculate_pre_weaning_deaths
 from sows.models import MortalityReportModel, PigletTransferModel, SowEventModel, SowModel
+from sows.services.piglet_care import PigletCareService
 
 
 TYPE_PRE_WEANING = MortalityReportModel.TYPE_PRE_WEANING
@@ -83,6 +84,11 @@ def pre_weaning_mortality_cycles(farm) -> list[PreWeaningMortalityRow]:
     ]
 
 
+def piglet_care_reconciliation_cycles(farm):
+    """Zwraca automatyczne upadki i nierozpisane przyjęcia z zamkniętych cykli."""
+    return PigletCareService(farm).completed_cycle_reconciliations()
+
+
 def _pre_weaning_row(farrowing, weanings):
     weaning = weanings[-1] if weanings else None
     if not weanings:
@@ -136,11 +142,12 @@ def mortality_list_context(farm, params) -> dict:
     if params.get("sow"):
         reports = reports.filter(sow__ear_tag__icontains=params["sow"].strip())
 
-    automatic_rows = pre_weaning_mortality_cycles(farm)
+    automatic_rows = piglet_care_reconciliation_cycles(farm)
     if date_from:
         automatic_rows = [row for row in automatic_rows if row.mortality_date >= date_from]
     if date_to:
         automatic_rows = [row for row in automatic_rows if row.mortality_date <= date_to]
+    summary_cycles = list(automatic_rows)
     if params.get("sow"):
         needle = params["sow"].strip().casefold()
         automatic_rows = [row for row in automatic_rows if needle in row.sow.ear_tag.casefold()]
@@ -152,7 +159,12 @@ def mortality_list_context(farm, params) -> dict:
     if source == "automatic":
         reports = reports.none()
 
-    summary = mortality_summary(farm)
+    summary = mortality_summary(
+        farm,
+        date_from=date_from,
+        date_to=date_to,
+        reconciliation_cycles=summary_cycles,
+    )
     context = {
         "mortality_reports": reports,
         "automatic_mortality_rows": automatic_rows,
@@ -172,7 +184,13 @@ def mortality_list_context(farm, params) -> dict:
     return context
 
 
-def mortality_summary(farm, *, date_from=None, date_to=None) -> dict:
+def mortality_summary(
+    farm,
+    *,
+    date_from=None,
+    date_to=None,
+    reconciliation_cycles=None,
+) -> dict:
     reports = MortalityReportModel.objects.filter(farm=farm)
     if date_from:
         reports = reports.filter(mortality_date__gte=date_from)
@@ -182,23 +200,36 @@ def mortality_summary(farm, *, date_from=None, date_to=None) -> dict:
         reports
         .values_list("mortality_type").annotate(total=Sum("quantity"))
     )
-    cycles = pre_weaning_mortality_cycles(farm)
-    if date_from:
-        cycles = [row for row in cycles if row.mortality_date >= date_from]
-    if date_to:
-        cycles = [row for row in cycles if row.mortality_date <= date_to]
-    pre_weaning = (
+    if reconciliation_cycles is None:
+        cycles = piglet_care_reconciliation_cycles(farm)
+        if date_from:
+            cycles = [row for row in cycles if row.mortality_date >= date_from]
+        if date_to:
+            cycles = [row for row in cycles if row.mortality_date <= date_to]
+    else:
+        cycles = reconciliation_cycles
+    legacy_pre_weaning = (
         quantities.get(MortalityReportModel.TYPE_PRE_WEANING, 0) or 0
-    ) + sum(row.quantity or 0 for row in cycles)
+    )
+    automatic_pre_weaning = sum(row.automatic_deaths for row in cycles)
     post_weaning = sum(quantities.get(kind, 0) or 0 for kind in MortalityReportModel.POST_WEANING_TYPES)
     return {
         "sow": quantities.get(MortalityReportModel.TYPE_SOW, 0) or 0,
-        "pre_weaning": pre_weaning,
+        "pre_weaning": legacy_pre_weaning + automatic_pre_weaning,
+        "automatic_pre_weaning": automatic_pre_weaning,
+        "legacy_pre_weaning": legacy_pre_weaning,
         "piglet": quantities.get(MortalityReportModel.TYPE_PIGLET, 0) or 0,
         "weaner": quantities.get(MortalityReportModel.TYPE_WEANER, 0) or 0,
         "finisher": quantities.get(MortalityReportModel.TYPE_FINISHER, 0) or 0,
         "unspecified": quantities.get(MortalityReportModel.TYPE_UNSPECIFIED_POST_WEANING, 0) or 0,
         "post_weaning": post_weaning,
+        "unreconciled_cycles": sum(
+            1 for row in cycles if row.requires_attention
+        ),
+        "unrecorded_inflow": sum(row.unrecorded_inflow for row in cycles),
+        "possible_missing_outflow": sum(
+            row.automatic_deaths for row in cycles
+        ),
     }
 
 

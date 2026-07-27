@@ -20,6 +20,7 @@ from .views import (
     add_vaccination_plan_view,
     edit_vaccination_plan_view,
     delete_vaccination_plan_view,
+    reactivate_vaccination_plan_view,
     record_vaccination_view,
     skip_vaccination_view,
     exclude_sow_from_vaccination_view,
@@ -71,4 +72,5 @@ urlpatterns = [
     path('konfiguracja/szczepienie/dodaj/', add_vaccination_plan_view, name='add_vaccination_plan'),
     path('konfiguracja/szczepienie/<int:plan_id>/edytuj/', edit_vaccination_plan_view, name='edit_vaccination_plan'),
     path('konfiguracja/szczepienie/<int:plan_id>/usun/', delete_vaccination_plan_view, name='delete_vaccination_plan'),
+    path('konfiguracja/szczepienie/<int:plan_id>/wlacz/', reactivate_vaccination_plan_view, name='reactivate_vaccination_plan'),
 ]

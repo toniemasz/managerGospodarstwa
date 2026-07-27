@@ -215,7 +215,10 @@
 
             allDetailFields.forEach((fieldName) => {
                 const field = getField(row, fieldName);
-                setFieldState(field, enabledFields.includes(fieldName), shouldClear);
+                const isEnabled = enabledFields.includes(fieldName);
+                setFieldState(field, isEnabled, shouldClear);
+                const container = field?.closest('td, .form-field');
+                if (container) container.hidden = !isEnabled;
             });
         };
 
@@ -229,7 +232,7 @@
             }
 
             row.querySelectorAll('.copy-sow').forEach((button) => {
-                button.setAttribute('aria-label', 'Skopiuj numer maciory z wiersza wyżej');
+                button.setAttribute('aria-label', 'Skopiuj maciorę z poprzedniego wiersza');
             });
 
             if (eventTypeField && eventTypeField.dataset.dynamicFieldsBound !== 'true') {
@@ -301,7 +304,7 @@
 
         const syncMortalityFields = (shouldClear = false) => {
             const isSow = typeSelect.value === 'MACIORA';
-            const requiresSow = isSow || typeSelect.value === 'PRZED_ODSADZENIEM';
+            const requiresSow = isSow;
 
             sowSection?.classList.toggle('hidden', !requiresSow);
             setFieldState(sowField, requiresSow, shouldClear);
@@ -341,6 +344,12 @@
         const selectedSowsSection = document.getElementById(
             'vaccination-selected-sows-section'
         );
+        const intervalValue = form.querySelector('#id_interval_value');
+        const intervalUnit = form.querySelector('#id_interval_unit');
+        const firstDueDate = form.querySelector('#id_first_due_date');
+        const reminderDays = form.querySelector('#id_reminder_days_ahead');
+        const scheduleMode = form.querySelector('#id_schedule_mode');
+        const schedulePreview = form.querySelector('[data-vaccination-schedule-preview]');
 
         const setSectionState = (section, enabled, shouldClear = false) => {
             if (!section) return;
@@ -373,6 +382,78 @@
             );
         };
 
+        const parseDate = (value) => {
+            const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
+            if (!match) return null;
+            return new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+        };
+        const addInterval = (date, value, unit) => {
+            const result = new Date(date.getTime());
+            if (unit === 'DAYS' || unit === 'WEEKS') {
+                result.setUTCDate(result.getUTCDate() + value * (unit === 'WEEKS' ? 7 : 1));
+                return result;
+            }
+            const months = unit === 'YEARS' ? value * 12 : value;
+            const targetMonth = result.getUTCMonth() + months;
+            const targetYear = result.getUTCFullYear() + Math.floor(targetMonth / 12);
+            const normalizedMonth = ((targetMonth % 12) + 12) % 12;
+            const lastDay = new Date(Date.UTC(targetYear, normalizedMonth + 1, 0)).getUTCDate();
+            result.setUTCFullYear(targetYear, normalizedMonth, Math.min(result.getUTCDate(), lastDay));
+            return result;
+        };
+        const formatDate = (date) => new Intl.DateTimeFormat('pl-PL', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            timeZone: 'UTC'
+        }).format(date);
+        const updateSchedulePreview = () => {
+            if (!schedulePreview) return;
+            const first = parseDate(firstDueDate?.value);
+            const value = Number.parseInt(intervalValue?.value || '', 10);
+            const unit = intervalUnit?.value;
+            const modeLabel = scheduleMode?.selectedOptions?.[0]?.textContent?.trim() || '—';
+            const reminder = Number.parseInt(reminderDays?.value || '', 10);
+            const firstOutput = schedulePreview.querySelector('[data-schedule-first]');
+            const nextOutput = schedulePreview.querySelector('[data-schedule-next]');
+
+            schedulePreview.querySelector('[data-schedule-mode]').textContent = `Tryb harmonogramu: ${modeLabel}`;
+            schedulePreview.querySelector('[data-schedule-reminder]').textContent = Number.isFinite(reminder)
+                ? `Przypomnienie: ${reminder} dni wcześniej`
+                : 'Przypomnienie: —';
+            if (!first || !Number.isFinite(value) || value < 1 || !unit) {
+                firstOutput.textContent = 'Pierwszy termin: —';
+                nextOutput.textContent = 'Kolejne terminy: —';
+                return;
+            }
+
+            const dates = [first];
+            for (let index = 0; index < 3; index += 1) {
+                dates.push(addInterval(dates.at(-1), value, unit));
+            }
+            firstOutput.textContent = `Pierwszy termin: ${formatDate(dates[0])}`;
+            nextOutput.textContent = `Kolejne terminy: ${dates.slice(1).map(formatDate).join(', ')}`;
+        };
+
+        const selectionOptions = Array.from(form.querySelectorAll('[data-sow-option]'));
+        const selectionCheckboxes = selectionOptions
+            .map((option) => option.querySelector('input[type="checkbox"]'))
+            .filter(Boolean);
+        const searchInput = form.querySelector('[data-sow-search]');
+        const statusFilter = form.querySelector('[data-sow-status-filter]');
+        const selectedCount = form.querySelector('[data-selected-count]');
+        const updateSelection = () => {
+            const search = (searchInput?.value || '').trim().toLocaleLowerCase('pl-PL');
+            const status = (statusFilter?.value || '').toLocaleLowerCase('pl-PL');
+            selectionOptions.forEach((option) => {
+                const haystack = (option.dataset.search || option.textContent).toLocaleLowerCase('pl-PL');
+                option.hidden = !haystack.includes(search) || !haystack.includes(status);
+            });
+            if (selectedCount) {
+                selectedCount.textContent = `Wybrano: ${selectionCheckboxes.filter((checkbox) => checkbox.checked).length}`;
+            }
+        };
+
         form.dataset.vaccinationPlanBound = 'true';
 
         triggerType.addEventListener('change', () => {
@@ -382,9 +463,30 @@
         scope.addEventListener('change', () => {
             syncScopeSection(true);
         });
+        [intervalValue, intervalUnit, firstDueDate, reminderDays, scheduleMode].forEach((field) => {
+            field?.addEventListener('input', updateSchedulePreview);
+            field?.addEventListener('change', updateSchedulePreview);
+        });
+        searchInput?.addEventListener('input', updateSelection);
+        statusFilter?.addEventListener('change', updateSelection);
+        selectionCheckboxes.forEach((checkbox) => checkbox.addEventListener('change', updateSelection));
+        form.querySelector('[data-select-visible]')?.addEventListener('click', () => {
+            selectionOptions.filter((option) => !option.hidden).forEach((option) => {
+                option.querySelector('input[type="checkbox"]').checked = true;
+            });
+            updateSelection();
+        });
+        form.querySelector('[data-clear-selection]')?.addEventListener('click', () => {
+            selectionCheckboxes.forEach((checkbox) => {
+                checkbox.checked = false;
+            });
+            updateSelection();
+        });
 
         syncTriggerSections(false);
         syncScopeSection(false);
+        updateSchedulePreview();
+        updateSelection();
     }
 
 
@@ -467,6 +569,34 @@
         if (!addButton || !rows || !template || !totalForms || addButton.dataset.saleRowsBound === 'true') return;
 
         const emptyState = document.getElementById('settlement-rows-empty');
+        const saleForm = document.getElementById('sale-form');
+        const parseDecimal = (value) => {
+            const parsed = Number.parseFloat(String(value || '').replace(/\s/g, '').replace(',', '.'));
+            return Number.isFinite(parsed) ? parsed : null;
+        };
+        const setCalculatedValue = (input, value) => {
+            if (!input || value === null || !Number.isFinite(value)) return;
+            if (input.value.trim() && input.dataset.calculated !== 'true') return;
+            input.value = value.toFixed(2).replace('.', ',');
+            input.dataset.calculated = 'true';
+        };
+        const calculateRow = (row) => {
+            if (!row || row.hidden) return;
+            const quantity = parseDecimal(row.querySelector('input[name$="-quantity"]')?.value);
+            const weight = parseDecimal(row.querySelector('input[name$="-weight"]')?.value);
+            const price = parseDecimal(row.querySelector('input[name$="-price_per_kg"]')?.value);
+            const vat = parseDecimal(row.querySelector('input[name$="-vat_value"]')?.value);
+            const netInput = row.querySelector('input[name$="-net_value"]');
+            const net = weight !== null && price !== null ? weight * price : parseDecimal(netInput?.value);
+
+            if (quantity && weight !== null) {
+                setCalculatedValue(row.querySelector('input[name$="-avg_weight"]'), weight / quantity);
+            }
+            if (weight !== null && price !== null) setCalculatedValue(netInput, net);
+            if (net !== null && vat !== null) {
+                setCalculatedValue(row.querySelector('input[name$="-gross_value"]'), net + vat);
+            }
+        };
         const updateEmptyState = () => {
             const hasVisibleRows = Array.from(rows.querySelectorAll('.settlement-row')).some((row) => !row.hidden);
             if (emptyState) emptyState.hidden = hasVisibleRows;
@@ -474,6 +604,15 @@
 
         addButton.dataset.saleRowsBound = 'true';
         rows.addEventListener('click', (event) => {
+            const moreButton = event.target.closest('.settlement-more-toggle');
+            if (moreButton) {
+                const row = moreButton.closest('.settlement-row');
+                const expanded = moreButton.getAttribute('aria-expanded') === 'true';
+                moreButton.setAttribute('aria-expanded', String(!expanded));
+                moreButton.textContent = expanded ? 'Więcej danych' : 'Mniej danych';
+                row?.classList.toggle('is-expanded', !expanded);
+                return;
+            }
             const button = event.target.closest('.remove-settlement-row');
             if (!button) return;
             const row = button.closest('.settlement-row');
@@ -481,6 +620,15 @@
             if (checkbox) checkbox.checked = true;
             if (row) row.hidden = true;
             updateEmptyState();
+        });
+        rows.addEventListener('input', (event) => {
+            const input = event.target.closest('input');
+            if (!input) return;
+            if (/-(avg_weight|net_value|gross_value)$/.test(input.name) && !event.isTrusted) return;
+            if (/-(avg_weight|net_value|gross_value)$/.test(input.name)) {
+                input.dataset.calculated = 'false';
+            }
+            calculateRow(input.closest('.settlement-row'));
         });
         addButton.addEventListener('click', () => {
             const index = parseInt(totalForms.value, 10);
@@ -499,6 +647,19 @@
             window.enhanceDataTables?.();
             updateEmptyState();
         });
+        saleForm?.querySelectorAll('[name="settlement_process"]').forEach((radio) => {
+            radio.addEventListener('change', () => {
+                const mode = saleForm.querySelector('[name="settlement_process"]:checked')?.value || 'manual';
+                saleForm.querySelectorAll('[data-pdf-settlement]').forEach((element) => {
+                    element.hidden = mode !== 'pdf';
+                });
+                const manualPanel = saleForm.querySelector('[data-manual-settlement]');
+                if (manualPanel) manualPanel.hidden = mode === 'later';
+                const noSettlement = saleForm.querySelector('[name="no_settlement"]');
+                if (noSettlement) noSettlement.value = mode === 'later' ? 'True' : 'False';
+            });
+        });
+        saleForm?.querySelector('[name="settlement_process"]:checked')?.dispatchEvent(new Event('change'));
         updateEmptyState();
     }
 
@@ -638,6 +799,9 @@
         if (!storageKey) return;
 
         let checkedState = parseJson(localStorage.getItem(storageKey), {});
+        const checkboxes = Array.from(document.querySelectorAll('.ingredient-checkbox[form="stageForm"]'));
+        const submitButton = form.querySelector('[data-stage-submit]');
+        const checkAllButton = document.querySelector('[data-check-all-ingredients]');
 
         const toggleRowStyle = (checkbox) => {
             const row = checkbox.closest('.ingredient-row');
@@ -647,9 +811,17 @@
             nameText?.classList.toggle('line-through', checkbox.checked);
             nameText?.classList.toggle('is-complete', checkbox.checked);
         };
+        const updateCompletion = () => {
+            const complete = checkboxes.every((checkbox) => checkbox.checked);
+            if (submitButton) submitButton.disabled = !complete;
+            if (checkAllButton) {
+                checkAllButton.textContent = complete ? 'Odznacz wszystkie' : 'Zaznacz wszystkie';
+                checkAllButton.setAttribute('aria-pressed', String(complete));
+            }
+        };
 
         form.dataset.stageChecklistBound = 'true';
-        document.querySelectorAll('.ingredient-checkbox').forEach((checkbox) => {
+        checkboxes.forEach((checkbox) => {
             const itemId = checkbox.dataset.id;
             checkbox.checked = Boolean(checkedState[itemId]);
             toggleRowStyle(checkbox);
@@ -658,12 +830,24 @@
                 checkedState[itemId] = this.checked;
                 localStorage.setItem(storageKey, JSON.stringify(checkedState));
                 toggleRowStyle(this);
+                updateCompletion();
             });
+        });
+        checkAllButton?.addEventListener('click', () => {
+            const shouldCheck = !checkboxes.every((checkbox) => checkbox.checked);
+            checkboxes.forEach((checkbox) => {
+                checkbox.checked = shouldCheck;
+                checkedState[checkbox.dataset.id] = shouldCheck;
+                toggleRowStyle(checkbox);
+            });
+            localStorage.setItem(storageKey, JSON.stringify(checkedState));
+            updateCompletion();
         });
 
         form.addEventListener('submit', () => {
             localStorage.removeItem(storageKey);
         });
+        updateCompletion();
     }
 
     function initConfirmations(root = document) {
@@ -674,10 +858,45 @@
             const eventName = element.tagName === 'FORM' ? 'submit' : 'click';
 
             element.addEventListener(eventName, (event) => {
+                if (element.dataset.submitting === 'true') {
+                    event.preventDefault();
+                    return;
+                }
                 const message = element.dataset.confirm;
                 if (message && !window.confirm(message)) {
                     event.preventDefault();
+                    return;
                 }
+
+                if (element.tagName === 'FORM') {
+                    const submitter = event.submitter || element.querySelector('[type="submit"]');
+                    const pendingLabel = element.dataset.submitLabel || (
+                        /usuń|usunąć|usunię/i.test(`${message || ''} ${submitter?.textContent || ''}`)
+                            ? 'Usuwanie…'
+                            : 'Przetwarzanie…'
+                    );
+                    element.dataset.submitting = 'true';
+                    element.setAttribute('aria-busy', 'true');
+                    if (submitter) {
+                        submitter.dataset.originalLabel = submitter.textContent;
+                        submitter.textContent = pendingLabel;
+                        submitter.classList.add('is-submitting');
+                        submitter.disabled = true;
+                    }
+                }
+            });
+        });
+    }
+
+    function resetPendingConfirmations(root = document) {
+        root.querySelectorAll('form[data-submitting="true"]').forEach((form) => {
+            form.dataset.submitting = 'false';
+            form.removeAttribute('aria-busy');
+            form.querySelectorAll('[data-original-label]').forEach((button) => {
+                button.textContent = button.dataset.originalLabel;
+                delete button.dataset.originalLabel;
+                button.classList.remove('is-submitting');
+                button.disabled = false;
             });
         });
     }
@@ -726,7 +945,13 @@
             if (seen.has(key)) return;
 
             seen.add(key);
-            entries.push({ type, title: entryTitle, text, origin });
+            entries.push({
+                type,
+                title: entryTitle,
+                text,
+                origin,
+                persistent: element.dataset.notificationPersistent === 'true'
+            });
         };
 
         center.querySelectorAll('[data-notification-entry]').forEach((element) => addEntry(element, 'message'));
@@ -766,7 +991,8 @@
                     type: 'error',
                     title: 'Nie zapisano zmian',
                     text: `Popraw oznaczone pola.\n${detailText}`,
-                    origin: 'form'
+                    origin: 'form',
+                    persistent: false
                 });
             }
         }
@@ -797,9 +1023,15 @@
             }
 
             const settings = typeSettings[entry.type];
+            const timeout = entry.persistent ? null : settings.timeout;
             isClosing = false;
             dialog.dataset.type = entry.type;
-            dialog.style.setProperty('--notification-timeout', `${settings.timeout}ms`);
+            dialog.dataset.persistent = timeout ? 'false' : 'true';
+            if (timeout) {
+                dialog.style.setProperty('--notification-timeout', `${timeout}ms`);
+            } else {
+                dialog.style.removeProperty('--notification-timeout');
+            }
             title.textContent = entry.title || settings.title;
             message.textContent = entry.text;
             center.hidden = false;
@@ -807,12 +1039,16 @@
 
             if (timerBar) {
                 timerBar.style.animation = 'none';
-                void timerBar.offsetWidth;
-                timerBar.style.animation = '';
+                if (timeout) {
+                    void timerBar.offsetWidth;
+                    timerBar.style.animation = '';
+                }
             }
 
             window.requestAnimationFrame(() => confirmButton.focus({ preventScroll: true }));
-            closeTimer = window.setTimeout(closeCurrent, settings.timeout);
+            closeTimer = timeout
+                ? window.setTimeout(closeCurrent, timeout)
+                : null;
         };
 
         const closeCurrent = () => {
@@ -831,7 +1067,7 @@
 
         confirmButton.addEventListener('click', closeCurrent);
         center.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape') {
+            if (event.key === 'Escape' && dialog.dataset.persistent !== 'true') {
                 event.preventDefault();
                 closeCurrent();
             }
@@ -849,7 +1085,7 @@
     }
 
     function initDisclosureMenus(root = document) {
-        const menus = Array.from(root.querySelectorAll('.account-menu'));
+        const menus = Array.from(root.querySelectorAll('.account-menu, .notification-menu, [data-mobile-search]'));
         if (!menus.length) return;
 
         document.addEventListener('click', (event) => {
@@ -860,7 +1096,51 @@
 
         document.addEventListener('keydown', (event) => {
             if (event.key !== 'Escape') return;
-            menus.forEach((menu) => menu.removeAttribute('open'));
+            menus.forEach((menu) => {
+                if (!menu.open) return;
+                menu.removeAttribute('open');
+                menu.querySelector('summary')?.focus();
+            });
+        });
+
+        root.querySelectorAll('[data-mobile-search]').forEach((menu) => {
+            const input = menu.querySelector('input[type="search"]');
+            menu.addEventListener('toggle', () => {
+                if (menu.open) window.requestAnimationFrame(() => input?.focus());
+            });
+            menu.querySelectorAll('[data-mobile-search-close]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    menu.removeAttribute('open');
+                    menu.querySelector('summary')?.focus();
+                });
+            });
+        });
+    }
+
+    function initFormAccessibility(root = document) {
+        root.querySelectorAll('[data-form-field]').forEach((container) => {
+            const field = container.querySelector('input, select, textarea');
+            if (!field) return;
+            const describedBy = [
+                container.querySelector('.field-hint')?.id,
+                container.querySelector('.field-error')?.id
+            ].filter(Boolean);
+            if (describedBy.length) field.setAttribute('aria-describedby', describedBy.join(' '));
+            if (container.classList.contains('has-error')) field.setAttribute('aria-invalid', 'true');
+        });
+
+        const summary = root.querySelector('[data-form-error-summary]');
+        if (!summary) return;
+        const firstError = root.querySelector(
+            '.has-error input, .has-error select, .has-error textarea, '
+            + '.form-field .errorlist'
+        );
+        const firstField = firstError?.matches('input, select, textarea')
+            ? firstError
+            : firstError?.closest('.form-field')?.querySelector('input, select, textarea');
+        window.requestAnimationFrame(() => {
+            (firstField || summary).focus({ preventScroll: true });
+            (firstField || summary).scrollIntoView({ behavior: 'smooth', block: 'center' });
         });
     }
 
@@ -915,7 +1195,9 @@
         initProductionStageChecklist();
         initConfirmations();
         initDisclosureMenus();
+        initFormAccessibility();
         initPriceUnitToggles();
         initTrendCharts();
     });
+    window.addEventListener('pageshow', () => resetPendingConfirmations());
 })();

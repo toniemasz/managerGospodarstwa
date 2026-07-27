@@ -1,13 +1,13 @@
 {% extends 'base.html' %}
 {% load feed_format %}
-{% block title %}Magazyn pasz{% endblock %}
+{% block title %}Ruchy i dostawy{% endblock %}
 
 {% block content %}
 <main class="app-page">
     <section class="page-header">
         <div>
             <p class="eyebrow">Pasze</p>
-            <h1>Magazyn</h1>
+            <h1>Ruchy i dostawy</h1>
             <p class="page-subtitle">Dostawy, stan surowców i ostrzeżenia niskiego poziomu.</p>
         </div>
         <div class="page-actions">
@@ -27,11 +27,11 @@
                     <strong>{{ total_inventory_kg|feed_quantity }}</strong>
                     <small>Pełny widok surowców i progów alarmowych.</small>
                 </a>
-                <div class="stat-tile{% if low_stock_alerts %} is-danger{% endif %}">
+                <a href="{% url 'feed_full_inventory' %}?low=1" class="stat-tile stat-link{% if low_stock_alerts %} is-danger{% endif %}">
                     <span>Niskie stany</span>
                     <strong>{{ low_stock_alerts|length }}</strong>
                     <small>{% if low_stock_alerts %}Wymagają kontroli lub dostawy.{% else %}Brak aktywnych alertów magazynowych.{% endif %}</small>
-                </div>
+                </a>
                 <div class="stat-tile">
                     <span>Dostawy w historii</span>
                     <strong>{{ deliveries|length }}</strong>
@@ -47,12 +47,19 @@
                     <ul class="inventory-alert-list">
                         {% for alert in low_stock_alerts %}
                         <li>
-                            <strong>{{ alert.name }}</strong>
-                            <span>{{ alert.current_stock|feed_quantity }} / próg {{ alert.low_stock_threshold_kg|feed_quantity }}</span>
+                            <div>
+                                <strong>{{ alert.name }}</strong>
+                                <span>{{ alert.current_stock|feed_quantity }} / próg {{ alert.low_stock_threshold_kg|feed_quantity }}</span>
+                            </div>
+                            <div class="row-actions">
+                                <a href="{% url 'add_delivery' %}?ingredient={{ alert.ingredient_id }}" class="table-link">Przyjmij dostawę</a>
+                                <a href="{% url 'inventory_adjustment' %}?ingredient={{ alert.ingredient_id }}" class="table-link">Skoryguj stan</a>
+                                <a href="{% url 'edit_ingredient' alert.ingredient_id %}" class="table-link">Zmień próg alertu</a>
+                            </div>
                         </li>
                         {% endfor %}
                     </ul>
-                    <a href="{% url 'feed_full_inventory' %}" class="button button-secondary">Pełny magazyn</a>
+                    <a href="{% url 'feed_full_inventory' %}?low=1" class="button button-secondary">Pokaż niskie stany</a>
                 {% else %}
                     <p>Stany surowców są powyżej progów alarmowych.</p>
                 {% endif %}

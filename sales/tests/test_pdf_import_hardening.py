@@ -59,6 +59,8 @@ def test_pdf_parser_warnings_are_shown_and_preview_does_not_save(sales_client):
         response = sales_client.post(reverse("add_sale"), {"import_pdf": "1", "settlement_pdf": uploaded})
     assert response.status_code == 200
     assert "Format wymaga ręcznego sprawdzenia" in response.content.decode()
+    assert 'name="settlement_review_required"' in response.content.decode()
+    assert 'value="True"' in response.content.decode()
     assert not PigSaleModel.objects.exists()
     audit = AuditLogModel.objects.get(action="PDF_IMPORT_PREVIEW")
     assert audit.metadata["filename"] == "settlement.pdf"

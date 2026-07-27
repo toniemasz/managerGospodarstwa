@@ -242,6 +242,76 @@
     margin: 0;
 }
 
+.mobile-search-menu {
+    display: none;
+}
+
+.mobile-search-menu > summary {
+    list-style: none;
+}
+
+.mobile-search-menu > summary::-webkit-details-marker {
+    display: none;
+}
+
+.mobile-search-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 78;
+    background: rgba(15, 23, 42, .42);
+}
+
+.mobile-search-panel {
+    position: fixed;
+    top: .5rem;
+    right: .5rem;
+    left: .5rem;
+    z-index: 79;
+    display: grid;
+    gap: 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: var(--card-padding);
+    box-shadow: var(--shadow);
+}
+
+.mobile-search-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+}
+
+.mobile-search-header .topbar-icon-button {
+    font-size: 1.6rem;
+}
+
+.mobile-search-form {
+    display: grid;
+    gap: .65rem;
+    margin: 0;
+}
+
+.mobile-search-form label {
+    color: var(--muted);
+    font-size: .82rem;
+    font-weight: 800;
+}
+
+.mobile-search-control {
+    position: relative;
+}
+
+.mobile-search-control input {
+    width: 100%;
+    padding-left: 2.75rem;
+}
+
+.mobile-search-control .topbar-search-icon {
+    display: inline-flex;
+}
+
 .topbar-search input {
     width: 100%;
     min-height: var(--control-height);

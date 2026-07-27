@@ -8,11 +8,11 @@ from farms.module_registry import (
 )
 
 
-MOBILE_NAV_KEYS = (
+MOBILE_PRIMARY_KEYS = (
     "tasks",
     "sows",
-    "inventory",
 )
+MOBILE_NAV_MODULE_LIMIT = 3
 
 
 def normalize_visible_modules(value) -> list[str]:
@@ -229,6 +229,7 @@ class ModuleNavigationService:
         self,
         modules: list[dict] | None = None,
     ) -> list[dict]:
+        """Zwraca stabilny zestaw modułów mobilnego paska nawigacji."""
         modules = (
             modules
             if modules is not None
@@ -243,34 +244,44 @@ class ModuleNavigationService:
 
         mobile = [
             by_key[key]
-            for key in MOBILE_NAV_KEYS
+            for key in MOBILE_PRIMARY_KEYS
             if key in by_key
         ]
 
-        active = next(
-            (
-                module
-                for module in modules
-                if (
-                    module["is_active"]
-                    and module["key"] != "settings"
-                )
-            ),
-            None,
+        pinned_candidates = [
+            key
+            for key in self.nav_keys()
+            if key not in MOBILE_PRIMARY_KEYS and key in by_key
+        ]
+        if "inventory" in pinned_candidates:
+            pinned_candidates.remove("inventory")
+            pinned_candidates.insert(0, "inventory")
+
+        if pinned_candidates and len(mobile) < MOBILE_NAV_MODULE_LIMIT:
+            mobile.append(by_key[pinned_candidates[0]])
+
+        return mobile[:MOBILE_NAV_MODULE_LIMIT]
+
+    def is_mobile_catalog_active(
+        self,
+        modules: list[dict] | None = None,
+        mobile_modules: list[dict] | None = None,
+    ) -> bool:
+        """Wskazuje, że aktywny moduł jest dostępny przez pozycję „Więcej”."""
+        modules = modules if modules is not None else self.modules()
+        mobile_modules = (
+            mobile_modules
+            if mobile_modules is not None
+            else self.mobile_modules(modules)
         )
+        mobile_keys = {module["key"] for module in mobile_modules}
 
-        mobile_keys = {
-            module["key"]
-            for module in mobile
-        }
-
-        if active and active["key"] not in mobile_keys:
-            mobile = [
-                active,
-                *mobile,
-            ]
-
-        return mobile[:3]
+        return any(
+            module["is_active"]
+            and module["key"] != "settings"
+            and module["key"] not in mobile_keys
+            for module in modules
+        )
 
 
 def module_visibility_groups(form) -> list[dict]:

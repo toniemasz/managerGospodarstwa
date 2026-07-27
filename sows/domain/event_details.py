@@ -26,7 +26,22 @@ def build_event_details(data: Mapping[str, Any]) -> dict:
             'born_dead': _value(data, 'born_dead', 0),
         }
     if event_type == SowStateMachine.WEANING:
-        return {'count': _value(data, 'count', 0)}
+        details = {'count': _value(data, 'count', 0)}
+        expected = data.get('piglet_balance_expected')
+        difference = data.get('piglet_balance_difference')
+        if expected is not None:
+            details['piglet_balance_expected'] = int(expected)
+        if difference:
+            details.update({
+                'piglet_balance_difference': int(difference),
+            })
+        automatic_deaths = data.get('automatic_pre_weaning_deaths')
+        if automatic_deaths:
+            details['automatic_pre_weaning_deaths'] = int(automatic_deaths)
+        unrecorded_inflow = data.get('unrecorded_piglet_inflow')
+        if unrecorded_inflow:
+            details['unrecorded_piglet_inflow'] = int(unrecorded_inflow)
+        return details
     if event_type == SowStateMachine.MISCARRIAGE:
         return {}
     if event_type == SowStateMachine.VACCINATION:

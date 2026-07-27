@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const checkboxes = Array.from(form.querySelectorAll('[data-production-checkbox]'));
     const counter = form.querySelector('[data-selected-production-count]');
     const submitButton = form.querySelector('[data-bulk-complete-button]');
+    const dialog = form.querySelector('[data-bulk-production-dialog]');
     if (!selectAll || !counter || !submitButton) return;
 
     const selectedCheckboxes = () => checkboxes.filter((checkbox) => checkbox.checked);
@@ -23,12 +24,20 @@ document.addEventListener('DOMContentLoaded', () => {
         updateState();
     });
     checkboxes.forEach((checkbox) => checkbox.addEventListener('change', updateState));
-    form.addEventListener('submit', (event) => {
-        const selectedCount = selectedCheckboxes().length;
-        if (!selectedCount || !window.confirm(`Zakończyć zaznaczone śrutowania (${selectedCount})?`)) {
-            event.preventDefault();
-            updateState();
-        }
+    submitButton.addEventListener('click', () => {
+        const selected = selectedCheckboxes();
+        if (!selected.length || !dialog) return;
+        const statuses = selected.map((checkbox) => checkbox.closest('tr')?.dataset.productionStatus);
+        dialog.querySelector('[data-ready-production-count]').textContent = statuses.filter((status) => status === 'STAGE_1_DONE').length;
+        dialog.querySelector('[data-skipped-stage-count]').textContent = statuses.filter((status) => status === 'QUEUED').length;
+        if (typeof dialog.showModal === 'function') dialog.showModal();
+        else dialog.setAttribute('open', '');
+    });
+    dialog?.querySelectorAll('[data-bulk-dialog-close]').forEach((button) => {
+        button.addEventListener('click', () => {
+            if (typeof dialog.close === 'function') dialog.close();
+            else dialog.removeAttribute('open');
+        });
     });
     updateState();
 });

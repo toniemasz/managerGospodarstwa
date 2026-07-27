@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from django import forms
 from django.forms import formset_factory
@@ -66,6 +66,16 @@ class PigSaleForm(KilogramStorageFormMixin, forms.ModelForm):
         required=False,
         widget=forms.FileInput(attrs={'accept': 'application/pdf'})
     )
+    settlement_process = forms.ChoiceField(
+        label="Sposób uzupełnienia rozliczenia",
+        required=False,
+        choices=(
+            ("manual", "Wpiszę ręcznie"),
+            ("pdf", "Importuję PDF"),
+            ("later", "Nie mam jeszcze rozliczenia"),
+        ),
+        widget=forms.RadioSelect,
+    )
 
     class Meta:
         model = PigSaleModel
@@ -74,6 +84,7 @@ class PigSaleForm(KilogramStorageFormMixin, forms.ModelForm):
             'document_number',
             'tattoo',
             'no_settlement',
+            'settlement_review_required',
             'avg_meatiness_seurop',
             'live_weight',
             'dressing_percentage',
@@ -94,20 +105,38 @@ class PigSaleForm(KilogramStorageFormMixin, forms.ModelForm):
                     format='%Y-%m-%d',
                     attrs={'type': 'date'}
                 ),
-            'no_settlement': forms.CheckboxInput(attrs={'class': 'checkbox-input'}),
+            'no_settlement': forms.HiddenInput(),
+            'settlement_review_required': forms.HiddenInput(),
         }
 
     def __init__(self, *args, farm=None, **kwargs):
         self.farm = farm or getattr(kwargs.get('instance'), 'farm', None)
         super().__init__(*args, **kwargs)
+        if not self.is_bound:
+            self.initial["settlement_process"] = (
+                "later"
+                if getattr(self.instance, "no_settlement", False)
+                else "manual"
+            )
         for name, field in self.fields.items():
-            if name == 'no_settlement':
+            if name in {
+                'no_settlement',
+                'settlement_process',
+                'settlement_review_required',
+            }:
                 continue
             existing = field.widget.attrs.get('class', '')
             field.widget.attrs['class'] = f'{existing} {FORM_FIELD_CLASS}'.strip()
 
     def clean(self):
         data = super().clean()
+        process = data.get("settlement_process")
+        if not process:
+            process = "later" if data.get("no_settlement") else "manual"
+            data["settlement_process"] = process
+        data["no_settlement"] = process == "later"
+        if process != "pdf":
+            data["settlement_review_required"] = False
         document_number = (data.get('document_number') or '').strip()
         data['document_number'] = document_number
         sale_date = data.get('sale_date')
@@ -219,6 +248,10 @@ class SaleClassRowForm(KilogramStorageFormMixin, forms.Form):
         required=False,
         widget=forms.TextInput(attrs={'inputmode': 'decimal'}),
     )
+    accept_calculation_mismatch = forms.BooleanField(
+        label="Akceptuję wartości inne niż wynik obliczeń",
+        required=False,
+    )
 
     meaningful_fields = [
         'meat_class',
@@ -242,6 +275,94 @@ class SaleClassRowForm(KilogramStorageFormMixin, forms.Form):
         if not hasattr(self, 'cleaned_data'):
             return False
         return any(self.cleaned_data.get(field) not in (None, '') for field in self.meaningful_fields)
+
+    def clean(self):
+        data = super().clean()
+        if not any(data.get(field) not in (None, "") for field in self.meaningful_fields):
+            return data
+
+        self.complete_calculated_values(data)
+        mismatches = self.calculation_mismatches(data)
+        if mismatches and not data.get("accept_calculation_mismatch"):
+            details = "; ".join(mismatches)
+            self.add_error(
+                "accept_calculation_mismatch",
+                (
+                    f"Wartości nie zgadzają się z obliczeniami: {details}. "
+                    "Popraw kwoty albo jawnie zaakceptuj wartości z dokumentu."
+                ),
+            )
+        return data
+
+    @staticmethod
+    def complete_calculated_values(data: dict) -> None:
+        """Uzupełnia brakujące wartości wyliczalne bez nadpisywania danych."""
+        quantity = data.get("quantity")
+        weight = data.get("weight")
+        price_per_kg = data.get("price_per_kg")
+
+        if quantity and weight is not None and data.get("avg_weight") is None:
+            data["avg_weight"] = (weight / quantity).quantize(
+                Decimal("0.01"),
+                rounding=ROUND_HALF_UP,
+            )
+
+        if (
+            weight is not None
+            and price_per_kg is not None
+            and data.get("net_value") is None
+        ):
+            data["net_value"] = (weight * price_per_kg).quantize(
+                Decimal("0.01"),
+                rounding=ROUND_HALF_UP,
+            )
+
+        if (
+            data.get("net_value") is not None
+            and data.get("vat_value") is not None
+            and data.get("gross_value") is None
+        ):
+            data["gross_value"] = (
+                data["net_value"] + data["vat_value"]
+            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @staticmethod
+    def calculation_mismatches(data: dict) -> list[str]:
+        """Porównuje podane wartości z obliczeniami, bez zmieniania danych."""
+        mismatches = []
+        quantity = data.get("quantity")
+        weight = data.get("weight")
+        avg_weight = data.get("avg_weight")
+        price_per_kg = data.get("price_per_kg")
+        net_value = data.get("net_value")
+        vat_value = data.get("vat_value")
+        gross_value = data.get("gross_value")
+
+        if quantity and weight is not None and avg_weight is not None:
+            expected_avg = (weight / quantity).quantize(
+                Decimal("0.01"),
+                rounding=ROUND_HALF_UP,
+            )
+            if abs(avg_weight - expected_avg) > Decimal("0.01"):
+                mismatches.append(f"średnia waga powinna wynosić {expected_avg}")
+
+        if weight is not None and price_per_kg is not None and net_value is not None:
+            expected_net = (weight * price_per_kg).quantize(
+                Decimal("0.01"),
+                rounding=ROUND_HALF_UP,
+            )
+            if abs(net_value - expected_net) > Decimal("0.01"):
+                mismatches.append(f"netto powinno wynosić {expected_net}")
+
+        if net_value is not None and vat_value is not None and gross_value is not None:
+            expected_gross = (net_value + vat_value).quantize(
+                Decimal("0.01"),
+                rounding=ROUND_HALF_UP,
+            )
+            if abs(gross_value - expected_gross) > Decimal("0.01"):
+                mismatches.append(f"brutto powinno wynosić {expected_gross}")
+
+        return mismatches
 
 
 class BaseSaleClassRowFormSet(forms.BaseFormSet):

@@ -1,6 +1,7 @@
 from django.db.models import Sum
 
 from sows.models import MortalityReportModel, SowEventModel
+from sows.services.piglet_care import PigletCareService
 
 
 class SowActivityProvider:
@@ -24,10 +25,11 @@ class SowActivityProvider:
             mortality_date__gte=date_from,
             mortality_date__lte=date_to,
         ).aggregate(total=Sum("quantity"))["total"] or 0
-        from sows.selectors.mortality import pre_weaning_mortality_cycles
         automatic_total = sum(
-            row.quantity or 0
-            for row in pre_weaning_mortality_cycles(self.farm)
-            if date_from <= row.mortality_date <= date_to
+            row.automatic_deaths
+            for row in PigletCareService(
+                self.farm
+            ).completed_cycle_reconciliations(weaned_from=date_from)
+            if row.mortality_date <= date_to
         )
         return manual_total + automatic_total

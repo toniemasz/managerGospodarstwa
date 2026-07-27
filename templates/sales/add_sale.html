@@ -9,7 +9,7 @@
             <h1>{% if is_edit %}Edycja dokumentu{% else %}Nowy dokument sprzedaży{% endif %}</h1>
             <p class="page-subtitle">Daty, rozliczenie klas i podsumowanie dokumentu.</p>
         </div>
-        <a href="{% url 'sales_list' %}" class="button button-secondary">Wróć</a>
+        <a href="{% url 'sales_list' %}" class="button button-secondary">Wróć do listy sprzedaży</a>
     </section>
 
     <form method="post" enctype="multipart/form-data" class="responsive-form" id="sale-form">
@@ -43,7 +43,7 @@
                         <p>Data sprzedaży może zostać uzupełniona później.</p>
                     </div>
                     {% if sale.no_settlement %}
-                        <span class="status-pill status-amber">Rozliczenie do importu</span>
+                        <span class="status-pill status-amber">Brak rozliczenia</span>
                     {% endif %}
                 </div>
 
@@ -95,31 +95,42 @@
                     </div>
                 </div>
 
-                <label class="option-box sale-option">
-                    <span class="checkbox-row">
-                        {{ form.no_settlement }}
-                        {{ form.no_settlement.label }}
-                    </span>
-                    {{ form.no_settlement.errors }}
-                </label>
+                {{ form.no_settlement }}
+                {{ form.settlement_review_required }}
+                <fieldset class="settlement-process" data-settlement-process>
+                    <legend>{{ form.settlement_process.label }}</legend>
+                    <label class="option-box">
+                        <input type="radio" name="{{ form.settlement_process.html_name }}" value="manual"{% if form.settlement_process.value == "manual" or not form.settlement_process.value %} checked{% endif %}>
+                        <span><strong>Mam rozliczenie — wpiszę ręcznie</strong><small>Uzupełnij pozycje w tabeli poniżej.</small></span>
+                    </label>
+                    <label class="option-box">
+                        <input type="radio" name="{{ form.settlement_process.html_name }}" value="pdf"{% if form.settlement_process.value == "pdf" %} checked{% endif %}>
+                        <span><strong>Mam rozliczenie — importuję PDF</strong><small>Wczytaj dokument i sprawdź rozpoznane wartości.</small></span>
+                    </label>
+                    <label class="option-box">
+                        <input type="radio" name="{{ form.settlement_process.html_name }}" value="later"{% if form.settlement_process.value == "later" %} checked{% endif %}>
+                        <span><strong>Nie mam jeszcze rozliczenia</strong><small>Zapisz podstawowe dane sprzedaży i uzupełnij rozliczenie później.</small></span>
+                    </label>
+                    {{ form.settlement_process.errors }}
+                </fieldset>
 
-                <div class="form-field">
+                <div class="form-field" data-pdf-settlement>
                     <label for="{{ form.settlement_pdf.id_for_label }}">{{ form.settlement_pdf.label }}</label>
                     {{ form.settlement_pdf }}
                     {{ form.settlement_pdf.errors }}
                 </div>
-                <div class="sale-import-actions">
+                <div class="sale-import-actions" data-pdf-settlement>
                     <button type="submit" name="import_pdf" value="1" class="button button-secondary">Importuj PDF</button>
                 </div>
 
                 <div class="sale-side-note">
                     <strong>Status dokumentu</strong>
-                    <span>{% if sale.no_settlement %}Rozliczenie do importu{% else %}Gotowy do zapisu{% endif %}</span>
+                    <span>{% if sale.no_settlement %}Brak rozliczenia{% else %}Kompletne rozliczenie{% endif %}</span>
                 </div>
             </aside>
         </section>
 
-        <section class="panel table-panel">
+        <section class="panel table-panel" data-manual-settlement>
             <div class="section-heading">
                 <div>
                     <h2>Tabela klas</h2>
@@ -139,7 +150,7 @@
                 >{{ row_formset.non_form_errors }}</div>
             {% endif %}
             <div class="table-scroll">
-                <table class="data-table settlement-table" data-no-pagination="true">
+                <table class="data-table settlement-table settlement-form-cards" data-no-pagination="true"{% if pdf_import_feedback %} data-imported-preview="true"{% endif %}>
                     <thead>
                         <tr>
                             <th>Lp</th>
@@ -159,17 +170,26 @@
                         {% for row_form in row_formset %}
                             {% with line_no=row_form.line_no.value|stringformat:"s" %}
                             <tr class="settlement-row{% if row_form.DELETE.value %} hidden{% endif %}{% if line_no in pdf_import_problem_line_numbers %} import-warning-row{% endif %}">
-                                <td>{{ row_form.line_no }}</td>
-                                <td>{{ row_form.meat_class }}</td>
-                                <td class="numeric-cell">{{ row_form.quantity }}</td>
-                                <td class="numeric-cell"><div class="mass-input-inline">{{ row_form.weight }}{{ row_form.weight_unit }}</div></td>
-                                <td class="numeric-cell"><div class="mass-input-inline">{{ row_form.avg_weight }}{{ row_form.avg_weight_unit }}</div></td>
-                                <td class="numeric-cell">{{ row_form.avg_meatiness }}</td>
-                                <td class="numeric-cell">{{ row_form.price_per_kg }}</td>
-                                <td class="numeric-cell">{{ row_form.net_value }}</td>
-                                <td class="numeric-cell">{{ row_form.vat_value }}</td>
-                                <td class="numeric-cell">{{ row_form.gross_value }}</td>
-                                <td class="delete-cell"><span class="hidden">{{ row_form.DELETE }}</span><button type="button" class="link-button-danger remove-settlement-row">Usuń</button></td>
+                                <td data-label="Pozycja" class="settlement-position">{{ row_form.line_no }}</td>
+                                <td data-label="Klasa">{{ row_form.meat_class }}</td>
+                                <td data-label="Liczba sztuk" class="numeric-cell">{{ row_form.quantity }}</td>
+                                <td data-label="Waga" class="numeric-cell"><div class="mass-input-inline">{{ row_form.weight }}{{ row_form.weight_unit }}</div></td>
+                                <td data-label="Średnia waga" class="numeric-cell settlement-secondary-field"><div class="mass-input-inline">{{ row_form.avg_weight }}{{ row_form.avg_weight_unit }}</div></td>
+                                <td data-label="Średnia mięsność" class="numeric-cell settlement-secondary-field">{{ row_form.avg_meatiness }}</td>
+                                <td data-label="Cena za kilogram" class="numeric-cell">{{ row_form.price_per_kg }}</td>
+                                <td data-label="Wartość netto" class="numeric-cell">{{ row_form.net_value }}</td>
+                                <td data-label="VAT" class="numeric-cell">{{ row_form.vat_value }}</td>
+                                <td data-label="Wartość brutto" class="numeric-cell">{{ row_form.gross_value }}</td>
+                                <td data-label="Akcje" class="delete-cell">
+                                    <button type="button" class="button button-secondary settlement-more-toggle" aria-expanded="false">Więcej danych</button>
+                                    <div class="settlement-mismatch">
+                                        {{ row_form.accept_calculation_mismatch }}
+                                        <label for="{{ row_form.accept_calculation_mismatch.id_for_label }}">{{ row_form.accept_calculation_mismatch.label }}</label>
+                                        {{ row_form.accept_calculation_mismatch.errors }}
+                                    </div>
+                                    <span class="hidden">{{ row_form.DELETE }}</span>
+                                    <button type="button" class="link-button-danger remove-settlement-row">Usuń pozycję</button>
+                                </td>
                             </tr>
                             {% endwith %}
                         {% endfor %}
@@ -181,17 +201,26 @@
 
         <template id="settlement-row-template">
             <tr class="settlement-row">
-                <td>{{ row_formset.empty_form.line_no }}</td>
-                <td>{{ row_formset.empty_form.meat_class }}</td>
-                <td class="numeric-cell">{{ row_formset.empty_form.quantity }}</td>
-                <td class="numeric-cell"><div class="mass-input-inline">{{ row_formset.empty_form.weight }}{{ row_formset.empty_form.weight_unit }}</div></td>
-                <td class="numeric-cell"><div class="mass-input-inline">{{ row_formset.empty_form.avg_weight }}{{ row_formset.empty_form.avg_weight_unit }}</div></td>
-                <td class="numeric-cell">{{ row_formset.empty_form.avg_meatiness }}</td>
-                <td class="numeric-cell">{{ row_formset.empty_form.price_per_kg }}</td>
-                <td class="numeric-cell">{{ row_formset.empty_form.net_value }}</td>
-                <td class="numeric-cell">{{ row_formset.empty_form.vat_value }}</td>
-                <td class="numeric-cell">{{ row_formset.empty_form.gross_value }}</td>
-                <td class="delete-cell"><span class="hidden">{{ row_formset.empty_form.DELETE }}</span><button type="button" class="link-button-danger remove-settlement-row">Usuń</button></td>
+                <td data-label="Pozycja" class="settlement-position">{{ row_formset.empty_form.line_no }}</td>
+                <td data-label="Klasa">{{ row_formset.empty_form.meat_class }}</td>
+                <td data-label="Liczba sztuk" class="numeric-cell">{{ row_formset.empty_form.quantity }}</td>
+                <td data-label="Waga" class="numeric-cell"><div class="mass-input-inline">{{ row_formset.empty_form.weight }}{{ row_formset.empty_form.weight_unit }}</div></td>
+                <td data-label="Średnia waga" class="numeric-cell settlement-secondary-field"><div class="mass-input-inline">{{ row_formset.empty_form.avg_weight }}{{ row_formset.empty_form.avg_weight_unit }}</div></td>
+                <td data-label="Średnia mięsność" class="numeric-cell settlement-secondary-field">{{ row_formset.empty_form.avg_meatiness }}</td>
+                <td data-label="Cena za kilogram" class="numeric-cell">{{ row_formset.empty_form.price_per_kg }}</td>
+                <td data-label="Wartość netto" class="numeric-cell">{{ row_formset.empty_form.net_value }}</td>
+                <td data-label="VAT" class="numeric-cell">{{ row_formset.empty_form.vat_value }}</td>
+                <td data-label="Wartość brutto" class="numeric-cell">{{ row_formset.empty_form.gross_value }}</td>
+                <td data-label="Akcje" class="delete-cell">
+                    <button type="button" class="button button-secondary settlement-more-toggle" aria-expanded="false">Więcej danych</button>
+                    <div class="settlement-mismatch">
+                        {{ row_formset.empty_form.accept_calculation_mismatch }}
+                        <label for="{{ row_formset.empty_form.accept_calculation_mismatch.id_for_label }}">{{ row_formset.empty_form.accept_calculation_mismatch.label }}</label>
+                        {{ row_formset.empty_form.accept_calculation_mismatch.errors }}
+                    </div>
+                    <span class="hidden">{{ row_formset.empty_form.DELETE }}</span>
+                    <button type="button" class="link-button-danger remove-settlement-row">Usuń pozycję</button>
+                </td>
             </tr>
         </template>
 

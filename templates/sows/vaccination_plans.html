@@ -1,16 +1,16 @@
 {% extends 'base.html' %}
-{% block title %}Reguły szczepień{% endblock %}
+{% block title %}Plany szczepień{% endblock %}
 
 {% block content %}
 <main class="app-page">
     <section class="page-header">
         <div>
             <p class="eyebrow">Maciory</p>
-            <h1>Reguły szczepień</h1>
-            <p class="page-subtitle">Konfiguracja przypomnień szczepień dla bieżącego gospodarstwa.</p>
+            <h1>Plany szczepień</h1>
+            <p class="page-subtitle">Harmonogramy i przypomnienia szczepień dla bieżącego gospodarstwa.</p>
         </div>
         <div class="header-actions">
-            <a href="{% url 'add_vaccination_plan' %}" class="button button-primary">Dodaj regułę</a>
+            <a href="{% url 'add_vaccination_plan' %}" class="button button-primary">Dodaj plan szczepień</a>
         </div>
     </section>
 
@@ -19,8 +19,8 @@
     <section class="panel table-panel">
         <div class="section-heading">
             <div>
-                <h2>Lista reguł</h2>
-                <p>Każda reguła może być później poprawiona albo usunięta.</p>
+                <h2>Lista planów</h2>
+                <p>Każdy plan można później poprawić albo wyłączyć bez usuwania historii.</p>
             </div>
         </div>
 
@@ -58,17 +58,24 @@
                         </td>
                         <td class="text-right" data-label="Akcje">
                             <div class="row-actions">
-                                <a href="{% url 'edit_vaccination_plan' plan.id %}" class="table-link">Edytuj</a>
-                                <form method="post" action="{% url 'delete_vaccination_plan' plan.id %}" data-confirm="Usunąć plan {{ plan.name|escapejs }}? Przyszłe przypomnienia zostaną zatrzymane, ale historia szczepień i pominięć pozostanie.">
+                                <a href="{% url 'edit_vaccination_plan' plan.id %}" class="table-link">Edytuj plan</a>
+                                {% if plan.is_active %}
+                                <form method="post" action="{% url 'delete_vaccination_plan' plan.id %}" data-confirm="Wyłączyć plan {{ plan.name|escapejs }}? Przyszłe przypomnienia zostaną zatrzymane, ale historia szczepień i pominięć pozostanie.">
                                     {% csrf_token %}
-                                    <button type="submit" class="button button-danger button-small">Usuń plan szczepienia</button>
+                                    <button type="submit" class="button button-danger button-small">Wyłącz plan</button>
                                 </form>
+                                {% else %}
+                                <form method="post" action="{% url 'reactivate_vaccination_plan' plan.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="button button-secondary button-small">Włącz ponownie</button>
+                                </form>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="empty-table">Brak zdefiniowanych reguł szczepień.</td>
+                        <td colspan="7" class="empty-table">Brak zdefiniowanych planów szczepień.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

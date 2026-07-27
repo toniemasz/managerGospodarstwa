@@ -55,6 +55,20 @@ class VaccinationScheduleService:
         reminders = self.build_reminders([sow], current_date, plan_ids={plan_id})
         return reminders[0] if reminders else None
 
+    def active_plans_for_sow(self, sow_id: int) -> list[VaccinationPlanModel]:
+        """Zwraca aktywne plany, które obejmują wskazaną maciorę."""
+        plans = self._plans(None)
+        return [
+            plan
+            for plan in plans
+            if self._covers_sow(
+                plan,
+                sow_id,
+                {sow.id for sow in plan.selected_sows.all()},
+                {sow.id for sow in plan.excluded_sows.all()},
+            )
+        ]
+
     def _plans(self, plan_ids: set[int] | None):
         queryset = VaccinationPlanModel.objects.filter(
             farm=self.farm,

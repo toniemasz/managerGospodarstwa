@@ -8,15 +8,15 @@
         <div>
             <p class="eyebrow">Maciory</p>
             <h1>{% if is_edit %}Edytuj upadek{% else %}Zgłoś upadek{% endif %}</h1>
-            <p class="page-subtitle">Rejestruj upadki przy aktywnym odchowie oraz straty po odsadzeniu.</p>
+            <p class="page-subtitle">Rejestruj upadki macior oraz zwierząt po odsadzeniu.</p>
         </div>
         <a href="{% url 'mortality_list' %}" class="button button-secondary">Lista upadków</a>
     </section>
 
     <section class="notice notice-info">
         <div>
-            <h2>Zakres zgłoszenia</h2>
-            <p>Upadek przed odsadzeniem przypisz do maciory, przy której prosięta znajdowały się w dniu zdarzenia. Nie zmienia to liczby biologicznie urodzonych.</p>
+            <h2>Upadki przed odsadzeniem są automatyczne</h2>
+            <p>Nie wpisujesz ich ręcznie. System wylicza je przy odsadzeniu z urodzeń, przeniesień i faktycznej liczby odsadzonych, a po korekcie historii przelicza wynik ponownie.</p>
         </div>
     </section>
 
@@ -38,7 +38,7 @@
             <div id="sec_mortality_sow" class="form-section dynamic-form-section hidden">
                 <div class="form-section-heading">
                     <h2>Maciora</h2>
-                    <p>Dla upadku maciory wybierz aktywną maciorę. Dla upadku przed odsadzeniem wybierz maciorę z aktywnym odchowem.</p>
+                    <p>Dla upadku maciory wybierz aktywną maciorę.</p>
                 </div>
                 {% include 'components/form_field.html' with field=form.sow %}
                 <datalist id="mortality-sow-options">
@@ -52,7 +52,7 @@
             <div id="sec_mortality_quantity" class="form-section dynamic-form-section">
                 <div class="form-section-heading">
                     <h2>Liczba sztuk</h2>
-                    <p>Dla prosiąt przed odsadzeniem liczba pomniejszy stan aktywnego odchowu. Dla maciory zapis zostanie ustawiony na 1 sztukę.</p>
+                    <p>Dla zwierząt po odsadzeniu wpisz liczbę sztuk. Dla maciory zapis zostanie ustawiony na 1 sztukę.</p>
                 </div>
                 {% include 'components/form_field.html' with field=form.quantity %}
             </div>

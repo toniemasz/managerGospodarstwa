@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% load feed_format %}
+{% block title %}Cofnij rozliczenie śrutowania{% endblock %}
+{% block content %}
+<main class="app-page app-page-narrow">
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Śrutowanie</p>
+            <h1>Cofnij rozliczenie</h1>
+            <p class="page-subtitle">{{ production.recipe.name }} · {{ production.quantity_kg|feed_quantity }} · {{ production.date|date:"d.m.Y" }}</p>
+        </div>
+        <a href="{% url 'feed_productions' %}" class="button button-secondary">Wróć do listy śrutowań</a>
+    </section>
+
+    <section class="notice notice-danger">
+        <div>
+            <h2>Ta operacja zmienia rozliczone dane</h2>
+            <p>Cofnięcie odwróci rozchód FIFO i koszt produkcji, usunie utworzoną partię gotowej paszy oraz automatyczne podanie. Jeśli partia została użyta w innym podaniu, operacja zostanie zablokowana.</p>
+        </div>
+    </section>
+
+    <section class="panel">
+        <form method="post" class="responsive-form" data-confirm="Cofnąć rozliczenie tego śrutowania?">
+            {% csrf_token %}
+            <div class="form-field">
+                <label for="reversal-reason">Przyczyna cofnięcia <span aria-hidden="true">*</span></label>
+                <textarea id="reversal-reason" name="reason" required rows="4" class="form-control" aria-describedby="reversal-reason-help">{{ request.POST.reason }}</textarea>
+                <p id="reversal-reason-help" class="field-hint">Przyczyna zostanie zapisana w historii zmian.</p>
+            </div>
+            <div class="form-actions">
+                <a href="{% url 'feed_productions' %}" class="button button-secondary">Anuluj</a>
+                <button type="submit" class="button button-danger">Cofnij rozliczenie</button>
+            </div>
+        </form>
+    </section>
+</main>
+{% endblock %}

@@ -224,6 +224,10 @@
     background: var(--primary);
 }
 
+.notification-dialog[data-persistent="true"] .notification-timer {
+    display: none;
+}
+
 body.notification-open {
     overflow: hidden;
 }

@@ -112,12 +112,17 @@
         box-shadow: var(--shadow);
     }
 
+    .mobile-search-menu {
+        display: block;
+    }
+
     .mobile-nav-link {
         display: inline-flex;
         flex-direction: column;
         min-height: 2.4rem;
         min-width: 3.95rem;
-        flex: 1 0 auto;
+        min-width: 0;
+        flex: 1 1 20%;
         align-items: center;
         justify-content: center;
         padding: .42rem .22rem;
@@ -314,6 +319,175 @@
     .mobile-card-table .table-link {
         min-height: 2.85rem;
         flex: 1 1 9rem;
+    }
+
+    .settlement-form-cards {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .settlement-form-cards thead {
+        display: none;
+    }
+
+    .settlement-form-cards,
+    .settlement-form-cards tbody,
+    .settlement-form-cards tr,
+    .settlement-form-cards td {
+        display: block;
+        width: 100%;
+    }
+
+    .settlement-form-cards tbody {
+        display: grid;
+        gap: .75rem;
+        padding: .15rem;
+    }
+
+    .settlement-form-cards tr {
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+    }
+
+    .settlement-form-cards td,
+    .settlement-form-cards td:first-child {
+        position: static;
+        display: grid;
+        grid-template-columns: minmax(7.5rem, 38%) minmax(0, 1fr);
+        gap: .55rem;
+        align-items: center;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface);
+        padding: .62rem;
+        box-shadow: none;
+        white-space: normal;
+    }
+
+    .settlement-form-cards td::before {
+        content: attr(data-label);
+        color: var(--muted);
+        font-size: .72rem;
+        font-weight: 900;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+
+    .settlement-form-cards .settlement-position {
+        background: var(--surface-soft);
+        font-weight: 900;
+    }
+
+    .settlement-form-cards .settlement-secondary-field {
+        display: none;
+    }
+
+    .settlement-form-cards .settlement-row.is-expanded .settlement-secondary-field {
+        display: grid;
+    }
+
+    .settlement-form-cards .mass-input-inline {
+        min-width: 0;
+    }
+
+    .settlement-form-cards .delete-cell {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: stretch;
+        justify-content: flex-end;
+        gap: .55rem;
+        border-bottom: 0;
+    }
+
+    .settlement-form-cards .delete-cell::before {
+        content: none;
+    }
+
+    .settlement-more-toggle {
+        display: inline-flex;
+    }
+
+    .settlement-mismatch {
+        width: 100%;
+        order: -1;
+    }
+
+    .bulk-event-form-cards {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .bulk-event-form-cards thead {
+        display: none;
+    }
+
+    .bulk-event-form-cards,
+    .bulk-event-form-cards tbody,
+    .bulk-event-form-cards tr,
+    .bulk-event-form-cards td {
+        display: block;
+        width: 100%;
+    }
+
+    .bulk-event-form-cards tbody {
+        display: grid;
+        gap: .75rem;
+        padding: .15rem;
+    }
+
+    .bulk-event-form-cards tr {
+        overflow: hidden;
+        counter-increment: bulk-event-card;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+    }
+
+    .bulk-event-form-cards td,
+    .bulk-event-form-cards td:first-child {
+        position: static;
+        display: grid;
+        grid-template-columns: minmax(7.5rem, 38%) minmax(0, 1fr);
+        gap: .55rem;
+        align-items: center;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface);
+        padding: .62rem;
+        box-shadow: none;
+        white-space: normal;
+    }
+
+    .bulk-event-form-cards td:first-child::before {
+        content: "Pozycja " counter(bulk-event-card) " · " attr(data-label);
+    }
+
+    .bulk-event-form-cards td::before {
+        content: attr(data-label);
+        color: var(--muted);
+        font-size: .72rem;
+        font-weight: 900;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+
+    .bulk-event-form-cards .bulk-cell-with-action {
+        display: grid;
+        gap: .4rem;
+    }
+
+    .bulk-event-form-cards .delete-cell {
+        display: flex;
+        justify-content: flex-end;
+        border-bottom: 0;
+    }
+
+    .bulk-event-form-cards .delete-cell::before {
+        content: none;
+    }
+
+    .selection-toolbar {
+        grid-template-columns: 1fr;
     }
 
     .today-task-submit {

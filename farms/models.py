@@ -80,8 +80,8 @@ class FarmSettingsModel(models.Model):
     font_scale = models.PositiveSmallIntegerField(
         default=100,
         validators=[
-            MinValueValidator(20, "Rozmiar tekstu nie może być mniejszy niż 20%%."),
-            MaxValueValidator(200, "Rozmiar tekstu nie może być większy niż 200%%."),
+            MinValueValidator(80, "Rozmiar tekstu nie może być mniejszy niż 80%%."),
+            MaxValueValidator(150, "Rozmiar tekstu nie może być większy niż 150%%."),
         ],
     )
     created_at = models.DateTimeField(auto_now_add=True)

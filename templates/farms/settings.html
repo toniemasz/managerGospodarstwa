@@ -13,11 +13,25 @@
         </div>
         <div class="header-actions">
             <a href="{% url 'audit_log' %}" class="button button-secondary">Historia zmian</a>
-            <button type="submit" form="farm-settings-form" class="button button-primary">Zapisz</button>
+            <button type="submit" form="farm-settings-form" class="button button-primary" data-settings-save disabled>Zapisz</button>
         </div>
     </section>
 
-    <form method="post" id="farm-settings-form" class="settings-admin-form">
+    <nav class="subnav settings-section-nav" aria-label="Sekcje ustawień">
+        <a href="#settings-profile">Ogólne</a>
+        <a href="#settings-interface">Wygląd</a>
+        <a href="#settings-modules">Nawigacja i moduły</a>
+        <a href="#settings-sows">Maciory i alerty</a>
+        <a href="#settings-feed">Pasze</a>
+        <a href="#settings-data">Dane i kopie</a>
+        <a href="#settings-advanced">Zaawansowane</a>
+    </nav>
+
+    <div class="notice notice-warning settings-unsaved-notice" data-settings-unsaved hidden aria-live="polite">
+        <div><strong>Masz niezapisane zmiany</strong><p>Zapisz ustawienia przed opuszczeniem strony.</p></div>
+    </div>
+
+    <form method="post" id="farm-settings-form" class="settings-admin-form" data-settings-form>
         {% csrf_token %}
         {% include 'components/form_errors.html' with form=form %}
 
@@ -79,16 +93,16 @@
                         type="range"
                         id="font-scale-slider"
                         class="font-scale-slider"
-                        min="20"
-                        max="200"
+                        min="80"
+                        max="150"
                         step="1"
                         value="{{ form.font_scale.value|default:'100' }}"
                         data-font-scale-slider
                     >
                     <div class="font-scale-control-row">
                         <div class="font-scale-limits" aria-hidden="true">
-                            <span>20%</span>
-                            <span>200%</span>
+                            <span>80%</span>
+                            <span>150%</span>
                         </div>
                         <div class="font-scale-number-field">
                             <label for="{{ form.font_scale.id_for_label }}">Własna wartość</label>
@@ -97,6 +111,13 @@
                                 <span>%</span>
                             </div>
                         </div>
+                    </div>
+                    <div class="settings-scale-presets" aria-label="Szybki wybór rozmiaru tekstu">
+                        <button type="button" class="button button-secondary button-small" data-font-scale-preset="90">Mały</button>
+                        <button type="button" class="button button-secondary button-small" data-font-scale-preset="100">Standardowy</button>
+                        <button type="button" class="button button-secondary button-small" data-font-scale-preset="120">Duży</button>
+                        <button type="button" class="button button-secondary button-small" data-font-scale-preset="140">Bardzo duży</button>
+                        <button type="button" class="button button-secondary button-small" data-font-scale-preset="100">Przywróć 100%</button>
                     </div>
                 </div>
                 {{ form.font_scale.errors }}
@@ -165,7 +186,7 @@
         </section>
 
         <div class="form-actions settings-save-bar">
-            <button type="submit" class="button button-primary">Zapisz zmiany</button>
+            <button type="submit" class="button button-primary" data-settings-save disabled>Zapisz zmiany</button>
         </div>
     </form>
 
@@ -176,6 +197,7 @@
         </div>
 
         <div class="settings-row-list">
+            <span id="settings-advanced" class="anchor-target" aria-hidden="true"></span>
             <div class="settings-action-row">
                 <div>
                     <strong>Pobierz kopię gospodarstwa</strong>
@@ -230,5 +252,5 @@
 
 {% block scripts %}
 {{ block.super }}
-<script src="{% static 'js/pages/settings.js' %}" defer></script>
+<script src="{% static 'js/pages/settings.js' %}?v=20260726-ux" defer></script>
 {% endblock %}

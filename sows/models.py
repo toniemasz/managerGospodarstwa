@@ -169,7 +169,7 @@ class SowEventModel(models.Model):
         related_name='vaccination_events',
         null=True,
         blank=True,
-        verbose_name="Plan szczepienia",
+        verbose_name="Plan szczepień",
     )
     vaccine_name = models.CharField(max_length=100, blank=True, verbose_name="Nazwa szczepienia")
     cycle_id = models.CharField(max_length=160, blank=True, verbose_name="Identyfikator cyklu")
@@ -284,7 +284,7 @@ class VaccinationCycleModel(models.Model):
         VaccinationPlanModel,
         on_delete=models.PROTECT,
         related_name='cycle_records',
-        verbose_name="Plan szczepienia",
+        verbose_name="Plan szczepień",
     )
     sow = models.ForeignKey(
         SowModel,
@@ -358,7 +358,6 @@ class MortalityReportModel(models.Model):
     ]
     MANUAL_TYPE_CHOICES = (
         (TYPE_SOW, 'Maciora'),
-        (TYPE_PRE_WEANING, 'Prosięta przed odsadzeniem'),
         (TYPE_PIGLET, 'Prosiak'),
         (TYPE_WEANER, 'Warchlak'),
         (TYPE_FINISHER, 'Tucznik'),

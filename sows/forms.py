@@ -3,7 +3,7 @@ from django import forms
 from django.utils import timezone
 from django.forms import formset_factory
 
-from .services.sow_repository import VaccinationPlanRepository
+from .services.sow_repository import SowRepository, VaccinationPlanRepository
 from .models import (
     MortalityReportModel,
     PigletTransferModel,
@@ -85,6 +85,13 @@ class VaccinationPlanForm(forms.ModelForm):
             self.instance.farm = self.farm
             active_sows = SowModel.objects.filter(farm=self.farm, is_archived=False).order_by('ear_tag')
             self.fields['selected_sows'].queryset = active_sows
+            status_by_id = {
+                sow.id: sow.dynamic_status_display
+                for sow in SowRepository(self.farm).get_all_sows()
+            }
+            self.fields['selected_sows'].label_from_instance = (
+                lambda sow: f"{sow.ear_tag} — {status_by_id.get(sow.id, 'Aktywna')}"
+            )
             if self.instance.pk:
                 self.fields['reinclude_sows'].queryset = self.instance.excluded_sows.filter(
                     farm=self.farm,
@@ -128,7 +135,7 @@ class VaccinationPlanForm(forms.ModelForm):
         if self.farm is not None:
             exists = VaccinationPlanModel.objects.filter(farm=self.farm, name__iexact=name).exclude(pk=self.instance.pk).exists()
             if exists:
-                raise ValidationError("Taki plan szczepienia istnieje już w tym gospodarstwie.")
+                raise ValidationError("Taki plan szczepień istnieje już w tym gospodarstwie.")
         return name
 
     def clean(self):
@@ -627,7 +634,6 @@ class MortalityReportForm(forms.ModelForm):
         choices = list(MortalityReportModel.MANUAL_TYPE_CHOICES)
         if self.instance.pk and self.instance.mortality_type != MortalityReportModel.TYPE_SOW:
             choices = [
-                (MortalityReportModel.TYPE_PRE_WEANING, 'Prosięta przed odsadzeniem'),
                 (MortalityReportModel.TYPE_PIGLET, 'Prosiak'),
                 (MortalityReportModel.TYPE_WEANER, 'Warchlak'),
                 (MortalityReportModel.TYPE_FINISHER, 'Tucznik'),
@@ -648,7 +654,10 @@ class MortalityReportForm(forms.ModelForm):
         if self.instance.pk and self.instance.sow_id and not self.is_bound:
             self.initial['sow'] = self.instance.sow.ear_tag
         self.fields['sow'].help_text = "Wpisz numer, np. 12, i wybierz maciorę z podpowiedzi albo wpisz pełny numer."
-        self.fields['quantity'].help_text = "Dla maciory system zapisuje 1 sztukę; dla prosiąt i zwierząt po odsadzeniu wpisz liczbę."
+        self.fields['quantity'].help_text = (
+            "Dla maciory system zapisuje 1 sztukę; dla zwierząt po odsadzeniu "
+            "wpisz liczbę. Upadki przed odsadzeniem system wylicza przy odsadzeniu."
+        )
 
     def clean(self):
         cleaned_data = super().clean()
@@ -670,31 +679,6 @@ class MortalityReportForm(forms.ModelForm):
                 self.add_error('sow', "Nie można zgłosić upadku już zarchiwizowanej maciory.")
             cleaned_data['sow'] = sow
             cleaned_data['quantity'] = 1
-
-        elif mortality_type == MortalityReportModel.TYPE_PRE_WEANING:
-            sow = self._find_active_sow(sow_value)
-            if sow is None and not self.errors.get('sow'):
-                self.add_error('sow', "Wybierz maciorę z aktywnym odchowem.")
-            elif mortality_date and quantity is not None:
-                try:
-                    farrowing = PigletCareService(self.farm).cycle_for_sow(
-                        sow=sow,
-                        on_date=mortality_date,
-                        require_active=True,
-                    )
-                    PigletCareService(self.farm).validate_pre_weaning_mortality(
-                        farrowing=farrowing,
-                        mortality_date=mortality_date,
-                        quantity=quantity,
-                        replaced_report=self.instance if self.instance.pk else None,
-                    )
-                except PigletCareError as error:
-                    self.add_error('quantity', error.messages[0])
-                else:
-                    cleaned_data['farrowing'] = farrowing
-            cleaned_data['sow'] = sow
-            if quantity is None:
-                self.add_error('quantity', "Podaj liczbę upadków.")
 
         elif mortality_type in MortalityReportModel.POST_WEANING_TYPES:
             if quantity is None:

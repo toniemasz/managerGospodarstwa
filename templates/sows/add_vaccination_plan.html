@@ -2,9 +2,9 @@
 
 {% block title %}
     {% if is_edit %}
-        Edycja szczepienia
+        Edycja planu szczepień
     {% else %}
-        Konfiguracja szczepienia
+        Nowy plan szczepień
     {% endif %}
 {% endblock %}
 
@@ -15,9 +15,9 @@
             <p class="eyebrow">Maciory</p>
             <h1>
                 {% if is_edit %}
-                    Edytuj regułę szczepienia
+                    Edytuj plan
                 {% else %}
-                    Dodaj regułę szczepienia
+                    Dodaj plan szczepień
                 {% endif %}
             </h1>
             <p class="page-subtitle">
@@ -27,7 +27,7 @@
 
         <a href="{% url 'vaccination_plans' %}"
            class="button button-secondary">
-            Wróć
+            Wróć do planów szczepień
         </a>
     </section>
 
@@ -37,7 +37,7 @@
                 data-notification-source
                 data-notification-form-errors="true"
                 data-notification-type="error"
-                data-notification-title="Nie zapisano reguły szczepienia"
+                data-notification-title="Nie zapisano planu szczepień"
                 hidden
             >
                 {{ form.non_field_errors }}
@@ -183,13 +183,21 @@
                         od daty rzeczywistego szczepienia.
                     </p>
                 </div>
+
+                <section class="schedule-preview" data-vaccination-schedule-preview aria-live="polite">
+                    <h3>Podgląd harmonogramu</h3>
+                    <p data-schedule-first>Pierwszy termin: —</p>
+                    <p data-schedule-next>Kolejne terminy: —</p>
+                    <p data-schedule-reminder>Przypomnienie: —</p>
+                    <p data-schedule-mode>Tryb harmonogramu: —</p>
+                </section>
             </div>
 
             <div class="form-section-heading">
                 <h2>Przypomnienie i zakres planu</h2>
                 <p>
                     Określ, kiedy pokazać przypomnienie oraz które maciory
-                    mają zostać objęte regułą.
+                    mają zostać objęte planem.
                 </p>
             </div>
 
@@ -226,7 +234,33 @@
                 <fieldset class="form-field">
                     <legend>{{ form.selected_sows.label }}</legend>
 
-                    {{ form.selected_sows }}
+                    <div class="selection-toolbar" data-sow-selection-toolbar>
+                        <label>
+                            <span>Wyszukaj numer kolczyka</span>
+                            <input type="search" class="form-control" data-sow-search placeholder="Np. 1024">
+                        </label>
+                        <label>
+                            <span>Filtr statusu</span>
+                            <select class="form-control" data-sow-status-filter>
+                                <option value="">Wszystkie statusy</option>
+                                <option value="proś">Prośne</option>
+                                <option value="karm">Karmiące</option>
+                                <option value="jał">Jałowe</option>
+                            </select>
+                        </label>
+                        <div class="selection-actions">
+                            <button type="button" class="button button-secondary button-small" data-select-visible>Zaznacz wszystkie widoczne</button>
+                            <button type="button" class="button button-secondary button-small" data-clear-selection>Odznacz wszystkie</button>
+                        </div>
+                        <output data-selected-count>Wybrano: 0</output>
+                    </div>
+                    <div class="sow-checkbox-list" data-sow-checkbox-list>
+                        {% for checkbox in form.selected_sows %}
+                            <div class="sow-checkbox-option" data-sow-option data-search="{{ checkbox.choice_label|lower }}">
+                                {{ checkbox }}
+                            </div>
+                        {% endfor %}
+                    </div>
                     {{ form.selected_sows.errors }}
 
                     <p class="field-hint">
@@ -258,7 +292,7 @@
                     {% if is_edit %}
                         Zapisz zmiany
                     {% else %}
-                        Zapisz regułę
+                        Zapisz plan
                     {% endif %}
                 </button>
             </div>
@@ -269,7 +303,7 @@
         <section class="panel compact-panel">
             <div class="section-heading">
                 <div>
-                    <h2>Usuwanie planu</h2>
+                    <h2>Wyłączanie planu</h2>
                     <p>
                         Plan zostanie wyłączony, ale wykonane i pominięte cykle
                         oraz historia szczepień pozostaną bez zmian.
@@ -281,13 +315,13 @@
                 method="post"
                 action="{% url 'delete_vaccination_plan' plan.id %}"
                 class="responsive-form"
-                data-confirm="Usunąć plan {{ plan.name|escapejs }}? Przyszłe przypomnienia zostaną zatrzymane, ale historia szczepień i pominięć pozostanie."
+                data-confirm="Wyłączyć plan {{ plan.name|escapejs }}? Przyszłe przypomnienia zostaną zatrzymane, ale historia szczepień i pominięć pozostanie."
             >
                 {% csrf_token %}
 
                 <div class="form-actions">
                     <button type="submit" class="button button-danger">
-                        Usuń plan szczepienia
+                        Wyłącz plan
                     </button>
                 </div>
             </form>

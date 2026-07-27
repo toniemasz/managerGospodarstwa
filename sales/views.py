@@ -134,6 +134,9 @@ def _handle_pdf_import(request, sale: PigSaleModel, template_context: dict, serv
         messages.error(request, "Nie udało się odczytać PDF. Sprawdź, czy plik ma obsługiwany format.")
         return _render_posted_sale_form(request, sale, template_context, service)
 
+    parsed.form_initial["settlement_review_required"] = bool(
+        parsed.warnings or not parsed.has_rows
+    )
     form = PigSaleForm(instance=sale, initial=parsed.form_initial, farm=sale.farm)
     row_formset = SaleClassRowFormSet(prefix='rows', initial=parsed.row_initial)
     log_action(

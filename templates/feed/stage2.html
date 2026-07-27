@@ -1,18 +1,19 @@
 {% extends 'base.html' %}
 {% load feed_format %}
-{% block title %}Etap 2 śrutowania{% endblock %}
+{% block title %}Dodaj składniki ręczne i zakończ{% endblock %}
 
 {% block content %}
 <main class="app-page">
     <section class="page-header">
         <div>
             <p class="eyebrow">Śrutowanie</p>
-            <h1>Etap 2: dodatki ręczne</h1>
+            <h1>Dodaj składniki ręczne i zakończ</h1>
+            <p class="context-label">Etap 2 z 2</p>
             <p class="page-subtitle">{{ production.recipe.name }} · {{ production.quantity_kg|feed_quantity }}</p>
         </div>
         <div class="header-actions">
             <a href="{% url 'edit_production' production.id %}" class="button button-secondary">Edytuj śrutowanie</a>
-            <a href="{% url 'feed_productions' %}" class="button button-secondary">Wróć</a>
+            <a href="{% url 'feed_productions' %}" class="button button-secondary">Wróć do listy śrutowań</a>
         </div>
     </section>
 
@@ -50,6 +51,9 @@
                 <button type="button" data-price-unit="ton">PLN/t</button>
                 <button type="button" data-price-unit="kg">PLN/kg</button>
             </div>
+            {% if stage2_items %}
+                <button type="button" class="button button-secondary button-small" data-check-all-ingredients>Zaznacz wszystkie</button>
+            {% endif %}
         </div>
         <div class="table-scroll">
             <table class="data-table production-stage-table">
@@ -66,7 +70,7 @@
                 <tbody>
                     {% for item in stage2_items %}
                     <tr class="ingredient-row">
-                        <td><input type="checkbox" class="ingredient-checkbox" data-id="{{ item.id }}" aria-label="Oznacz {{ item.name }} jako gotowe"></td>
+                        <td><input type="checkbox" class="ingredient-checkbox" name="confirmed_ingredients" value="{{ item.id }}" data-id="{{ item.id }}" form="stageForm" aria-label="Oznacz {{ item.name }} jako gotowe"></td>
                         <td><strong class="row-name">{{ item.name }}</strong></td>
                         <td class="text-right">{{ item.percentage|feed_percent }}</td>
                         <td class="text-right"><strong>{{ item.weight_kg|feed_quantity }}</strong></td>
@@ -81,7 +85,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="empty-table">Brak składników ręcznych w tej recepturze.</td>
+                        <td colspan="6" class="empty-table">Ten etap nie ma składników ręcznych. Możesz zakończyć śrutowanie.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -99,7 +103,7 @@
         </div>
         <div class="form-actions">
             <a href="{% url 'feed_productions' %}" class="button button-secondary">Anuluj</a>
-            <button type="submit" class="button button-primary">Zakończ i pobierz z magazynu</button>
+            <button type="submit" class="button button-primary" data-stage-submit>Dodaj składniki ręczne i zakończ</button>
         </div>
     </form>
 </main>

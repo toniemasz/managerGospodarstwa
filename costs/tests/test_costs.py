@@ -185,3 +185,35 @@ def test_production_cost_sync_is_idempotent_and_farm_scoped(cost_context):
     other_farm = get_or_create_user_farm(other_user)
     with pytest.raises(ValidationError, match="innego gospodarstwa"):
         sync_production_cost(farm=other_farm, production=production, user=other_user)
+
+
+@pytest.mark.django_db
+def test_cost_list_separates_source_payment_and_links_production(cost_context):
+    client, _user, farm = cost_context
+    recipe = RecipeModel.objects.create(farm=farm, name="Pasza testowa")
+    production = ProductionModel.objects.create(
+        recipe=recipe,
+        date=date.today(),
+        quantity_kg=Decimal("100.00"),
+        status=ProductionModel.Statuses.COMPLETED,
+    )
+    CostModel.objects.create(
+        farm=farm,
+        production=production,
+        date=date.today(),
+        amount=Decimal("123.45"),
+        description="Koszt paszy",
+        is_paid=True,
+    )
+
+    response = client.get(reverse("cost_list"), {"year": date.today().year})
+    content = response.content.decode()
+
+    assert response.status_code == 200
+    assert ">Źródło<" in content
+    assert ">Płatność<" in content
+    assert "Produkcja paszy" in content
+    assert "Nie dotyczy" in content
+    assert "Automatyczny FIFO" not in content
+    assert f'href="{reverse("production_detail", args=[production.pk])}"' in content
+    assert "Zobacz śrutowanie" in content

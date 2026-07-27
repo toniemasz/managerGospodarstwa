@@ -12,7 +12,7 @@
             <p class="page-subtitle">Najważniejsze zadania i szybkie akcje w gospodarstwie.</p>
         </div>
         <div class="header-actions">
-            <a href="{% url 'task_center' %}" class="button button-secondary">Panel zadań</a>
+            <a href="{% url 'task_center' %}" class="button button-secondary">Zobacz wszystkie zadania</a>
             <a href="{% url 'modules_catalog' %}" class="button button-secondary">Wszystkie moduły</a>
         </div>
     </section>
@@ -23,7 +23,7 @@
                 <div>
                     <h2>Dzisiaj</h2>
                 </div>
-                <a href="{% url 'task_center' %}" class="table-link">Pełny panel</a>
+                <a href="{% url 'task_center' %}" class="table-link">Zobacz wszystkie zadania</a>
             </div>
             <div class="today-task-group-grid today-task-group-grid--quick">
                 {% for group in today_task_groups %}
@@ -78,7 +78,7 @@
                 <h2>Zadania zaplanowane na dziś</h2>
                 <p>Wybierz grupę, aby szybko zatwierdzić wykonane zdarzenia albo przejść do właściwego panelu.</p>
             </div>
-            <a href="{% url 'task_center' %}" class="table-link">Pełny panel</a>
+            <a href="{% url 'task_center' %}" class="table-link">Zobacz wszystkie zadania</a>
         </div>
         <div class="today-task-group-grid">
             {% for group in today_task_groups %}

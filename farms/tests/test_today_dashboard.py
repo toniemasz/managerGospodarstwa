@@ -101,7 +101,7 @@ def test_today_dashboard_loads_task_cards_kpis_recent_events_and_is_farm_scoped(
     assert "mobile-mode-switch" not in content
     assert "mobile-dashboard-switch" not in content
     assert "Dzisiaj" in content
-    assert "Dodaj zdarzenie maciory" in content
+    assert "Dodaj wpis po numerze kolczyka" in content
     assert "Zgłoś upadek" in content
     assert "Dodaj poród" in content
     assert "Dodaj odsadzenie" in content
@@ -188,7 +188,7 @@ def test_today_dashboard_respects_module_visibility_for_actions_and_links(today_
     content = response.content.decode()
 
     assert response.status_code == 200
-    assert "Dodaj zdarzenie maciory" in content
+    assert "Dodaj wpis po numerze kolczyka" in content
     assert "Zgłoś upadek" in content
     assert "Maciory" in content
     assert "Ustawienia" in content

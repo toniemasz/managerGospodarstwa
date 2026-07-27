@@ -24,6 +24,7 @@ class SaleRepository:
             price_per_kg=db_model.price_per_kg,
             document_number=db_model.document_number,
             no_settlement=db_model.no_settlement,
+            settlement_review_required=db_model.settlement_review_required,
             settlement_status=db_model.settlement_status,
             avg_meatiness_seurop=db_model.avg_meatiness_seurop,
             live_weight=db_model.live_weight,

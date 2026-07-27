@@ -12,6 +12,7 @@ class PigSaleEntity:
     price_per_kg: Decimal
     document_number: str = ''
     no_settlement: bool = False
+    settlement_review_required: bool = False
     settlement_status: str = ''
     avg_meatiness_seurop: Decimal | None = None
     live_weight: Decimal | None = None

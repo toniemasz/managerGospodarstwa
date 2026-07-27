@@ -73,7 +73,7 @@ class FarmDashboardService:
 
     def _quick_actions(self) -> list[dict]:
         actions = (
-            {"module": "sows", "title": "Dodaj zdarzenie", "description": "Szybki zapis zdarzenia maciory.", "url": reverse("bulk_sow_events") + "?rows=1", "icon_name": "sow", "tone": "green"},
+            {"module": "sows", "title": "Dodaj wpis po numerze kolczyka", "description": "Zapisz jedno zdarzenie maciory.", "url": reverse("bulk_sow_events") + "?rows=1", "icon_name": "sow", "tone": "green"},
             {"module": "sows", "title": "Nowa maciora", "description": "Dodaj kartę zwierzęcia do stada.", "url": reverse("add_sow"), "icon_name": "sow", "tone": "green"},
             {"module": "production", "title": "Zleć śrutowanie", "description": "Dodaj produkcję paszy do kolejki.", "url": reverse("add_production"), "icon_name": "production", "tone": "amber"},
             {"module": "inventory", "title": "Dodaj dostawę", "description": "Przyjmij surowiec na magazyn.", "url": reverse("add_delivery"), "icon_name": "warehouse", "tone": "amber"},

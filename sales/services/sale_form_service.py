@@ -79,6 +79,10 @@ class SaleFormService:
         initial = self.form_initial_from_post(post_data)
         initial.update(self.without_empty_values(parsed.sale_fields))
         initial['no_settlement'] = False
+        initial['settlement_process'] = 'pdf'
+        initial['settlement_review_required'] = bool(
+            parsed.warnings or not parsed.rows
+        )
 
         return SalePdfImportResult(
             form_initial=initial,
@@ -130,6 +134,7 @@ class SaleFormService:
         ]
         initial = {field: post_data.get(field) for field in fields if post_data.get(field)}
         initial['no_settlement'] = post_data.get('no_settlement') == 'on'
+        initial['settlement_process'] = post_data.get('settlement_process', 'manual')
         return initial
 
     @staticmethod

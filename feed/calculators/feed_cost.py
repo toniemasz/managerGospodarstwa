@@ -21,6 +21,10 @@ class InventoryItem:
     def is_low_stock(self) -> bool:
         return self.current_stock < self.low_stock_threshold_kg
 
+    @property
+    def threshold_difference(self) -> Decimal:
+        return self.current_stock - self.low_stock_threshold_kg
+
     def current_stock_in_t(self) -> Decimal:
         return self.current_stock/Decimal('1000.00')
 

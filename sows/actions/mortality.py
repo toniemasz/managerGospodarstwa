@@ -8,7 +8,6 @@ from django.utils import timezone
 
 from common.cache import invalidate_farm_cache_on_commit
 from sows.models import MortalityReportModel, SowModel
-from sows.services.piglet_care import PigletCareService
 
 
 @dataclass(frozen=True)
@@ -24,32 +23,22 @@ def update_mortality_report(*, farm, report_id: int, data: dict) -> MortalityRep
         raise ValidationError("Nie znaleziono zgłoszenia upadku w bieżącym gospodarstwie.")
     if report.mortality_type == MortalityReportModel.TYPE_SOW:
         raise ValidationError("Upadku maciory nie można zmieniać po zarchiwizowaniu maciory.")
+    if report.mortality_type == MortalityReportModel.TYPE_PRE_WEANING:
+        raise ValidationError(
+            "Historycznych upadków przed odsadzeniem nie można edytować. "
+            "Bieżące wartości system wylicza automatycznie z odsadzenia."
+        )
     mortality_type = data["mortality_type"]
     editable_types = {
-        MortalityReportModel.TYPE_PRE_WEANING,
         *MortalityReportModel.POST_WEANING_TYPES[:3],
     }
     if mortality_type not in editable_types:
-        raise ValidationError("Wybierz upadek przed odsadzeniem, prosiaka, warchlaka albo tucznika.")
+        raise ValidationError("Wybierz upadek prosiaka, warchlaka albo tucznika.")
     quantity = data.get("quantity")
     if quantity is None or quantity <= 0:
         raise ValidationError("Podaj liczbę sztuk większą od zera.")
-    if mortality_type == MortalityReportModel.TYPE_PRE_WEANING:
-        farrowing = data.get("farrowing")
-        if farrowing is None:
-            raise ValidationError("Wybierz maciorę z aktywnym odchowem.")
-        farrowing = PigletCareService(farm).lock_farrowings((farrowing.id,))[farrowing.id]
-        PigletCareService(farm).validate_pre_weaning_mortality(
-            farrowing=farrowing,
-            mortality_date=data["mortality_date"],
-            quantity=quantity,
-            replaced_report=report,
-        )
-        report.sow = farrowing.sow
-        report.farrowing = farrowing
-    else:
-        report.sow = None
-        report.farrowing = None
+    report.sow = None
+    report.farrowing = None
     report.mortality_type = mortality_type
     report.quantity = quantity
     report.mortality_date = data["mortality_date"]
@@ -82,22 +71,10 @@ def create_mortality_report(*, farm, user=None, data: dict) -> MortalityReportRe
         sow = _get_active_sow_for_mortality(farm=farm, sow=sow)
         quantity = 1
     elif mortality_type == MortalityReportModel.TYPE_PRE_WEANING:
-        farrowing = data.get("farrowing")
-        if farrowing is None and sow is not None:
-            farrowing = PigletCareService(farm).cycle_for_sow(
-                sow=sow,
-                on_date=data["mortality_date"],
-                require_active=True,
-            )
-        if farrowing is None:
-            raise ValidationError("Wybierz maciorę z aktywnym odchowem.")
-        farrowing = PigletCareService(farm).lock_farrowings((farrowing.id,))[farrowing.id]
-        PigletCareService(farm).validate_pre_weaning_mortality(
-            farrowing=farrowing,
-            mortality_date=data["mortality_date"],
-            quantity=quantity,
+        raise ValidationError(
+            "Upadków przed odsadzeniem nie wpisuje się ręcznie. "
+            "System wylicza je automatycznie podczas odsadzenia."
         )
-        sow = farrowing.sow
     elif mortality_type in MortalityReportModel.POST_WEANING_TYPES[:3]:
         sow = None
         farrowing = None
@@ -137,6 +114,11 @@ def _normalize_mortality_type(value: str) -> str:
     if value == "post_weaning":
         raise ValidationError(
             "Wybierz dokładny typ upadku: Prosiak, Warchlak albo Tucznik."
+        )
+    if value == MortalityReportModel.TYPE_PRE_WEANING:
+        raise ValidationError(
+            "Upadków przed odsadzeniem nie wpisuje się ręcznie. "
+            "System wylicza je automatycznie podczas odsadzenia."
         )
     return value
 

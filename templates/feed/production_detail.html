@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% load feed_format %}
+{% block title %}Szczegóły śrutowania{% endblock %}
+{% block content %}
+<main class="app-page">
+    <section class="page-header">
+        <div>
+            <p class="eyebrow">Śrutowanie</p>
+            <h1>{{ production.recipe.name }}</h1>
+            <p class="page-subtitle">{{ production.date|date:"d.m.Y" }} · {{ production.quantity_kg|feed_quantity }}</p>
+        </div>
+        <div class="header-actions">
+            {% if production.status == 'COMPLETED' %}
+                <a href="{% url 'reverse_production_settlement' production.id %}" class="button button-danger">Cofnij rozliczenie</a>
+            {% endif %}
+            <a href="{% url 'feed_productions' %}" class="button button-secondary">Wróć do listy śrutowań</a>
+        </div>
+    </section>
+    <section class="stats-grid">
+        <div class="stat-tile"><span>Status</span><strong>{{ production.get_status_display }}</strong></div>
+        <div class="stat-tile"><span>Koszt FIFO</span><strong>{{ production.feed_cost_total|feed_money }}</strong></div>
+        <div class="stat-tile"><span>Koszt jednostkowy</span><strong>{{ production.feed_cost_per_kg|feed_price:"kg" }}</strong></div>
+    </section>
+    <section class="panel table-panel">
+        <div class="section-heading">
+            <div><h2>Skład receptury</h2><p>Historyczny skład użyty dla tego śrutowania.</p></div>
+        </div>
+        <div class="table-scroll">
+            <table class="data-table mobile-card-table" data-mobile-cards="true">
+                <thead><tr><th>Składnik</th><th>Źródło</th><th class="text-right">Udział</th><th class="text-right">Ilość</th></tr></thead>
+                <tbody>
+                    {% for item in all_items %}
+                        <tr>
+                            <td data-label="Składnik"><strong>{{ item.name }}</strong></td>
+                            <td data-label="Źródło">{% if item.is_in_bin %}Silos{% else %}Ręcznie{% endif %}</td>
+                            <td data-label="Udział" class="text-right">{{ item.percentage|feed_percent }}</td>
+                            <td data-label="Ilość" class="text-right">{{ item.weight_kg|feed_quantity }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="4" class="empty-table">Brak składników w zapisanej recepturze.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+{% endblock %}

@@ -77,8 +77,9 @@ def _write_csv(columns, rows):
 
 
 def build_csv_export(farm, *, year=None) -> tuple[bytes, str]:
+    from sows.services.piglet_care import PigletCareService
+
     selected_year = year or timezone.localdate().year
-    from sows.selectors.mortality import pre_weaning_mortality_cycles
     datasets = {
         "sows.csv": [
             {"id": obj.pk, "ear_tag": obj.ear_tag, "entry_date": obj.entry_date, "is_archived": obj.is_archived, "archived_at": obj.archived_at}
@@ -154,17 +155,22 @@ def build_csv_export(farm, *, year=None) -> tuple[bytes, str]:
             for obj in MortalityReportModel.objects.filter(farm=farm).order_by("id")
         ] + [
             {
-                "id": f"AUTO-{row.farrowing.id}",
-                "mortality_type": "PRZED_ODSADZENIEM",
+                "id": f"AUTO-WEANING-{row.weaning.id}",
+                "mortality_type": MortalityReportModel.TYPE_PRE_WEANING,
                 "sow_id": row.sow.id,
                 "farrowing_id": row.farrowing.id,
                 "mortality_date": row.mortality_date,
-                "quantity": row.quantity if row.quantity is not None else "",
-                "reason": "Wyliczone automatycznie z oproszenia i odsadzenia",
-                "note": row.unavailable_reason,
+                "quantity": row.automatic_deaths,
+                "reason": "Wyliczone automatycznie przy odsadzeniu",
+                "note": (
+                    f"Urodzone {row.born_alive}, przyjęte {row.received}, "
+                    f"przekazane {row.transferred}, historyczne upadki "
+                    f"{row.deaths}, odsadzone {row.weaned}."
+                ),
                 "source": "automatic",
             }
-            for row in pre_weaning_mortality_cycles(farm)
+            for row in PigletCareService(farm).completed_cycle_reconciliations()
+            if row.automatic_deaths
         ],
         "ingredients.csv": [
             {"id": obj.pk, "name": obj.name, "description": obj.description, "low_stock_threshold_kg": obj.low_stock_threshold_kg, "is_in_bin": obj.is_in_bin}

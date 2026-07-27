@@ -92,6 +92,17 @@
                     {{ form.count }}
                     {{ form.count.errors }}
                 </div>
+                <div class="notice notice-warning">
+                    <div>
+                        <h2>Automatyczne rozliczenie odchowu</h2>
+                        <p>
+                            Odsadzenie jest stanem faktycznym i zawsze zostanie zapisane. Jeżeli
+                            bilans jest większy od liczby odsadzonych, różnica zostanie automatycznie
+                            wyliczona jako upadki przed odsadzeniem. Jeżeli odsadzenie jest większe
+                            od bilansu, system pokaże nierozpisane przyjęcie prosiąt.
+                        </p>
+                    </div>
+                </div>
             </div>
 
             <div id="sec_miscarriage" class="form-section dynamic-form-section hidden">

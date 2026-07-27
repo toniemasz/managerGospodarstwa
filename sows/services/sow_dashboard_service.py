@@ -1,5 +1,5 @@
 import logging
-from datetime import date
+from datetime import date, timedelta
 
 from farms.services.settings_service import get_farm_settings
 from sows.domain.rules import FARROWING_ALERT_DAYS_AHEAD, PREGNANCY_CHECK_AFTER_DAYS
@@ -60,6 +60,19 @@ class SowDashboardService:
             sows=sows,
             current_date=today,
             update_states=False,
+        )
+        notifications["piglet_care_reconciliations"] = (
+            [
+                row
+                for row in PigletCareService(
+                    self.farm
+                ).completed_cycle_reconciliations(
+                    weaned_from=today - timedelta(days=90),
+                )
+                if row.requires_attention
+            ]
+            if self.farm is not None
+            else []
         )
         self._attach_operational_notes(sows, notifications)
 
@@ -197,5 +210,10 @@ class SowDashboardService:
                     "description": item["vaccine_name"],
                     "priority": "urgent" if item["days_to_target"] <= 0 else "upcoming",
                 })
+        items.extend({
+            "title": f"Sprawdź odchów maciory {row.sow.ear_tag}",
+            "description": row.explanation,
+            "priority": "urgent",
+        } for row in notifications.get("piglet_care_reconciliations", [])[:3])
         priority_order = {"urgent": 0, "today": 1, "upcoming": 2}
         return sorted(items, key=lambda item: (priority_order.get(item["priority"], 9), item["title"]))[:5]

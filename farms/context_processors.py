@@ -15,7 +15,7 @@ def _font_scale(settings):
         scale = int(getattr(settings, "font_scale", 100) or 100)
     except (TypeError, ValueError):
         scale = 100
-    return str(min(200, max(20, scale)))
+    return str(min(150, max(80, scale)))
 
 
 def _topbar_notifications(farm):
@@ -75,11 +75,16 @@ def current_farm(request):
         settings = get_farm_settings(farm)
         service = ModuleNavigationService(farm, active)
         modules = service.modules()
+        mobile_modules = service.mobile_modules(modules)
         notifications, notification_count = _topbar_notifications(farm)
         context['ui_modules'] = modules
         context['ui_module_groups'] = service.grouped_modules(modules)
         context['ui_primary_modules'] = service.primary_modules(modules)
-        context['ui_mobile_modules'] = service.mobile_modules(modules)
+        context['ui_mobile_modules'] = mobile_modules
+        context['ui_mobile_catalog_active'] = service.is_mobile_catalog_active(
+            modules,
+            mobile_modules,
+        )
         context['ui_visible_module_keys'] = service.visible_keys()
         context['ui_interface_scale'] = _interface_scale(settings)
         context['ui_theme'] = _theme(settings)

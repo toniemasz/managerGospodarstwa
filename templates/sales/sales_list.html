@@ -75,14 +75,14 @@
                     {% for sale in sales %}
                     <tr class="sale-row"
                         data-search="{{ sale.document_number }} {{ sale.tattoo }} {{ sale.sale_date|date:'d.m.Y' }}"
-                        data-filter="{% if sale.no_settlement %}PENDING{% else %}READY{% endif %}">
+                        data-filter="{% if sale.no_settlement %}PENDING{% elif sale.settlement_review_required %}REVIEW{% else %}READY{% endif %}">
                         <td><strong>{{ sale.sale_date|date:"d.m.Y"|default:"--" }}</strong></td>
                         <td>
                             <a href="{% url 'edit_sale' sale.id %}" class="table-link">{{ sale.document_number|default:"--" }}</a>
                         </td>
                         <td>{{ sale.tattoo|default:"--" }}</td>
                         <td>
-                            {% if sale.no_settlement %}
+                            {% if sale.no_settlement or sale.settlement_review_required %}
                                 <span class="status-pill status-amber">{{ sale.settlement_status }}</span>
                             {% else %}
                                 <span class="status-pill status-green">{{ sale.settlement_status }}</span>
@@ -112,8 +112,9 @@
                 <label for="statusFilter">Status</label>
                 <select id="statusFilter">
                     <option value="ALL">Wszystkie</option>
-                    <option value="READY">Z rozliczeniem</option>
-                    <option value="PENDING">Do importu</option>
+                    <option value="READY">Kompletne rozliczenie</option>
+                    <option value="PENDING">Brak rozliczenia</option>
+                    <option value="REVIEW">Import wymaga sprawdzenia</option>
                 </select>
             </div>
             <div class="table-control">

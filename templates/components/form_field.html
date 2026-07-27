@@ -1,10 +1,10 @@
-<div class="form-field{% if field.errors %} has-error{% endif %}{% if wide %} form-field-full{% endif %}">
+<div class="form-field{% if field.errors %} has-error{% endif %}{% if wide %} form-field-full{% endif %}" data-form-field>
     {% if field.field.widget.input_type == 'checkbox' %}
-    <label class="checkbox-row">{{ field }}<span>{{ field.label }}</span></label>
+    <label class="checkbox-row">{{ field }}<span>{{ field.label }}{% if field.field.required %} <span class="required-marker" aria-label="pole wymagane">*</span>{% endif %}</span></label>
     {% else %}
-    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-    {{ field }}
+    <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="required-marker" aria-label="pole wymagane">*</span>{% endif %}</label>
+    <div class="{% if unit %}field-with-unit{% endif %}">{{ field }}{% if unit %}<span class="field-unit">{{ unit }}</span>{% endif %}</div>
     {% endif %}
-    {% if field.help_text %}<p class="field-hint">{{ field.help_text }}</p>{% endif %}
-    {{ field.errors }}
+    {% if field.help_text %}<p class="field-hint" id="{{ field.id_for_label }}-help">{{ field.help_text }}</p>{% endif %}
+    {% if field.errors %}<div class="field-error" id="{{ field.id_for_label }}-errors">{{ field.errors }}</div>{% endif %}
 </div>
