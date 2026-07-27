@@ -32,6 +32,96 @@ class PigletCareBalance:
         return f"Maciora {self.farrowing.sow.ear_tag} · oproszenie {self.farrowing.event_date:%d.%m.%Y}"
 
 
+@dataclass(frozen=True)
+class PigletCareReconciliation:
+    """Automatyczne rozliczenie zamkniętego odchowu na podstawie stanu faktycznego."""
+
+    farrowing: SowEventModel
+    weaning: SowEventModel
+    born_alive: int
+    received: int
+    transferred: int
+    deaths: int
+    weaned: int
+
+    @property
+    def difference(self) -> int:
+        return (
+            self.born_alive
+            + self.received
+            - self.transferred
+            - self.deaths
+            - self.weaned
+        )
+
+    @property
+    def quantity(self) -> int:
+        return abs(self.difference)
+
+    @property
+    def automatic_deaths(self) -> int:
+        """Upadki wyliczone z dodatniej różnicy bilansu zakończonego odchowu."""
+        return max(self.difference, 0)
+
+    @property
+    def unrecorded_inflow(self) -> int:
+        """Nierozpisane przyjęcie, gdy odsadzenie przewyższa stan ewidencyjny."""
+        return max(-self.difference, 0)
+
+    @property
+    def is_balanced(self) -> bool:
+        return self.difference == 0
+
+    @property
+    def possible_missing_outflow(self) -> int:
+        """Zgodność ze starszym kontraktem: obecnie jest to automatyczny upadek."""
+        return self.automatic_deaths
+
+    @property
+    def possible_missing_inflow(self) -> int:
+        """Zgodność ze starszym kontraktem: nierozpisane przyjęcie."""
+        return self.unrecorded_inflow
+
+    @property
+    def is_automatic_mortality(self) -> bool:
+        return self.automatic_deaths > 0
+
+    @property
+    def requires_attention(self) -> bool:
+        return self.unrecorded_inflow > 0
+
+    @property
+    def cycle_label(self) -> str:
+        return (
+            f"{self.farrowing.event_date:%d.%m.%Y} – "
+            f"{self.weaning.event_date:%d.%m.%Y}"
+        )
+
+    @property
+    def mortality_date(self) -> date:
+        """Zgodność z filtrami listy upadków; to data kontroli, nie data upadku."""
+        return self.weaning.event_date
+
+    @property
+    def sow(self):
+        return self.farrowing.sow
+
+    @property
+    def explanation(self) -> str:
+        if self.difference > 0:
+            return (
+                f"System automatycznie wyliczył {self.automatic_deaths} szt. upadków "
+                "przed odsadzeniem z różnicy pomiędzy bilansem odchowu a liczbą odsadzonych."
+            )
+        if self.difference < 0:
+            return (
+                f"Odsadzono o {self.unrecorded_inflow} szt. więcej niż wynika z ewidencji. "
+                "System zachował odsadzenie jako stan faktyczny i oznaczył różnicę jako "
+                "nierozpisane przyjęcie prosiąt."
+            )
+        return "Bilans odchowu jest zgodny."
+
+
 class PigletCareService:
     """Centralne źródło prawdy dla bilansu prosiąt w konkretnym odchowie."""
 
@@ -319,6 +409,7 @@ class PigletCareService:
         replaced_weaning: SowEventModel | None = None,
         lock_for_update: bool = False,
     ) -> PigletCareBalance:
+        """Waliduje dane podstawowe; rozbieżność bilansu nie blokuje odsadzenia."""
         if quantity is None or quantity < 0:
             raise PigletCareError("Liczba odsadzanych prosiąt nie może być ujemna.")
         excluded_weaning_id = replaced_weaning.id if replaced_weaning else None
@@ -334,23 +425,115 @@ class PigletCareService:
             as_of=weaning_date,
             excluded_weaning_id=excluded_weaning_id,
         )
-        candidate = SowEventModel(
-            sow=sow,
-            event_type="WEANING",
-            event_date=weaning_date,
-            details={"count": quantity},
-        )
-        try:
-            self.validate_cycle_history(
-                farrowing,
-                excluded_weaning_ids={excluded_weaning_id} if excluded_weaning_id else set(),
-                candidate_weanings=[candidate],
-            )
-        except PigletCareError as error:
-            raise PigletCareError(
-                f"Nie można odsadzać {quantity} prosiąt. Dostępne obecnie: {max(balance.available, 0)}."
-            ) from error
         return balance
+
+    def completed_cycle_reconciliations(
+        self,
+        *,
+        sow_id: int | None = None,
+        weaned_from: date | None = None,
+        include_balanced: bool = False,
+    ) -> list[PigletCareReconciliation]:
+        """Wylicza upadki lub nierozpisane przyjęcie dla zakończonych odchowów."""
+        events = SowEventModel.objects.filter(
+            sow__farm=self.farm,
+            event_type__in=("FARROWING", "WEANING"),
+        )
+        if sow_id is not None:
+            events = events.filter(sow_id=sow_id)
+        events = list(events.select_related("sow").order_by("sow_id", "event_date", "id"))
+
+        cycles = []
+        current_farrowing = None
+        current_weanings = []
+        current_sow_id = None
+
+        def append_cycle() -> None:
+            if current_farrowing is not None and current_weanings:
+                cycles.append((current_farrowing, list(current_weanings)))
+
+        for event in events:
+            if event.sow_id != current_sow_id:
+                append_cycle()
+                current_sow_id = event.sow_id
+                current_farrowing = None
+                current_weanings = []
+            if event.event_type == "FARROWING":
+                append_cycle()
+                current_farrowing = event
+                current_weanings = []
+            elif current_farrowing is not None:
+                current_weanings.append(event)
+        append_cycle()
+
+        if weaned_from is not None:
+            cycles = [
+                (farrowing, weanings)
+                for farrowing, weanings in cycles
+                if weanings[-1].event_date >= weaned_from
+            ]
+        if not cycles:
+            return []
+
+        farrowing_ids = [farrowing.id for farrowing, _weanings in cycles]
+        farrowing_id_set = set(farrowing_ids)
+        cycle_end_by_farrowing_id = {
+            farrowing.id: weanings[-1].event_date
+            for farrowing, weanings in cycles
+        }
+        incoming = defaultdict(int)
+        outgoing = defaultdict(int)
+        for transfer in PigletTransferModel.objects.filter(
+            farm=self.farm,
+            canceled_at__isnull=True,
+        ).filter(
+            Q(source_farrowing_id__in=farrowing_ids)
+            | Q(target_farrowing_id__in=farrowing_ids)
+        ):
+            if (
+                transfer.source_farrowing_id in farrowing_id_set
+                and transfer.transfer_date
+                <= cycle_end_by_farrowing_id[transfer.source_farrowing_id]
+            ):
+                outgoing[transfer.source_farrowing_id] += transfer.quantity
+            if (
+                transfer.target_farrowing_id in farrowing_id_set
+                and transfer.transfer_date
+                <= cycle_end_by_farrowing_id[transfer.target_farrowing_id]
+            ):
+                incoming[transfer.target_farrowing_id] += transfer.quantity
+        deaths = defaultdict(int)
+        for farrowing_id, mortality_date, quantity in (
+            MortalityReportModel.objects.filter(
+                farm=self.farm,
+                mortality_type=MortalityReportModel.TYPE_PRE_WEANING,
+                farrowing_id__in=farrowing_ids,
+            ).values_list("farrowing_id", "mortality_date", "quantity")
+        ):
+            if mortality_date <= cycle_end_by_farrowing_id[farrowing_id]:
+                deaths[farrowing_id] += quantity
+
+        reconciliations = []
+        for farrowing, weanings in cycles:
+            row = PigletCareReconciliation(
+                farrowing=farrowing,
+                weaning=weanings[-1],
+                born_alive=self._born_alive(farrowing),
+                received=incoming[farrowing.id],
+                transferred=outgoing[farrowing.id],
+                deaths=deaths.get(farrowing.id, 0) or 0,
+                weaned=sum(
+                    self._detail_count(weaning.details, "count")
+                    for weaning in weanings
+                ),
+            )
+            if include_balanced or not row.is_balanced:
+                reconciliations.append(row)
+        return sorted(
+            reconciliations,
+            key=lambda row: (row.weaning.event_date, row.weaning.id),
+            reverse=True,
+        )
 
     def validate_cycle_history(
         self,
@@ -365,6 +548,7 @@ class PigletCareService:
         born_alive_override: int | None = None,
     ) -> None:
         deltas = defaultdict(int)
+        dated_weanings = defaultdict(list)
         transfers = PigletTransferModel.objects.filter(
             farm=self.farm,
             canceled_at__isnull=True,
@@ -399,19 +583,30 @@ class PigletCareService:
         if excluded_weaning_ids:
             weanings = weanings.exclude(pk__in=excluded_weaning_ids)
         for weaning_date, details in weanings.values_list("event_date", "details"):
-            deltas[weaning_date] -= self._detail_count(details, "count")
+            dated_weanings[weaning_date].append(
+                self._detail_count(details, "count")
+            )
         for event in candidate_weanings or []:
             if event.sow_id == farrowing.sow_id:
-                deltas[event.event_date] -= self._detail_count(event.details, "count")
+                dated_weanings[event.event_date].append(
+                    self._detail_count(event.details, "count")
+                )
 
         available = self._born_alive(farrowing) if born_alive_override is None else born_alive_override
-        for operation_date in sorted(deltas):
+        for operation_date in sorted(set(deltas) | set(dated_weanings)):
             available += deltas[operation_date]
             if available < 0:
                 raise PigletCareError(
                     "Operacja spowodowałaby ujemny stan odchowu "
                     f"maciory {farrowing.sow.ear_tag} w dniu {operation_date:%d.%m.%Y}."
                 )
+            for quantity in dated_weanings[operation_date]:
+                available -= quantity
+                # Odsadzenie jest stanem faktycznym zamykającym odchów.
+                # Dodatnia różnica staje się automatycznym upadkiem, a ujemna
+                # nierozpisanym przyjęciem. Żaden z tych przypadków nie blokuje
+                # produkcji ani nie tworzy fikcyjnego transferu.
+                available = 0
 
     def weanings_for_cycle(self, farrowing: SowEventModel):
         queryset = SowEventModel.objects.filter(

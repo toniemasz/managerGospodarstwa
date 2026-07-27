@@ -13,8 +13,9 @@ from django.urls import reverse
 from costs.models import CostModel
 from farms.services.farm_service import get_or_create_user_farm
 from feed.models import DeliveryModel, IngredientModel, InventoryMovementModel, ProductionIngredientUsageModel, ProductionModel, RecipeItemModel, RecipeModel
-from feed.actions.productions import complete_production, delete_production_with_inventory
 from feed.actions.inventory import InventoryActions
+from feed.actions.productions import complete_production, delete_production_with_inventory
+from feed.actions.recipe_versions import RecipeVersionActions
 from feed.forms import InventoryAdjustmentForm
 from feed.services.reconciliation import ProductionReconciliationWorkflow
 
@@ -165,6 +166,109 @@ def test_deleting_historical_completed_production_requires_domain_action(invento
         first_production.delete()
     assert ProductionModel.objects.filter(pk=first_production.pk).exists()
     assert ProductionModel.objects.filter(pk=later_production.pk).exists()
+
+
+@pytest.mark.django_db
+def test_deleting_historical_production_rebuilds_only_affected_fifo_and_costs(inventory_data):
+    user, farm, ingredient, recipe = inventory_data
+    first_delivery, second_delivery = _replace_fifo_deliveries(ingredient)
+    version, _ = RecipeVersionActions(farm=farm, user=user).ensure_current_version(recipe)
+
+    def complete_versioned(quantity, production_date):
+        production = ProductionModel.objects.create(
+            recipe=recipe,
+            recipe_version=version,
+            date=production_date,
+            quantity_kg=Decimal(quantity),
+            status=ProductionModel.Statuses.STAGE_1_DONE,
+        )
+        success, message = complete_production(farm, production.pk, user=user)
+        assert success, message
+        production.refresh_from_db()
+        return production
+
+    earlier_production = complete_versioned("100.00", date(2026, 1, 10))
+    deleted_production = complete_versioned("1200.00", date(2026, 2, 10))
+    later_production = complete_versioned("500.00", date(2026, 3, 10))
+    earlier_usage_ids = list(
+        earlier_production.ingredient_usages.values_list("id", flat=True)
+    )
+    delivery_movement_id = InventoryMovementModel.objects.get(
+        farm=farm,
+        movement_type=InventoryMovementModel.Types.DELIVERY,
+        source_model=first_delivery._meta.label,
+        source_id=str(first_delivery.pk),
+    ).pk
+    later_serving = later_production.automatic_feed_serving
+    assert later_serving.total_cost == Decimal("750.00")
+
+    assert delete_production_with_inventory(farm, deleted_production) is True
+
+    first_delivery.refresh_from_db()
+    second_delivery.refresh_from_db()
+    later_production.refresh_from_db()
+    later_serving.refresh_from_db()
+    later_allocation = later_serving.allocations.get()
+    assert not ProductionModel.objects.filter(pk=deleted_production.pk).exists()
+    assert list(
+        earlier_production.ingredient_usages.values_list("id", flat=True)
+    ) == earlier_usage_ids
+    assert InventoryMovementModel.objects.get(
+        farm=farm,
+        movement_type=InventoryMovementModel.Types.DELIVERY,
+        source_model=first_delivery._meta.label,
+        source_id=str(first_delivery.pk),
+    ).pk == delivery_movement_id
+    assert later_production.recipe_version_id == version.pk
+    assert later_production.feed_cost_total == Decimal("600.00")
+    assert CostModel.objects.get(production=later_production).amount == Decimal("600.00")
+    assert later_allocation.unit_cost == Decimal("1.20000")
+    assert later_allocation.cost == Decimal("600.00")
+    assert later_serving.total_cost == Decimal("600.00")
+    assert first_delivery.remaining_quantity_kg == Decimal("400.00")
+    assert second_delivery.remaining_quantity_kg == Decimal("1000.00")
+    assert delete_production_with_inventory(farm, deleted_production) is False
+
+
+@pytest.mark.django_db
+def test_release_production_restores_multiple_deliveries_with_one_bulk_update(
+    inventory_data,
+):
+    _, farm, ingredient, recipe = inventory_data
+    first_delivery, second_delivery = _replace_fifo_deliveries(ingredient)
+    DeliveryModel.objects.filter(pk__in=(first_delivery.pk, second_delivery.pk)).update(
+        remaining_quantity_kg=Decimal("0.00")
+    )
+    production = ProductionModel.objects.create(
+        recipe=recipe,
+        date=date(2026, 3, 1),
+        quantity_kg=Decimal("2000.00"),
+    )
+    for delivery in (first_delivery, second_delivery):
+        ProductionIngredientUsageModel.objects.create(
+            farm=farm,
+            production=production,
+            ingredient=ingredient,
+            delivery=delivery,
+            quantity_kg=Decimal("1000.00"),
+            unit_price=delivery.price_per_kg,
+            cost=Decimal("1000.00"),
+        )
+
+    with CaptureQueriesContext(connection) as captured:
+        InventoryActions(farm).release_production(production)
+
+    delivery_updates = [
+        query["sql"]
+        for query in captured.captured_queries
+        if query["sql"].lstrip().upper().startswith('UPDATE "FEED_DELIVERYMODEL"')
+    ]
+    assert len(delivery_updates) == 1
+    assert list(
+        DeliveryModel.objects.filter(pk__in=(first_delivery.pk, second_delivery.pk))
+        .order_by("pk")
+        .values_list("remaining_quantity_kg", flat=True)
+    ) == [Decimal("1000.00"), Decimal("1000.00")]
 
 
 @pytest.mark.django_db

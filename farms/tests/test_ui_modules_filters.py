@@ -141,14 +141,17 @@ def test_settings_visibility_section_is_grouped(ui_client):
     content = response.content.decode()
     assert all(label in content for label in ["Widoczność modułów", "Produkcja", "Pasza i magazyn", "Finanse", "System"])
     assert "Ustawienia zawsze widoczne" in content
-    assert "Pokaż na pasku nawigacji" in content
+    assert "Przypięty w menu" in content
     assert "Gęstość interfejsu" in content
     assert "Motyw" in content
     assert "Rozmiar tekstu" in content
     assert 'type="range"' in content
-    assert 'min="20"' in content
-    assert 'max="200"' in content
+    assert 'min="80"' in content
+    assert 'max="150"' in content
     assert "Własna wartość" in content
+    assert "Masz niezapisane zmiany" in content
+    assert 'data-font-scale-preset="140"' in content
+    assert 'data-settings-save' in content
 
 
 @pytest.mark.django_db
@@ -168,7 +171,7 @@ def test_settings_appearance_choices_are_applied_to_page_shell(ui_client):
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("font_scale", ["19", "201"])
+@pytest.mark.parametrize("font_scale", ["79", "151"])
 def test_settings_font_scale_is_limited_to_safe_range(ui_client, font_scale):
     response = ui_client.post(reverse("farm_settings"), _settings_payload(font_scale=font_scale))
 

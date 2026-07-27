@@ -50,6 +50,7 @@ from feed.actions.recipe_versions import (
     recipe_version_items_from_formset,
 )
 from feed.selectors.inventory import (
+    full_inventory_context,
     ingredients_for_farm,
     inventory_dashboard,
     inventory_page_context,
@@ -173,7 +174,14 @@ def feed_inventory_view(request):
 @login_required
 def add_delivery_view(request):
     farm = get_current_farm(request)
-    initial = [{"date": timezone.localdate()}]
+    selected_ingredient = IngredientModel.objects.filter(
+        farm=farm,
+        pk=request.GET.get("ingredient"),
+    ).first()
+    initial = [{
+        "date": timezone.localdate(),
+        **({"ingredient": selected_ingredient} if selected_ingredient else {}),
+    }]
     if request.method == 'POST':
         formset = DeliveryFormSet(
             request.POST,
@@ -532,12 +540,22 @@ def delete_production_view(request, pk):
         representation = str(production)
         object_id = production.pk
         try:
-            delete_production_with_inventory(farm, production)
+            deleted = delete_production_with_inventory(farm, production)
         except ValidationError as error:
             messages.error(request, error.messages[0])
         else:
-            log_action(farm=farm, user=request.user, action="DELETE", model_label="feed.ProductionModel", object_id=object_id, object_repr=representation)
-            messages.success(request, "Usunięto śrutowanie.")
+            if deleted:
+                log_action(
+                    farm=farm,
+                    user=request.user,
+                    action="DELETE",
+                    model_label="feed.ProductionModel",
+                    object_id=object_id,
+                    object_repr=representation,
+                )
+                messages.success(request, "Usunięto śrutowanie.")
+            else:
+                messages.info(request, "Śrutowanie zostało już usunięte.")
     return redirect('feed_productions')
 
 
@@ -576,7 +594,12 @@ def feed_calculator_view(request):
 @login_required
 def feed_full_inventory_view(request):
     farm = get_current_farm(request)
-    context = inventory_dashboard(farm)
+    context = full_inventory_context(
+        farm,
+        query=request.GET.get("q", ""),
+        low_only=request.GET.get("low") == "1",
+        storage=request.GET.get("storage", ""),
+    )
     return render(request, 'feed/full_inventory.html', context)
 
 
@@ -598,7 +621,17 @@ def inventory_adjustment_view(request):
                 messages.success(request, "Korekta magazynowa została zapisana.")
                 return redirect("feed_inventory")
     else:
-        form = InventoryAdjustmentForm(farm=farm, initial={"movement_date": timezone.localdate()})
+        selected_ingredient = IngredientModel.objects.filter(
+            farm=farm,
+            pk=request.GET.get("ingredient"),
+        ).first()
+        form = InventoryAdjustmentForm(
+            farm=farm,
+            initial={
+                "movement_date": timezone.localdate(),
+                **({"ingredient": selected_ingredient} if selected_ingredient else {}),
+            },
+        )
     return render(request, "feed/form_generic.html", {
         "form": form,
         "title": "Korekta stanu magazynowego",

@@ -42,8 +42,8 @@ class FarmSettingsForm(KilogramStorageFormMixin, forms.ModelForm):
             'interface_scale': forms.RadioSelect(),
             'theme': forms.RadioSelect(),
             'font_scale': forms.NumberInput(attrs={
-                'min': 20,
-                'max': 200,
+                'min': 80,
+                'max': 150,
                 'step': 1,
                 'inputmode': 'numeric',
                 'data-font-scale-number': 'true',

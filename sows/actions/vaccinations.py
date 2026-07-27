@@ -39,7 +39,7 @@ def save_vaccination_plan(*, farm, form) -> VaccinationPlanModel:
         name__iexact=plan.name,
     ).exclude(pk=plan.pk).exists():
         raise VaccinationPlanNameConflictError(
-            "Taki plan szczepienia istnieje już w tym gospodarstwie."
+            "Taki plan szczepień istnieje już w tym gospodarstwie."
         )
     plan.save()
     form.save_m2m()
@@ -170,6 +170,23 @@ class VaccinationActions:
             plan.save(update_fields=("is_active", "requires_configuration"))
             plan.selected_sows.clear()
             plan.excluded_sows.clear()
+            invalidate_farm_cache_on_commit(self.farm, groups=("sows",))
+        return plan
+
+    @transaction.atomic
+    def reactivate_plan(self, *, plan_id: int) -> VaccinationPlanModel:
+        """Włącza plan ponownie, wymagając odtworzenia utraconego wyboru macior."""
+        plan = get_object_or_404(
+            VaccinationPlanModel.objects.select_for_update(),
+            id=plan_id,
+            farm=self.farm,
+        )
+        if not plan.is_active:
+            plan.is_active = True
+            plan.requires_configuration = (
+                plan.scope == VaccinationPlanModel.SCOPE_SELECTED
+            )
+            plan.save(update_fields=("is_active", "requires_configuration"))
             invalidate_farm_cache_on_commit(self.farm, groups=("sows",))
         return plan
 

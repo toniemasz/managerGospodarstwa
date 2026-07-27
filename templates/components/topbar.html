@@ -52,6 +52,28 @@
     </form>
 
     <div class="user-menu">
+        <details class="mobile-search-menu" data-mobile-search>
+            <summary class="topbar-icon-button" aria-label="Otwórz wyszukiwarkę">
+                {% include 'components/app_icon.html' with name='search' %}
+            </summary>
+            <div class="mobile-search-backdrop" data-mobile-search-close aria-hidden="true"></div>
+            <div class="mobile-search-panel" role="dialog" aria-modal="true" aria-label="Wyszukiwarka">
+                <div class="mobile-search-header">
+                    <strong>Szukaj w gospodarstwie</strong>
+                    <button type="button" class="topbar-icon-button" data-mobile-search-close aria-label="Zamknij wyszukiwarkę">
+                        <span aria-hidden="true">×</span>
+                    </button>
+                </div>
+                <form class="mobile-search-form" role="search" method="get" action="{% url 'global_search' %}">
+                    <label for="mobile-global-search">Nazwa, numer lub dokument</label>
+                    <div class="mobile-search-control">
+                        <span class="topbar-search-icon">{% include 'components/app_icon.html' with name='search' %}</span>
+                        <input id="mobile-global-search" type="search" name="q" placeholder="Wpisz minimum 2 znaki" value="{{ global_search_query|default:'' }}" autocomplete="off">
+                    </div>
+                    <button type="submit" class="button button-primary">Pokaż wyniki</button>
+                </form>
+            </div>
+        </details>
         <details class="notification-menu">
             <summary class="topbar-icon-button" aria-label="Powiadomienia">
                 {% include 'components/app_icon.html' with name='bell' %}
@@ -119,11 +141,11 @@
     {% for module in ui_mobile_modules %}
         <a href="{{ module.url }}" class="mobile-nav-link{% if module.is_active %} is-active{% endif %}"{% if module.is_active %} aria-current="page"{% endif %}>
             <span class="mobile-nav-icon {{ module.tone }}">{% include 'components/app_icon.html' with name=module.icon_name %}</span>
-            <span>{{ module.title }}</span>
+            <span>{{ module.mobile_title|default:module.title }}</span>
         </a>
     {% endfor %}
-    <a href="{% url 'modules_catalog' %}" class="mobile-nav-link{% if request.resolver_match.url_name == 'modules_catalog' %} is-active{% endif %}">
+    <a href="{% url 'modules_catalog' %}" class="mobile-nav-link{% if request.resolver_match.url_name == 'modules_catalog' or ui_mobile_catalog_active %} is-active{% endif %}"{% if request.resolver_match.url_name == 'modules_catalog' or ui_mobile_catalog_active %} aria-current="page"{% endif %}>
         <span class="mobile-nav-icon">{% include 'components/app_icon.html' with name='dashboard' %}</span>
-        <span>Moduły</span>
+        <span>Więcej</span>
     </a>
 </nav>

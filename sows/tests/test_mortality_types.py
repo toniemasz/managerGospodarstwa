@@ -5,9 +5,15 @@ from django.urls import reverse
 from django.core.exceptions import ValidationError
 
 from farms.models import FarmModel
+from sows.forms import MortalityReportForm
 from sows.models import MortalityReportModel, SowEventModel, SowModel
 from sows.actions.mortality import create_mortality_report, delete_mortality_report, update_mortality_report
-from sows.selectors.mortality import post_weaning_stock_summary, pre_weaning_mortality_cycles
+from sows.selectors.mortality import (
+    mortality_summary,
+    piglet_care_reconciliation_cycles,
+    post_weaning_stock_summary,
+    pre_weaning_mortality_cycles,
+)
 
 
 @pytest.fixture
@@ -73,6 +79,93 @@ def test_missing_weaning_is_unavailable_not_zero(mortality_farm):
     row = pre_weaning_mortality_cycles(farm)[0]
     assert row.quantity is None
     assert row.unavailable_reason == "Brak zdarzenia odsadzenia"
+
+
+@pytest.mark.django_db
+def test_positive_balance_difference_is_counted_as_automatic_mortality(
+    mortality_farm,
+):
+    sow = SowModel.objects.create(farm=mortality_farm, ear_tag="M-CHECK")
+    farrowing = SowEventModel.objects.create(
+        sow=sow,
+        event_type="FARROWING",
+        event_date=date(2026, 1, 1),
+        details={"born_alive": 12},
+    )
+    SowEventModel.objects.create(
+        sow=sow,
+        event_type="WEANING",
+        event_date=date(2026, 1, 28),
+        details={"count": 10},
+    )
+
+    rows = piglet_care_reconciliation_cycles(mortality_farm)
+    summary = mortality_summary(mortality_farm)
+
+    assert len(rows) == 1
+    assert rows[0].difference == 2
+    assert rows[0].automatic_deaths == 2
+    assert summary["pre_weaning"] == 2
+    assert summary["automatic_pre_weaning"] == 2
+    assert summary["unreconciled_cycles"] == 0
+
+    MortalityReportModel.objects.create(
+        farm=mortality_farm,
+        mortality_type=MortalityReportModel.TYPE_PRE_WEANING,
+        sow=sow,
+        farrowing=farrowing,
+        mortality_date=date(2026, 1, 20),
+        quantity=2,
+    )
+
+    assert piglet_care_reconciliation_cycles(mortality_farm) == []
+    assert mortality_summary(mortality_farm)["pre_weaning"] == 2
+
+
+@pytest.mark.django_db
+def test_pre_weaning_mortality_cannot_be_created_manually(mortality_farm):
+    sow = SowModel.objects.create(farm=mortality_farm, ear_tag="AUTO-ONLY")
+    farrowing = SowEventModel.objects.create(
+        sow=sow,
+        event_type="FARROWING",
+        event_date=date(2026, 1, 1),
+        details={"born_alive": 12},
+    )
+
+    with pytest.raises(ValidationError, match="nie wpisuje się ręcznie"):
+        create_mortality_report(
+            farm=mortality_farm,
+            data={
+                "mortality_type": MortalityReportModel.TYPE_PRE_WEANING,
+                "sow": sow,
+                "farrowing": farrowing,
+                "mortality_date": date(2026, 1, 20),
+                "quantity": 2,
+            },
+        )
+
+    form = MortalityReportForm(
+        farm=mortality_farm,
+        data={
+            "mortality_type": MortalityReportModel.TYPE_PRE_WEANING,
+            "mortality_date": date(2026, 1, 20),
+            "quantity": 2,
+        },
+    )
+    assert form.is_valid() is False
+    assert MortalityReportModel.TYPE_PRE_WEANING not in {
+        value for value, _label in form.fields["mortality_type"].choices
+    }
+
+
+@pytest.mark.django_db
+def test_mortality_form_view_does_not_offer_manual_pre_weaning_type(
+    mortality_client,
+):
+    response = mortality_client.get(reverse("report_mortality"))
+
+    assert response.status_code == 200
+    assert 'value="PRZED_ODSADZENIEM"' not in response.content.decode()
 
 
 @pytest.mark.django_db

@@ -42,6 +42,8 @@ urlpatterns = [
     # Etapy śrutowania
     path('srutowanie/<int:pk>/etap1/', production_views.process_stage1_view, name='process_stage1'),
     path('srutowanie/<int:pk>/etap2/', production_views.process_stage2_view, name='process_stage2'),
+    path('srutowanie/<int:pk>/szczegoly/', production_views.production_detail_view, name='production_detail'),
+    path('srutowanie/<int:pk>/cofnij-rozliczenie/', production_views.reverse_production_settlement_view, name='reverse_production_settlement'),
 
     # Kalkulator
     path('kalkulator/', views.feed_calculator_view, name='feed_calculator'),

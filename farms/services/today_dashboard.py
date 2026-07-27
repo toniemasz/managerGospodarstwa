@@ -150,7 +150,7 @@ class TodayDashboardService:
 
     def _quick_actions(self) -> list[dict]:
         actions = [
-            ("sows", "Dodaj zdarzenie maciory", "Zapisz inseminację, USG, oproszenie albo odsadzenie.", reverse("bulk_sow_events") + "?rows=1", "sow", "green"),
+            ("sows", "Dodaj wpis po numerze kolczyka", "Zapisz jedno zdarzenie maciory, która nie jest jeszcze wybrana.", reverse("bulk_sow_events") + "?rows=1", "sow", "green"),
             ("sows", "Zgłoś upadek", "Zapisz upadek maciory lub zwierząt po odsadzeniu.", reverse("report_mortality"), "warning", "danger"),
             ("sows", "Dodaj poród", "Zapisz oproszenie z wynikiem miotu.", reverse("bulk_sow_events") + "?rows=1&event_type=FARROWING", "calendar", "green"),
             ("sows", "Dodaj odsadzenie", "Zapisz liczbę odsadzonych prosiąt.", reverse("bulk_sow_events") + "?rows=1&event_type=WEANING", "sow", "green"),
@@ -332,7 +332,7 @@ class TodayDashboardService:
                 self._kpi("Karmiące", summary["lactating_count"], "szt.", "Maciory po oproszeniu.", "sow", "green", reverse("dashboard")),
                 self._kpi("Do kontroli", len(summary["sows_to_check_usg"]), "szt.", "Wymagają USG.", "tasks", "warning", reverse("bulk_pregnancy_check")),
                 self._kpi("Do porodu", summary["farrowing_due_count"], "szt.", "W oknie alertu.", "calendar", "warning", reverse("farrowing_panel")),
-                self._kpi("Upadki w miesiącu", self._mortality_month_total(), "szt.", "Ręczne i wyliczone przed odsadzeniem.", "warning", "danger", reverse("mortality_list")),
+                self._kpi("Upadki w miesiącu", self._mortality_month_total(), "szt.", "Upadki zgłoszone po odsadzeniu oraz automatycznie wyliczone przy odsadzeniu.", "warning", "danger", reverse("mortality_list")),
             ])
         if self._module_visible("inventory"):
             cards.append(self._kpi("Niskie stany paszy", len(self._inventory_summary()["low_stock_alerts"]), "skł.", "Poniżej progu.", "warning", "danger", reverse("feed_inventory")))
@@ -468,7 +468,7 @@ class TodayDashboardService:
         explicit_links = [
             ("sows", "Maciory", "Pełna lista macior", reverse("dashboard"), "sow"),
             ("statistics", "Statystyki", "Pełne statystyki", reverse("farm_statistics"), "statistics"),
-            ("inventory", "Magazyn", "Pełny magazyn", reverse("feed_full_inventory"), "warehouse"),
+            ("inventory", "Magazyn", "Stany surowców", reverse("feed_full_inventory"), "warehouse"),
             ("sales", "Sprzedaż", "Pełna sprzedaż", reverse("sales_list"), "sales"),
             ("costs", "Koszty", "Pełne koszty", reverse("cost_list"), "costs"),
         ]

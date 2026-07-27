@@ -1,18 +1,18 @@
 {% extends 'base.html' %}
-{% block title %}{% if is_single %}Dodaj zdarzenie{% else %}Masowe zdarzenia macior{% endif %}{% endblock %}
+{% block title %}{% if is_single %}Dodaj wpis po numerze kolczyka{% else %}Dodaj wiele zdarzeń{% endif %}{% endblock %}
 
 {% block content %}
 <main class="app-page">
     <section class="page-header">
         <div>
             <p class="eyebrow">Maciory</p>
-            <h1>{% if is_single %}Dodaj zdarzenie{% else %}Masowe dodawanie zdarzeń{% endif %}</h1>
-            <p class="page-subtitle">{% if is_single %}Szybki wpis: numer kolczyka, typ zdarzenia, dzisiejsza data i najważniejsze pola.{% else %}Wpisuj numery macior w tabeli albo wybieraj je z podpowiedzi istniejących rekordów.{% endif %}</p>
+            <h1>{% if is_single %}Dodaj wpis po numerze kolczyka{% else %}Dodaj wiele zdarzeń{% endif %}</h1>
+            <p class="page-subtitle">{% if is_single %}Maciora nie jest jeszcze wybrana. Wpisz numer kolczyka i zapisz jedno zdarzenie.{% else %}Wpisz wiele zdarzeń; każdy wiersz jest walidowany w cyklu wskazanej maciory.{% endif %}</p>
         </div>
         <div class="header-actions">
-            <a href="{% url 'bulk_sow_events' %}?rows=1" class="button button-secondary">Jedno zdarzenie</a>
-            <a href="{% url 'bulk_sow_events' %}" class="button button-secondary">Tryb masowy</a>
-            <a href="{% url 'dashboard' %}" class="button button-secondary">Wróć</a>
+            <a href="{% url 'bulk_sow_events' %}?rows=1" class="button button-secondary{% if is_single %} is-active{% endif %}">Jeden wpis</a>
+            <a href="{% url 'bulk_sow_events' %}" class="button button-secondary{% if not is_single %} is-active{% endif %}">Wiele wpisów</a>
+            <a href="{% url 'dashboard' %}" class="button button-secondary">Wróć do listy macior</a>
         </div>
     </section>
 
@@ -104,7 +104,7 @@
             </div>
             {% else %}
             <div class="table-scroll">
-                <table class="data-table bulk-event-table" data-no-pagination="true">
+                <table class="data-table bulk-event-table bulk-event-form-cards" data-no-pagination="true">
                     <thead>
                         <tr>
                             <th>Maciora</th>
@@ -122,25 +122,25 @@
                     <tbody id="bulk-event-rows">
                         {% for form in formset %}
                         <tr class="bulk-event-row">
-                            <td>
+                            <td data-label="Numer maciory">
                                 <div class="bulk-cell-with-action">
                                     {{ form.sow_ear_tag }}
                                     {% if not is_single %}
-                                    <button type="button" class="mini-button copy-sow" title="Skopiuj maciorę z wiersza wyżej">↥</button>
+                                    <button type="button" class="button button-secondary button-small copy-sow" title="Skopiuj maciorę z poprzedniego wiersza" aria-label="Skopiuj maciorę z poprzedniego wiersza">Skopiuj poprzednią</button>
                                     {% endif %}
                                 </div>
                                 {{ form.sow_ear_tag.errors }}
                                 {{ form.non_field_errors }}
                             </td>
-                            <td>{{ form.event_type }}{{ form.event_type.errors }}</td>
-                            <td>{{ form.event_date }}{{ form.event_date.errors }}</td>
-                            <td>{{ form.technician }}{{ form.technician.errors }}</td>
-                            <td>{{ form.pregnancy_result }}{{ form.pregnancy_result.errors }}</td>
-                            <td>{{ form.born_alive }}{{ form.born_alive.errors }}</td>
-                            <td>{{ form.born_dead }}{{ form.born_dead.errors }}</td>
-                            <td>{{ form.count }}{{ form.count.errors }}</td>
-                            <td>{{ form.vaccine_name }}{{ form.vaccine_name.errors }}</td>
-                            <td class="delete-cell"><span class="hidden">{{ form.DELETE }}</span><button type="button" class="link-button-danger remove-bulk-event-row">Usuń</button></td>
+                            <td data-label="Typ zdarzenia">{{ form.event_type }}{{ form.event_type.errors }}</td>
+                            <td data-label="Data">{{ form.event_date }}{{ form.event_date.errors }}</td>
+                            <td data-label="Inseminator" data-event-field="INSEMINATION">{{ form.technician }}{{ form.technician.errors }}</td>
+                            <td data-label="Wynik USG" data-event-field="PREGNANCY_CHECK">{{ form.pregnancy_result }}{{ form.pregnancy_result.errors }}</td>
+                            <td data-label="Urodzone żywe" data-event-field="FARROWING">{{ form.born_alive }}{{ form.born_alive.errors }}</td>
+                            <td data-label="Urodzone martwe" data-event-field="FARROWING">{{ form.born_dead }}{{ form.born_dead.errors }}</td>
+                            <td data-label="Odsadzone" data-event-field="WEANING">{{ form.count }}{{ form.count.errors }}</td>
+                            <td data-label="Plan szczepień" data-event-field="VACCINATION">{{ form.vaccine_name }}{{ form.vaccine_name.errors }}</td>
+                            <td data-label="Akcje" class="delete-cell"><span class="hidden">{{ form.DELETE }}</span><button type="button" class="link-button-danger remove-bulk-event-row">Usuń kartę</button></td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -152,28 +152,28 @@
         {% if not is_single %}
         <template id="bulk-event-row-template">
             <tr class="bulk-event-row">
-                <td>
+                <td data-label="Numer maciory">
                     <div class="bulk-cell-with-action">
                         {{ formset.empty_form.sow_ear_tag }}
-                        <button type="button" class="mini-button copy-sow" title="Skopiuj maciorę z wiersza wyżej">↥</button>
+                        <button type="button" class="button button-secondary button-small copy-sow" title="Skopiuj maciorę z poprzedniego wiersza" aria-label="Skopiuj maciorę z poprzedniego wiersza">Skopiuj poprzednią</button>
                     </div>
                 </td>
-                <td>{{ formset.empty_form.event_type }}</td>
-                <td>{{ formset.empty_form.event_date }}</td>
-                <td>{{ formset.empty_form.technician }}</td>
-                <td>{{ formset.empty_form.pregnancy_result }}</td>
-                <td>{{ formset.empty_form.born_alive }}</td>
-                <td>{{ formset.empty_form.born_dead }}</td>
-                <td>{{ formset.empty_form.count }}</td>
-                <td>{{ formset.empty_form.vaccine_name }}</td>
-                <td class="delete-cell"><span class="hidden">{{ formset.empty_form.DELETE }}</span><button type="button" class="link-button-danger remove-bulk-event-row">Usuń</button></td>
+                <td data-label="Typ zdarzenia">{{ formset.empty_form.event_type }}</td>
+                <td data-label="Data">{{ formset.empty_form.event_date }}</td>
+                <td data-label="Inseminator" data-event-field="INSEMINATION">{{ formset.empty_form.technician }}</td>
+                <td data-label="Wynik USG" data-event-field="PREGNANCY_CHECK">{{ formset.empty_form.pregnancy_result }}</td>
+                <td data-label="Urodzone żywe" data-event-field="FARROWING">{{ formset.empty_form.born_alive }}</td>
+                <td data-label="Urodzone martwe" data-event-field="FARROWING">{{ formset.empty_form.born_dead }}</td>
+                <td data-label="Odsadzone" data-event-field="WEANING">{{ formset.empty_form.count }}</td>
+                <td data-label="Plan szczepień" data-event-field="VACCINATION">{{ formset.empty_form.vaccine_name }}</td>
+                <td data-label="Akcje" class="delete-cell"><span class="hidden">{{ formset.empty_form.DELETE }}</span><button type="button" class="link-button-danger remove-bulk-event-row">Usuń kartę</button></td>
             </tr>
         </template>
         {% endif %}
 
         <div class="form-actions">
             <a href="{% url 'dashboard' %}" class="button button-secondary">Anuluj</a>
-            <button type="submit" class="button button-primary">Zapisz zdarzenia</button>
+            <button type="submit" class="button button-primary">{% if is_single %}Zapisz zdarzenie{% else %}Zapisz zdarzenia{% endif %}</button>
         </div>
     </form>
 </main>

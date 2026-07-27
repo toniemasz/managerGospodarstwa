@@ -9,7 +9,8 @@ MODULE_GROUPS = (
 MODULE_DEFINITIONS = (
     {
         "key": "tasks",
-        "title": "Zadania na dziś",
+        "title": "Wszystkie zadania",
+        "mobile_title": "Zadania",
         "url_name": "task_center",
         "group": "production",
         "icon": "Z",
@@ -22,7 +23,7 @@ MODULE_DEFINITIONS = (
         ),
         "catalog_links": (
             {
-                "title": "Panel zadań",
+                "title": "Wszystkie zadania",
                 "url_name": "task_center",
                 "icon_name": "tasks",
                 "active_urls": (
@@ -244,7 +245,7 @@ MODULE_DEFINITIONS = (
         ),
         "catalog_links": (
             {
-                "title": "Magazyn",
+                "title": "Ruchy i dostawy",
                 "url_name": "feed_inventory",
                 "icon_name": "warehouse",
                 "active_urls": (
@@ -255,7 +256,7 @@ MODULE_DEFINITIONS = (
                 ),
             },
             {
-                "title": "Pełny magazyn",
+                "title": "Stany surowców",
                 "url_name": "feed_full_inventory",
                 "icon_name": "warehouse",
                 "active_urls": (
@@ -273,7 +274,7 @@ MODULE_DEFINITIONS = (
                 ),
             },
             {
-                "title": "Podania",
+                "title": "Zużycie paszy",
                 "url_name": "feed_servings",
                 "icon_name": "serving",
                 "active_urls": (
@@ -341,6 +342,8 @@ MODULE_DEFINITIONS = (
             "bulk_complete_productions",
             "process_stage1",
             "process_stage2",
+            "production_detail",
+            "reverse_production_settlement",
         ),
         "catalog_links": (
             {

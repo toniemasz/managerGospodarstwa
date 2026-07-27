@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from datetime import date
 from decimal import Decimal
 
@@ -151,23 +152,44 @@ class InventoryActions:
     @transaction.atomic
     def release_production(self, production: ProductionModel, *, remove_cost: bool = True) -> None:
         farm = self.farm
-        usages = (
+        usages = list(
             ProductionIngredientUsageModel.objects.select_for_update()
             .filter(
                 farm=farm,
                 production=production,
             )
+            .only("id", "delivery_id", "quantity_kg")
             .order_by("id")
         )
-        usage_ids = []
+
+        restored_by_delivery = defaultdict(lambda: Decimal("0.00"))
         for usage in usages:
-            usage_ids.append(usage.pk)
             if usage.delivery_id:
-                DeliveryModel.objects.filter(pk=usage.delivery_id).update(
-                    remaining_quantity_kg=F("remaining_quantity_kg") + usage.quantity_kg,
+                restored_by_delivery[usage.delivery_id] += usage.quantity_kg
+
+        if restored_by_delivery:
+            deliveries = list(
+                DeliveryModel.objects.select_for_update()
+                .filter(
+                    pk__in=restored_by_delivery,
+                    ingredient__farm=farm,
                 )
-        if usage_ids:
-            ProductionIngredientUsageModel.objects.filter(pk__in=usage_ids).delete()
+                .only("id", "remaining_quantity_kg")
+                .order_by("id")
+            )
+            if len(deliveries) != len(restored_by_delivery):
+                raise ValidationError(
+                    "Nie można przywrócić FIFO: alokacja wskazuje dostawę z innego gospodarstwa."
+                )
+            for delivery in deliveries:
+                delivery.remaining_quantity_kg += restored_by_delivery[delivery.pk]
+            DeliveryModel.objects.bulk_update(deliveries, ("remaining_quantity_kg",))
+
+        if usages:
+            ProductionIngredientUsageModel.objects.filter(
+                farm=farm,
+                production=production,
+            ).delete()
         InventoryMovementModel.objects.filter(
             farm=farm,
             movement_type=InventoryMovementModel.Types.PRODUCTION_USAGE,

@@ -239,6 +239,49 @@ input[type="date"] {
     margin-top: .15rem;
 }
 
+.required-marker {
+    color: var(--danger);
+}
+
+.field-with-unit {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: .45rem;
+}
+
+.field-unit {
+    color: var(--muted);
+    font-weight: 850;
+}
+
+.form-error-summary {
+    margin-bottom: var(--section-gap);
+}
+
+.settings-scale-presets,
+.settings-section-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .45rem;
+}
+
+.settings-unsaved-notice {
+    position: sticky;
+    top: calc(var(--topbar-height) + .5rem);
+    z-index: 20;
+}
+
+.module-nav-disabled-help {
+    color: var(--muted);
+    font-size: .78rem;
+}
+
+.anchor-target {
+    position: relative;
+    top: calc(-1 * var(--topbar-height));
+}
+
 .errorlist {
     list-style: none;
     margin: .25rem 0 0;

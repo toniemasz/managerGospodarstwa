@@ -1,15 +1,15 @@
 {% extends 'base.html' %}
-{% block title %}Panel zadań{% endblock %}
+{% block title %}Wszystkie zadania{% endblock %}
 {% block content %}
 <main class="app-page">
     <section class="page-header">
         <div>
             <p class="eyebrow">Centrala</p>
-            <h1>Panel zadań</h1>
+            <h1>Wszystkie zadania</h1>
             <p class="page-subtitle">{{ task_count }} aktywnych zadań z produkcji, paszy i finansów. Zacznij od kart z oznaczeniem „Pilne” albo „Dzisiaj”.</p>
         </div>
         <div class="header-actions">
-            <a href="{% url 'modules_home' %}" class="button button-secondary">Wróć do Dzisiaj</a>
+            <a href="{% url 'modules_home' %}" class="button button-secondary">Wróć do widoku Dzisiaj</a>
         </div>
     </section>
 

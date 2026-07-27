@@ -80,7 +80,10 @@ def test_full_two_stage_http_flow_completes_without_server_error(authenticated_f
     production = create_production(recipe, quantity="100.00")
 
     assert client.get(reverse("process_stage1", args=[production.pk])).status_code == 200
-    stage_one = client.post(reverse("process_stage1", args=[production.pk]))
+    stage_one = client.post(
+        reverse("process_stage1", args=[production.pk]),
+        {"confirmed_ingredients": [str(ingredient.pk)]},
+    )
     assert stage_one.status_code == 302
     assert stage_one.url == reverse("process_stage2", args=[production.pk])
     production.refresh_from_db()
@@ -128,6 +131,53 @@ def test_public_production_ui_has_no_force_or_serving_choice_controls(authentica
     assert "mimo braków" not in combined
     assert "pozostać na magazynie" not in combined
     assert "cała wyprodukowana ilość zostanie automatycznie zarejestrowana jako podana" in combined
+    assert "Zakończ gotowe produkcje" in combined
+    assert "Zakończ z pominięciem etapów" in combined
+    assert "Operacja rozchodzi składniki FIFO" in combined
+
+
+@pytest.mark.django_db
+def test_stage_checklist_is_required_by_server_and_does_not_change_inventory(authenticated_farm):
+    client, _, farm = authenticated_farm
+    recipe, ingredient = create_recipe(farm, stock_kg="500.00")
+    production = create_production(recipe)
+
+    response = client.post(reverse("process_stage1", args=[production.pk]), {})
+
+    assert response.status_code == 400
+    production.refresh_from_db()
+    assert production.status == ProductionModel.Statuses.QUEUED
+    assert not ProductionIngredientUsageModel.objects.filter(production=production).exists()
+    assert "Potwierdź pobranie wszystkich składników" in response.content.decode()
+    assert str(ingredient.pk) in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_completed_production_uses_controlled_reversal_screen(authenticated_farm):
+    client, user, farm = authenticated_farm
+    recipe, _ = create_recipe(farm, stock_kg="500.00")
+    production = create_production(
+        recipe,
+        status=ProductionModel.Statuses.STAGE_1_DONE,
+    )
+    success, _ = complete_production(farm, production.pk, user=user)
+    assert success is True
+
+    list_content = client.get(reverse("feed_productions")).content.decode()
+    get_response = client.get(reverse("reverse_production_settlement", args=[production.pk]))
+    post_response = client.post(
+        reverse("reverse_production_settlement", args=[production.pk]),
+        {"reason": "Błędna ilość składnika"},
+    )
+
+    assert "Cofnij rozliczenie" in list_content
+    assert f'href="{reverse("edit_production", args=[production.pk])}"' not in list_content
+    assert get_response.status_code == 200
+    assert "odwróci rozchód FIFO i koszt produkcji" in get_response.content.decode()
+    assert post_response.status_code == 302
+    production.refresh_from_db()
+    assert production.status == ProductionModel.Statuses.STAGE_1_DONE
+    assert not CostModel.objects.filter(production=production).exists()
 
 
 @pytest.mark.django_db
@@ -150,7 +200,11 @@ def test_legacy_serving_setting_and_post_choice_cannot_disable_automatic_serving
 
     response = client.post(
         reverse("process_stage2", args=[production.pk]),
-        {"create_feed_serving": "off", "create_feed_serving_present": "1"},
+        {
+            "create_feed_serving": "off",
+            "create_feed_serving_present": "1",
+            "confirmed_ingredients": [str(second.pk)],
+        },
     )
 
     assert response.status_code == 302
@@ -534,6 +588,29 @@ def test_bulk_completion_handles_queued_stage_one_and_duplicate_ids(authenticate
     assert FinishedFeedBatchModel.objects.filter(
         production__in=[queued, stage_one], remaining_quantity_kg=Decimal("0.00"),
     ).count() == 2
+
+
+@pytest.mark.django_db
+def test_bulk_ready_mode_completes_only_productions_after_stage_one(authenticated_farm):
+    client, _, farm = authenticated_farm
+    recipe, _ = create_recipe(farm, stock_kg="1000.00")
+    queued = create_production(recipe, production_date=date(2026, 7, 8))
+    stage_one = create_production(
+        recipe,
+        production_date=date(2026, 7, 9),
+        status=ProductionModel.Statuses.STAGE_1_DONE,
+    )
+
+    response = client.post(reverse("bulk_complete_productions"), {
+        "production_ids": [str(queued.pk), str(stage_one.pk)],
+        "completion_mode": "ready",
+    })
+
+    assert response.status_code == 302
+    queued.refresh_from_db()
+    stage_one.refresh_from_db()
+    assert queued.status == ProductionModel.Statuses.QUEUED
+    assert stage_one.status == ProductionModel.Statuses.COMPLETED
 
 
 @pytest.mark.django_db

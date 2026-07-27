@@ -382,6 +382,23 @@ tbody tr:last-child td {
     background: var(--warning-soft);
 }
 
+.settlement-more-toggle {
+    display: none;
+}
+
+.settlement-mismatch {
+    display: grid;
+    min-width: 12rem;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: .4rem;
+    align-items: start;
+    white-space: normal;
+}
+
+.settlement-mismatch .errorlist {
+    grid-column: 1 / -1;
+}
+
 .bulk-event-table input[name$="-sow_ear_tag"] {
     min-width: 12ch;
 }

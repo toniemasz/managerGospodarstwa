@@ -4,10 +4,10 @@
         Składniki
     </a>{% endif %}
     {% if 'inventory' in ui_visible_module_keys %}<a href="{% url 'feed_inventory' %}" class="{% if active == 'feed_inventory' or active == 'feed_full_inventory' or active == 'add_delivery' or active == 'edit_delivery' %}is-active{% endif %}">
-        Magazyn
+        Ruchy i dostawy
     </a>{% endif %}
     {% if 'inventory' in ui_visible_module_keys %}<a href="{% url 'finished_feed_inventory' %}" class="{% if active == 'finished_feed_inventory' or active == 'create_ready_feed_product' or active == 'add_ready_feed_delivery' %}is-active{% endif %}">Gotowe pasze</a>{% endif %}
-    {% if 'inventory' in ui_visible_module_keys %}<a href="{% url 'feed_servings' %}" class="{% if active == 'feed_servings' or active == 'create_feed_serving' %}is-active{% endif %}">Podania</a>{% endif %}
+    {% if 'inventory' in ui_visible_module_keys %}<a href="{% url 'feed_servings' %}" class="{% if active == 'feed_servings' or active == 'create_feed_serving' %}is-active{% endif %}">Zużycie paszy</a>{% endif %}
     {% if 'recipes' in ui_visible_module_keys %}<a href="{% url 'feed_recipes' %}" class="{% if active == 'feed_recipes' or active == 'recipe_detail' or active == 'add_recipe' or active == 'edit_recipe' %}is-active{% endif %}">
         Receptury
     </a>{% endif %}

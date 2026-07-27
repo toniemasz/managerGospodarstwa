@@ -106,6 +106,48 @@ def test_sales_list_displays_net_values(auth_client):
 
 
 @pytest.mark.django_db
+def test_sales_list_distinguishes_missing_complete_and_review_required(auth_client):
+    PigSaleModel.objects.create(
+        farm=auth_client.farm,
+        sale_date=date(2026, 7, 1),
+        no_settlement=True,
+    )
+    PigSaleModel.objects.create(
+        farm=auth_client.farm,
+        sale_date=date(2026, 7, 2),
+    )
+    PigSaleModel.objects.create(
+        farm=auth_client.farm,
+        sale_date=date(2026, 7, 3),
+        settlement_review_required=True,
+    )
+
+    response = auth_client.get(reverse('sales_list'), {'period': 'all'})
+    content = response.content.decode()
+
+    assert response.status_code == 200
+    assert 'Brak rozliczenia' in content
+    assert 'Kompletne rozliczenie' in content
+    assert 'Import wymaga sprawdzenia' in content
+    assert 'data-filter="REVIEW"' in content
+
+
+def test_manual_settlement_clears_previous_pdf_review_flag():
+    sale = PigSaleModel(settlement_review_required=True)
+    form = PigSaleForm(
+        data={
+            'sale_date': '2026-07-03',
+            'settlement_process': 'manual',
+            'settlement_review_required': 'True',
+        },
+        instance=sale,
+    )
+
+    assert form.is_valid(), form.errors
+    assert form.cleaned_data['settlement_review_required'] is False
+
+
+@pytest.mark.django_db
 def test_sales_list_displays_large_mass_in_tonnes(auth_client):
     PigSaleModel.objects.create(
         farm=auth_client.farm,
@@ -435,3 +477,87 @@ def test_sale_mass_forms_convert_selected_tonnes_to_kilograms():
     assert sale_form.cleaned_data["live_weight"] == Decimal("1250.00")
     assert row_form.cleaned_data["weight"] == Decimal("1500.00")
     assert row_form.cleaned_data["avg_weight"] == Decimal("120.00")
+
+
+def test_sale_row_form_completes_consistent_calculated_values():
+    form = SaleClassRowForm(data={
+        "line_no": "1",
+        "meat_class": "E",
+        "quantity": "4",
+        "weight": "486,40",
+        "price_per_kg": "5,25",
+        "vat_value": "204,29",
+    })
+
+    assert form.is_valid(), form.errors
+    assert form.cleaned_data["avg_weight"] == Decimal("121.60")
+    assert form.cleaned_data["net_value"] == Decimal("2553.60")
+    assert form.cleaned_data["gross_value"] == Decimal("2757.89")
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "expected_error"),
+    (
+        ("net_value", "2500,00", "netto powinno wynosić 2553.60"),
+        ("gross_value", "2700,00", "brutto powinno wynosić 2757.89"),
+        ("avg_weight", "120,00", "średnia waga powinna wynosić 121.60"),
+    ),
+)
+def test_sale_row_form_rejects_calculation_mismatch_without_confirmation(
+    field,
+    value,
+    expected_error,
+):
+    data = {
+        "line_no": "1",
+        "meat_class": "E",
+        "quantity": "4",
+        "weight": "486,40",
+        "avg_weight": "121,60",
+        "price_per_kg": "5,25",
+        "net_value": "2553,60",
+        "vat_value": "204,29",
+        "gross_value": "2757,89",
+    }
+    data[field] = value
+    form = SaleClassRowForm(data=data)
+
+    assert form.is_valid() is False
+    assert expected_error in form.errors["accept_calculation_mismatch"][0]
+
+
+def test_sale_row_form_allows_explicit_imported_value_override():
+    form = SaleClassRowForm(data={
+        "line_no": "1",
+        "meat_class": "E",
+        "quantity": "4",
+        "weight": "486,40",
+        "avg_weight": "120,00",
+        "price_per_kg": "5,25",
+        "net_value": "2500,00",
+        "vat_value": "200,00",
+        "gross_value": "2700,00",
+        "accept_calculation_mismatch": "on",
+    })
+
+    assert form.is_valid(), form.errors
+    assert form.cleaned_data["net_value"] == Decimal("2500.00")
+
+
+def test_sale_row_form_keeps_empty_row_empty():
+    form = SaleClassRowForm(data={"line_no": "1"})
+
+    assert form.is_valid(), form.errors
+    assert form.cleaned_data.get("net_value") is None
+
+
+@pytest.mark.django_db
+def test_sale_form_renders_one_responsive_formset_and_process_choices(auth_client):
+    content = auth_client.get(reverse("add_sale")).content.decode()
+
+    assert content.count('id="settlement-rows"') == 1
+    assert "settlement-form-cards" in content
+    assert 'data-label="Cena za kilogram"' in content
+    assert "Więcej danych" in content
+    assert "Nie mam jeszcze rozliczenia" in content
+    assert "Zapisz podstawowe dane sprzedaży i uzupełnij rozliczenie później." in content

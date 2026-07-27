@@ -104,3 +104,58 @@ def test_pin_endpoint_changes_only_current_farm(catalog_client):
 @pytest.mark.django_db
 def test_pin_endpoint_accepts_only_post(catalog_client):
     assert catalog_client.get(reverse("set_module_pin")).status_code == 405
+
+
+@pytest.mark.django_db
+def test_mobile_navigation_has_stable_order_and_respects_pinned_modules(catalog_client):
+    settings = get_farm_settings(catalog_client.farm)
+    settings.visible_modules = ["tasks", "sows", "inventory", "sales", "settings"]
+    settings.nav_modules = ["tasks", "sows", "sales", "inventory"]
+    settings.save(update_fields=["visible_modules", "nav_modules"])
+
+    keys_by_page = []
+    for active_url in ("dashboard", "sales_list", "feed_inventory"):
+        service = ModuleNavigationService(catalog_client.farm, active_url)
+        mobile = service.mobile_modules()
+        keys_by_page.append([module["key"] for module in mobile])
+
+    assert keys_by_page == [
+        ["tasks", "sows", "inventory"],
+        ["tasks", "sows", "inventory"],
+        ["tasks", "sows", "inventory"],
+    ]
+
+
+@pytest.mark.django_db
+def test_mobile_navigation_has_no_duplicates_and_at_most_three_modules(catalog_client):
+    settings = get_farm_settings(catalog_client.farm)
+    settings.nav_modules = ["tasks", "sows", "inventory", "sales", "costs"]
+    settings.save(update_fields=["nav_modules"])
+
+    mobile = ModuleNavigationService(catalog_client.farm, "sales_list").mobile_modules()
+    keys = [module["key"] for module in mobile]
+
+    assert len(keys) <= 3
+    assert len(keys) == len(set(keys))
+
+
+@pytest.mark.django_db
+def test_mobile_catalog_is_active_for_module_outside_bottom_bar(catalog_client):
+    settings = get_farm_settings(catalog_client.farm)
+    settings.nav_modules = ["tasks", "sows", "inventory"]
+    settings.save(update_fields=["nav_modules"])
+    service = ModuleNavigationService(catalog_client.farm, "sales_list")
+    modules = service.modules()
+    mobile = service.mobile_modules(modules)
+
+    assert service.is_mobile_catalog_active(modules, mobile) is True
+    assert [module["key"] for module in mobile] == ["tasks", "sows", "inventory"]
+
+
+@pytest.mark.django_db
+def test_mobile_search_uses_existing_global_search_endpoint(catalog_client):
+    content = catalog_client.get(reverse("modules_home")).content.decode()
+
+    assert 'data-mobile-search' in content
+    assert f'action="{reverse("global_search")}"' in content
+    assert 'aria-label="Wyszukiwarka"' in content

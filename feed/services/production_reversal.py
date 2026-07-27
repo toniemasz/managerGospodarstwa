@@ -64,7 +64,7 @@ class ProductionSettlementReversalWorkflow:
         production.completed_at = None
         production.completion_feed_serving_mode = ""
 
-        ProductionReconciliationWorkflow(self.farm).rebuild()
+        ProductionReconciliationWorkflow(self.farm).rebuild_from_date(production.date)
         log_action(
             farm=self.farm,
             user=self.user,

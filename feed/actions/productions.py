@@ -184,10 +184,14 @@ def delete_production_with_inventory(farm, production):
     if farm is None:
         raise ValueError("Usunięcie produkcji wymaga jawnego gospodarstwa.")
     with transaction.atomic():
-        production = ProductionModel.objects.select_for_update().select_related("recipe").get(
-            pk=production.pk,
-            recipe__farm=farm,
+        production = (
+            ProductionModel.objects.select_for_update()
+            .select_related("recipe")
+            .filter(pk=production.pk, recipe__farm=farm)
+            .first()
         )
+        if production is None:
+            return False
         if production.status == ProductionModel.Statuses.COMPLETED:
             ProductionSettlementReversalWorkflow(farm=farm).reverse(
                 production.pk,
@@ -198,3 +202,4 @@ def delete_production_with_inventory(farm, production):
             InventoryActions(farm).release_production(production)
         production.delete()
         invalidate_farm_cache_on_commit(farm, groups=("feed",))
+        return True

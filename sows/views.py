@@ -1,5 +1,5 @@
 import logging
-from datetime import date
+from datetime import date, timedelta
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -31,6 +31,7 @@ from common.cache import invalidate_farm_cache_on_commit
 from farms.services.current_farm import get_current_farm
 from farms.services.module_navigation import ModuleNavigationService
 from farms.services.audit_log_service import log_action
+from farms.services.settings_service import get_farm_settings
 from farms.services.today_dashboard import TodayDashboardService
 from sows.actions.mortality import create_mortality_report, delete_mortality_report, update_mortality_report
 from sows.actions.piglet_transfers import PigletTransferActions
@@ -46,6 +47,7 @@ from sows.domain.event_details import initial_data_from_event_details
 from sows.selectors.mortality import mortality_list_context
 from sows.selectors.piglet_transfers import piglet_transfer_list
 from sows.services.piglet_care import PigletCareError, PigletCareService
+from sows.services.vaccination_schedule import VaccinationScheduleService
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +132,7 @@ def vaccination_plans_view(request):
 
 @login_required
 def add_vaccination_plan_view(request):
-    """Widok odpowiedzialny za konfigurację nowych szczepień cyklicznych."""
+    """Tworzy plan szczepień w bieżącym gospodarstwie."""
     farm = get_current_farm(request)
     if request.method == 'POST':
         form = VaccinationPlanForm(request.POST, farm=farm)
@@ -144,7 +146,7 @@ def add_vaccination_plan_view(request):
                     plan.selected_sows.clear()
                 invalidate_farm_cache_on_commit(farm, groups=("sows",))
                 log_action(farm=farm, user=request.user, action="CREATE", obj=plan)
-                messages.success(request, "Reguła szczepienia została dodana.")
+                messages.success(request, "Plan szczepień został dodany.")
                 return redirect('vaccination_plans')
     else:
         form = VaccinationPlanForm(farm=farm)
@@ -172,7 +174,7 @@ def edit_vaccination_plan_view(request, plan_id):
                     plan.excluded_sows.remove(*reinclude_sows)
                 invalidate_farm_cache_on_commit(farm, groups=("sows",))
                 log_action(farm=farm, user=request.user, action="UPDATE", obj=plan)
-                messages.success(request, "Reguła szczepienia została zaktualizowana.")
+                messages.success(request, "Plan szczepień został zaktualizowany.")
                 return redirect('vaccination_plans')
     else:
         form = VaccinationPlanForm(instance=plan, farm=farm)
@@ -190,7 +192,23 @@ def delete_vaccination_plan_view(request, plan_id):
     farm = get_current_farm(request)
     plan = VaccinationActions(farm, user=request.user).deactivate_plan(plan_id=plan_id)
     log_action(farm=farm, user=request.user, action="UPDATE", obj=plan)
-    messages.success(request, "Plan szczepienia został wyłączony. Historia pozostała bez zmian.")
+    messages.success(request, "Plan szczepień został wyłączony. Historia pozostała bez zmian.")
+    return redirect('vaccination_plans')
+
+
+@login_required
+@require_POST
+def reactivate_vaccination_plan_view(request, plan_id):
+    farm = get_current_farm(request)
+    plan = VaccinationActions(farm, user=request.user).reactivate_plan(plan_id=plan_id)
+    log_action(farm=farm, user=request.user, action="UPDATE", obj=plan)
+    if plan.requires_configuration:
+        messages.warning(
+            request,
+            "Plan został włączony, ale wymaga ponownego wyboru macior przed uruchomieniem przypomnień.",
+        )
+        return redirect('edit_vaccination_plan', plan_id=plan.id)
+    messages.success(request, "Plan szczepień został włączony ponownie.")
     return redirect('vaccination_plans')
 
 
@@ -284,9 +302,93 @@ def sow_detail_view(request, sow_id):
 
     repo = SowRepository(farm=farm)
     sow = repo.get_sow_by_id(sow_id)
+    settings = get_farm_settings(farm)
+    current_date = timezone.localdate()
+    sow.update_state_for_date(
+        current_date,
+        pregnancy_check_after_days=settings.pregnancy_check_after_days,
+    )
     sow.piglet_care = PigletCareService(farm).current_balance_for_sow(db_sow)
+    operational_context = _sow_operational_context(
+        sow,
+        farm=farm,
+        current_date=current_date,
+        pregnancy_check_after_days=settings.pregnancy_check_after_days,
+    )
 
-    return render(request, 'sows/sow_detail.html', {'sow': sow, 'form': form})
+    return render(request, 'sows/sow_detail.html', {
+        'sow': sow,
+        'form': form,
+        **operational_context,
+    })
+
+
+def _sow_operational_context(
+    sow,
+    *,
+    farm,
+    current_date,
+    pregnancy_check_after_days,
+) -> dict:
+    care_reconciliations = PigletCareService(farm).completed_cycle_reconciliations(
+        sow_id=sow.id,
+    )
+    automatic_pre_weaning_deaths = sum(
+        row.automatic_deaths for row in care_reconciliations
+    )
+    mortality_context = {
+        "piglet_care_reconciliations": care_reconciliations,
+        "pre_weaning_deaths_total": (
+            sow.recorded_pre_weaning_deaths
+            + automatic_pre_weaning_deaths
+        ),
+        "automatic_pre_weaning_deaths": automatic_pre_weaning_deaths,
+    }
+    if sow.is_archived:
+        return {
+            "next_sow_task": None,
+            "active_vaccination_plans": [],
+            **mortality_context,
+        }
+
+    vaccination_service = VaccinationScheduleService(farm)
+    active_plans = vaccination_service.active_plans_for_sow(sow.id)
+    candidates = []
+
+    if sow.status in {"TO_CHECK", "TO_RECHECK"} and sow.last_insemination_date:
+        due_date = sow.last_insemination_date + timedelta(
+            days=pregnancy_check_after_days
+        )
+        candidates.append(("USG", due_date))
+    if sow.expected_farrowing_date:
+        candidates.append(("Oproszenie przewidywane", sow.expected_farrowing_date))
+    for reminder in vaccination_service.build_reminders([sow], current_date):
+        candidates.append((
+            f"Szczepienie: {reminder['vaccine_name']}",
+            reminder["target_date"],
+        ))
+
+    next_task = None
+    if candidates:
+        title, due_date = min(candidates, key=lambda candidate: candidate[1])
+        days = (due_date - current_date).days
+        if days < 0:
+            time_label = f"zaległe o {abs(days)} dni"
+        elif days == 0:
+            time_label = "dzisiaj"
+        else:
+            time_label = f"za {days} dni"
+        next_task = {
+            "title": title,
+            "date": due_date,
+            "time_label": time_label,
+        }
+
+    return {
+        "next_sow_task": next_task,
+        "active_vaccination_plans": active_plans,
+        **mortality_context,
+    }
 
 
 @login_required
@@ -330,6 +432,7 @@ def add_event_view(request, sow_id):
                 return redirect('sow_detail', sow_id=sow_id)
             for event in result.created_events:
                 log_action(farm=farm, user=request.user, action="CREATE", obj=event)
+            _add_weaning_reconciliation_message(request, result.created_events)
             messages.success(request, "Zdarzenie zostało dodane.")
             return redirect('sow_detail', sow_id=sow_id)
     else:
@@ -387,6 +490,7 @@ def bulk_sow_events_view(request):
                             model_label="sows.SowEventModel",
                             object_repr=f"{row.event_type} - {row.event_date} (Maciora: {row.sow.ear_tag})",
                         )
+                    _add_weaning_reconciliation_message(request, rows)
                     messages.success(request, f"Zapisano {created_count} zdarzeń.")
                     return redirect('dashboard')
 
@@ -511,6 +615,7 @@ def edit_event_view(request, event_id):
                 form.add_error(None, error.messages[0])
             else:
                 log_action(farm=farm, user=request.user, action="UPDATE", obj=event)
+                _add_weaning_reconciliation_message(request, [event])
                 messages.success(request, "Zdarzenie zostało zaktualizowane.")
                 return redirect('sow_detail', sow_id=sow_id)
     else:
@@ -716,6 +821,13 @@ def edit_mortality_view(request, report_id):
     if report.mortality_type == MortalityReportModel.TYPE_SOW:
         messages.error(request, "Upadku maciory nie można zmieniać po zarchiwizowaniu maciory.")
         return redirect('mortality_list')
+    if report.mortality_type == MortalityReportModel.TYPE_PRE_WEANING:
+        messages.info(
+            request,
+            "To historyczny wpis. Upadki przed odsadzeniem są obecnie wyliczane "
+            "automatycznie z odsadzenia i nie można ich edytować ręcznie.",
+        )
+        return redirect('mortality_list')
     if request.method == 'POST':
         form = MortalityReportForm(request.POST, farm=farm, instance=report)
         if form.is_valid():
@@ -833,6 +945,31 @@ def _log_mortality_report(*, farm, user, result) -> None:
                 "death_date": report.mortality_date.isoformat(),
                 "mortality_report_id": report.id,
             },
+        )
+
+
+def _add_weaning_reconciliation_message(request, events) -> None:
+    automatic_deaths = 0
+    unrecorded_inflow = 0
+    for event in events:
+        if event.event_type != "WEANING":
+            continue
+        details = event.details or {}
+        automatic_deaths += int(
+            details.get("automatic_pre_weaning_deaths") or 0
+        )
+        unrecorded_inflow += int(details.get("unrecorded_piglet_inflow") or 0)
+    if automatic_deaths:
+        messages.warning(
+            request,
+            f"System automatycznie wyliczył {automatic_deaths} szt. upadków przed "
+            "odsadzeniem. Wynik będzie przeliczany po każdej korekcie historii.",
+        )
+    if unrecorded_inflow:
+        messages.warning(
+            request,
+            f"Odsadzenie zapisano bez blokady. {unrecorded_inflow} szt. oznaczono "
+            "jako nierozpisane przyjęcie, ponieważ odsadzenie przewyższa ewidencję.",
         )
 
 

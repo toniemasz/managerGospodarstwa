@@ -16,19 +16,55 @@
     </section>
     {% endif %}
 
+    {% if piglet_care_reconciliations %}
+    <section class="notice notice-warning">
+        <div>
+            <h2>Automatyczne rozliczenie odchowu</h2>
+            {% for row in piglet_care_reconciliations %}
+                <p>
+                    Cykl {{ row.cycle_label }}: {{ row.explanation }}
+                    Bilans: urodzone {{ row.born_alive }}, przyjęte {{ row.received }},
+                    przekazane {{ row.transferred }}, historyczne upadki {{ row.deaths }},
+                    odsadzone {{ row.weaned }}.
+                    {% if row.requires_attention %}
+                        <a href="{% url 'edit_event' row.weaning.id %}" class="table-link">Edytuj odsadzenie</a>
+                    {% endif %}
+                </p>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
     <section class="record-hero">
         <div class="record-hero-copy">
             <p class="eyebrow">Karta maciory</p>
             <h1>
                 Maciora {{ sow.ear_tag }}
-                <span class="status-pill status-green">{{ sow.dynamic_status_display|default:"Aktywna" }}</span>
+                {% if sow.is_archived %}
+                    <span class="status-pill{% if sow.archive_reason == 'death' %} status-red{% endif %}">
+                        {{ sow.archive_reason_display }}
+                    </span>
+                {% else %}
+                    <span class="status-pill status-green">{{ sow.dynamic_status_display }}</span>
+                {% endif %}
             </h1>
-            <p>W stadzie od {{ sow.entry_date|date:"d.m.Y" }} · ID systemu: {{ sow.id }}</p>
+            <p>
+                W stadzie od {{ sow.entry_date|date:"d.m.Y" }}.
+                {% if next_sow_task %}
+                    Najbliższa czynność:
+                    <strong>{{ next_sow_task.title }} {{ next_sow_task.time_label }}</strong>
+                    ({{ next_sow_task.date|date:"d.m.Y" }}).
+                {% elif sow.is_archived %}
+                    Rekord pozostaje dostępny do kontroli i korekty historii.
+                {% endif %}
+            </p>
         </div>
         <div class="record-hero-actions">
-            <a href="{% url 'add_event' sow.id %}" class="button button-primary">Dodaj zdarzenie</a>
-            <a href="{% url 'edit_sow' sow.id %}" class="button button-secondary">Edytuj maciorę</a>
-            <a href="{% url 'dashboard' %}" class="button button-secondary">Wróć</a>
+            {% if not sow.is_archived %}
+                <a href="{% url 'add_event' sow.id %}" class="button button-primary">Dodaj zdarzenie tej maciory</a>
+            {% endif %}
+            <a href="{% url 'edit_sow' sow.id %}" class="button button-secondary">Edytuj dane maciory</a>
+            <a href="{% url 'dashboard' %}" class="button button-secondary">Wróć do listy macior</a>
         </div>
     </section>
 
@@ -50,10 +86,10 @@
                     <strong>{{ sow.avg_weaned }} szt.</strong>
                     <small>Średnia liczba prosiąt po odsadzeniu.</small>
                 </div>
-                <div class="stat-tile{% if sow.recorded_pre_weaning_deaths %} is-warning{% endif %}">
-                    <span>Zarejestrowane upadki przed odsadzeniem</span>
-                    <strong>{{ sow.recorded_pre_weaning_deaths }} szt.</strong>
-                    <small>Jawne zgłoszenia przypisane do cykli odchowu.</small>
+                <div class="stat-tile{% if pre_weaning_deaths_total %} is-warning{% endif %}">
+                    <span>Upadki przed odsadzeniem</span>
+                    <strong>{{ pre_weaning_deaths_total }} szt.</strong>
+                    <small>Automatycznie wyliczone: {{ automatic_pre_weaning_deaths }}{% if sow.recorded_pre_weaning_deaths %}; historyczne ręczne: {{ sow.recorded_pre_weaning_deaths }}{% endif %}.</small>
                 </div>
             </section>
 
@@ -111,8 +147,8 @@
                         <tbody>
                             {% for event in sow.all_events %}
                             <tr class="event-row" data-filter="{% if event.is_piglet_transfer %}PIGLET_TRANSFER{% else %}{{ event.event_type }}{% endif %}" data-search="{{ event.event_date }} {{ event.get_event_type_display }}">
-                                <td><strong>{{ event.event_date|date:"d.m.Y" }}</strong></td>
-                                <td>
+                                <td data-label="Data zdarzenia"><strong>{{ event.event_date|date:"d.m.Y" }}</strong></td>
+                                <td data-label="Typ">
                                     {% if event.event_type == 'INSEMINATION' %}
                                         <span class="status-pill status-amber">Inseminacja</span>
                                     {% elif event.event_type == 'PREGNANCY_CHECK' %}
@@ -133,7 +169,7 @@
                                         <span class="status-pill">{{ event.get_event_type_display }}</span>
                                     {% endif %}
                                 </td>
-                                <td>
+                                <td data-label="Szczegóły">
                                     <div class="event-detail">
                                         {% if event.event_type == 'INSEMINATION' %}
                                             <span>Inseminator/technik: <strong>{{ event.details.technician|default:"Brak danych" }}</strong></span>
@@ -154,6 +190,25 @@
                                             <span>Urodzone martwe: <strong>{{ event.details.born_dead|default:"0" }}</strong></span>
                                         {% elif event.event_type == 'WEANING' %}
                                             <span>Odsadzone prosięta: <strong>{{ event.details.count|default:"0" }} szt.</strong></span>
+                                            {% if event.details.automatic_pre_weaning_deaths %}
+                                                <span class="status-pill status-amber">Automatyczne upadki: {{ event.details.automatic_pre_weaning_deaths }} szt.</span>
+                                                <span>
+                                                    W chwili zapisu bilans wskazywał
+                                                    <strong>{{ event.details.piglet_balance_expected }} szt.</strong>
+                                                </span>
+                                            {% elif event.details.unrecorded_piglet_inflow %}
+                                                <span class="status-pill status-blue">Nierozpisane przyjęcie: {{ event.details.unrecorded_piglet_inflow }} szt.</span>
+                                                <span>
+                                                    W chwili zapisu bilans wskazywał
+                                                    <strong>{{ event.details.piglet_balance_expected }} szt.</strong>
+                                                </span>
+                                            {% elif event.details.piglet_balance_warning_ignored %}
+                                                <span class="status-pill status-amber">Historycznie zapisano mimo ostrzeżenia bilansu</span>
+                                                <span>
+                                                    W chwili zapisu ewidencja wskazywała
+                                                    <strong>{{ event.details.piglet_balance_expected }} szt.</strong>
+                                                </span>
+                                            {% endif %}
                                         {% elif event.event_type == 'MISCARRIAGE' %}
                                             <span>Maciora wróciła do statusu jałowa.</span>
                                             <span>Utworzono: <strong>{{ event.created_at|date:"d.m.Y H:i" }}</strong></span>
@@ -171,7 +226,7 @@
                                         {% endif %}
                                     </div>
                                 </td>
-                                <td class="text-right">
+                                <td class="text-right" data-label="Akcje">
                                     <div class="row-actions">
                                         {% if event.is_piglet_transfer %}
                                             <a href="{% url 'edit_piglet_transfer' event.transfer_id %}" class="table-link">Transfer</a>
@@ -206,68 +261,74 @@
 
         <aside class="record-side">
             <section class="side-summary-card is-tinted">
-                <h2>Dane rekordu</h2>
+                <h2>Bieżący cykl</h2>
                 <dl class="summary-list is-carded">
                     <div>
-                        <dt>Numer kolczyka</dt>
-                        <dd>{{ sow.ear_tag }}</dd>
+                        <dt>Status</dt>
+                        <dd>
+                            {% if sow.is_archived %}
+                                {{ sow.archive_reason_display }}
+                            {% else %}
+                                {{ sow.dynamic_status_display }}
+                            {% endif %}
+                        </dd>
                     </div>
                     <div>
-                        <dt>Data wprowadzenia</dt>
-                        <dd>{{ sow.entry_date|date:"d.m.Y" }}</dd>
+                        <dt>Ostatnia inseminacja</dt>
+                        <dd>{{ sow.last_insemination_date|date:"d.m.Y"|default:"—" }}</dd>
                     </div>
                     <div>
                         <dt>Przewidywany poród</dt>
-                        <dd>{{ sow.expected_farrowing_date|date:"d.m.Y"|default:"--" }}</dd>
+                        <dd>{{ sow.expected_farrowing_date|date:"d.m.Y"|default:"—" }}</dd>
                     </div>
                     <div>
-                        <dt>Utworzono profil</dt>
-                        <dd>{{ sow.created_at|date:"d.m.Y H:i" }}</dd>
+                        <dt>Ostatnie oproszenie</dt>
+                        <dd>{{ sow.last_farrowing_date|date:"d.m.Y"|default:"—" }}</dd>
                     </div>
+                    <div>
+                        <dt>Ostatnie odsadzenie</dt>
+                        <dd>{{ sow.last_weaning_date|date:"d.m.Y"|default:"—" }}</dd>
+                    </div>
+                    {% if sow.piglet_care %}
+                    <div>
+                        <dt>Aktualnie w odchowie</dt>
+                        <dd>{{ sow.piglet_care.available }} szt.</dd>
+                    </div>
+                    {% endif %}
                 </dl>
             </section>
 
-            <section class="timeline-card">
-                <div class="section-heading">
-                    <div>
-                        <h2>Ostatnie zdarzenia</h2>
-                        <p>Skrócony podgląd historii.</p>
-                    </div>
+            <section class="side-summary-card">
+                <h2>Najbliższe zadanie</h2>
+                {% if next_sow_task %}
+                    <p><strong>{{ next_sow_task.title }} {{ next_sow_task.time_label }}</strong></p>
+                    <p>{{ next_sow_task.date|date:"d.m.Y" }}</p>
+                {% else %}
+                    <p>Brak zaplanowanej czynności wymagającej uwagi.</p>
+                {% endif %}
+            </section>
+
+            <section class="side-summary-card">
+                <h2>Aktywne plany szczepień</h2>
+                {% if active_vaccination_plans %}
+                    <ul class="compact-list">
+                        {% for plan in active_vaccination_plans %}
+                            <li>{{ plan.name }}</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p>Brak aktywnych planów dla tej maciory.</p>
+                {% endif %}
+            </section>
+
+            <section class="side-summary-card">
+                <h2>Skróty</h2>
+                <div class="row-actions">
+                    {% if not sow.is_archived %}
+                        <a href="{% url 'add_event' sow.id %}" class="table-link">Dodaj zdarzenie tej maciory</a>
+                    {% endif %}
+                    <a href="{% url 'edit_sow' sow.id %}" class="table-link">Edytuj dane maciory</a>
                 </div>
-                <ol class="timeline-list">
-                    {% for event in sow.all_events|slice:":4" %}
-                    <li class="timeline-item">
-                        <div class="timeline-item-heading">
-                            <h3>{{ event.get_event_type_display }}</h3>
-                            <time datetime="{{ event.event_date|date:'Y-m-d' }}">{{ event.event_date|date:"d.m.Y" }}</time>
-                        </div>
-                        <div class="event-detail">
-                            {% if event.event_type == 'INSEMINATION' %}
-                                <span>Technik: <strong>{{ event.details.technician|default:"Brak danych" }}</strong></span>
-                            {% elif event.event_type == 'PREGNANCY_CHECK' %}
-                                <span>Wynik: <strong>{{ event.details.result|default:"Brak danych" }}</strong></span>
-                            {% elif event.event_type == 'FARROWING' %}
-                                <span>Żywe: <strong>{{ event.details.born_alive|default:"0" }}</strong>, martwe: <strong>{{ event.details.born_dead|default:"0" }}</strong></span>
-                            {% elif event.event_type == 'WEANING' %}
-                                <span>Odsadzone: <strong>{{ event.details.count|default:"0" }} szt.</strong></span>
-                            {% elif event.event_type == 'MISCARRIAGE' %}
-                                <span>Poronienie · utworzono {{ event.created_at|date:"d.m.Y H:i" }}</span>
-                            {% elif event.event_type == 'VACCINATION' %}
-                                <span>Szczepionka: <strong>{{ event.details.vaccine_name|default:"Brak nazwy" }}</strong></span>
-                                {% if event.details.note %}<span>Notatka: <strong>{{ event.details.note }}</strong></span>{% endif %}
-                            {% elif event.event_type == 'PIGLET_TRANSFER_OUT' %}
-                                <span>Przekazano <strong>{{ event.details.quantity }} szt.</strong> do {{ event.details.other_sow_ear_tag }}.</span>
-                            {% elif event.event_type == 'PIGLET_TRANSFER_IN' %}
-                                <span>Przyjęto <strong>{{ event.details.quantity }} szt.</strong> od {{ event.details.other_sow_ear_tag }}.</span>
-                            {% else %}
-                                <span>{{ event.get_event_type_display }}</span>
-                            {% endif %}
-                        </div>
-                    </li>
-                    {% empty %}
-                    <li class="empty-table">Brak zdarzeń do pokazania.</li>
-                    {% endfor %}
-                </ol>
             </section>
         </aside>
     </section>

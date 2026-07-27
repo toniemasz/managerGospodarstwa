@@ -1,4 +1,11 @@
 {% if form.errors %}
+<div class="notice notice-danger form-error-summary" role="alert" tabindex="-1" data-form-error-summary>
+    <div>
+        <h2>Nie zapisano zmian</h2>
+        <p>Popraw oznaczone pola — wykryto {{ form.errors.items|length }} {% if form.errors.items|length == 1 %}błędne pole lub sekcję{% else %}błędne pola lub sekcje{% endif %}. Szczegóły znajdują się przy polach.</p>
+        {% if form.non_field_errors %}{{ form.non_field_errors }}{% endif %}
+    </div>
+</div>
 <div
     data-notification-source
     data-notification-form-errors="true"
@@ -6,7 +13,7 @@
     data-notification-title="Nie zapisano zmian"
     hidden
 >
-    Popraw oznaczone pola.
+    Popraw oznaczone pola — wykryto {{ form.errors.items|length }} błędne pola lub sekcje.
     {% if form.non_field_errors %}{{ form.non_field_errors }}{% endif %}
 </div>
 {% endif %}

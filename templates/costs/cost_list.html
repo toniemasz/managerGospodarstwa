@@ -39,7 +39,7 @@
         {% if costs %}
         <div class="table-scroll">
             <table class="data-table mobile-card-table" data-mobile-cards="true">
-                <thead><tr><th>Data</th><th>Opis</th><th>Kategoria</th><th>Dokument</th><th>Dostawca</th><th>Status</th><th class="text-right">Kwota</th><th class="text-right">Akcje</th></tr></thead>
+                <thead><tr><th>Data</th><th>Opis</th><th>Kategoria</th><th>Dokument</th><th>Dostawca</th><th>Źródło</th><th>Płatność</th><th class="text-right">Kwota</th><th class="text-right">Akcje</th></tr></thead>
                 <tbody>
                     {% for cost in costs %}
                     <tr>
@@ -48,15 +48,22 @@
                         <td data-label="Kategoria">{{ cost.category.name|default:'Bez kategorii' }}</td>
                         <td data-label="Dokument">{{ cost.document_number|default:'—' }}</td>
                         <td data-label="Dostawca">{{ cost.supplier|default:'—' }}</td>
-                        <td data-label="Status">
+                        <td data-label="Źródło">
                             {% if cost.production_id %}
-                                <span class="status-pill status-green">Automatyczny FIFO</span>
+                                <span class="status-pill status-green">Produkcja paszy</span>
+                            {% else %}
+                                <span class="status-pill">Ręczny</span>
+                            {% endif %}
+                        </td>
+                        <td data-label="Płatność">
+                            {% if cost.production_id %}
+                                <span class="status-pill">Nie dotyczy</span>
                             {% else %}
                                 <span class="status-pill {% if cost.is_paid %}status-green{% else %}status-amber{% endif %}">{% if cost.is_paid %}Opłacony{% else %}Nieopłacony{% endif %}</span>
                             {% endif %}
                         </td>
                         <td data-label="Kwota" class="text-right"><strong>{{ cost.amount|smart_unit:"zł" }}</strong></td>
-                        <td data-label="Akcje" class="text-right">{% if cost.production_id %}<span class="muted-small">Z FIFO</span>{% else %}<a href="{% url 'edit_cost' cost.id %}" class="table-link">Edytuj</a>{% endif %}</td>
+                        <td data-label="Akcje" class="text-right">{% if cost.production_id %}<a href="{% url 'production_detail' cost.production_id %}" class="table-link">Zobacz śrutowanie</a>{% else %}<a href="{% url 'edit_cost' cost.id %}" class="table-link">Edytuj</a>{% endif %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

@@ -64,6 +64,61 @@ class TestSowViews:
         url = reverse('sow_detail', args=[sow.id])
         response = setup_client.get(url)
         assert response.status_code == 200
+        content = response.content.decode()
+        assert 'Dodaj zdarzenie tej maciory' in content
+        assert 'Edytuj dane maciory' in content
+        assert 'ID systemu' not in content
+        assert 'Bieżący cykl' in content
+        assert 'Ostatnie zdarzenia' not in content
+
+    def test_sow_detail_shows_nearest_operational_task_and_active_plan(self, setup_client):
+        sow = SowModel.objects.create(ear_tag="DETAIL-TASK", farm=setup_client.farm)
+        SowEventModel.objects.create(
+            sow=sow,
+            event_type='INSEMINATION',
+            event_date=date.today() - timedelta(days=35),
+            details={'technician': 'Jan'},
+        )
+        VaccinationPlanModel.objects.create(
+            farm=setup_client.farm,
+            name='Plan całego stada',
+            days_after_event=120,
+            event_source='INSEMINATION',
+            scope=VaccinationPlanModel.SCOPE_ALL,
+        )
+
+        response = setup_client.get(reverse('sow_detail', args=[sow.id]))
+        content = response.content.decode()
+
+        assert response.status_code == 200
+        assert 'Najbliższa czynność' in content
+        assert 'USG zaległe o 5 dni' in content
+        assert 'Aktywne plany szczepień' in content
+        assert 'Plan całego stada' in content
+
+    def test_archived_sow_detail_hides_new_event_action_and_keeps_history_correction(self, setup_client):
+        sow = SowModel.objects.create(
+            ear_tag="DETAIL-ARCHIVED",
+            farm=setup_client.farm,
+            is_archived=True,
+            archive_reason=SowModel.ARCHIVE_REASON_DEATH,
+            death_date=date.today(),
+        )
+        event = SowEventModel.objects.create(
+            sow=sow,
+            event_type='INSEMINATION',
+            event_date=date.today() - timedelta(days=20),
+            details={'technician': 'Jan'},
+        )
+
+        response = setup_client.get(reverse('sow_detail', args=[sow.id]))
+        content = response.content.decode()
+
+        assert response.status_code == 200
+        assert 'Dodaj zdarzenie' not in content
+        assert 'Upadek' in content
+        assert reverse('edit_sow', args=[sow.id]) in content
+        assert reverse('edit_event', args=[event.id]) in content
 
     def test_sow_detail_edit_rejects_another_active_sow_number(self, setup_client):
         existing = SowModel.objects.create(ear_tag='DETAIL-EXISTING', farm=setup_client.farm)
@@ -183,6 +238,53 @@ class TestSowViews:
         assert response.status_code == 302
         plan.refresh_from_db()
         assert plan.is_active is False
+
+    def test_inactive_plan_can_be_reactivated_with_safe_scope_handling(self, setup_client):
+        all_plan = VaccinationPlanModel.objects.create(
+            farm=setup_client.farm,
+            name='Plan dla wszystkich',
+            days_before_farrowing=21,
+            scope=VaccinationPlanModel.SCOPE_ALL,
+            is_active=False,
+        )
+        selected_plan = VaccinationPlanModel.objects.create(
+            farm=setup_client.farm,
+            name='Plan wybranych',
+            days_before_farrowing=21,
+            scope=VaccinationPlanModel.SCOPE_SELECTED,
+            is_active=False,
+        )
+        other_user = User.objects.create_user(username='plan-reactivate-other')
+        foreign_plan = VaccinationPlanModel.objects.create(
+            farm=get_or_create_user_farm(other_user),
+            name='Obcy plan',
+            days_before_farrowing=21,
+            is_active=False,
+        )
+
+        foreign_response = setup_client.post(
+            reverse('reactivate_vaccination_plan', args=[foreign_plan.id])
+        )
+        all_response = setup_client.post(
+            reverse('reactivate_vaccination_plan', args=[all_plan.id])
+        )
+        selected_response = setup_client.post(
+            reverse('reactivate_vaccination_plan', args=[selected_plan.id])
+        )
+
+        assert foreign_response.status_code == 404
+        assert all_response.status_code == 302
+        assert selected_response.status_code == 302
+        assert selected_response.url == reverse(
+            'edit_vaccination_plan',
+            args=[selected_plan.id],
+        )
+        all_plan.refresh_from_db()
+        selected_plan.refresh_from_db()
+        assert all_plan.is_active is True
+        assert all_plan.requires_configuration is False
+        assert selected_plan.is_active is True
+        assert selected_plan.requires_configuration is True
 
     def test_edit_vaccination_plan_changes_trigger_and_clears_old_schedule(
             self,
@@ -413,6 +515,35 @@ class TestSowViews:
         assert response.status_code == 200
         assert 'id="add-bulk-event-row"' not in content
         assert 'name="events-TOTAL_FORMS" value="1"' in content
+        assert "Jeden wpis" in content
+        assert "Zapisz zdarzenie" in content
+
+    def test_bulk_event_form_has_mobile_cards_and_accessible_copy_action(self, setup_client):
+        response = setup_client.get(reverse('bulk_sow_events'))
+        content = response.content.decode()
+
+        assert response.status_code == 200
+        assert "bulk-event-form-cards" in content
+        assert 'data-label="Numer maciory"' in content
+        assert 'data-event-field="PREGNANCY_CHECK"' in content
+        assert 'aria-label="Skopiuj maciorę z poprzedniego wiersza"' in content
+        assert "Wiele wpisów" in content
+        assert "Zapisz zdarzenia" in content
+
+    def test_vaccination_plan_form_has_schedule_preview_and_scalable_selection(self, setup_client):
+        SowModel.objects.create(ear_tag="FILTER-1", farm=setup_client.farm)
+
+        response = setup_client.get(reverse('add_vaccination_plan'))
+        content = response.content.decode()
+
+        assert response.status_code == 200
+        assert "Dodaj plan szczepień" in content
+        assert "Podgląd harmonogramu" in content
+        assert "Wyszukaj numer kolczyka" in content
+        assert "Zaznacz wszystkie widoczne" in content
+        assert "Odznacz wszystkie" in content
+        assert "Wybrano: 0" in content
+        assert "FILTER-1" in content
 
     def test_bulk_sow_events_view_creates_valid_events(self, setup_client):
         sow = SowModel.objects.create(ear_tag="BULK-1", farm=setup_client.farm)

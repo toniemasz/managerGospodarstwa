@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import F
+from django.db.models import F, Sum
 
 from feed.models import (
     FeedProductModel,
@@ -77,6 +77,45 @@ def production_creates_produced_feed(production) -> bool:
     return production.pk is not None
 
 
+def _refresh_batch_allocation_costs(batch) -> None:
+    """Synchronizuje historyczne podania po korekcie kosztu partii."""
+    allocations = list(
+        batch.serving_allocations.select_for_update().only(
+            "id",
+            "serving_id",
+            "quantity_kg",
+            "unit_cost",
+            "cost",
+        )
+    )
+    if not allocations:
+        return
+
+    serving_ids = set()
+    for allocation in allocations:
+        allocation.unit_cost = batch.cost_per_kg
+        allocation.cost = quantize_money(allocation.quantity_kg * batch.cost_per_kg)
+        serving_ids.add(allocation.serving_id)
+    FeedServingAllocationModel.objects.bulk_update(allocations, ("unit_cost", "cost"))
+
+    totals = {
+        row["serving_id"]: quantize_money(row["total"] or Decimal("0.00"))
+        for row in FeedServingAllocationModel.objects.filter(serving_id__in=serving_ids)
+        .values("serving_id")
+        .annotate(total=Sum("cost"))
+    }
+    servings = list(
+        FeedServingModel.objects.select_for_update()
+        .filter(pk__in=serving_ids)
+        .only("id", "total_cost")
+        .order_by("id")
+    )
+    for serving in servings:
+        serving.total_cost = totals.get(serving.pk, Decimal("0.00"))
+    FeedServingModel.objects.bulk_update(servings, ("total_cost",))
+
+
+@transaction.atomic
 def create_finished_feed_batch_for_production(production):
     farm = production.recipe.farm
     farm.__class__.objects.select_for_update().get(pk=farm.pk)
@@ -105,7 +144,7 @@ def create_finished_feed_batch_for_production(production):
         raise ValidationError("Produkt produkcji nie może być sklasyfikowany jako pasza kupiona.")
     if product.recipe_id != production.recipe_id:
         raise ValidationError("Produkt produkowany jest powiązany z inną recepturą.")
-    batch, _ = FinishedFeedBatchModel.objects.get_or_create(
+    batch, created = FinishedFeedBatchModel.objects.get_or_create(
         production=production,
         defaults={
             "farm": production.recipe.farm,
@@ -120,6 +159,7 @@ def create_finished_feed_batch_for_production(production):
     )
     if batch.product_id != product.pk:
         raise ValidationError("Istniejąca partia produkcji wskazuje inny produkt.")
+    previous_cost_per_kg = batch.cost_per_kg
     batch_updates = {
         "batch_date": production.date,
         "cost_per_kg": production.feed_cost_per_kg,
@@ -129,6 +169,8 @@ def create_finished_feed_batch_for_production(production):
     for field, value in batch_updates.items():
         setattr(batch, field, value)
     batch.save(update_fields=tuple(batch_updates))
+    if not created and batch.cost_per_kg != previous_cost_per_kg:
+        _refresh_batch_allocation_costs(batch)
     return batch
 
 

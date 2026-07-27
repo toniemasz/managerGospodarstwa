@@ -53,13 +53,15 @@ class SowEventActions:
         data: dict,
         farrowing_decision: str | None = None,
     ):
+        data = dict(data)
         if data.get("event_type") == SowStateMachine.WEANING:
-            PigletCareService(self.farm).validate_weaning(
+            balance = PigletCareService(self.farm).validate_weaning(
                 sow=sow,
                 weaning_date=data["event_date"],
                 quantity=data.get("count") or 0,
                 lock_for_update=True,
             )
+            self._add_weaning_balance_snapshot(data, balance)
         result = self.event_service.create_event(
             sow=sow,
             sow_status=sow_status,
@@ -152,12 +154,17 @@ class SowEventActions:
         for row in rows:
             sow = self._get_row_sow(row.sow.id)
             if row.event_type == SowStateMachine.WEANING:
-                care.validate_weaning(
+                balance = care.validate_weaning(
                     sow=sow,
                     weaning_date=row.event_date,
                     quantity=int(row.details.get("count") or 0),
                     lock_for_update=True,
                 )
+                self._add_weaning_balance_snapshot(row.details, balance)
+                row.details = self.event_service.build_details({
+                    **row.details,
+                    "event_type": row.event_type,
+                })
             created_events.append(self.repository.create_event(
                 sow=sow,
                 event_type=row.event_type,
@@ -171,6 +178,7 @@ class SowEventActions:
     @transaction.atomic
     def update_event(self, *, event_id: int, data: dict) -> SowEventModel:
         event = self._get_event(event_id, lock_for_update=True)
+        data = dict(data)
         care = PigletCareService(self.farm)
         if event.event_type == SowStateMachine.FARROWING:
             has_care_history = (
@@ -193,13 +201,14 @@ class SowEventActions:
                     born_alive_override=int(data.get("born_alive") or 0),
                 )
         if data["event_type"] == SowStateMachine.WEANING:
-            PigletCareService(self.farm).validate_weaning(
+            balance = PigletCareService(self.farm).validate_weaning(
                 sow=event.sow,
                 weaning_date=data["event_date"],
                 quantity=data.get("count") or 0,
                 replaced_weaning=event if event.event_type == SowStateMachine.WEANING else None,
                 lock_for_update=True,
             )
+            self._add_weaning_balance_snapshot(data, balance)
         old_plan_id = event.vaccination_plan_id
         old_cycle_id = event.cycle_id
         old_scheduled_date = event.scheduled_date
@@ -292,6 +301,15 @@ class SowEventActions:
             queryset = queryset.select_for_update(of=("self",))
         filters = {"id": event_id, "sow__farm": self.farm}
         return get_object_or_404(queryset, **filters)
+
+    @staticmethod
+    def _add_weaning_balance_snapshot(data: dict, balance) -> None:
+        quantity = int(data.get("count") or 0)
+        difference = quantity - balance.available
+        data["piglet_balance_expected"] = balance.available
+        data["piglet_balance_difference"] = difference
+        data["automatic_pre_weaning_deaths"] = max(-difference, 0)
+        data["unrecorded_piglet_inflow"] = max(difference, 0)
 
 
 def record_bulk_pregnancy_checks(

@@ -34,14 +34,14 @@
                     <span>Zaznacz wszystkie dostępne</span>
                 </label>
                 <span class="muted-small" data-selected-production-count>Wybrano: 0</span>
-                <button type="submit" class="button button-primary" data-bulk-complete-button disabled>Zakończ zaznaczone</button>
+                <button type="button" class="button button-primary" data-bulk-complete-button disabled>Przejdź do podsumowania</button>
             </div>
         </div>
 
         <div class="table-scroll">
             <table class="data-table mobile-card-table" data-mobile-cards="true">
                 <thead>
-                    <tr>
+                    <tr data-production-status="{{ prod.status }}">
                         <th aria-label="Wybór"></th>
                         <th>Data</th>
                         <th>Receptura</th>
@@ -86,7 +86,7 @@
                             {% if prod.status == 'QUEUED' %}
                                 <span class="status-pill">W kolejce</span>
                             {% elif prod.status == 'STAGE_1_DONE' %}
-                                <span class="status-pill status-blue">Po etapie binów</span>
+                                <span class="status-pill status-blue">Pobrano składniki z silosów</span>
                             {% else %}
                                 <span class="status-pill status-green">Zakończone</span>
                             {% endif %}
@@ -94,13 +94,16 @@
                         <td data-label="Akcje" class="text-right">
                             <div class="row-actions">
                                 {% if prod.status == 'QUEUED' %}
-                                    <a href="{% url 'process_stage1' prod.id %}" class="table-link">Etap 1</a>
+                                    <a href="{% url 'process_stage1' prod.id %}" class="table-link">Potwierdź pobranie z silosów</a>
                                 {% elif prod.status == 'STAGE_1_DONE' %}
-                                    <a href="{% url 'process_stage2' prod.id %}" class="table-link">Etap 2</a>
+                                    <a href="{% url 'process_stage2' prod.id %}" class="table-link">Dodaj składniki ręczne i zakończ</a>
                                 {% else %}
-                                    <span class="muted-small">{{ prod.completed_at|date:"d.m.Y H:i" }}</span>
+                                    <a href="{% url 'production_detail' prod.id %}" class="table-link">Szczegóły</a>
+                                    <a href="{% url 'reverse_production_settlement' prod.id %}" class="table-link danger-link">Cofnij rozliczenie</a>
                                 {% endif %}
-                                <a href="{% url 'edit_production' prod.id %}" class="table-link">Edytuj</a>
+                                {% if prod.status != 'COMPLETED' %}
+                                    <a href="{% url 'edit_production' prod.id %}" class="table-link">Edytuj</a>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>
@@ -112,10 +115,37 @@
                 </tbody>
             </table>
         </div>
+
+        <dialog class="confirmation-dialog" data-bulk-production-dialog aria-labelledby="bulk-production-title">
+            <div class="dialog-card">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Potwierdzenie</p>
+                        <h2 id="bulk-production-title">Zakończenie śrutowań</h2>
+                    </div>
+                    <button type="button" class="topbar-icon-button" data-bulk-dialog-close aria-label="Zamknij">×</button>
+                </div>
+                <dl class="summary-list">
+                    <div><dt>Po pierwszym etapie</dt><dd data-ready-production-count>0</dd></div>
+                    <div><dt>Z pominięciem etapów</dt><dd data-skipped-stage-count>0</dd></div>
+                </dl>
+                <div class="notice notice-warning">
+                    <div>
+                        <h3>Skutek operacji</h3>
+                        <p>Operacja rozchodzi składniki FIFO, tworzy partie gotowej paszy i rejestruje automatyczne podanie całej wyprodukowanej ilości.</p>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="button button-secondary" data-bulk-dialog-close>Anuluj</button>
+                    <button type="submit" name="completion_mode" value="ready" class="button button-primary">Zakończ gotowe produkcje</button>
+                    <button type="submit" name="completion_mode" value="skip" class="button button-danger">Zakończ z pominięciem etapów</button>
+                </div>
+            </div>
+        </dialog>
     </form>
 </main>
 {% endblock %}
 
 {% block scripts %}
-<script src="{% static 'js/pages/productions.js' %}" defer></script>
+<script src="{% static 'js/pages/productions.js' %}?v=20260726-ux" defer></script>
 {% endblock %}

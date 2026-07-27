@@ -12,9 +12,9 @@
             <p class="page-subtitle">Lista, statusy, szczepienia i archiwum bieżącego gospodarstwa.</p>
         </div>
         <div class="header-actions">
-            <a href="{% url 'bulk_sow_events' %}?rows=1" class="button button-primary">Dodaj zdarzenie</a>
+            <a href="{% url 'bulk_sow_events' %}?rows=1" class="button button-primary">Dodaj wpis po numerze kolczyka</a>
             <a href="{% url 'add_sow' %}" class="button button-secondary">Dodaj maciorę</a>
-            <a href="{% url 'bulk_sow_events' %}" class="button button-secondary">Masowe zdarzenia</a>
+            <a href="{% url 'bulk_sow_events' %}" class="button button-secondary">Dodaj wiele zdarzeń</a>
         </div>
     </section>
 
@@ -49,7 +49,7 @@
                 <h2>Do obsługi</h2>
                 <p>Najbliższe czynności produkcyjne dla stada.</p>
             </div>
-            <a href="{% url 'task_center' %}?tab=production" class="table-link">Panel zadań</a>
+            <a href="{% url 'task_center' %}?tab=production" class="table-link">Wszystkie zadania</a>
         </div>
         {% if sow_attention_items %}
         <div class="quick-list">

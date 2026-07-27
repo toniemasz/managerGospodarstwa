@@ -115,3 +115,50 @@ def inventory_page_context(farm, *, movement_type="", date_from=None, date_to=No
         "movement_types": InventoryMovementModel.Types.choices,
     })
     return context
+
+
+def full_inventory_context(
+    farm,
+    *,
+    query: str = "",
+    low_only: bool = False,
+    storage: str = "",
+) -> dict:
+    """Filtruje i sortuje obliczony stan magazynu bez zmiany źródła prawdy."""
+    dashboard = inventory_dashboard(farm)
+    normalized_query = (query or "").strip().casefold()
+    normalized_storage = storage if storage in {"bin", "bag"} else ""
+    inventory = [
+        item
+        for item in dashboard["inventory"]
+        if (
+            (not normalized_query or normalized_query in item.name.casefold())
+            and (not low_only or item.is_low_stock)
+            and (
+                not normalized_storage
+                or (normalized_storage == "bin" and item.is_in_bin)
+                or (normalized_storage == "bag" and not item.is_in_bin)
+            )
+        )
+    ]
+
+    def sort_key(item):
+        if item.current_stock <= Decimal("0.00"):
+            return (0, item.name.casefold())
+        if item.is_low_stock:
+            return (1, item.threshold_difference, item.name.casefold())
+        if item.low_stock_threshold_kg > Decimal("0.00"):
+            return (2, item.threshold_difference, item.name.casefold())
+        return (3, item.name.casefold())
+
+    inventory.sort(key=sort_key)
+    return {
+        **dashboard,
+        "inventory": inventory,
+        "inventory_query": query,
+        "inventory_low_only": low_only,
+        "inventory_storage": normalized_storage,
+        "inventory_has_filters": bool(
+            normalized_query or low_only or normalized_storage
+        ),
+    }

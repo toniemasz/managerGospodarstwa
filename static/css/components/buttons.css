@@ -21,6 +21,34 @@
     box-shadow: none;
 }
 
+.is-submitting {
+    cursor: wait;
+    opacity: .78;
+}
+
+.is-submitting::before {
+    width: .9em;
+    height: .9em;
+    flex: 0 0 auto;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    content: "";
+    animation: submit-spinner .7s linear infinite;
+}
+
+@keyframes submit-spinner {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .is-submitting::before {
+        animation: none;
+    }
+}
+
 .button-small {
     min-height: calc(var(--button-height) - .35rem);
     padding: .4rem .62rem;

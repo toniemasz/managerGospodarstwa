@@ -40,6 +40,53 @@ def test_feed_inventory_view_loads_for_authenticated_user(auth_client):
 
 
 @pytest.mark.django_db
+def test_full_inventory_filters_sorts_and_prefills_actions(auth_client):
+    farm = auth_client.farm
+    empty = IngredientModel.objects.create(
+        farm=farm,
+        name="Brakująca pszenica",
+        is_in_bin=True,
+        low_stock_threshold_kg=Decimal("100.00"),
+    )
+    low = IngredientModel.objects.create(
+        farm=farm,
+        name="Niska soja",
+        is_in_bin=False,
+        low_stock_threshold_kg=Decimal("100.00"),
+    )
+    delivery = DeliveryModel.objects.create(
+        ingredient=low,
+        date=timezone.localdate(),
+        quantity_kg=Decimal("50.00"),
+        price_per_kg=Decimal("1.00"),
+    )
+    InventoryActions(farm).sync_delivery(delivery)
+
+    response = auth_client.get(reverse("feed_full_inventory"), {"low": "1"})
+    content = response.content.decode()
+
+    assert response.status_code == 200
+    assert [item.ingredient_id for item in response.context["inventory"]] == [
+        empty.id,
+        low.id,
+    ]
+    assert "Tylko niskie stany" in content
+    assert f"?ingredient={empty.id}" in content
+    assert "Różnica do progu" in content
+
+    delivery_form = auth_client.get(reverse("add_delivery"), {"ingredient": low.id})
+    adjustment_form = auth_client.get(reverse("inventory_adjustment"), {"ingredient": low.id})
+    assert delivery_form.context["formset"].forms[0]["ingredient"].value() == low.id
+    assert adjustment_form.context["form"]["ingredient"].value() == low.id
+
+    filtered = auth_client.get(
+        reverse("feed_full_inventory"),
+        {"q": "soja", "storage": "bag"},
+    )
+    assert [item.ingredient_id for item in filtered.context["inventory"]] == [low.id]
+
+
+@pytest.mark.django_db
 def test_feed_recipes_view_loads_successfully(auth_client):
     url = reverse('feed_recipes')
     response = auth_client.get(url)
@@ -227,7 +274,10 @@ def test_feed_production_post_actions(auth_client, feed_objects):
     })
     assert edit.status_code == 302
 
-    stage1 = auth_client.post(reverse('process_stage1', args=[production.id]))
+    stage1 = auth_client.post(
+        reverse('process_stage1', args=[production.id]),
+        {"confirmed_ingredients": [str(feed_objects["ingredient"].id)]},
+    )
     assert stage1.status_code == 302
     production.refresh_from_db()
     assert production.status == ProductionModel.Statuses.STAGE_1_DONE

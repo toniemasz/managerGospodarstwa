@@ -420,6 +420,10 @@
     gap: var(--grid-gap);
 }
 
+.inventory-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+}
+
 .module-group-list {
     display: grid;
     gap: var(--section-gap);
@@ -1286,6 +1290,123 @@
 
 .sale-option {
     display: block;
+}
+
+.settlement-process {
+    display: grid;
+    gap: .55rem;
+    border: 0;
+    padding: 0;
+}
+
+.settlement-process legend {
+    margin-bottom: .35rem;
+    font-weight: 900;
+}
+
+.settlement-process .option-box {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: .65rem;
+    align-items: start;
+    cursor: pointer;
+}
+
+.settlement-process .option-box input {
+    margin-top: .2rem;
+}
+
+.settlement-process .option-box span {
+    display: grid;
+    gap: .15rem;
+}
+
+.settlement-process .option-box small {
+    color: var(--muted);
+}
+
+.schedule-preview {
+    display: grid;
+    gap: .35rem;
+    border-left: 3px solid var(--primary);
+    background: var(--primary-soft);
+    padding: .75rem;
+}
+
+.schedule-preview h3,
+.schedule-preview p {
+    margin: 0;
+}
+
+.selection-toolbar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .65rem;
+    margin-bottom: .75rem;
+}
+
+.selection-toolbar label {
+    display: grid;
+    gap: .25rem;
+}
+
+.selection-toolbar label > span,
+.selection-toolbar output {
+    color: var(--muted);
+    font-size: .78rem;
+    font-weight: 850;
+}
+
+.selection-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .45rem;
+}
+
+.sow-checkbox-list {
+    display: grid;
+    max-height: 22rem;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: .35rem;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: .55rem;
+}
+
+.sow-checkbox-option label {
+    display: flex;
+    min-height: 2.75rem;
+    align-items: center;
+    gap: .5rem;
+    border-radius: var(--radius);
+    padding: .45rem;
+}
+
+.sow-checkbox-option label:hover {
+    background: var(--surface-soft);
+}
+
+.confirmation-dialog {
+    width: min(42rem, calc(100vw - 1rem));
+    max-height: calc(100vh - 1rem);
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    padding: 0;
+    box-shadow: var(--shadow);
+}
+
+.confirmation-dialog::backdrop {
+    background: rgba(15, 23, 42, .48);
+}
+
+.dialog-card {
+    display: grid;
+    gap: var(--section-gap);
+    padding: var(--panel-padding);
 }
 
 .sale-import-actions {

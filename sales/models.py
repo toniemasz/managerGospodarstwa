@@ -24,6 +24,10 @@ class PigSaleModel(models.Model):
     document_number = models.CharField(max_length=50, blank=True, verbose_name="Numer dokumentu")
     tattoo = models.CharField(max_length=50, blank=True, verbose_name="Tatuaż")
     no_settlement = models.BooleanField(default=False, verbose_name="Bez rozliczenia")
+    settlement_review_required = models.BooleanField(
+        default=False,
+        verbose_name="Import wymaga sprawdzenia",
+    )
 
     quantity = models.PositiveIntegerField(default=0, verbose_name="Ilość sprzedanych sztuk")
     total_weight = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'), verbose_name="Waga całkowita (kg)")
@@ -56,10 +60,10 @@ class PigSaleModel(models.Model):
     @property
     def settlement_status(self) -> str:
         if self.no_settlement:
-            return "Rozliczenie do importu"
-        if self.rows.exists():
-            return "Rozliczenie zaimportowane"
-        return "Dane ręczne"
+            return "Brak rozliczenia"
+        if self.settlement_review_required:
+            return "Import wymaga sprawdzenia"
+        return "Kompletne rozliczenie"
 
     @property
     def total_price(self) -> Decimal:

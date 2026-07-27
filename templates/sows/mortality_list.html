@@ -8,7 +8,7 @@
         <div>
             <p class="eyebrow">Maciory</p>
             <h1>Upadki</h1>
-            <p class="page-subtitle">Jawne zgłoszenia upadków oraz oznaczone historyczne szacunki ze starszych cykli.</p>
+            <p class="page-subtitle">Upadki przed odsadzeniem wyliczane automatycznie oraz ręczne zgłoszenia po odsadzeniu.</p>
         </div>
         <div class="header-actions">
             <a href="{% url 'report_mortality' %}" class="button button-primary">Zgłoś upadek</a>
@@ -20,11 +20,16 @@
 
     <section class="stats-grid compact-stats">
         <div class="stat-tile"><span>Upadki macior</span><strong>{{ summary.sow }} szt.</strong></div>
-        <div class="stat-tile"><span>Przed odsadzeniem</span><strong>{{ summary.pre_weaning }} szt.</strong><small>Zgłoszenia i historyczne szacunki.</small></div>
+        <div class="stat-tile"><span>Przed odsadzeniem</span><strong>{{ summary.pre_weaning }} szt.</strong><small>Automatyczne: {{ summary.automatic_pre_weaning }}{% if summary.legacy_pre_weaning %}, historyczne ręczne: {{ summary.legacy_pre_weaning }}{% endif %}.</small></div>
         <div class="stat-tile"><span>Upadki prosiąt</span><strong>{{ summary.piglet }} szt.</strong></div>
         <div class="stat-tile"><span>Upadki warchlaków</span><strong>{{ summary.weaner }} szt.</strong></div>
         <div class="stat-tile"><span>Upadki tuczników</span><strong>{{ summary.finisher }} szt.</strong></div>
         <div class="stat-tile{% if summary.post_weaning %} is-warning{% endif %}"><span>Łącznie po odsadzeniu</span><strong>{{ summary.post_weaning }} szt.</strong></div>
+        <div class="stat-tile{% if summary.unreconciled_cycles %} is-warning{% endif %}">
+            <span>Nierozpisane przyjęcia</span>
+            <strong>{{ summary.unreconciled_cycles }}</strong>
+            <small>{{ summary.unrecorded_inflow }} szt. odsadzonych ponad ewidencję.</small>
+        </div>
         {% if summary.unspecified %}<div class="stat-tile is-warning"><span>Nieokreślone po odsadzeniu</span><strong>{{ summary.unspecified }} szt.</strong><small>Rekordy historyczne do klasyfikacji.</small></div>{% endif %}
     </section>
 
@@ -63,7 +68,7 @@
                                 {{ report.get_mortality_type_display }}
                             </span>
                         </td>
-                        <td data-label="Źródło">Ręczne</td>
+                        <td data-label="Źródło">{% if report.mortality_type == 'PRZED_ODSADZENIEM' %}Historyczny wpis ręczny{% else %}Ręczne{% endif %}</td>
                         <td data-label="Maciora">
                             {% if report.sow %}
                                 <a href="{% url 'sow_detail' report.sow.id %}" class="table-link">{{ report.sow.ear_tag }}</a>
@@ -77,21 +82,45 @@
                         <td data-label="Notatka">{{ report.note|default:"—" }}</td>
                         <td data-label="Utworzył">{{ report.created_by.username|default:"—" }}</td>
                         <td data-label="Utworzono">{{ report.created_at|date:"d.m.Y H:i" }}</td>
-                        <td data-label="Akcje">{% if report.mortality_type != 'MACIORA' %}<div class="row-actions"><a href="{% url 'edit_mortality' report.id %}" class="table-link">Edytuj</a><form method="post" action="{% url 'delete_mortality' report.id %}" data-confirm="Usunąć zgłoszenie upadku?">{% csrf_token %}<button type="submit" class="table-link button-link danger-link">Usuń</button></form></div>{% else %}—{% endif %}</td>
+                        <td data-label="Akcje">
+                            {% if report.mortality_type != 'MACIORA' %}
+                                <div class="row-actions">
+                                    {% if report.mortality_type != 'PRZED_ODSADZENIEM' %}<a href="{% url 'edit_mortality' report.id %}" class="table-link">Edytuj</a>{% endif %}
+                                    <form method="post" action="{% url 'delete_mortality' report.id %}" data-confirm="Usunąć zgłoszenie upadku?">{% csrf_token %}<button type="submit" class="table-link button-link danger-link">Usuń</button></form>
+                                </div>
+                            {% else %}—{% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                     {% for row in automatic_mortality_rows %}
                     <tr>
                         <td data-label="Data"><strong>{{ row.mortality_date|date:"d.m.Y" }}</strong></td>
-                        <td data-label="Typ"><span class="status-pill status-blue">Przed odsadzeniem</span></td>
-                        <td data-label="Źródło">Historyczny szacunek: urodzone minus odsadzone</td>
+                        <td data-label="Typ">
+                            {% if row.is_automatic_mortality %}
+                                <span class="status-pill status-amber">Przed odsadzeniem</span>
+                            {% else %}
+                                <span class="status-pill status-blue">Nierozpisane przyjęcie</span>
+                            {% endif %}
+                        </td>
+                        <td data-label="Źródło">Automatycznie z odsadzenia</td>
                         <td data-label="Maciora"><a href="{% url 'sow_detail' row.sow.id %}" class="table-link">{{ row.sow.ear_tag }}</a></td>
                         <td data-label="Cykl">{{ row.cycle_label }}</td>
-                        <td data-label="Liczba" class="text-right"><strong>{% if row.quantity != None %}{{ row.quantity }} szt.{% else %}—{% endif %}</strong></td>
-                        <td data-label="Przyczyna">{% if row.is_inconsistent %}Niejednoznaczne dane historyczne: możliwy transfer{% else %}—{% endif %}</td>
-                        <td data-label="Notatka">{% if row.unavailable_reason %}Nie można obliczyć — {{ row.unavailable_reason|lower }}{% else %}—{% endif %}</td>
+                        <td data-label="Liczba" class="text-right">
+                            <strong>{% if row.is_automatic_mortality %}{{ row.automatic_deaths }}{% else %}{{ row.unrecorded_inflow }}{% endif %} szt.</strong>
+                        </td>
+                        <td data-label="Przyczyna">{{ row.explanation }}</td>
+                        <td data-label="Notatka">
+                            Urodzone {{ row.born_alive }}, przyjęte {{ row.received }},
+                            przekazane {{ row.transferred }}, historyczne upadki {{ row.deaths }},
+                            odsadzone {{ row.weaned }}.
+                        </td>
                         <td data-label="Utworzył">System</td><td data-label="Utworzono">—</td>
-                        <td data-label="Akcje"><a href="{% url 'sow_detail' row.sow.id %}" class="table-link">Zdarzenia maciory</a></td>
+                        <td data-label="Akcje">
+                            <div class="row-actions">
+                                <a href="{% url 'edit_event' row.weaning.id %}" class="table-link">Edytuj odsadzenie</a>
+                                <a href="{% url 'sow_detail' row.farrowing.sow.id %}" class="table-link">Historia maciory</a>
+                            </div>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>

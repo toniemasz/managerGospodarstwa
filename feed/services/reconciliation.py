@@ -46,6 +46,46 @@ class ProductionReconciliationWorkflow:
         ).exclude(source_id__in=production_ids).delete()
         return {"deliveries": delivery_count, "production_movements": production_count}
 
+    @transaction.atomic
+    def rebuild_from_date(self, date_from) -> dict[str, int]:
+        """Odbudowuje FIFO od daty zmiany, bez naruszania wcześniejszej historii."""
+        productions = list(
+            ProductionModel.objects.select_for_update(of=("self",))
+            .filter(
+                recipe__farm=self.farm,
+                status=ProductionModel.Statuses.COMPLETED,
+                date__gte=date_from,
+            )
+            .select_related("recipe")
+            .order_by("date", "time", "id")
+        )
+        usage_count = 0
+        for production in productions:
+            try:
+                result = self.inventory.book_production(
+                    production,
+                    forced=True,
+                    prefer_existing_movements=True,
+                )
+                sync_production_cost(
+                    farm=self.farm,
+                    production=production,
+                    cost_result=result,
+                )
+                production.refresh_from_db()
+                create_finished_feed_batch_for_production(production)
+                usage_count += result.usage_count
+            except Exception as error:
+                raise InventoryRebuildError(
+                    "Błąd rozliczenia produkcji podczas częściowej odbudowy FIFO",
+                    farm=self.farm,
+                    production=production,
+                ) from error
+        return {
+            "productions": len(productions),
+            "production_movements": usage_count,
+        }
+
     def _rebuild_deliveries(self) -> int:
         count = 0
         deliveries = DeliveryModel.objects.filter(

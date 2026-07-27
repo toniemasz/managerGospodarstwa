@@ -9,10 +9,9 @@ from django.urls import reverse
 
 from farms.models import FarmModel
 from sows.actions.events import SowEventActions
-from sows.actions.mortality import create_mortality_report
 from sows.actions.piglet_transfers import PigletTransferActions
-from sows.forms import MortalityReportForm, PigletTransferForm, SowEventForm
-from sows.models import MortalityReportModel, PigletTransferModel, SowEventModel, SowModel
+from sows.forms import PigletTransferForm, SowEventForm
+from sows.models import PigletTransferModel, SowEventModel, SowModel
 from sows.services.piglet_care import PigletCareService
 from sows.services.reporting import SowReportingService
 from sows.services.sow_repository import SowRepository
@@ -95,33 +94,206 @@ def test_receiving_sow_can_wean_more_than_it_biologically_bore(piglet_farm, cycl
 
 
 @pytest.mark.django_db
-def test_pre_weaning_death_reduces_care_not_born_alive_and_limits_weaning(piglet_farm, cycles):
-    create_transfer(piglet_farm, cycles)
+def test_factual_weaning_is_saved_without_confirmation_and_marks_missing_inflow(
+    piglet_farm,
+    cycles,
+):
     sow_b, farrowing_b = cycles[1]
-    create_mortality_report(
-        farm=piglet_farm,
+    actions = SowEventActions(piglet_farm)
+
+    result = actions.create_event(
+        sow=sow_b,
+        sow_status="LACTATING",
         data={
-            "mortality_type": MortalityReportModel.TYPE_PRE_WEANING,
-            "sow": sow_b,
-            "farrowing": farrowing_b,
-            "mortality_date": date(2026, 7, 10),
-            "quantity": 1,
+            "event_type": "WEANING",
+            "event_date": date(2026, 7, 28),
+            "count": 11,
         },
     )
-    farrowing_b.refresh_from_db()
 
-    assert PigletCareService(piglet_farm).balance(farrowing_b).available == 10
-    assert farrowing_b.details["born_alive"] == 8
-    with pytest.raises(ValidationError, match="Dostępne obecnie: 10"):
-        SowEventActions(piglet_farm).create_event(
-            sow=sow_b,
-            sow_status="LACTATING",
-            data={"event_type": "WEANING", "event_date": date(2026, 7, 28), "count": 11},
-        )
+    assert result.created_event.details == {
+        "count": 11,
+        "piglet_balance_expected": 8,
+        "piglet_balance_difference": 3,
+        "unrecorded_piglet_inflow": 3,
+    }
+    reconciliation = PigletCareService(
+        piglet_farm
+    ).completed_cycle_reconciliations()[0]
+    assert reconciliation.farrowing == farrowing_b
+    assert reconciliation.difference == -3
+    assert reconciliation.deaths == 0
+    assert reconciliation.possible_missing_inflow == 3
 
 
 @pytest.mark.django_db
-def test_weaning_and_mortality_forms_use_current_care_balance(piglet_farm, cycles):
+def test_editing_weaning_recalculates_reared_count_and_clears_discrepancy(
+    piglet_farm,
+    cycles,
+):
+    sow_b = cycles[1][0]
+    actions = SowEventActions(piglet_farm)
+    created = actions.create_event(
+        sow=sow_b,
+        sow_status="LACTATING",
+        data={
+            "event_type": "WEANING",
+            "event_date": date(2026, 7, 28),
+            "count": 11,
+        },
+    ).created_event
+
+    updated = actions.update_event(
+        event_id=created.id,
+        data={
+            "event_type": "WEANING",
+            "event_date": date(2026, 7, 28),
+            "count": 8,
+        },
+    )
+    sow = SowRepository(piglet_farm).get_sow_by_id(sow_b.id)
+
+    assert updated.details == {
+        "count": 8,
+        "piglet_balance_expected": 8,
+    }
+    assert sow.total_weaned == 8
+    assert sow.avg_weaned == 8
+    assert PigletCareService(
+        piglet_farm
+    ).completed_cycle_reconciliations() == []
+
+
+@pytest.mark.django_db
+def test_late_transfer_resolves_inflow_and_deaths_are_derived_without_overwrite(
+    piglet_farm,
+    cycles,
+):
+    sow_b, farrowing_b = cycles[1]
+    SowEventActions(piglet_farm).create_event(
+        sow=sow_b,
+        sow_status="LACTATING",
+        data={
+            "event_type": "WEANING",
+            "event_date": date(2026, 7, 28),
+            "count": 11,
+        },
+    )
+
+    transfer = create_transfer(piglet_farm, cycles)
+
+    assert transfer.quantity == 3
+    assert PigletCareService(
+        piglet_farm
+    ).completed_cycle_reconciliations() == []
+    assert farrowing_b.details["born_alive"] == 8
+
+    sow_a, farrowing_a = cycles[0]
+    SowEventActions(piglet_farm).create_event(
+        sow=sow_a,
+        sow_status="LACTATING",
+        data={
+            "event_type": "WEANING",
+            "event_date": date(2026, 7, 28),
+            "count": 5,
+        },
+    )
+    row = PigletCareService(piglet_farm).completed_cycle_reconciliations()[0]
+
+    assert row.farrowing == farrowing_a
+    assert row.automatic_deaths == 4
+    assert farrowing_a.details["born_alive"] == 12
+    assert not PigletTransferModel.objects.filter(
+        farm=piglet_farm,
+        quantity=4,
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_weaning_view_saves_mismatch_without_confirmation(
+    piglet_farm,
+    cycles,
+    client,
+):
+    sow_b = cycles[1][0]
+    client.force_login(piglet_farm.owner)
+    url = reverse("add_event", args=[sow_b.id])
+    data = {
+        "event_type": "WEANING",
+        "event_date": "2026-07-28",
+        "count": "11",
+    }
+
+    response = client.post(url, data, follow=True)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert "Odsadzenie zapisano bez blokady" in content
+    assert "Ignoruję ostrzeżenie" not in content
+    event = SowEventModel.objects.get(
+        sow=sow_b,
+        event_type="WEANING",
+    )
+    assert event.details["count"] == 11
+    assert event.details["unrecorded_piglet_inflow"] == 3
+
+
+@pytest.mark.django_db
+def test_quick_bulk_weaning_uses_the_same_automatic_reconciliation(
+    piglet_farm,
+    cycles,
+    client,
+):
+    sow_b = cycles[1][0]
+    client.force_login(piglet_farm.owner)
+    url = reverse("bulk_sow_events") + "?rows=1&event_type=WEANING"
+    data = {
+        "events-TOTAL_FORMS": "1",
+        "events-INITIAL_FORMS": "0",
+        "events-MIN_NUM_FORMS": "0",
+        "events-MAX_NUM_FORMS": "1000",
+        "events-0-sow_ear_tag": sow_b.ear_tag,
+        "events-0-event_type": "WEANING",
+        "events-0-event_date": "2026-07-28",
+        "events-0-count": "11",
+    }
+
+    response = client.post(url, data)
+
+    assert response.status_code == 302
+    event = SowEventModel.objects.get(sow=sow_b, event_type="WEANING")
+    assert event.details["count"] == 11
+    assert event.details["unrecorded_piglet_inflow"] == 3
+
+
+@pytest.mark.django_db
+def test_pre_weaning_death_is_derived_at_weaning_without_changing_births(
+    piglet_farm,
+    cycles,
+):
+    create_transfer(piglet_farm, cycles)
+    sow_b, farrowing_b = cycles[1]
+    event = SowEventActions(piglet_farm).create_event(
+        sow=sow_b,
+        sow_status="LACTATING",
+        data={
+            "event_type": "WEANING",
+            "event_date": date(2026, 7, 28),
+            "count": 10,
+        },
+    ).created_event
+    farrowing_b.refresh_from_db()
+
+    row = PigletCareService(piglet_farm).completed_cycle_reconciliations()[0]
+
+    assert event.details["automatic_pre_weaning_deaths"] == 1
+    assert row.automatic_deaths == 1
+    assert PigletCareService(piglet_farm).balance(farrowing_b).available == 1
+    assert farrowing_b.details["born_alive"] == 8
+
+
+@pytest.mark.django_db
+def test_weaning_form_accepts_any_factual_non_negative_count(piglet_farm, cycles):
     create_transfer(piglet_farm, cycles)
     sow_b = cycles[1][0]
 
@@ -145,21 +317,8 @@ def test_weaning_and_mortality_forms_use_current_care_balance(piglet_farm, cycle
             "count": 12,
         },
     )
-    excessive_mortality = MortalityReportForm(
-        farm=piglet_farm,
-        data={
-            "mortality_type": MortalityReportModel.TYPE_PRE_WEANING,
-            "sow": sow_b.ear_tag,
-            "mortality_date": date(2026, 7, 15),
-            "quantity": 12,
-        },
-    )
-
     assert valid_weaning.is_valid() is True
-    assert excessive_weaning.is_valid() is False
-    assert "Dostępne obecnie: 11" in excessive_weaning.errors["count"][0]
-    assert excessive_mortality.is_valid() is False
-    assert "ujemny stan odchowu" in excessive_mortality.errors["quantity"][0]
+    assert excessive_weaning.is_valid() is True
 
 
 @pytest.mark.django_db
@@ -424,6 +583,28 @@ def test_active_balance_query_count_does_not_grow_with_number_of_sows(
         balances = PigletCareService(piglet_farm).active_balances(as_of=TRANSFER_DATE)
 
     assert len(balances) == 8
+
+
+@pytest.mark.django_db
+def test_completed_cycle_reconciliation_uses_fixed_query_count(
+    piglet_farm,
+    cycles,
+    django_assert_num_queries,
+):
+    for sow, _farrowing in cycles:
+        SowEventModel.objects.create(
+            sow=sow,
+            event_type="WEANING",
+            event_date=date(2026, 7, 28),
+            details={"count": 1},
+        )
+
+    with django_assert_num_queries(3):
+        rows = PigletCareService(
+            piglet_farm
+        ).completed_cycle_reconciliations()
+
+    assert len(rows) == 3
 
 
 @pytest.mark.django_db(transaction=True)

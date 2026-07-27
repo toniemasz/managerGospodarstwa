@@ -9,7 +9,7 @@
             <legend>{{ group.title }}</legend>
             {% for item in group.fields %}
                 {% if item.field %}
-                <div class="module-settings-card">
+                <div class="module-settings-card" data-module-setting="{{ item.key }}">
                     <label class="module-toggle">
                         <span class="module-toggle-copy">
                             <strong>{{ item.field.label }}</strong>
@@ -18,9 +18,10 @@
                         {{ item.field }}
                     </label>
                     <label class="module-nav-toggle">
-                        <span>Pokaż na pasku nawigacji</span>
+                        <span>Przypięty w menu</span>
                         {{ item.nav_field }}
                     </label>
+                    <small class="module-nav-disabled-help" data-module-disabled-help hidden>Włącz moduł, aby przypiąć go do menu.</small>
                 </div>
                 {% else %}
                 <div class="module-settings-card is-locked">

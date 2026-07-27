@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 
@@ -12,6 +13,13 @@ from feed.actions.productions import (
 )
 from feed.models import ProductionModel
 from feed.selectors.productions import production_details_for_stages, production_or_404
+from feed.services.production_reversal import ProductionSettlementReversalWorkflow
+
+
+def _checklist_is_complete(request, items) -> bool:
+    expected_ids = {str(item["id"]) for item in items}
+    confirmed_ids = set(request.POST.getlist("confirmed_ingredients"))
+    return expected_ids == confirmed_ids
 
 
 def _redirect_from_stage_1(request, production):
@@ -34,7 +42,11 @@ def process_stage1_view(request, pk):
     if redirect_response:
         return redirect_response
 
+    context = production_details_for_stages(farm, pk)
     if request.method == "POST":
+        if not _checklist_is_complete(request, context["stage1_items"]):
+            messages.error(request, "Potwierdź pobranie wszystkich składników z silosów.")
+            return render(request, "feed/stage1.html", context, status=400)
         success, message = mark_stage_1_done(farm, pk)
         if success:
             production.refresh_from_db()
@@ -49,7 +61,7 @@ def process_stage1_view(request, pk):
         messages.error(request, message)
         return redirect("feed_productions")
 
-    return render(request, "feed/stage1.html", production_details_for_stages(farm, pk))
+    return render(request, "feed/stage1.html", context)
 
 
 @login_required
@@ -65,7 +77,11 @@ def process_stage2_view(request, pk):
         messages.warning(request, "Najpierw zakończ Etap 1 śrutowania.")
         return redirect("process_stage1", pk=pk)
 
+    context = production_details_for_stages(farm, pk)
     if request.method == "POST":
+        if not _checklist_is_complete(request, context["stage2_items"]):
+            messages.error(request, "Potwierdź dodanie wszystkich składników ręcznych.")
+            return render(request, "feed/stage2.html", context, status=400)
         success, message = complete_production(
             farm,
             pk,
@@ -84,17 +100,64 @@ def process_stage2_view(request, pk):
             messages.error(request, message)
         return redirect("feed_productions")
 
-    context = production_details_for_stages(farm, pk)
     return render(request, "feed/stage2.html", context)
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def reverse_production_settlement_view(request, pk):
+    farm = get_current_farm(request)
+    production = production_or_404(farm, pk)
+    if production.status != ProductionModel.Statuses.COMPLETED:
+        messages.info(request, "Cofnąć można wyłącznie zakończone śrutowanie.")
+        return redirect("feed_productions")
+
+    if request.method == "POST":
+        reason = request.POST.get("reason", "").strip()
+        try:
+            ProductionSettlementReversalWorkflow(
+                farm=farm,
+                user=request.user,
+            ).reverse(production.pk, reason=reason)
+        except ValidationError as error:
+            messages.error(request, error.messages[0])
+        else:
+            messages.success(
+                request,
+                "Rozliczenie zostało cofnięte. Śrutowanie wróciło do etapu składników ręcznych.",
+            )
+            return redirect("feed_productions")
+
+    return render(request, "feed/production_reversal.html", {"production": production})
+
+
+@login_required
+def production_detail_view(request, pk):
+    farm = get_current_farm(request)
+    return render(
+        request,
+        "feed/production_detail.html",
+        production_details_for_stages(farm, pk),
+    )
 
 
 @login_required
 @require_POST
 def bulk_complete_productions_view(request):
     farm = get_current_farm(request)
+    production_ids = request.POST.getlist("production_ids")
+    completion_mode = request.POST.get("completion_mode", "skip")
+    if completion_mode == "ready":
+        production_ids = list(
+            ProductionModel.objects.filter(
+                pk__in=production_ids,
+                recipe__farm=farm,
+                status=ProductionModel.Statuses.STAGE_1_DONE,
+            ).values_list("pk", flat=True)
+        )
     result = bulk_complete_productions(
         farm,
-        request.POST.getlist("production_ids"),
+        production_ids,
         user=request.user,
     )
 

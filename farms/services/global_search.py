@@ -88,7 +88,7 @@ def _sow_results(farm, query: str, active_url_name: str) -> dict:
     plans = [
         {
             "title": plan.name,
-            "subtitle": "Plan szczepienia",
+            "subtitle": "Plan szczepień",
             "meta": "Konfiguracja rozrodu",
             "url": reverse("edit_vaccination_plan", args=[plan.id]),
             "icon_name": "health",
