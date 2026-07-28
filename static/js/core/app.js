@@ -751,6 +751,25 @@
         updateEmptyState();
     }
 
+    function initPriceUnitInputs(root = document) {
+        root.querySelectorAll?.('.price-unit-select').forEach((unitSelect) => {
+            const applyStep = () => {
+                if (!unitSelect.name || !unitSelect.form) return;
+                const priceFieldName = unitSelect.name.replace(/_unit$/, '');
+                const priceInput = unitSelect.form.elements.namedItem(priceFieldName);
+                if (!priceInput) return;
+                const perTonne = unitSelect.value === 't';
+                priceInput.step = perTonne ? '0.01' : '0.00001';
+                priceInput.min = perTonne ? '0.01' : '0.00001';
+            };
+            if (unitSelect.dataset.priceInputBound !== 'true') {
+                unitSelect.dataset.priceInputBound = 'true';
+                unitSelect.addEventListener('change', applyStep);
+            }
+            applyStep();
+        });
+    }
+
     function initDeliveryFormset(root = document) {
         const form = root.getElementById?.('delivery-form') || document.getElementById('delivery-form');
         if (!form || form.dataset.deliveryRowsBound === 'true') return;
@@ -778,16 +797,17 @@
             if (row) row.hidden = true;
             updateEmptyState();
         });
-
         addButton.addEventListener('click', () => {
             const index = parseInt(totalForms.value, 10);
             const html = template.innerHTML.replaceAll('__prefix__', index);
             rows.insertAdjacentHTML('beforeend', html);
             totalForms.value = index + 1;
             window.enhanceAutoResizeFields?.(rows.lastElementChild);
+            initPriceUnitInputs(rows.lastElementChild);
             updateEmptyState();
         });
 
+        initPriceUnitInputs(rows);
         updateEmptyState();
     }
 
@@ -1192,6 +1212,7 @@
         initSaleFormset();
         initRecipeFormset();
         initDeliveryFormset();
+        initPriceUnitInputs();
         initProductionStageChecklist();
         initConfirmations();
         initDisclosureMenus();

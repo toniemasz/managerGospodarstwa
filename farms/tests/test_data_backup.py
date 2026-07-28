@@ -264,6 +264,7 @@ def test_user_backup_restores_vaccination_scope_cycles_and_event_snapshot():
         interval_unit='YEARS',
         schedule_mode='FIXED',
         first_due_date=date(2025, 2, 28),
+        starts_on=date(2025, 1, 1),
         scope='SELECTED',
     )
     plan.selected_sows.add(sow)
@@ -295,6 +296,7 @@ def test_user_backup_restores_vaccination_scope_cycles_and_event_snapshot():
     restored_cycle = VaccinationCycleModel.objects.get(plan__farm=target_farm)
     assert counts['cykle szczepień'] == 1
     assert list(restored_plan.selected_sows.values_list('ear_tag', flat=True)) == ['VAC-BACKUP']
+    assert restored_plan.starts_on == date(2025, 1, 1)
     assert restored_event.vaccination_plan == restored_plan
     assert restored_event.vaccine_name == 'Różyca'
     assert restored_cycle.plan == restored_plan
@@ -363,7 +365,7 @@ def test_version_2_backup_without_new_optional_sections_is_upgraded_safely():
     )
 
     analysis = analyze_user_backup(backup_file, target_farm)
-    assert analysis['format_version'] == 5
+    assert analysis['format_version'] == 6
     assert analysis['payload']['source_version'] == 2
 
     backup_file.seek(0)
@@ -371,6 +373,34 @@ def test_version_2_backup_without_new_optional_sections_is_upgraded_safely():
     assert counts['maciory'] == 1
     assert SowModel.objects.filter(farm=target_farm, ear_tag='LEGACY-SOW').exists()
     assert not MortalityReportModel.objects.filter(farm=target_farm).exists()
+
+
+@pytest.mark.django_db
+def test_version_5_backup_without_plan_start_keeps_legacy_schedule_behavior():
+    source_user = User.objects.create_user(username='legacy-plan-source')
+    source_farm = get_or_create_user_farm(source_user)
+    VaccinationPlanModel.objects.create(
+        farm=source_farm,
+        name='Plan bez daty startu',
+        days_before_farrowing=14,
+        starts_on=date(2026, 7, 28),
+    )
+    archive, _ = build_user_backup(source_user, source_farm)
+    payload = _payload_from_archive(archive)
+    payload['version'] = 5
+    payload['data']['sows.VaccinationPlanModel'][0]['fields'].pop('starts_on')
+
+    target_user = User.objects.create_user(username='legacy-plan-target')
+    target_farm = get_or_create_user_farm(target_user)
+    backup_file = SimpleUploadedFile(
+        'legacy-v5.json',
+        json.dumps(payload).encode(),
+        content_type='application/json',
+    )
+
+    import_user_backup(backup_file, target_farm)
+
+    assert VaccinationPlanModel.objects.get(farm=target_farm).starts_on is None
 
 
 @pytest.mark.django_db

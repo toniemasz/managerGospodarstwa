@@ -43,7 +43,11 @@ def test_sow_number_is_unique_only_for_active_sows_in_same_farm():
 
 
 @pytest.mark.django_db
-def test_vaccination_plan_form_requires_exactly_one_trigger():
+def test_vaccination_plan_form_requires_exactly_one_trigger(monkeypatch):
+    monkeypatch.setattr(
+        "sows.forms.timezone.localdate",
+        lambda: date(2026, 7, 1),
+    )
     no_trigger = VaccinationPlanForm(data={'name': 'Pusta', 'reminder_days_ahead': 7})
     missing_source = VaccinationPlanForm(data={
         'name': 'Po zdarzeniu',
@@ -83,7 +87,11 @@ def test_periodic_vaccination_plan_requires_explicit_first_due_date():
 
 
 @pytest.mark.django_db
-def test_selected_scope_rejects_archived_and_foreign_sows():
+def test_selected_scope_rejects_archived_and_foreign_sows(monkeypatch):
+    monkeypatch.setattr(
+        "sows.forms.timezone.localdate",
+        lambda: date(2026, 7, 1),
+    )
     farm = get_or_create_user_farm(User.objects.create_user(username='form-scope'))
     other_farm = get_or_create_user_farm(User.objects.create_user(username='form-scope-other'))
     active = SowModel.objects.create(farm=farm, ear_tag='ACTIVE')

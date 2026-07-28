@@ -3,7 +3,11 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date, timedelta
 
-from sows.domain.vaccinations import add_vaccination_interval, vaccination_cycle_id
+from sows.domain.vaccinations import (
+    add_vaccination_interval,
+    first_vaccination_date_on_or_after,
+    vaccination_cycle_id,
+)
 from sows.models import VaccinationCycleModel, VaccinationPlanModel
 
 
@@ -95,6 +99,9 @@ class VaccinationScheduleService:
 
         if not target_date or not cycle_id or cycle_id in states:
             return None
+        starts_on = self._effective_starts_on(plan, sow)
+        if starts_on is not None and target_date < starts_on:
+            return None
         days_to_target = (target_date - current_date).days
         if days_to_target > plan.reminder_days_ahead:
             return None
@@ -137,6 +144,15 @@ class VaccinationScheduleService:
                 return None, None
             target_date = add_vaccination_interval(last_event.event_date, value, unit)
 
+        starts_on = self._effective_starts_on(plan, sow)
+        if starts_on is not None and target_date < starts_on:
+            target_date = first_vaccination_date_on_or_after(
+                target_date,
+                starts_on,
+                value,
+                unit,
+            )
+
         while True:
             cycle_id = vaccination_cycle_id(plan.id, target_date)
             state = states.get(cycle_id)
@@ -149,6 +165,12 @@ class VaccinationScheduleService:
             else:
                 base_date = state.scheduled_date
             target_date = add_vaccination_interval(base_date, value, unit)
+
+    @staticmethod
+    def _effective_starts_on(plan, sow) -> date | None:
+        if plan.starts_on is None:
+            return None
+        return max(plan.starts_on, sow.entry_date)
 
     @staticmethod
     def _last_completed_event(plan, sow):

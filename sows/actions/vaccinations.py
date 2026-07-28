@@ -32,6 +32,7 @@ def save_vaccination_plan(*, farm, form) -> VaccinationPlanModel:
 
     farm.__class__.objects.select_for_update().get(pk=farm.pk)
     plan = form.save(commit=False)
+    is_new = plan.pk is None
     plan.farm = farm
     plan.name = plan.name.strip()
     if VaccinationPlanModel.objects.filter(
@@ -41,6 +42,8 @@ def save_vaccination_plan(*, farm, form) -> VaccinationPlanModel:
         raise VaccinationPlanNameConflictError(
             "Taki plan szczepień istnieje już w tym gospodarstwie."
         )
+    if is_new:
+        plan.starts_on = timezone.localdate()
     plan.save()
     form.save_m2m()
     return plan

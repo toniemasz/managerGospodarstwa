@@ -235,7 +235,11 @@ class Command(BaseCommand):
         ]
         plans = {}
         for payload in plan_payloads:
-            plan = VaccinationPlanModel.objects.create(farm=farm, **payload)
+            plan = VaccinationPlanModel.objects.create(
+                farm=farm,
+                starts_on=date(2025, 1, 1),
+                **payload,
+            )
             plans[plan.name] = plan
         return plans
 

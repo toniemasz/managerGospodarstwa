@@ -1,6 +1,8 @@
 import logging
 from datetime import date, timedelta
 
+from django.utils import timezone
+
 from farms.services.settings_service import get_farm_settings
 from sows.domain.rules import FARROWING_ALERT_DAYS_AHEAD, PREGNANCY_CHECK_AFTER_DAYS
 from sows.services.sow_repository import SowRepository
@@ -32,7 +34,7 @@ class SowDashboardService:
         }
 
     def get_dashboard_summary(self) -> dict:
-        today = date.today()
+        today = timezone.localdate()
         sows = self.repository.get_all_sows()
         balances_by_sow = (
             {
@@ -100,7 +102,7 @@ class SowDashboardService:
         update_states: bool = True,
     ) -> dict:
         """Zwraca wspólny zestaw alertów bez liczenia statystyk dashboardu."""
-        current_date = current_date or date.today()
+        current_date = current_date or timezone.localdate()
         sows = sows if sows is not None else self.repository.get_all_sows()
         pregnancy_check_after_days = self._pregnancy_check_after_days()
 
@@ -131,7 +133,7 @@ class SowDashboardService:
         for sow in sows:
             try:
                 sow.update_state_for_date(
-                    date.today(),
+                    timezone.localdate(),
                     pregnancy_check_after_days=self._pregnancy_check_after_days(),
                 )
             except Exception as e:

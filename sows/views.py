@@ -398,7 +398,7 @@ def add_event_view(request, sow_id):
 
     repo = SowRepository(farm=farm)
     sow = repo.get_sow_by_id(sow_id)
-    sow.update_state_for_date(date.today())
+    sow.update_state_for_date(timezone.localdate())
     actions = SowEventActions(farm=farm, user=request.user, repository=repo)
 
     if request.method == 'POST':
@@ -438,7 +438,7 @@ def add_event_view(request, sow_id):
     else:
         requested_event_type = request.GET.get('event_type', '')
         allowed_event_types = {value for value, _label in SowEventModel.EVENT_TYPES}
-        initial = {'event_date': date.today()}
+        initial = {'event_date': timezone.localdate()}
         if requested_event_type in allowed_event_types:
             initial['event_type'] = requested_event_type
         form = SowEventForm(sow_status=sow.status, farm=farm, sow=db_sow, initial=initial)
@@ -504,7 +504,7 @@ def bulk_sow_events_view(request):
             initial=empty_bulk_event_initials(
                 initial_count,
                 event_type=requested_event_type,
-                event_date=date.today() if is_single else None,
+                event_date=timezone.localdate() if is_single else None,
             ),
             form_kwargs={'farm': farm},
         )
@@ -666,7 +666,7 @@ def add_piglet_transfer_view(request):
                 messages.success(request, "Przeniesienie prosiąt zostało zapisane.")
                 return redirect('piglet_transfer_list')
     else:
-        form = PigletTransferForm(farm=farm, initial={'transfer_date': date.today()})
+        form = PigletTransferForm(farm=farm, initial={'transfer_date': timezone.localdate()})
     return render(request, 'sows/piglet_transfer_form.html', {'form': form})
 
 
@@ -806,7 +806,7 @@ def report_mortality_view(request):
         form = MortalityReportForm(
             farm=farm,
             initial={
-                'mortality_date': date.today(),
+                'mortality_date': timezone.localdate(),
                 'mortality_type': request.GET.get('mortality_type', ''),
             },
         )

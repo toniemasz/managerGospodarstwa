@@ -1,7 +1,7 @@
 from django.db import models
 from django.db.models.functions import ExtractYear, Lower, Trim
-from datetime import date
 from decimal import Decimal
+from django.utils import timezone
 
 class PigSaleModel(models.Model):
     CLASS_CHOICES = [
@@ -20,7 +20,7 @@ class PigSaleModel(models.Model):
         related_name='pig_sales',
         verbose_name="Gospodarstwo",
     )
-    sale_date = models.DateField(default=date.today, blank=True, null=True, verbose_name="Data sprzedaży")
+    sale_date = models.DateField(default=timezone.localdate, blank=True, null=True, verbose_name="Data sprzedaży")
     document_number = models.CharField(max_length=50, blank=True, verbose_name="Numer dokumentu")
     tattoo = models.CharField(max_length=50, blank=True, verbose_name="Tatuaż")
     no_settlement = models.BooleanField(default=False, verbose_name="Bez rozliczenia")

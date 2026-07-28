@@ -1,11 +1,10 @@
 # sows/models.py
 
-from datetime import date
-
 from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models.functions import Lower, Trim
+from django.utils import timezone
 
 
 class VaccinationPlanModel(models.Model):
@@ -71,6 +70,12 @@ class VaccinationPlanModel(models.Model):
         verbose_name="Tryb harmonogramu",
     )
     first_due_date = models.DateField(null=True, blank=True, verbose_name="Data pierwszego terminu")
+    starts_on = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Początek obowiązywania planu",
+        help_text="Pierwszy dzień, od którego plan może generować terminy.",
+    )
     scope = models.CharField(
         max_length=10,
         choices=SCOPE_CHOICES,
@@ -123,7 +128,7 @@ class SowModel(models.Model):
         verbose_name="Gospodarstwo",
     )
     ear_tag = models.CharField(max_length=50)
-    entry_date = models.DateField(default=date.today) # Domyślnie dzisiejsza data
+    entry_date = models.DateField(default=timezone.localdate) # Domyślnie dzisiejsza data
     created_at = models.DateTimeField(auto_now_add=True) # Automatyczna data utworzenia
     is_archived = models.BooleanField(default=False, verbose_name="Czy zarchiwizowana?")
     archived_at = models.DateTimeField(null=True, blank=True)

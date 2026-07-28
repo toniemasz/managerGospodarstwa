@@ -150,7 +150,8 @@ def test_delivery_ui_creates_separate_fifo_batches_and_manual_serving(ready_feed
     first = client.post(reverse("add_ready_feed_delivery", args=[product.pk]), {
         "date": "2026-07-01",
         "quantity_kg": "200.00",
-        "price_per_kg": "1.50000",
+        "price_per_kg": "1500",
+        "price_per_kg_unit": "t",
     })
     second = client.post(reverse("add_ready_feed_delivery", args=[product.pk]), {
         "date": "2026-07-02",

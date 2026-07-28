@@ -6,6 +6,7 @@ from datetime import date
 
 from django.core.exceptions import ValidationError
 from django.db.models import Exists, OuterRef, Q, Sum
+from django.utils import timezone
 
 from sows.models import MortalityReportModel, PigletTransferModel, SowEventModel
 
@@ -220,7 +221,7 @@ class PigletCareService:
         return not weanings.exists()
 
     def active_farrowings(self, *, as_of: date | None = None) -> list[SowEventModel]:
-        as_of = as_of or date.today()
+        as_of = as_of or timezone.localdate()
         later_farrowings = SowEventModel.objects.filter(
             sow_id=OuterRef("sow_id"),
             event_type="FARROWING",
@@ -249,7 +250,7 @@ class PigletCareService:
         )
 
     def active_balances(self, *, as_of: date | None = None) -> list[PigletCareBalance]:
-        as_of = as_of or date.today()
+        as_of = as_of or timezone.localdate()
         farrowings = self.active_farrowings(as_of=as_of)
         if not farrowings:
             return []
@@ -279,7 +280,7 @@ class PigletCareService:
         ]
 
     def current_balance_for_sow(self, sow, *, as_of: date | None = None) -> PigletCareBalance | None:
-        as_of = as_of or date.today()
+        as_of = as_of or timezone.localdate()
         try:
             farrowing = self.cycle_for_sow(sow=sow, on_date=as_of, require_active=True)
         except PigletCareError:

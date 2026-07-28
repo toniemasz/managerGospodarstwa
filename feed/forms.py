@@ -7,7 +7,7 @@ from .models import IngredientModel, RecipeModel, RecipeItemModel, DeliveryModel
     IngredientPriceConfigModel, ProductionIngredientUsageModel, RecipeVersionModel, RecipeVersionItemModel, \
     FeedProductModel
 from feed.domain.rules import LOW_STOCK_THRESHOLD_KG
-from common.forms import KilogramStorageFormMixin
+from common.forms import KilogramStorageFormMixin, PricePerKilogramStorageFormMixin
 from common.units import format_mass
 
 
@@ -168,8 +168,13 @@ def recipe_version_item_formset_factory(*, extra=0):
     )
 
 
-class DeliveryForm(KilogramStorageFormMixin, forms.ModelForm):
+class DeliveryForm(
+    PricePerKilogramStorageFormMixin,
+    KilogramStorageFormMixin,
+    forms.ModelForm,
+):
     mass_fields = ('quantity_kg',)
+    price_per_kg_fields = ('price_per_kg',)
     class Meta:
         model = DeliveryModel
         fields = ['date', 'ingredient', 'quantity_kg', 'price_per_kg']
@@ -189,13 +194,23 @@ class DeliveryForm(KilogramStorageFormMixin, forms.ModelForm):
             _apply_widget_class(field)
 
     def has_changed(self):
-        unit_field = self.mass_unit_field_name('quantity_kg')
-        return any(field_name != unit_field for field_name in self.changed_data)
+        technical_fields = {
+            self.mass_unit_field_name('quantity_kg'),
+            self.price_unit_field_name('price_per_kg'),
+        }
+        return any(
+            field_name not in technical_fields
+            for field_name in self.changed_data
+        )
 
     def clean(self):
         cleaned_data = super().clean()
         quantity = cleaned_data.get('quantity_kg')
-        if self.instance.pk and quantity is not None:
+        if (
+            self.instance.pk
+            and quantity is not None
+            and 'quantity_kg' in self.changed_data
+        ):
             allocated = ProductionIngredientUsageModel.objects.filter(
                 delivery=self.instance,
             ).aggregate(total=Sum('quantity_kg'))['total'] or Decimal('0.00')
@@ -210,6 +225,7 @@ class DeliveryForm(KilogramStorageFormMixin, forms.ModelForm):
             self.instance.pk
             and ingredient is not None
             and ingredient.pk != self.instance.ingredient_id
+            and 'ingredient' in self.changed_data
             and ProductionIngredientUsageModel.objects.filter(delivery=self.instance).exists()
         ):
             self.add_error(
@@ -298,11 +314,16 @@ class PurchasedReadyFeedProductForm(forms.Form):
         return name
 
 
-class ReadyFeedDeliveryForm(KilogramStorageFormMixin, forms.Form):
+class ReadyFeedDeliveryForm(
+    PricePerKilogramStorageFormMixin,
+    KilogramStorageFormMixin,
+    forms.Form,
+):
     mass_fields = ('quantity_kg',)
+    price_per_kg_fields = ('price_per_kg',)
     date = forms.DateField(label="Data dostawy", widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}))
     quantity_kg = forms.DecimalField(label="Ilość", min_value=Decimal("0.01"), max_digits=12, decimal_places=2)
-    price_per_kg = forms.DecimalField(label="Cena za kg", min_value=Decimal("0.00001"), max_digits=14, decimal_places=5)
+    price_per_kg = forms.DecimalField(label="Cena", min_value=Decimal("0.00001"), max_digits=14, decimal_places=5)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

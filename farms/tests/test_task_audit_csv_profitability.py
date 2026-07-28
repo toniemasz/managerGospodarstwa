@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timezone as datetime_timezone
 from decimal import Decimal
 from io import BytesIO
 
@@ -65,7 +65,20 @@ def test_task_center_and_audit_log_are_isolated(client, two_farms):
 @pytest.mark.django_db
 def test_csv_export_and_atomic_import_round_trip(two_farms):
     _, source, _, target = two_farms
-    sow = SowModel.objects.create(farm=source, ear_tag="CSV-1")
+    archived_at = datetime(
+        2026,
+        7,
+        28,
+        12,
+        30,
+        tzinfo=datetime_timezone.utc,
+    )
+    sow = SowModel.objects.create(
+        farm=source,
+        ear_tag="CSV-1",
+        is_archived=True,
+        archived_at=archived_at,
+    )
     plan = VaccinationPlanModel.objects.create(
         farm=source,
         name="CSV szczepienie",
@@ -73,6 +86,7 @@ def test_csv_export_and_atomic_import_round_trip(two_farms):
         interval_unit="WEEKS",
         schedule_mode="FIXED",
         first_due_date=date.today(),
+        starts_on=date(2026, 1, 15),
         scope="SELECTED",
     )
     plan.selected_sows.add(sow)
@@ -116,10 +130,15 @@ def test_csv_export_and_atomic_import_round_trip(two_farms):
     assert counts["maciory"] == 1
     assert counts["cykle szczepień"] == 1
     assert SowModel.objects.filter(farm=target, ear_tag=sow.ear_tag).exists()
+    assert (
+        SowModel.objects.get(farm=target, ear_tag=sow.ear_tag).archived_at
+        == archived_at
+    )
     assert IngredientModel.objects.filter(farm=target, name="Pszenica").exists()
     assert CostModel.objects.filter(farm=target, description="Koszt z CSV", amount=Decimal("123.45")).exists()
     restored_plan = VaccinationPlanModel.objects.get(farm=target)
     assert restored_plan.interval_value == 6
+    assert restored_plan.starts_on == date(2026, 1, 15)
     assert list(restored_plan.selected_sows.values_list("ear_tag", flat=True)) == ["CSV-1"]
     assert VaccinationCycleModel.objects.get(plan=restored_plan).note == "CSV test"
     restored_production = ProductionModel.objects.get(recipe__farm=target, recipe__name=recipe.name)

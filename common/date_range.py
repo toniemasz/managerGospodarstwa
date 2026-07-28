@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, timedelta
 
+from django.utils import timezone
+
 
 @dataclass
 class DateRange:
@@ -29,7 +31,7 @@ PERIOD_OPTIONS = [
 
 
 def parse_date_range(params, default_period: str = '6m') -> DateRange:
-    today = date.today()
+    today = timezone.localdate()
     period = params.get('period') or default_period
     if period not in {option[0] for option in PERIOD_OPTIONS}:
         period = default_period

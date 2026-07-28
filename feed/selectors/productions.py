@@ -57,6 +57,8 @@ def default_production_quantity(farm=None) -> Decimal:
 
 def default_production_initial(farm, *, selected_recipe=None, current_datetime=None) -> dict:
     current_datetime = current_datetime or timezone.now()
+    if timezone.is_aware(current_datetime):
+        current_datetime = timezone.localtime(current_datetime)
     initial = {
         "quantity_kg": default_production_quantity(farm),
         "date": current_datetime.date(),
