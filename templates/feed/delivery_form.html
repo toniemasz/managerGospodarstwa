@@ -45,7 +45,8 @@
                             <th>Składnik</th>
                             <th>Ilość</th>
                             <th>Jednostka</th>
-                            <th>Cena (PLN/kg)</th>
+                            <th>Cena</th>
+                            <th>Jednostka ceny</th>
                             <th>Usuń</th>
                         </tr>
                     </thead>
@@ -56,7 +57,8 @@
                             <td data-label="Składnik">{{ form.ingredient }}{{ form.ingredient.errors }}</td>
                             <td data-label="Ilość">{{ form.quantity_kg }}{{ form.quantity_kg.errors }}</td>
                             <td data-label="Jednostka">{{ form.quantity_kg_unit }}{{ form.quantity_kg_unit.errors }}</td>
-                            <td data-label="Cena (PLN/kg)">{{ form.price_per_kg }}{{ form.price_per_kg.errors }}</td>
+                            <td data-label="Cena">{{ form.price_per_kg }}{{ form.price_per_kg.errors }}</td>
+                            <td data-label="Jednostka ceny">{{ form.price_unit }}{{ form.price_unit.errors }}</td>
                             <td data-label="Usuń" class="delete-cell">
                                 <span class="hidden">{{ form.DELETE }}</span>
                                 <button type="button" class="link-button-danger remove-delivery-row">Usuń</button>
@@ -74,7 +76,8 @@
                     <td data-label="Składnik">{{ formset.empty_form.ingredient }}</td>
                     <td data-label="Ilość">{{ formset.empty_form.quantity_kg }}</td>
                     <td data-label="Jednostka">{{ formset.empty_form.quantity_kg_unit }}</td>
-                    <td data-label="Cena (PLN/kg)">{{ formset.empty_form.price_per_kg }}</td>
+                    <td data-label="Cena">{{ formset.empty_form.price_per_kg }}</td>
+                    <td data-label="Jednostka ceny">{{ formset.empty_form.price_unit }}</td>
                     <td data-label="Usuń" class="delete-cell">
                         <span class="hidden">{{ formset.empty_form.DELETE }}</span>
                         <button type="button" class="link-button-danger remove-delivery-row">Usuń</button>
