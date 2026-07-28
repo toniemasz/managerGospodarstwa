@@ -30,7 +30,7 @@ MAX_CSV_ARCHIVE_SIZE = 25 * 1024 * 1024
 SCHEMAS = {
     "sows.csv": ("id", "ear_tag", "entry_date", "is_archived", "archived_at"),
     "sow_events.csv": ("id", "sow_id", "event_type", "event_date", "details", "vaccination_plan_id", "vaccine_name", "cycle_id", "scheduled_date"),
-    "vaccination_plans.csv": ("id", "name", "days_before_farrowing", "days_after_event", "event_source", "interval_months", "interval_value", "interval_unit", "schedule_mode", "first_due_date", "scope", "is_active", "requires_configuration", "selected_sow_ids", "excluded_sow_ids", "reminder_days_ahead"),
+    "vaccination_plans.csv": ("id", "name", "days_before_farrowing", "days_after_event", "event_source", "interval_months", "interval_value", "interval_unit", "schedule_mode", "first_due_date", "starts_on", "scope", "is_active", "requires_configuration", "selected_sow_ids", "excluded_sow_ids", "reminder_days_ahead"),
     "vaccination_cycles.csv": ("id", "plan_id", "sow_id", "cycle_id", "scheduled_date", "status", "completed_at", "skipped_at", "note"),
     "piglet_transfers.csv": ("id", "source_farrowing_id", "target_farrowing_id", "quantity", "transfer_date", "note", "canceled_at", "cancellation_note"),
     "mortality.csv": ("id", "mortality_type", "sow_id", "farrowing_id", "mortality_date", "quantity", "reason", "note", "source"),
@@ -50,7 +50,7 @@ OPTIONAL_COLUMNS = {
     "sow_events.csv": {"vaccination_plan_id", "vaccine_name", "cycle_id", "scheduled_date"},
     "vaccination_plans.csv": {
         "interval_value", "interval_unit", "schedule_mode", "first_due_date", "scope",
-        "is_active", "requires_configuration", "selected_sow_ids", "excluded_sow_ids",
+        "starts_on", "is_active", "requires_configuration", "selected_sow_ids", "excluded_sow_ids",
     },
     "mortality.csv": {"farrowing_id"},
 }
@@ -403,6 +403,7 @@ def import_csv_archive(uploaded_file, farm) -> dict[str, int]:
             interval_unit=row.get("interval_unit") or ("MONTHS" if interval_value else None),
             schedule_mode=row.get("schedule_mode") or ("FROM_LAST_COMPLETED" if interval_value else None),
             first_due_date=first_due_date,
+            starts_on=_date(row.get("starts_on"), nullable=True),
             scope=row.get("scope") or "ALL",
             is_active=_bool(row["is_active"]) if row.get("is_active") not in (None, "") else not (interval_value and not first_due_date),
             requires_configuration=_bool(row["requires_configuration"]) if row.get("requires_configuration") not in (None, "") else bool(interval_value and not first_due_date),

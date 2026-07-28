@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
-
 from django.db import transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 
 from common.cache import invalidate_farm_cache_on_commit
 from sows.domain.sow_state_machine import SowStateMachine
@@ -80,7 +79,7 @@ class SowEventActions:
         results_by_sow_id: dict,
         event_date=None,
     ) -> list[SowEventModel]:
-        event_date = event_date or date.today()
+        event_date = event_date or timezone.localdate()
         events = []
 
         for sow in sows:
@@ -125,7 +124,7 @@ class SowEventActions:
                 performed_date=event_date,
                 note=note,
             )
-        event_date = event_date or date.today()
+        event_date = event_date or timezone.localdate()
         events = []
         details = {
             "vaccine_name": vaccine_name,

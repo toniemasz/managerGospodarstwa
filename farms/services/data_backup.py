@@ -44,8 +44,8 @@ from sows.models import (
 )
 
 
-BACKUP_FORMAT_VERSION = 5
-SUPPORTED_USER_BACKUP_VERSIONS = {1, 2, 3, 4, 5}
+BACKUP_FORMAT_VERSION = 6
+SUPPORTED_USER_BACKUP_VERSIONS = {1, 2, 3, 4, 5, 6}
 
 
 def _normalize_mortality_type(value):

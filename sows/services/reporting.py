@@ -5,6 +5,7 @@ from datetime import date
 from decimal import Decimal
 
 from django.db.models import Count, Sum
+from django.utils import timezone
 
 from sows.models import MortalityReportModel, PigletTransferModel, SowEventModel, SowModel
 from sows.selectors.mortality import mortality_summary, post_weaning_stock_summary
@@ -219,6 +220,6 @@ class SowReportingService:
             return date_from or date.min, date_to or date.max
         if months_limit == 0:
             return date.min, date.max
-        today = date.today()
+        today = timezone.localdate()
         month_index = today.year * 12 + today.month - 1 - months_limit
         return date(month_index // 12, month_index % 12 + 1, 1), today

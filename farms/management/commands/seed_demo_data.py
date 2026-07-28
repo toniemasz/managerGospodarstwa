@@ -7,6 +7,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management import BaseCommand, CommandError, call_command
 from django.db import transaction
+from django.utils import timezone
 
 from costs.models import CostCategoryModel, CostModel
 from farms.services.farm_service import get_or_create_user_farm
@@ -75,11 +76,11 @@ class Command(BaseCommand):
         farm.save(update_fields=["name"])
         get_farm_settings(farm)
 
-        today = date.today()
+        today = timezone.localdate()
         plans = [
-            {"name": "Parwowiroza przed oproszeniem", "days_before_farrowing": 21},
-            {"name": "E. coli po oproszeniu", "days_after_event": 7, "event_source": "FARROWING"},
-            {"name": "Parwowiroza po inseminacji", "days_after_event": 14, "event_source": "INSEMINATION"},
+            {"name": "Parwowiroza przed oproszeniem", "days_before_farrowing": 21, "starts_on": today},
+            {"name": "E. coli po oproszeniu", "days_after_event": 7, "event_source": "FARROWING", "starts_on": today},
+            {"name": "Parwowiroza po inseminacji", "days_after_event": 14, "event_source": "INSEMINATION", "starts_on": today},
             {
                 "name": "Różyca cykliczna",
                 "interval_months": 4,
@@ -87,6 +88,7 @@ class Command(BaseCommand):
                 "interval_unit": "MONTHS",
                 "schedule_mode": "FROM_LAST_COMPLETED",
                 "first_due_date": today,
+                "starts_on": today,
             },
         ]
         for data in plans:
@@ -169,7 +171,6 @@ class Command(BaseCommand):
                 defaults={"quantity_kg": Decimal("2000") + Decimal(index % 3) * Decimal("500"), "status": status},
             )
             if status == ProductionModel.Statuses.COMPLETED and not production.completed_at:
-                from django.utils import timezone
                 production.completed_at = timezone.now() - timedelta(days=index * 9)
                 production.save(update_fields=["completed_at"])
 

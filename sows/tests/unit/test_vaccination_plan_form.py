@@ -1,11 +1,21 @@
 from datetime import date
+from unittest.mock import patch
 
 import pytest
 from django.contrib.auth.models import User
-
 from farms.services.farm_service import get_or_create_user_farm
+from sows.actions.vaccinations import save_vaccination_plan
 from sows.forms import VaccinationPlanForm
 from sows.models import SowModel, VaccinationPlanModel
+
+
+LOCAL_TODAY = date(2026, 7, 12)
+
+
+@pytest.fixture(autouse=True)
+def fixed_local_today():
+    with patch("sows.forms.timezone.localdate", return_value=LOCAL_TODAY):
+        yield
 
 
 @pytest.fixture
@@ -165,6 +175,58 @@ def test_interval_plan_is_valid_and_sets_legacy_interval_months(farm):
     assert plan.interval_months == 4
     assert plan.schedule_mode == VaccinationPlanModel.SCHEDULE_FIXED
     assert plan.first_due_date == date(2026, 7, 12)
+
+
+@pytest.mark.django_db
+def test_new_interval_plan_defaults_to_local_today_and_rejects_earlier_date(farm):
+    initial_form = VaccinationPlanForm(farm=farm)
+    invalid = VaccinationPlanForm(
+        data=vaccination_plan_data(
+            trigger_type='INTERVAL',
+            days_before_farrowing='',
+            interval_value='1',
+            interval_unit=VaccinationPlanModel.INTERVAL_MONTHS,
+            schedule_mode=VaccinationPlanModel.SCHEDULE_FIXED,
+            first_due_date='2026-07-11',
+        ),
+        farm=farm,
+    )
+
+    assert initial_form['first_due_date'].value() == LOCAL_TODAY
+    assert invalid.is_valid() is False
+    assert (
+        "Data pierwszego terminu nowego planu nie może być wcześniejsza"
+        in invalid.errors['first_due_date'][0]
+    )
+
+
+@pytest.mark.django_db
+def test_action_sets_local_start_only_when_plan_is_created(farm):
+    form = VaccinationPlanForm(data=vaccination_plan_data(), farm=farm)
+    assert form.is_valid(), form.errors
+
+    with patch(
+        "sows.actions.vaccinations.timezone.localdate",
+        return_value=LOCAL_TODAY,
+    ):
+        plan = save_vaccination_plan(farm=farm, form=form)
+
+    assert plan.starts_on == LOCAL_TODAY
+
+    edit_form = VaccinationPlanForm(
+        data=vaccination_plan_data(name="Zmieniona nazwa"),
+        instance=plan,
+        farm=farm,
+    )
+    assert edit_form.is_valid(), edit_form.errors
+    later = LOCAL_TODAY.replace(day=20)
+    with patch(
+        "sows.actions.vaccinations.timezone.localdate",
+        return_value=later,
+    ):
+        edited = save_vaccination_plan(farm=farm, form=edit_form)
+
+    assert edited.starts_on == LOCAL_TODAY
 
 
 @pytest.mark.django_db

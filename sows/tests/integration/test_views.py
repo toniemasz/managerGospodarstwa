@@ -6,6 +6,7 @@ from django.contrib.messages import get_messages
 from django.urls import reverse
 from django.contrib.auth.models import User
 from django.test import override_settings
+from django.utils import timezone
 from datetime import date, timedelta
 
 from farms.models import AuditLogModel
@@ -95,6 +96,38 @@ class TestSowViews:
         assert 'USG zaległe o 5 dni' in content
         assert 'Aktywne plany szczepień' in content
         assert 'Plan całego stada' in content
+
+    def test_sow_detail_does_not_show_pre_start_vaccination_as_next_task(
+        self,
+        setup_client,
+    ):
+        today = timezone.localdate()
+        sow = SowModel.objects.create(
+            ear_tag="DETAIL-OLD-VACCINATION",
+            farm=setup_client.farm,
+            entry_date=today - timedelta(days=120),
+        )
+        SowEventModel.objects.create(
+            sow=sow,
+            event_type="FARROWING",
+            event_date=today - timedelta(days=60),
+        )
+        VaccinationPlanModel.objects.create(
+            farm=setup_client.farm,
+            name="Nowy plan bez historii",
+            days_after_event=5,
+            event_source="FARROWING",
+            starts_on=today,
+            scope=VaccinationPlanModel.SCOPE_ALL,
+        )
+
+        response = setup_client.get(reverse('sow_detail', args=[sow.id]))
+        content = response.content.decode()
+
+        assert response.status_code == 200
+        assert "Szczepienie: Nowy plan bez historii" not in content
+        assert "Brak zaplanowanej czynności wymagającej uwagi." in content
+        assert "Nowy plan bez historii" in content
 
     def test_archived_sow_detail_hides_new_event_action_and_keeps_history_correction(self, setup_client):
         sow = SowModel.objects.create(

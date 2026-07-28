@@ -12,6 +12,11 @@ MASS_UNIT_CHOICES = (
     (KILOGRAM, "kg"),
     (TONNE, "t"),
 )
+PRICE_PER_KG_QUANT = Decimal("0.00001")
+PRICE_UNIT_CHOICES = (
+    (KILOGRAM, "zł/kg"),
+    (TONNE, "zł/t"),
+)
 
 
 def as_decimal(value) -> Decimal:
@@ -40,6 +45,39 @@ def from_kilograms(value, unit: str) -> Decimal:
     if unit == KILOGRAM:
         return amount
     raise ValueError("Nieprawidłowa jednostka masy.")
+
+
+def _as_price_decimal(value) -> Decimal:
+    try:
+        normalized = str(value).strip().replace("\xa0", " ").replace(" ", "").replace(",", ".")
+        return Decimal(normalized)
+    except (InvalidOperation, TypeError, ValueError) as error:
+        raise ValueError("Podaj prawidłową cenę.") from error
+
+
+def to_price_per_kg(value, unit: str) -> Decimal:
+    """Przelicza dodatnią cenę z wybranej jednostki do kanonicznego zł/kg."""
+
+    amount = _as_price_decimal(value)
+    if unit == TONNE:
+        amount /= KILOGRAMS_PER_TONNE
+    elif unit != KILOGRAM:
+        raise ValueError("Nieprawidłowa jednostka ceny.")
+    amount = amount.quantize(PRICE_PER_KG_QUANT, rounding=ROUND_HALF_UP)
+    if amount <= 0:
+        raise ValueError("Cena musi być większa od zera.")
+    return amount
+
+
+def from_price_per_kg(value, unit: str) -> Decimal:
+    """Przelicza kanoniczne zł/kg do wartości prezentowanej w wybranej jednostce."""
+
+    amount = _as_price_decimal(value)
+    if unit == TONNE:
+        return amount * KILOGRAMS_PER_TONNE
+    if unit == KILOGRAM:
+        return amount
+    raise ValueError("Nieprawidłowa jednostka ceny.")
 
 
 def preferred_mass_unit(value_kg) -> str:

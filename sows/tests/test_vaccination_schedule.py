@@ -9,7 +9,11 @@ from django.http import Http404
 from farms.services.farm_service import get_or_create_user_farm
 from sows.actions.vaccinations import VaccinationActions
 from sows.actions.events import SowEventActions
-from sows.domain.vaccinations import add_vaccination_interval, vaccination_cycle_id
+from sows.domain.vaccinations import (
+    add_vaccination_interval,
+    first_vaccination_date_on_or_after,
+    vaccination_cycle_id,
+)
 from sows.models import (
     SowEventModel,
     SowModel,
@@ -57,6 +61,15 @@ def reminders(farm, current_date):
 )
 def test_add_vaccination_interval_uses_calendar_units(base_date, value, unit, expected):
     assert add_vaccination_interval(base_date, value, unit) == expected
+
+
+def test_old_periodic_date_is_advanced_without_year_by_year_iteration():
+    assert first_vaccination_date_on_or_after(
+        date(1900, 1, 31),
+        date(2026, 7, 28),
+        1,
+        VaccinationPlanModel.INTERVAL_MONTHS,
+    ) == date(2026, 7, 28)
 
 
 @pytest.mark.django_db
@@ -126,6 +139,138 @@ def test_overdue_cycle_remains_visible_until_closed(farm):
     assert item["target_date"] == date(2024, 1, 1)
     assert item["status"] == "overdue"
     assert item["status_label"] == "Zaległe"
+
+
+@pytest.mark.django_db
+def test_periodic_plan_ignores_pre_start_cycles_but_keeps_real_overdue(farm):
+    SowModel.objects.create(
+        farm=farm,
+        ear_tag="START-PERIODIC",
+        entry_date=date(2026, 1, 1),
+    )
+    create_plan(
+        farm,
+        first_due_date=date(2026, 7, 10),
+        starts_on=date(2026, 7, 28),
+        interval_value=10,
+        interval_unit=VaccinationPlanModel.INTERVAL_DAYS,
+        reminder_days_ahead=7,
+    )
+
+    before_due = reminders(farm, date(2026, 7, 28))[0]
+    overdue = reminders(farm, date(2026, 8, 5))[0]
+
+    assert before_due["target_date"] == date(2026, 7, 30)
+    assert before_due["status"] == "upcoming"
+    assert overdue["target_date"] == date(2026, 7, 30)
+    assert overdue["status"] == "overdue"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("event_type", "event_date", "plan_values"),
+    [
+        (
+            "INSEMINATION",
+            date(2026, 7, 1),
+            {"days_after_event": 10, "event_source": "INSEMINATION"},
+        ),
+        (
+            "FARROWING",
+            date(2026, 7, 1),
+            {"days_after_event": 10, "event_source": "FARROWING"},
+        ),
+    ],
+)
+def test_after_event_plan_does_not_restore_pre_start_due_date(
+    farm,
+    event_type,
+    event_date,
+    plan_values,
+):
+    sow = SowModel.objects.create(
+        farm=farm,
+        ear_tag=f"OLD-{event_type}",
+        entry_date=date(2026, 1, 1),
+    )
+    SowEventModel.objects.create(
+        sow=sow,
+        event_type=event_type,
+        event_date=event_date,
+    )
+    create_plan(
+        farm,
+        interval_value=None,
+        interval_unit=None,
+        schedule_mode=None,
+        first_due_date=None,
+        starts_on=date(2026, 7, 28),
+        **plan_values,
+    )
+
+    assert reminders(farm, date(2026, 8, 5)) == []
+    assert not VaccinationCycleModel.objects.exists()
+    assert not SowEventModel.objects.filter(event_type="VACCINATION").exists()
+
+
+@pytest.mark.django_db
+def test_old_event_can_generate_due_date_on_or_after_plan_start(farm):
+    sow = SowModel.objects.create(
+        farm=farm,
+        ear_tag="FUTURE-FROM-OLD",
+        entry_date=date(2026, 1, 1),
+    )
+    SowEventModel.objects.create(
+        sow=sow,
+        event_type="INSEMINATION",
+        event_date=date(2026, 7, 20),
+    )
+    create_plan(
+        farm,
+        interval_value=None,
+        interval_unit=None,
+        schedule_mode=None,
+        first_due_date=None,
+        starts_on=date(2026, 7, 28),
+        days_after_event=16,
+        event_source="INSEMINATION",
+        reminder_days_ahead=10,
+    )
+
+    item = reminders(farm, date(2026, 7, 28))[0]
+
+    assert item["target_date"] == date(2026, 8, 5)
+
+
+@pytest.mark.django_db
+def test_before_farrowing_plan_ignores_due_date_before_start(farm):
+    sow = SowModel.objects.create(
+        farm=farm,
+        ear_tag="BEFORE-FARROWING-START",
+        entry_date=date(2026, 1, 1),
+    )
+    SowEventModel.objects.create(
+        sow=sow,
+        event_type="INSEMINATION",
+        event_date=date(2026, 4, 20),
+    )
+    SowEventModel.objects.create(
+        sow=sow,
+        event_type="PREGNANCY_CHECK",
+        event_date=date(2026, 5, 20),
+        details={"result": "TAK"},
+    )
+    create_plan(
+        farm,
+        interval_value=None,
+        interval_unit=None,
+        schedule_mode=None,
+        first_due_date=None,
+        starts_on=date(2026, 7, 28),
+        days_before_farrowing=21,
+    )
+
+    assert reminders(farm, date(2026, 8, 1)) == []
 
 
 @pytest.mark.django_db

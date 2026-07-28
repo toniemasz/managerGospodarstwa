@@ -10,6 +10,7 @@ from costs.models import CostModel
 from farms.models import AuditLogModel
 from farms.services.farm_service import get_or_create_user_farm
 from farms.services.settings_service import get_farm_settings
+from farms.services.task_center import TaskCenterService
 from farms.services.today_dashboard import TodayDashboardService
 from feed.models import IngredientModel
 from sales.models import PigSaleModel
@@ -126,6 +127,47 @@ def test_today_dashboard_loads_task_cards_kpis_recent_events_and_is_farm_scoped(
     assert "TODAY-COST" in content
     assert "SECRET-SOW" not in content
     assert "SECRET-SALE" not in content
+
+
+@pytest.mark.django_db
+def test_pre_start_vaccination_is_absent_from_dashboard_and_task_center(
+    today_dashboard_client,
+):
+    today = timezone.localdate()
+    farm = today_dashboard_client.farm
+    sow = SowModel.objects.create(
+        farm=farm,
+        ear_tag="HISTORYCZNE-SZCZEPIENIE",
+        entry_date=today - timedelta(days=120),
+    )
+    SowEventModel.objects.create(
+        sow=sow,
+        event_type="FARROWING",
+        event_date=today - timedelta(days=60),
+    )
+    VaccinationPlanModel.objects.create(
+        farm=farm,
+        name="Plan od dzisiaj",
+        days_after_event=5,
+        event_source="FARROWING",
+        starts_on=today,
+        reminder_days_ahead=7,
+    )
+
+    dashboard = today_dashboard_client.get(reverse("modules_home"))
+    task_center = TaskCenterService(farm).get_tasks()
+    vaccination_tasks = [
+        item
+        for item in task_center["tabs"]["production"]["items"]
+        if item["metadata"].get("kind") == "vaccination"
+    ]
+
+    assert dashboard.status_code == 200
+    assert (
+        "Szczepienie maciory HISTORYCZNE-SZCZEPIENIE"
+        not in dashboard.content.decode()
+    )
+    assert vaccination_tasks == []
 
 
 @pytest.mark.django_db

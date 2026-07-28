@@ -79,6 +79,8 @@ class VaccinationPlanForm(forms.ModelForm):
     def __init__(self, *args, farm=None, **kwargs):
         self.farm = farm
         super().__init__(*args, **kwargs)
+        if not self.is_bound and not self.instance.pk:
+            self.initial.setdefault('first_due_date', timezone.localdate())
         self.fields['scope'].required = False
         self.fields['scope'].initial = VaccinationPlanModel.SCOPE_ALL
         if self.farm is not None:
@@ -191,6 +193,23 @@ class VaccinationPlanForm(forms.ModelForm):
             for field_name, error_message in required_interval_fields:
                 if cleaned_data.get(field_name) in (None, ''):
                     self.add_error(field_name, error_message)
+
+            starts_on = (
+                self.instance.starts_on
+                if self.instance.pk
+                else timezone.localdate()
+            )
+            first_due_date = cleaned_data.get('first_due_date')
+            if (
+                starts_on is not None
+                and first_due_date is not None
+                and first_due_date < starts_on
+            ):
+                self.add_error(
+                    'first_due_date',
+                    "Data pierwszego terminu nowego planu nie może być "
+                    "wcześniejsza niż data rozpoczęcia planu.",
+                )
 
             cleaned_data['days_before_farrowing'] = None
             cleaned_data['days_after_event'] = None
