@@ -65,7 +65,7 @@
                 <small>Tony paszy na tonę sprzedanej wagi żywej.</small>
             </div>
             <div class="stat-tile"><span>Koszt paszy/kg żywej</span><strong>{{ feed_cost_per_live_kg|smart_unit:"zł" }}</strong></div>
-            <div class="stat-tile"><span>Koszt całkowity/kg żywej</span><strong>{{ total_cost_per_live_kg|smart_unit:"zł" }}</strong></div>
+            <div class="stat-tile"><span>Całkowity koszt na kg wagi żywej</span><strong>{{ total_cost_per_live_kg|smart_unit:"zł/kg" }}</strong></div>
             <div class="stat-tile"><span>Sprzedaż brutto/kg żywej</span><strong>{{ gross_per_live_kg|smart_unit:"zł" }}</strong></div>
         </div>
         {% else %}

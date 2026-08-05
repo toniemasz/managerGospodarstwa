@@ -53,6 +53,64 @@ class CostService:
             "categories": category_rows,
         }
 
+    @staticmethod
+    def grouped_history(queryset) -> dict:
+        """Buduje podsumowanie i historię kategorii z jednego zestawu kosztów."""
+        costs = sorted(
+            queryset,
+            key=lambda cost: (cost.date, cost.pk),
+            reverse=True,
+        )
+        groups = {}
+        total = Decimal("0.00")
+        paid = Decimal("0.00")
+        unpaid = Decimal("0.00")
+
+        for cost in costs:
+            amount = cost.amount or Decimal("0.00")
+            total += amount
+            if cost.is_paid:
+                paid += amount
+            else:
+                unpaid += amount
+
+            group = groups.setdefault(
+                cost.category_id,
+                {
+                    "category_id": cost.category_id,
+                    "category__name": cost.category.name if cost.category_id else None,
+                    "name": cost.category.name if cost.category_id else "Bez kategorii",
+                    "total": Decimal("0.00"),
+                    "count": 0,
+                    "latest_date": cost.date,
+                    "costs": [],
+                },
+            )
+            group["total"] += amount
+            group["count"] += 1
+            group["costs"].append(cost)
+
+        category_groups = sorted(
+            groups.values(),
+            key=lambda group: (
+                -group["total"],
+                group["name"].casefold(),
+                group["category_id"] or 0,
+            ),
+        )
+        return {
+            "costs": costs,
+            "category_groups": category_groups,
+            "summary": {
+                "total": total,
+                "paid": paid,
+                "unpaid": unpaid,
+                "count": len(costs),
+                "largest_category": category_groups[0] if category_groups else None,
+                "categories": category_groups,
+            },
+        }
+
     def categories(self, *, include_inactive=True):
         queryset = CostCategoryModel.objects.filter(farm=self.farm)
         if not include_inactive:

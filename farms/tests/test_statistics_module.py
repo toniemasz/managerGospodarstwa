@@ -82,9 +82,75 @@ def test_statistics_service_calculates_feed_sales_and_profitability(statistics_f
     assert result["costs"]["total"] == Decimal("2000.00")
     assert result["additional_costs"]["total"] == Decimal("500.00")
     assert result["profitability"]["net_result"] == Decimal("6000.00")
+    assert result["profitability"]["total_cost_per_live_kg"] == Decimal("2000") / Decimal("1200")
     assert result["feed_efficiency"]["feed_to_live_weight_ratio"] == Decimal("0.8333333333333333333333333333")
     assert result["production"]["completed_count"] == 1
     assert result["recipe_ranking"][0]["recipe_name"] == "Grower statystyczny"
+
+
+@pytest.mark.django_db
+def test_total_cost_per_live_kg_uses_cost_registry_and_matching_sales_period(statistics_farms):
+    _, farm, _ = statistics_farms
+    manual_category = CostCategoryModel.objects.create(farm=farm, name="Weterynarz")
+    feed_category = CostCategoryModel.objects.create(farm=farm, name="Pasza")
+    CostModel.objects.create(
+        farm=farm,
+        category=manual_category,
+        date=date(2026, 7, 10),
+        amount=Decimal("300.00"),
+        description="Badanie",
+    )
+    recipe = RecipeModel.objects.create(farm=farm, name="Pasza statystyczna")
+    production = ProductionModel.objects.create(
+        recipe=recipe,
+        date=date(2026, 7, 15),
+        quantity_kg=Decimal("1000.00"),
+        status=ProductionModel.Statuses.COMPLETED,
+        feed_cost_total=Decimal("999.00"),
+    )
+    CostModel.objects.create(
+        farm=farm,
+        category=feed_category,
+        production=production,
+        date=date(2026, 7, 15),
+        amount=Decimal("400.00"),
+        description="Automatyczny koszt paszy",
+        is_paid=True,
+    )
+    CostModel.objects.create(
+        farm=farm,
+        category=manual_category,
+        date=date(2025, 7, 10),
+        amount=Decimal("900.00"),
+        description="Koszt poza okresem",
+    )
+    PigSaleModel.objects.create(
+        farm=farm,
+        sale_date=date(2026, 7, 20),
+        quantity=1,
+        live_weight=Decimal("100.00"),
+        net_value=Decimal("1000.00"),
+        gross_value=Decimal("1000.00"),
+    )
+    PigSaleModel.objects.create(
+        farm=farm,
+        sale_date=date(2025, 7, 20),
+        quantity=1,
+        live_weight=Decimal("1000.00"),
+        net_value=Decimal("1000.00"),
+        gross_value=Decimal("1000.00"),
+    )
+
+    result = FarmStatisticsService(farm).calculate(
+        date_from=date(2026, 1, 1),
+        date_to=date(2026, 12, 31),
+    )
+
+    assert result["costs"]["total"] == Decimal("700.00")
+    assert result["costs"]["feed_cost"] == Decimal("400.00")
+    assert result["costs"]["additional"]["total"] == Decimal("300.00")
+    assert result["sales"]["live_weight_kg"] == Decimal("100.00")
+    assert result["profitability"]["total_cost_per_live_kg"] == Decimal("7.00")
 
 
 @pytest.mark.django_db
@@ -273,6 +339,27 @@ def test_statistics_view_is_farm_scoped(client, statistics_farms):
     assert "Stado i upadki" in content
     assert "Aplikacja nie ma jeszcze ewidencji obsady grup tuczowych i upadków" not in content
     assert "TAJNE-STAT" not in content
+
+
+@pytest.mark.django_db
+def test_total_cost_per_live_kg_card_is_available_in_all_financial_statistics_views(client, statistics_farms):
+    owner, _farm, _other_farm = statistics_farms
+    client.force_login(owner)
+    expected_title = "Całkowity koszt na kg wagi żywej"
+    missing_weight_note = "Brakuje wagi żywej w dokumentach sprzedaży."
+
+    overview = client.get(reverse("farm_statistics"), {"year": "2026"}).content.decode()
+    costs = client.get(reverse("farm_statistics_section", args=["costs"]), {"year": "2026"}).content.decode()
+    profitability = client.get(
+        reverse("farm_statistics_section", args=["profitability"]),
+        {"year": "2026"},
+    ).content.decode()
+
+    for content in (overview, costs, profitability):
+        assert expected_title in content
+        assert missing_weight_note in content
+        assert "Brak danych" in content
+    assert "Koszt/kg żywej" not in profitability
 
 
 @pytest.mark.django_db

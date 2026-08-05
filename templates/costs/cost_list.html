@@ -27,47 +27,97 @@
         <div class="stat-tile"><span>Liczba wpisów</span><strong>{{ summary.count }}</strong></div>
     </section>
 
-    <details class="form-disclosure">
-        <summary>Szczegóły kosztów <small>kategorie i dodatkowe podsumowania</small></summary>
-        <section class="stats-grid">
-            <div class="stat-tile"><span>Największa kategoria</span><strong>{% if summary.largest_category %}{{ summary.largest_category.category__name|default:'Bez kategorii' }}{% else %}—{% endif %}</strong></div>
-        </section>
-    </details>
-
-    <section class="panel table-panel">
-        <div class="section-heading"><div><h2>Rejestr kosztów</h2><p>Dokumenty i płatności w wybranym okresie.</p></div></div>
-        {% if costs %}
-        <div class="table-scroll">
-            <table class="data-table mobile-card-table" data-mobile-cards="true">
-                <thead><tr><th>Data</th><th>Opis</th><th>Kategoria</th><th>Dokument</th><th>Dostawca</th><th>Źródło</th><th>Płatność</th><th class="text-right">Kwota</th><th class="text-right">Akcje</th></tr></thead>
-                <tbody>
-                    {% for cost in costs %}
-                    <tr>
-                        <td data-label="Data">{{ cost.date|date:'d.m.Y' }}</td>
-                        <td data-label="Opis"><strong>{{ cost.description }}</strong></td>
-                        <td data-label="Kategoria">{{ cost.category.name|default:'Bez kategorii' }}</td>
-                        <td data-label="Dokument">{{ cost.document_number|default:'—' }}</td>
-                        <td data-label="Dostawca">{{ cost.supplier|default:'—' }}</td>
-                        <td data-label="Źródło">
-                            {% if cost.production_id %}
-                                <span class="status-pill status-green">Produkcja paszy</span>
-                            {% else %}
-                                <span class="status-pill">Ręczny</span>
-                            {% endif %}
-                        </td>
-                        <td data-label="Płatność">
-                            {% if cost.production_id %}
-                                <span class="status-pill">Nie dotyczy</span>
-                            {% else %}
-                                <span class="status-pill {% if cost.is_paid %}status-green{% else %}status-amber{% endif %}">{% if cost.is_paid %}Opłacony{% else %}Nieopłacony{% endif %}</span>
-                            {% endif %}
-                        </td>
-                        <td data-label="Kwota" class="text-right"><strong>{{ cost.amount|smart_unit:"zł" }}</strong></td>
-                        <td data-label="Akcje" class="text-right">{% if cost.production_id %}<a href="{% url 'production_detail' cost.production_id %}" class="table-link">Zobacz śrutowanie</a>{% else %}<a href="{% url 'edit_cost' cost.id %}" class="table-link">Edytuj</a>{% endif %}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    <section class="panel cost-category-panel">
+        <div class="section-heading">
+            <div>
+                <h2>Koszty według kategorii</h2>
+                <p>Rozwiń kategorię, aby zobaczyć i zarządzać pojedynczymi wpisami.</p>
+            </div>
+        </div>
+        {% if category_groups %}
+        <div class="cost-category-list" data-no-pagination="true">
+            {% for group in category_groups %}
+            <details class="cost-category-group">
+                <summary>
+                    <span class="cost-category-name">
+                        <strong>{{ group.name }}</strong>
+                        <small>
+                            Wpisy: {{ group.count }}
+                            · ostatni koszt {{ group.latest_date|date:'d.m.Y' }}
+                        </small>
+                    </span>
+                    <span class="cost-category-summary">
+                        <strong>{{ group.total|smart_unit:"zł" }}</strong>
+                        <small class="cost-category-toggle">
+                            <span class="when-closed">Pokaż historię</span>
+                            <span class="when-open">Ukryj historię</span>
+                        </small>
+                    </span>
+                </summary>
+                <div class="table-scroll cost-history-scroll">
+                    <table class="data-table mobile-card-table cost-history-table" data-mobile-cards="true">
+                        <thead>
+                            <tr>
+                                <th>Data kosztu</th>
+                                <th class="text-right">Kwota</th>
+                                <th>Opis</th>
+                                <th>Dostawca</th>
+                                <th>Dokument</th>
+                                <th>Płatność</th>
+                                <th>Źródło</th>
+                                <th>Autor</th>
+                                <th>Utworzono</th>
+                                <th>Zaktualizowano</th>
+                                <th class="text-right">Akcje</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cost in group.costs %}
+                            <tr>
+                                <td data-label="Data kosztu">{{ cost.date|date:'d.m.Y' }}</td>
+                                <td data-label="Kwota" class="text-right"><strong>{{ cost.amount|smart_unit:"zł" }}</strong></td>
+                                <td data-label="Opis" class="cost-history-description">{{ cost.description }}</td>
+                                <td data-label="Dostawca">{{ cost.supplier|default:'—' }}</td>
+                                <td data-label="Dokument">{{ cost.document_number|default:'—' }}</td>
+                                <td data-label="Płatność">
+                                    {% if cost.production_id %}
+                                        <span class="status-pill">Nie dotyczy</span>
+                                    {% else %}
+                                        <span class="status-pill {% if cost.is_paid %}status-green{% else %}status-amber{% endif %}">{% if cost.is_paid %}Opłacony{% else %}Nieopłacony{% endif %}</span>
+                                    {% endif %}
+                                </td>
+                                <td data-label="Źródło">
+                                    {% if cost.production_id %}
+                                        <span class="status-pill status-green">Automatyczny koszt paszy</span>
+                                    {% else %}
+                                        <span class="status-pill">Ręczny</span>
+                                    {% endif %}
+                                </td>
+                                <td data-label="Autor">
+                                    {% if cost.created_by %}{{ cost.created_by.get_full_name|default:cost.created_by.username }}{% else %}—{% endif %}
+                                </td>
+                                <td data-label="Utworzono">{{ cost.created_at|date:'d.m.Y H:i' }}</td>
+                                <td data-label="Zaktualizowano">{{ cost.updated_at|date:'d.m.Y H:i' }}</td>
+                                <td data-label="Akcje" class="text-right">
+                                    <div class="row-actions">
+                                        {% if cost.production_id %}
+                                            <a href="{% url 'production_detail' cost.production_id %}" class="table-link">Zobacz śrutowanie</a>
+                                        {% else %}
+                                            <a href="{% url 'edit_cost' cost.id %}" class="table-link">Edytuj</a>
+                                            <form method="post" action="{% url 'delete_cost' cost.id %}" data-confirm="Usunąć koszt {{ cost.description|escapejs }} z dnia {{ cost.date|date:'d.m.Y' }}? Podsumowania zostaną przeliczone automatycznie.">
+                                                {% csrf_token %}
+                                                <button type="submit" class="link-button-danger">Usuń</button>
+                                            </form>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+            {% endfor %}
         </div>
         {% else %}
             {% url 'add_cost' as add_cost_url %}

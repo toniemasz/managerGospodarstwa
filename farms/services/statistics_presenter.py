@@ -11,6 +11,17 @@ class StatisticsPresenter:
         return {"title": title, "value": value, "unit": unit, "note": note, "tone": tone}
 
     @classmethod
+    def total_cost_per_live_kg_card(cls, profitability):
+        value = profitability["total_cost_per_live_kg"]
+        note = "" if value is not None else "Brakuje wagi żywej w dokumentach sprzedaży."
+        return cls.card(
+            "Całkowity koszt na kg wagi żywej",
+            value,
+            "zł/kg",
+            note,
+        )
+
+    @classmethod
     def overview(cls, data: dict) -> dict:
         sales = data["sales"]
         profitability = data["profitability"]
@@ -25,6 +36,7 @@ class StatisticsPresenter:
                 ),
                 cls.card("Sprzedaż netto", sales["net_sales"], "zł", f"{sales['sale_count']} dokumentów"),
                 cls.card("Koszt paszy", efficiency["feed_cost"], "zł", "Zakończone śrutowania FIFO"),
+                cls.total_cost_per_live_kg_card(profitability),
                 cls.card("Pasza / waga żywa", efficiency["feed_to_live_weight_ratio"], "t/t", "Przybliżony wskaźnik closeout"),
             ],
             "chart_labels": [row["month"] for row in data["timeline"]],
@@ -53,7 +65,7 @@ class StatisticsPresenter:
                 cls.card("Wynik netto", values["net_result"], "zł", tone="is-success" if values["net_result"] >= 0 else "is-danger"),
                 cls.card("Sprzedaż netto", values["net_sales"], "zł"),
                 cls.card("Koszty razem", values["total_cost"], "zł"),
-                cls.card("Koszt/kg żywej", values["total_cost_per_live_kg"], "zł/kg"),
+                cls.total_cost_per_live_kg_card(values),
                 cls.card("Sprzedaż brutto/kg żywej", values["gross_per_live_kg"], "zł/kg"),
                 cls.card("Koszt paszy", values["feed_cost"], "zł"),
                 cls.card("Pozostałe koszty", values["additional_cost"], "zł"),
@@ -176,6 +188,7 @@ class StatisticsPresenter:
         return {
             "section_cards": [
                 cls.card("Koszty razem", values["total"], "zł"),
+                cls.total_cost_per_live_kg_card(data["profitability"]),
                 cls.card("Koszt paszy", values["feed_cost"], "zł"),
                 cls.card("Pozostałe koszty", values["additional"]["total"], "zł"),
                 cls.card("Liczba kosztów dodatkowych", values["additional"]["count"]),

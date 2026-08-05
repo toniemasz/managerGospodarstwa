@@ -109,11 +109,19 @@ def test_cross_domain_calculators_keep_one_source_of_truth():
 
 def test_feed_efficiency_returns_missing_value_instead_of_false_zero():
     sales = {**_sales_report(), "live_weight_kg": ZERO, "slaughter_weight_kg": ZERO, "net_sales": ZERO}
-    result = FeedEfficiencyCalculator.calculate(sales=sales, feed=_feed_report())
+    feed = _feed_report()
+    profitability = ProfitabilityCalculator.calculate(
+        sales=sales,
+        costs=_cost_report(),
+        feed=feed,
+        timeline=[],
+    )
+    result = FeedEfficiencyCalculator.calculate(sales=sales, feed=feed, profitability=profitability)
 
     assert result["feed_to_live_weight_ratio"] is None
     assert result["feed_to_slaughter_weight_ratio"] is None
     assert result["feed_cost_share_of_net_sales_percent"] is None
+    assert profitability["total_cost_per_live_kg"] is None
 
 
 def test_sales_section_loads_only_sales_provider():
