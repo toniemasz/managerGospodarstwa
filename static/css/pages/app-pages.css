@@ -581,6 +581,143 @@
     color: var(--muted);
 }
 
+.cost-category-panel {
+    overflow: hidden;
+}
+
+.cost-category-list {
+    display: grid;
+    border-top: 1px solid var(--border);
+}
+
+.cost-category-group {
+    min-width: 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.cost-category-group:last-child {
+    border-bottom: 0;
+}
+
+.cost-category-group > summary {
+    display: grid;
+    min-height: var(--control-height);
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--grid-gap);
+    align-items: center;
+    padding: var(--panel-padding);
+    background: var(--surface);
+    cursor: pointer;
+    list-style: none;
+}
+
+.cost-category-group > summary::-webkit-details-marker {
+    display: none;
+}
+
+.cost-category-group > summary:hover,
+.cost-category-group > summary:focus-visible {
+    background: var(--primary-soft);
+}
+
+.cost-category-name,
+.cost-category-summary {
+    display: grid;
+    min-width: 0;
+    gap: var(--space-xs);
+}
+
+.cost-category-name strong,
+.cost-category-summary strong {
+    overflow-wrap: anywhere;
+}
+
+.cost-category-name small,
+.cost-category-summary small {
+    color: var(--muted);
+    font-size: var(--small-font-size);
+    font-weight: 750;
+}
+
+.cost-category-summary {
+    justify-items: end;
+    text-align: right;
+}
+
+.cost-category-toggle {
+    color: var(--primary) !important;
+    font-weight: 900 !important;
+}
+
+.cost-category-group .when-open {
+    display: none;
+}
+
+.cost-category-group[open] .when-closed {
+    display: none;
+}
+
+.cost-category-group[open] .when-open {
+    display: inline;
+}
+
+.cost-history-scroll {
+    border-top: 1px solid var(--border);
+}
+
+.cost-history-table {
+    width: max-content;
+    min-width: 100%;
+}
+
+.cost-history-description {
+    min-width: 14rem;
+    max-width: 28rem;
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
+@media (max-width: 720px) {
+    .cost-category-group > summary {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .cost-category-summary {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        justify-items: start;
+        text-align: left;
+    }
+
+    .cost-history-table {
+        width: 100%;
+    }
+
+    .cost-history-description {
+        min-width: 0;
+        max-width: none;
+    }
+
+    .cost-history-table td {
+        grid-template-columns: minmax(8.7rem, 44%) minmax(0, 1fr);
+    }
+
+    .cost-history-table td::before {
+        overflow-wrap: anywhere;
+    }
+
+    .cost-history-table .row-actions {
+        align-items: stretch;
+    }
+
+    .cost-history-table .row-actions form,
+    .cost-history-table .row-actions .link-button-danger {
+        display: flex;
+        min-height: var(--button-height);
+        flex: 1 1 9rem;
+    }
+}
+
 .result-tile.is-positive {
     border-color: var(--success);
     border-left: 3px solid var(--success);

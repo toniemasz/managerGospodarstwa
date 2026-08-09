@@ -58,7 +58,7 @@ STATISTICS_SECTION_DEFINITIONS = (
         label="Koszty",
         title="Koszty",
         description="Koszt paszy i pozostałe koszty gospodarstwa bez podwójnego liczenia.",
-        dependencies=("costs",),
+        dependencies=("sales", "costs", "feed", "profitability"),
     ),
 )
 

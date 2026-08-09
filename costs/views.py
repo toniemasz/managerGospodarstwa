@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from costs.forms import CostCategoryForm, CostFilterForm, CostForm
 from costs.models import CostCategoryModel, CostModel
@@ -16,7 +17,6 @@ from costs.actions import (
 from common.filter_ui import filter_ui_state
 from farms.services.accounting_year import get_available_years
 from farms.services.audit_log_service import log_action
-from common.cache import invalidate_farm_cache_on_commit
 from farms.services.current_farm import get_current_farm
 
 
@@ -29,9 +29,11 @@ def cost_list_view(request):
         filters.update({key: value for key, value in form.cleaned_data.items() if value not in (None, "")})
     service = CostService(farm)
     costs = service.get_costs(**filters)
+    grouped_history = service.grouped_history(costs)
     context = {
-        "costs": costs,
-        "summary": service.summarize(costs),
+        "costs": grouped_history["costs"],
+        "category_groups": grouped_history["category_groups"],
+        "summary": grouped_history["summary"],
         "filter_form": form,
         "selected_year": filters.get("year"),
         "available_years": get_available_years(farm),
@@ -73,16 +75,16 @@ def edit_cost_view(request, pk):
 
 
 @login_required
+@require_POST
 def delete_cost_view(request, pk):
     farm = get_current_farm(request)
     cost = get_object_or_404(CostModel, pk=pk, farm=farm)
     if cost.production_id:
         messages.error(request, "Koszt paszy jest powiązany ze śrutowaniem i nie można go usunąć ręcznie.")
         return redirect("cost_list")
-    if request.method == "POST":
-        deleted = delete_manual_cost(farm=farm, cost_id=cost.pk)
-        log_action(farm=farm, user=request.user, action="DELETE", **deleted)
-        messages.success(request, "Koszt został usunięty.")
+    deleted = delete_manual_cost(farm=farm, cost_id=cost.pk)
+    log_action(farm=farm, user=request.user, action="DELETE", **deleted)
+    messages.success(request, "Koszt został usunięty.")
     return redirect("cost_list")
 
 
