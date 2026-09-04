@@ -4,10 +4,11 @@ from datetime import date, timedelta
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.utils import timezone
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.db.models.deletion import ProtectedError
 
 from .services.sow_dashboard_service import SowDashboardService
@@ -40,6 +41,7 @@ from sows.actions.sows import SowEarTagConflictError, save_sow
 from sows.actions.vaccinations import (
     VaccinationActionError,
     VaccinationActions,
+    VaccinationCycleSelection,
     VaccinationPlanNameConflictError,
     save_vaccination_plan,
 )
@@ -222,6 +224,50 @@ def _vaccination_cycle_post_data(request):
         }
     except (TypeError, ValueError) as error:
         raise VaccinationActionError("Nieprawidłowe dane cyklu szczepienia.") from error
+
+
+def _selected_vaccination_cycles_post_data(request) -> list[VaccinationCycleSelection]:
+    selections = []
+    seen = set()
+    for value in request.POST.getlist('vaccination_selections'):
+        try:
+            plan_id, sow_id, cycle_id, scheduled_date = value.split('|', 3)
+            selection = VaccinationCycleSelection(
+                plan_id=int(plan_id),
+                sow_id=int(sow_id),
+                cycle_id=cycle_id,
+                scheduled_date=date.fromisoformat(scheduled_date),
+            )
+        except (AttributeError, TypeError, ValueError) as error:
+            raise VaccinationActionError(
+                "Nieprawidłowy identyfikator szczepienia. Odśwież ekran i spróbuj ponownie."
+            ) from error
+        identity = (
+            selection.plan_id,
+            selection.sow_id,
+            selection.cycle_id,
+            selection.scheduled_date,
+        )
+        if (
+            selection.plan_id < 1
+            or selection.sow_id < 1
+            or not selection.cycle_id
+            or identity in seen
+        ):
+            raise VaccinationActionError(
+                "Nieprawidłowy identyfikator szczepienia. Odśwież ekran i spróbuj ponownie."
+            )
+        seen.add(identity)
+        selections.append(selection)
+    return selections
+
+
+def _vaccination_count_label(count: int) -> str:
+    if count == 1:
+        return "szczepienie"
+    if count % 10 in {2, 3, 4} and count % 100 not in {12, 13, 14}:
+        return "szczepienia"
+    return "szczepień"
 
 
 @login_required
@@ -555,39 +601,36 @@ def farrowing_panel_view(request):
 
 @login_required
 def bulk_vaccinate_view(request):
-    """Odbiera żądanie z dashboardu, wyświetla ekran potwierdzenia i zapisuje zdarzenia."""
+    """Wyświetla panel i atomowo zapisuje wybrane cykle szczepień."""
     farm = get_current_farm(request)
     if request.method == 'POST':
-        sow_ids = request.POST.getlist('sow_ids')
-        vaccine_name = request.POST.get('vaccine_name')
-        cycle_id = request.POST.get('cycle_id')
-        plan_id = request.POST.get('plan_id')
-        scheduled_date_value = request.POST.get('scheduled_date')
-
-        if request.POST.get('confirm') == 'yes':
-            try:
-                events = SowEventActions(farm=farm, user=request.user).bulk_create_vaccinations(
-                    sow_ids=sow_ids,
-                    vaccine_name=vaccine_name,
-                    cycle_id=cycle_id,
-                    plan_id=int(plan_id) if plan_id else None,
-                    scheduled_date=(date.fromisoformat(scheduled_date_value) if scheduled_date_value else None),
-                )
-            except (VaccinationActionError, ValueError) as error:
-                message = error.messages[0] if isinstance(error, ValidationError) else str(error)
-                messages.error(request, message)
+        try:
+            selections = _selected_vaccination_cycles_post_data(request)
+            if not selections:
+                messages.warning(request, "Nie zaznaczono żadnego szczepienia.")
                 return redirect('bulk_vaccinate')
-            for event in events:
-                log_action(farm=farm, user=request.user, action="CREATE", obj=event)
-            messages.success(request, f"Zapisano szczepienie dla {len(events)} macior.")
-            return redirect('dashboard')
-        else:
-            sows = SowModel.objects.filter(id__in=sow_ids, farm=farm)
-            return render(request, 'sows/bulk_vaccinate.html', {
-                'sows': sows,
-                'vaccine_name': vaccine_name,
-                'cycle_id': cycle_id
-            })
+            with transaction.atomic():
+                events = VaccinationActions(farm, user=request.user).record_selected_cycles(
+                    selections=selections,
+                )
+                for event in events:
+                    log_action(farm=farm, user=request.user, action="CREATE", obj=event)
+        except VaccinationActionError as error:
+            messages.error(request, error.messages[0])
+            return redirect('bulk_vaccinate')
+        except Http404:
+            messages.error(
+                request,
+                "Lista szczepień zmieniła się lub jeden z cykli jest nieaktualny. "
+                "Odśwież ekran i spróbuj ponownie.",
+            )
+            return redirect('bulk_vaccinate')
+        event_count = len(events)
+        messages.success(
+            request,
+            f"Zarejestrowano {event_count} {_vaccination_count_label(event_count)}.",
+        )
+        return redirect('bulk_vaccinate')
 
     service = SowDashboardService(farm=farm)
     context = service.get_notifications()

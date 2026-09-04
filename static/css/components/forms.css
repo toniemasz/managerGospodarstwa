@@ -393,6 +393,51 @@ input[type="date"] {
     line-height: 1.45;
 }
 
+.vaccination-list {
+    padding: 0;
+}
+
+.vaccination-entry {
+    display: grid;
+    gap: var(--space-sm);
+}
+
+.vaccination-entry-label {
+    display: flex;
+    min-width: 0;
+    align-items: flex-start;
+    gap: .65rem;
+    cursor: pointer;
+}
+
+.vaccination-entry-label input {
+    flex: 0 0 auto;
+    margin-top: .2rem;
+}
+
+.vaccination-entry-copy {
+    display: grid;
+    min-width: 0;
+    gap: .18rem;
+    line-height: 1.45;
+}
+
+.vaccination-entry-meta {
+    color: var(--muted);
+    font-size: var(--small-font-size);
+    font-weight: 700;
+}
+
+.vaccination-entry-actions,
+.vaccination-bulk-actions {
+    justify-content: flex-start;
+}
+
+.vaccination-entry-actions .button,
+.vaccination-bulk-actions .button {
+    min-height: 44px;
+}
+
 .warning-option {
     border-color: var(--warning);
     background: var(--warning-soft);
