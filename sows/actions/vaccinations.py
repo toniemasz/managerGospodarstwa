@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date
 
 from django.core.exceptions import ValidationError
@@ -24,6 +25,16 @@ class VaccinationActionError(ValidationError):
 
 class VaccinationPlanNameConflictError(ValidationError):
     pass
+
+
+@dataclass(frozen=True)
+class VaccinationCycleSelection:
+    """Jednoznacznie wskazuje bieżący cykl szczepienia konkretnej maciory."""
+
+    plan_id: int
+    sow_id: int
+    cycle_id: str
+    scheduled_date: date
 
 
 @transaction.atomic
@@ -69,17 +80,50 @@ class VaccinationActions:
         performed_date: date | None = None,
         note: str = "",
     ) -> list[SowEventModel]:
-        performed_date = performed_date or timezone.localdate()
-        events = [
-            self._record_one(
+        selections = [
+            VaccinationCycleSelection(
                 plan_id=plan_id,
                 sow_id=sow_id,
                 cycle_id=cycle_id,
                 scheduled_date=scheduled_date,
+            )
+            for sow_id in sow_ids
+        ]
+        return self.record_selected_cycles(
+            selections=selections,
+            performed_date=performed_date,
+            note=note,
+        )
+
+    @transaction.atomic
+    def record_selected_cycles(
+        self,
+        *,
+        selections: list[VaccinationCycleSelection],
+        performed_date: date | None = None,
+        note: str = "",
+    ) -> list[SowEventModel]:
+        """Atomowo zapisuje wskazane, ponownie zweryfikowane cykle szczepień."""
+        plan_sow_pairs = [
+            (selection.plan_id, selection.sow_id)
+            for selection in selections
+        ]
+        if len(plan_sow_pairs) != len(set(plan_sow_pairs)):
+            raise VaccinationActionError(
+                "Wybrano więcej niż jeden cykl tego samego planu dla jednej maciory. "
+                "Odśwież ekran i spróbuj ponownie."
+            )
+        performed_date = performed_date or timezone.localdate()
+        events = [
+            self._record_one(
+                plan_id=selection.plan_id,
+                sow_id=selection.sow_id,
+                cycle_id=selection.cycle_id,
+                scheduled_date=selection.scheduled_date,
                 performed_date=performed_date,
                 note=note,
             )
-            for sow_id in sow_ids
+            for selection in selections
         ]
         if events:
             invalidate_farm_cache_on_commit(self.farm, groups=("sows",))

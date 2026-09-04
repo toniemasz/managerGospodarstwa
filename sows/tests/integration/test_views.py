@@ -10,13 +10,25 @@ from django.utils import timezone
 from datetime import date, timedelta
 
 from farms.models import AuditLogModel
-from sows.models import MortalityReportModel, SowEventModel, SowModel, VaccinationPlanModel
+from sows.domain.vaccinations import vaccination_cycle_id
+from sows.models import (
+    MortalityReportModel,
+    SowEventModel,
+    SowModel,
+    VaccinationCycleModel,
+    VaccinationPlanModel,
+)
 from farms.services.farm_service import get_or_create_user_farm
 from sows.services.sow_repository import SowRepository
 
 
 def response_messages(response):
     return [str(message) for message in get_messages(response.wsgi_request)]
+
+
+def vaccination_selection(plan, sow, scheduled_date):
+    cycle_id = vaccination_cycle_id(plan.id, scheduled_date)
+    return f"{plan.id}|{sow.id}|{cycle_id}|{scheduled_date.isoformat()}"
 
 
 @pytest.mark.django_db
@@ -446,22 +458,343 @@ class TestSowViews:
         content = confirm_page.content.decode()
         assert "Panel szczepień" in content
         assert "Maciora VAC-1" in content
+        assert content.count("Zarejestruj zaznaczone szczepienia") == 1
+        assert "Zarejestruj szczepienie" not in content
+        assert "Pomiń to szczepienie" in content
+        assert "Usuń szczepienie dla tej maciory" in content
 
         save_response = setup_client.post(reverse('bulk_vaccinate'), {
-            'confirm': 'yes',
-            'sow_ids': [str(sow.id)],
-            'vaccine_name': 'Parwo',
-            'cycle_id': f"periodic_{plan.id}_{date.today().isoformat()}",
-            'plan_id': str(plan.id),
-            'scheduled_date': date.today().isoformat(),
+            'vaccination_selections': [
+                vaccination_selection(plan, sow, date.today()),
+            ],
         })
 
         assert save_response.status_code == 302
+        assert "Zarejestrowano 1 szczepienie." in response_messages(save_response)
         event = SowEventModel.objects.get(sow=sow, event_type='VACCINATION')
         assert event.details['vaccine_name'] == 'Parwo'
         assert event.details['cycle_id'] == f"periodic_{plan.id}_{date.today().isoformat()}"
         assert event.details['scheduled_date'] == date.today().isoformat()
         assert event.vaccination_plan == plan
+        assert VaccinationCycleModel.objects.filter(
+            plan=plan,
+            sow=sow,
+            cycle_id=event.cycle_id,
+            status=VaccinationCycleModel.STATUS_COMPLETED,
+        ).exists()
+        assert AuditLogModel.objects.filter(
+            farm=setup_client.farm,
+            action="CREATE",
+            model_label="sows.SowEventModel",
+            object_id=str(event.id),
+        ).exists()
+
+        refreshed_page = setup_client.get(reverse('bulk_vaccinate'))
+        assert "Maciora VAC-1" not in refreshed_page.content.decode()
+
+        duplicate_response = setup_client.post(reverse('bulk_vaccinate'), {
+            'vaccination_selections': [
+                vaccination_selection(plan, sow, date.today()),
+            ],
+        })
+        assert duplicate_response.status_code == 302
+        assert "Ten cykl nie jest już aktywny dla tej maciory." in response_messages(
+            duplicate_response
+        )
+        assert SowEventModel.objects.filter(sow=sow, event_type='VACCINATION').count() == 1
+
+    def test_bulk_vaccinate_saves_selected_cycles_from_multiple_groups(self, setup_client):
+        today = date.today()
+        selections = []
+        expected = set()
+        for index, days_ago in enumerate((0, 1, 2), start=1):
+            sow = SowModel.objects.create(
+                ear_tag=f"MULTI-{index}",
+                farm=setup_client.farm,
+                entry_date=today - timedelta(days=90),
+            )
+            scheduled_date = today - timedelta(days=days_ago)
+            plan = VaccinationPlanModel.objects.create(
+                name=f"Szczepienie {index}",
+                interval_value=1,
+                interval_unit=VaccinationPlanModel.INTERVAL_MONTHS,
+                schedule_mode=VaccinationPlanModel.SCHEDULE_FIXED,
+                first_due_date=scheduled_date,
+                reminder_days_ahead=7,
+                scope=VaccinationPlanModel.SCOPE_SELECTED,
+                farm=setup_client.farm,
+            )
+            plan.selected_sows.add(sow)
+            cycle_id = vaccination_cycle_id(plan.id, scheduled_date)
+            selections.append(vaccination_selection(plan, sow, scheduled_date))
+            expected.add((plan.id, sow.id, cycle_id, scheduled_date))
+
+        response = setup_client.post(reverse('bulk_vaccinate'), {
+            'vaccination_selections': selections,
+        })
+
+        assert response.status_code == 302
+        assert "Zarejestrowano 3 szczepienia." in response_messages(response)
+        events = SowEventModel.objects.filter(event_type='VACCINATION')
+        assert events.count() == 3
+        assert {
+            (event.vaccination_plan_id, event.sow_id, event.cycle_id, event.scheduled_date)
+            for event in events
+        } == expected
+        cycles = VaccinationCycleModel.objects.filter(
+            status=VaccinationCycleModel.STATUS_COMPLETED,
+        )
+        assert cycles.count() == 3
+        assert {
+            (
+                cycle.plan_id,
+                cycle.sow_id,
+                cycle.cycle_id,
+                cycle.scheduled_date,
+                cycle.completed_at,
+            )
+            for cycle in cycles
+        } == {
+            (plan_id, sow_id, cycle_id, scheduled_date, today)
+            for plan_id, sow_id, cycle_id, scheduled_date in expected
+        }
+        assert AuditLogModel.objects.filter(
+            farm=setup_client.farm,
+            action="CREATE",
+            model_label="sows.SowEventModel",
+        ).count() == 3
+
+        refreshed_page = setup_client.get(reverse('bulk_vaccinate'))
+        refreshed_content = refreshed_page.content.decode()
+        assert all(f"Maciora MULTI-{index}" not in refreshed_content for index in range(1, 4))
+
+    def test_bulk_vaccinate_saves_only_checked_items(self, setup_client):
+        today = date.today()
+        selected_sow = SowModel.objects.create(
+            ear_tag="CHECKED",
+            farm=setup_client.farm,
+            entry_date=today - timedelta(days=30),
+        )
+        unselected_sow = SowModel.objects.create(
+            ear_tag="UNCHECKED",
+            farm=setup_client.farm,
+            entry_date=today - timedelta(days=30),
+        )
+        plan = VaccinationPlanModel.objects.create(
+            name="Wybór częściowy",
+            interval_value=1,
+            interval_unit=VaccinationPlanModel.INTERVAL_MONTHS,
+            schedule_mode=VaccinationPlanModel.SCHEDULE_FIXED,
+            first_due_date=today,
+            reminder_days_ahead=7,
+            farm=setup_client.farm,
+        )
+
+        response = setup_client.post(reverse('bulk_vaccinate'), {
+            'vaccination_selections': [
+                vaccination_selection(plan, selected_sow, today),
+            ],
+        })
+
+        assert response.status_code == 302
+        assert SowEventModel.objects.filter(sow=selected_sow, event_type='VACCINATION').exists()
+        assert not SowEventModel.objects.filter(sow=unselected_sow).exists()
+        refreshed_content = setup_client.get(reverse('bulk_vaccinate')).content.decode()
+        assert "Maciora CHECKED" not in refreshed_content
+        assert "Maciora UNCHECKED" in refreshed_content
+
+    def test_bulk_vaccinate_allows_one_sow_in_different_plans(self, setup_client):
+        today = date.today()
+        sow = SowModel.objects.create(
+            ear_tag="TWO-PLANS",
+            farm=setup_client.farm,
+            entry_date=today - timedelta(days=30),
+        )
+        plans = [
+            VaccinationPlanModel.objects.create(
+                name=f"Plan maciory {index}",
+                interval_value=1,
+                interval_unit=VaccinationPlanModel.INTERVAL_MONTHS,
+                schedule_mode=VaccinationPlanModel.SCHEDULE_FIXED,
+                first_due_date=today,
+                reminder_days_ahead=7,
+                scope=VaccinationPlanModel.SCOPE_SELECTED,
+                farm=setup_client.farm,
+            )
+            for index in (1, 2)
+        ]
+        for plan in plans:
+            plan.selected_sows.add(sow)
+
+        response = setup_client.post(reverse('bulk_vaccinate'), {
+            'vaccination_selections': [
+                vaccination_selection(plan, sow, today)
+                for plan in plans
+            ],
+        })
+
+        assert response.status_code == 302
+        assert "Zarejestrowano 2 szczepienia." in response_messages(response)
+        assert SowEventModel.objects.filter(
+            sow=sow,
+            event_type='VACCINATION',
+        ).count() == 2
+        assert VaccinationCycleModel.objects.filter(sow=sow).count() == 2
+
+    def test_bulk_vaccinate_without_selection_or_with_invalid_identifier_saves_nothing(
+        self,
+        setup_client,
+    ):
+        empty_response = setup_client.post(reverse('bulk_vaccinate'), {})
+
+        assert empty_response.status_code == 302
+        assert "Nie zaznaczono żadnego szczepienia." in response_messages(empty_response)
+        assert not SowEventModel.objects.filter(event_type='VACCINATION').exists()
+
+        invalid_response = setup_client.post(reverse('bulk_vaccinate'), {
+            'vaccination_selections': ['niepoprawny-identyfikator'],
+        })
+
+        assert invalid_response.status_code == 302
+        assert any(
+            "Nieprawidłowy identyfikator szczepienia." in message
+            for message in response_messages(invalid_response)
+        )
+        assert not SowEventModel.objects.filter(event_type='VACCINATION').exists()
+
+    def test_bulk_vaccinate_rejects_two_cycles_of_the_same_plan_and_sow(self, setup_client):
+        today = date.today()
+        sow = SowModel.objects.create(
+            ear_tag="DUPLICATE-CYCLE",
+            farm=setup_client.farm,
+            entry_date=today - timedelta(days=30),
+        )
+        plan = VaccinationPlanModel.objects.create(
+            name="Plan z podwójnym cyklem",
+            interval_value=1,
+            interval_unit=VaccinationPlanModel.INTERVAL_DAYS,
+            schedule_mode=VaccinationPlanModel.SCHEDULE_FIXED,
+            first_due_date=today,
+            reminder_days_ahead=7,
+            farm=setup_client.farm,
+        )
+
+        response = setup_client.post(reverse('bulk_vaccinate'), {
+            'vaccination_selections': [
+                vaccination_selection(plan, sow, today),
+                vaccination_selection(plan, sow, today + timedelta(days=1)),
+            ],
+        })
+
+        assert response.status_code == 302
+        assert any(
+            "Wybrano więcej niż jeden cykl tego samego planu" in message
+            for message in response_messages(response)
+        )
+        assert not SowEventModel.objects.filter(sow=sow, event_type='VACCINATION').exists()
+        assert not VaccinationCycleModel.objects.filter(plan=plan, sow=sow).exists()
+
+    def test_bulk_vaccinate_rolls_back_all_items_when_one_cycle_is_stale(self, setup_client):
+        today = date.today()
+        sows = [
+            SowModel.objects.create(
+                ear_tag=f"STALE-{index}",
+                farm=setup_client.farm,
+                entry_date=today - timedelta(days=30),
+            )
+            for index in (1, 2)
+        ]
+        plans = []
+        for index, sow in enumerate(sows, start=1):
+            plan = VaccinationPlanModel.objects.create(
+                name=f"Plan nieaktualny {index}",
+                interval_value=1,
+                interval_unit=VaccinationPlanModel.INTERVAL_MONTHS,
+                schedule_mode=VaccinationPlanModel.SCHEDULE_FIXED,
+                first_due_date=today,
+                reminder_days_ahead=7,
+                scope=VaccinationPlanModel.SCOPE_SELECTED,
+                farm=setup_client.farm,
+            )
+            plan.selected_sows.add(sow)
+            plans.append(plan)
+
+        stale_cycle_id = vaccination_cycle_id(plans[1].id, today)
+        VaccinationCycleModel.objects.create(
+            plan=plans[1],
+            sow=sows[1],
+            cycle_id=stale_cycle_id,
+            scheduled_date=today,
+            status=VaccinationCycleModel.STATUS_SKIPPED,
+            skipped_at=today,
+        )
+
+        response = setup_client.post(reverse('bulk_vaccinate'), {
+            'vaccination_selections': [
+                vaccination_selection(plans[0], sows[0], today),
+                vaccination_selection(plans[1], sows[1], today),
+            ],
+        })
+
+        assert response.status_code == 302
+        assert "Ten cykl nie jest już aktywny dla tej maciory." in response_messages(response)
+        assert not SowEventModel.objects.filter(event_type='VACCINATION').exists()
+        assert not VaccinationCycleModel.objects.filter(plan=plans[0], sow=sows[0]).exists()
+        assert VaccinationCycleModel.objects.filter(
+            plan=plans[1],
+            sow=sows[1],
+            status=VaccinationCycleModel.STATUS_SKIPPED,
+        ).exists()
+
+    def test_bulk_vaccinate_rejects_foreign_farm_cycle_atomically(self, setup_client):
+        today = date.today()
+        own_sow = SowModel.objects.create(
+            ear_tag="OWN-CYCLE",
+            farm=setup_client.farm,
+            entry_date=today - timedelta(days=30),
+        )
+        own_plan = VaccinationPlanModel.objects.create(
+            name="Własny plan",
+            interval_value=1,
+            interval_unit=VaccinationPlanModel.INTERVAL_MONTHS,
+            schedule_mode=VaccinationPlanModel.SCHEDULE_FIXED,
+            first_due_date=today,
+            reminder_days_ahead=7,
+            farm=setup_client.farm,
+        )
+        other_user = User.objects.create_user(username="foreign-vaccination-owner")
+        other_farm = get_or_create_user_farm(other_user)
+        foreign_sow = SowModel.objects.create(
+            ear_tag="FOREIGN-CYCLE",
+            farm=other_farm,
+            entry_date=today - timedelta(days=30),
+        )
+        foreign_plan = VaccinationPlanModel.objects.create(
+            name="Obcy plan",
+            interval_value=1,
+            interval_unit=VaccinationPlanModel.INTERVAL_MONTHS,
+            schedule_mode=VaccinationPlanModel.SCHEDULE_FIXED,
+            first_due_date=today,
+            reminder_days_ahead=7,
+            farm=other_farm,
+        )
+
+        response = setup_client.post(reverse('bulk_vaccinate'), {
+            'vaccination_selections': [
+                vaccination_selection(own_plan, own_sow, today),
+                vaccination_selection(foreign_plan, foreign_sow, today),
+            ],
+        })
+
+        assert response.status_code == 302
+        assert "Lista szczepień zmieniła się" in response_messages(response)[0]
+        assert not SowEventModel.objects.filter(
+            sow__in=(own_sow, foreign_sow),
+            event_type='VACCINATION',
+        ).exists()
+        assert not VaccinationCycleModel.objects.filter(
+            sow__in=(own_sow, foreign_sow),
+        ).exists()
 
     def test_archive_and_archived_sows_views(self, setup_client):
         sow = SowModel.objects.create(ear_tag="ARCHIVE-ME", farm=setup_client.farm)
