@@ -152,6 +152,34 @@ def test_settings_visibility_section_is_grouped(ui_client):
     assert "Masz niezapisane zmiany" in content
     assert 'data-font-scale-preset="140"' in content
     assert 'data-settings-save' in content
+    assert content.count('role="tab"') == 5
+    assert content.count('data-settings-panel="') == 5
+    assert 'data-font-scale-custom hidden' in content
+
+
+@pytest.mark.django_db
+def test_shared_shell_contains_accessible_confirmation_and_favicon(ui_client):
+    content = ui_client.get(reverse("farm_settings")).content.decode()
+
+    assert 'rel="icon"' in content
+    assert 'images/favicon.svg' in content
+    assert '<dialog class="confirmation-dialog"' in content
+    assert 'data-confirmation-cancel' in content
+    assert 'aria-describedby="confirmation-dialog-message"' in content
+
+
+@pytest.mark.django_db
+def test_form_error_summary_links_to_invalid_field(ui_client):
+    response = ui_client.post(
+        reverse("farm_settings"),
+        _settings_payload(font_scale="151"),
+    )
+    content = response.content.decode()
+
+    assert response.status_code == 200
+    assert 'data-form-error-summary' in content
+    assert 'href="#id_font_scale"' in content
+    assert 'id="id_font_scale"' in content
 
 
 @pytest.mark.django_db

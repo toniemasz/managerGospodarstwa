@@ -6,9 +6,18 @@ from django.forms import formset_factory
 from .models import PigSaleModel
 from .number_parsing import parse_polish_decimal, parse_polish_int
 from common.forms import KilogramStorageFormMixin
+from farms.services.idempotency import new_submission_token
 
 
 FORM_FIELD_CLASS = 'form-control'
+
+
+def _normalize_polish_number(value, parser):
+    if isinstance(value, str) and value.strip():
+        parsed = parser(value)
+        if parsed is not None:
+            return str(parsed)
+    return value
 
 
 class PolishDecimalField(forms.DecimalField):
@@ -19,23 +28,16 @@ class PolishDecimalField(forms.DecimalField):
         return super().prepare_value(value)
 
     def to_python(self, value):
-        if isinstance(value, str) and value.strip():
-            parsed = parse_polish_decimal(value)
-            if parsed is not None:
-                value = str(parsed)
-        return super().to_python(value)
+        return super().to_python(_normalize_polish_number(value, parse_polish_decimal))
 
 
 class PolishIntegerField(forms.IntegerField):
     def to_python(self, value):
-        if isinstance(value, str) and value.strip():
-            parsed = parse_polish_int(value)
-            if parsed is not None:
-                value = str(parsed)
-        return super().to_python(value)
+        return super().to_python(_normalize_polish_number(value, parse_polish_int))
 
 
 class PigSaleForm(KilogramStorageFormMixin, forms.ModelForm):
+    submission_token = forms.UUIDField(required=False, widget=forms.HiddenInput)
     mass_fields = ('live_weight',)
     avg_meatiness_seurop = PolishDecimalField(
         label="Średnia mięsność SEUROP (%)",
@@ -112,6 +114,8 @@ class PigSaleForm(KilogramStorageFormMixin, forms.ModelForm):
     def __init__(self, *args, farm=None, **kwargs):
         self.farm = farm or getattr(kwargs.get('instance'), 'farm', None)
         super().__init__(*args, **kwargs)
+        if not self.is_bound:
+            self.initial.setdefault("submission_token", new_submission_token())
         if not self.is_bound:
             self.initial["settlement_process"] = (
                 "later"
@@ -267,9 +271,13 @@ class SaleClassRowForm(KilogramStorageFormMixin, forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        raw_position = str(self.prefix or '').rsplit('-', 1)[-1]
+        position = str(int(raw_position) + 1) if raw_position.isdigit() else 'nowa'
         for field in self.fields.values():
             existing = field.widget.attrs.get('class', '')
             field.widget.attrs['class'] = f'{existing} settlement-input'.strip()
+            if not field.widget.is_hidden:
+                field.widget.attrs['aria-label'] = f'{field.label}, pozycja {position}'
 
     def has_row_data(self) -> bool:
         if not hasattr(self, 'cleaned_data'):
@@ -393,5 +401,5 @@ SaleClassRowFormSet = formset_factory(
 )
 
 
-def empty_sale_row_initials(count: int = 8) -> list[dict]:
+def empty_sale_row_initials(count: int = 1) -> list[dict]:
     return [{'line_no': index} for index in range(1, count + 1)]

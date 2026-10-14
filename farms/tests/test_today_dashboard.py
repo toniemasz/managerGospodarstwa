@@ -122,11 +122,26 @@ def test_today_dashboard_loads_task_cards_kpis_recent_events_and_is_farm_scoped(
     assert "dashboard-alert-list" not in content
     assert "Upadek" in content
     assert "2 szt. · Nieokreślone po odsadzeniu" in content
-    assert "Sprzedaż netto" in content
+    assert "Sprzedaże" in content
     assert "TODAY-SALE" in content
     assert "TODAY-COST" in content
     assert "SECRET-SOW" not in content
     assert "SECRET-SALE" not in content
+
+
+@pytest.mark.django_db
+def test_today_dashboard_uses_selected_non_duplicated_kpis(today_dashboard_client):
+    farm = today_dashboard_client.farm
+    settings = get_farm_settings(farm)
+    settings.dashboard_stats = ["total_sows", "low_stock"]
+    settings.save(update_fields=("dashboard_stats",))
+    SowModel.objects.create(farm=farm, ear_tag="KPI-ONE")
+
+    response = today_dashboard_client.get(reverse("modules_home"))
+    kpis = response.context["today_kpis"]
+
+    assert [item["title"] for item in kpis] == ["Maciory", "Niski stan"]
+    assert len({item["title"] for item in kpis}) == len(kpis)
 
 
 @pytest.mark.django_db

@@ -3,17 +3,16 @@
 
 {% block content %}
 <main class="app-page">
-    <section class="page-header">
-        <div>
-            <p class="eyebrow">Sprzedaż</p>
-            <h1>{% if is_edit %}Edycja dokumentu{% else %}Nowy dokument sprzedaży{% endif %}</h1>
-            <p class="page-subtitle">Daty, rozliczenie klas i podsumowanie dokumentu.</p>
-        </div>
-        <a href="{% url 'sales_list' %}" class="button button-secondary">Wróć do listy sprzedaży</a>
-    </section>
+    {% url 'sales_list' as sales_list_url %}
+    {% if is_edit %}
+        {% include 'components/page_header.html' with eyebrow='Sprzedaż' title='Edycja dokumentu' subtitle='Daty, rozliczenie klas i podsumowanie dokumentu.' back_url=sales_list_url back_label='Wróć do listy sprzedaży' %}
+    {% else %}
+        {% include 'components/page_header.html' with eyebrow='Sprzedaż' title='Nowy dokument sprzedaży' subtitle='Daty, rozliczenie klas i podsumowanie dokumentu.' back_url=sales_list_url back_label='Wróć do listy sprzedaży' %}
+    {% endif %}
 
     <form method="post" enctype="multipart/form-data" class="responsive-form" id="sale-form">
         {% csrf_token %}
+        {{ form.submission_token }}
         {% include 'components/form_errors.html' with form=form %}
 
         {% if pdf_import_feedback %}
@@ -47,7 +46,7 @@
                     {% endif %}
                 </div>
 
-                <div class="form-grid three-columns">
+                <div class="form-grid two-columns">
                     <div class="form-field">
                         <label for="{{ form.sale_date.id_for_label }}">{{ form.sale_date.label }}</label>
                         {{ form.sale_date }}
@@ -58,33 +57,17 @@
                         {{ form.document_number }}
                         {{ form.document_number.errors }}
                     </div>
-                    <div class="form-field">
-                        <label for="{{ form.tattoo.id_for_label }}">{{ form.tattoo.label }}</label>
-                        {{ form.tattoo }}
-                        {{ form.tattoo.errors }}
-                    </div>
-
-                    <div class="form-field">
-                        <label for="{{ form.avg_meatiness_seurop.id_for_label }}">{{ form.avg_meatiness_seurop.label }}</label>
-                        {{ form.avg_meatiness_seurop }}
-                        {{ form.avg_meatiness_seurop.errors }}
-                    </div>
-                    <div class="form-field">
-                        <label for="{{ form.live_weight.id_for_label }}">{{ form.live_weight.label }}</label>
-                        {{ form.live_weight }}
-                        {{ form.live_weight.errors }}
-                    </div>
-                    <div class="form-field">
-                        <label for="{{ form.live_weight_unit.id_for_label }}">{{ form.live_weight_unit.label }}</label>
-                        {{ form.live_weight_unit }}
-                        {{ form.live_weight_unit.errors }}
-                    </div>
-                    <div class="form-field">
-                        <label for="{{ form.dressing_percentage.id_for_label }}">{{ form.dressing_percentage.label }}</label>
-                        {{ form.dressing_percentage }}
-                        {{ form.dressing_percentage.errors }}
-                    </div>
                 </div>
+                <details class="form-disclosure sale-additional-data"{% if form.tattoo.value or form.avg_meatiness_seurop.value or form.live_weight.value or form.dressing_percentage.value %} open{% endif %}>
+                    <summary>Dane dodatkowe <small>Opcjonalne</small></summary>
+                    <div class="form-grid two-columns">
+                        {% include 'components/form_field.html' with field=form.tattoo %}
+                        {% include 'components/form_field.html' with field=form.avg_meatiness_seurop %}
+                        {% include 'components/form_field.html' with field=form.live_weight %}
+                        {% include 'components/form_field.html' with field=form.live_weight_unit %}
+                        {% include 'components/form_field.html' with field=form.dressing_percentage %}
+                    </div>
+                </details>
             </div>
 
             <aside class="panel sale-side-panel">
@@ -150,7 +133,7 @@
                 >{{ row_formset.non_form_errors }}</div>
             {% endif %}
             <div class="table-scroll">
-                <table class="data-table settlement-table settlement-form-cards" data-no-pagination="true"{% if pdf_import_feedback %} data-imported-preview="true"{% endif %}>
+                <table class="data-table settlement-table mobile-form-cards settlement-form-cards" data-no-pagination="true"{% if pdf_import_feedback %} data-imported-preview="true"{% endif %}>
                     <thead>
                         <tr>
                             <th>Lp</th>
@@ -197,6 +180,7 @@
                 </table>
             </div>
             <p id="settlement-rows-empty" class="empty-inline" hidden>Brak pozycji rozliczenia. Użyj przycisku „Dodaj wiersz”, aby utworzyć pierwszą.</p>
+            <p id="settlement-rows-status" class="sr-only" aria-live="polite"></p>
         </section>
 
         <template id="settlement-row-template">
@@ -224,7 +208,7 @@
             </tr>
         </template>
 
-        <div class="form-actions">
+        <div class="form-actions sticky-form-actions">
             <a href="{% url 'sales_list' %}" class="button button-secondary">Anuluj</a>
             <button type="submit" name="save_sale" value="1" class="button button-primary">Zapisz sprzedaż</button>
         </div>

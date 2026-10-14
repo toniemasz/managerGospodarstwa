@@ -4,9 +4,10 @@
         <h1>{{ title }}</h1>
         {% if subtitle %}<p class="page-subtitle">{{ subtitle }}</p>{% endif %}
     </div>
-    {% if actions_template %}
+    {% if actions_template or back_url %}
         <div class="header-actions">
-            {% include actions_template %}
+            {% if back_url %}<a href="{{ back_url }}" class="button button-secondary">{{ back_label|default:'Wróć' }}</a>{% endif %}
+            {% if actions_template %}{% include actions_template %}{% endif %}
         </div>
     {% endif %}
 </section>

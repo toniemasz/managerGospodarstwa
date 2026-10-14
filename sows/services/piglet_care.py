@@ -374,33 +374,6 @@ class PigletCareService:
         for farrowing in (transfer.source_farrowing, transfer.target_farrowing):
             self.validate_cycle_history(farrowing, excluded_transfer_ids={transfer.id})
 
-    def validate_pre_weaning_mortality(
-        self,
-        *,
-        farrowing: SowEventModel,
-        mortality_date: date,
-        quantity: int,
-        replaced_report: MortalityReportModel | None = None,
-    ) -> None:
-        excluded_report_id = replaced_report.id if replaced_report else None
-        if quantity is None or quantity <= 0:
-            raise PigletCareError("Liczba upadków musi być większa od zera.")
-        if not self.is_active_on(farrowing, mortality_date):
-            raise PigletCareError("Odchów nie był aktywny w dniu upadku.")
-        candidate = MortalityReportModel(
-            farm=self.farm,
-            mortality_type=MortalityReportModel.TYPE_PRE_WEANING,
-            sow=farrowing.sow,
-            farrowing=farrowing,
-            mortality_date=mortality_date,
-            quantity=quantity,
-        )
-        self.validate_cycle_history(
-            farrowing,
-            excluded_mortality_ids={excluded_report_id} if excluded_report_id else set(),
-            candidate_mortalities=[candidate],
-        )
-
     def validate_weaning(
         self,
         *,

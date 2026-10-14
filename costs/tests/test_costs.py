@@ -1,6 +1,7 @@
 from datetime import date
 from decimal import Decimal
 from importlib import import_module
+from uuid import uuid4
 
 import pytest
 from django.apps import apps as django_apps
@@ -87,6 +88,26 @@ def test_cost_create_edit_delete_form_and_audit(cost_context):
     foreign_category = CostCategoryModel.objects.create(farm=other_farm, name="Obca")
     form = CostForm(data={**data, "category": foreign_category.pk}, farm=farm)
     assert not form.is_valid()
+
+
+@pytest.mark.django_db
+def test_repeated_cost_submission_creates_only_one_cost(cost_context):
+    client, _user, farm = cost_context
+    category = CostCategoryModel.objects.create(farm=farm, name="Energia")
+    data = {
+        "submission_token": str(uuid4()),
+        "date": "2026-03-10",
+        "amount": "450.50",
+        "category": category.pk,
+        "description": "Prąd",
+    }
+
+    first = client.post(reverse("add_cost"), data)
+    second = client.post(reverse("add_cost"), data)
+
+    assert first.status_code == second.status_code == 302
+    assert CostModel.objects.filter(farm=farm, description="Prąd").count() == 1
+    assert AuditLogModel.objects.filter(farm=farm, action="CREATE").count() == 1
 
 
 @pytest.mark.django_db

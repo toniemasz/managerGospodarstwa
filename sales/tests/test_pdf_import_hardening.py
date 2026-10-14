@@ -47,6 +47,52 @@ def test_pdf_import_rejects_corrupted_pdf_and_pdf_without_table(sales_client):
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("filename", "content_type", "payload", "message"),
+    [
+        ("settlement.txt", "application/pdf", b"%PDF-1.4", "rozszerzeniem .pdf"),
+        ("settlement.pdf", "text/plain", b"%PDF-1.4", "nie ma typu PDF"),
+        ("settlement.pdf", "application/pdf", b"not-pdf", "prawidłowym dokumentem PDF"),
+    ],
+)
+def test_pdf_import_rejects_invalid_extension_mime_and_signature(
+    sales_client,
+    filename,
+    content_type,
+    payload,
+    message,
+):
+    uploaded = SimpleUploadedFile(filename, payload, content_type=content_type)
+
+    response = sales_client.post(
+        reverse("add_sale"),
+        {"import_pdf": "1", "settlement_pdf": uploaded},
+    )
+
+    assert response.status_code == 200
+    assert message in response.content.decode()
+    assert not PigSaleModel.objects.exists()
+
+
+@pytest.mark.django_db
+def test_pdf_import_rejects_file_larger_than_ten_megabytes(sales_client):
+    uploaded = SimpleUploadedFile(
+        "large.pdf",
+        b"%PDF-" + b"0" * (10 * 1024 * 1024),
+        content_type="application/pdf",
+    )
+
+    response = sales_client.post(
+        reverse("add_sale"),
+        {"import_pdf": "1", "settlement_pdf": uploaded},
+    )
+
+    assert response.status_code == 200
+    assert "maksymalnie 10 MB" in response.content.decode()
+    assert not PigSaleModel.objects.exists()
+
+
+@pytest.mark.django_db
 def test_pdf_parser_warnings_are_shown_and_preview_does_not_save(sales_client):
     uploaded = SimpleUploadedFile("settlement.pdf", b"%PDF-1.4\nfake", content_type="application/pdf")
     result = SalePdfImportResult(

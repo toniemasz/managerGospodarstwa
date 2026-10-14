@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from costs.dashboard import CostDashboardProvider
 from common.cache import TASK_CENTER_TTL, cached_farm_value
+from common.number_formatting import format_money
 from feed.services.dashboard import FeedDashboardProvider
 from sales.dashboard import SalesDashboardProvider
 from sows.services.sow_dashboard_service import SowDashboardService
@@ -260,7 +261,7 @@ class TaskCenterService:
             cost_items.append(
                 self._task(
                     title=f"Koszt wymaga uwagi: {cost.description}",
-                    description=f"{cost.amount:.2f} zł — {', '.join(issues)}.",
+                    description=f"{format_money(cost.amount, currency='zł')} — {', '.join(issues)}.",
                     status_label="wymaga uzupełnienia",
                     priority="upcoming" if cost.is_paid else "urgent",
                     due_date=cost.date,

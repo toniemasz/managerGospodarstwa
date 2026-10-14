@@ -7,8 +7,8 @@ from django.db import transaction
 
 from sales.actions import replace_sale_rows, save_sale as save_sale_action
 from sales.forms import SaleClassRowFormSet, empty_sale_row_initials
-from sales.models import PigSaleModel, SaleClassRowModel
-from sales.services.parsers.factory import SaleSettlementParserFactory
+from sales.models import PigSaleModel, SaleClassRowModel  # compatibility: public patch target
+from sales.services.pdf_import_service import SaleSettlementPdfParser
 
 
 @dataclass
@@ -56,7 +56,7 @@ class SalePdfImportResult:
         }
 
 
-class SaleFormService:
+class SaleImportService:
     def __init__(self, farm):
         if farm is None:
             raise ValueError("Zapis sprzedaży wymaga jawnego gospodarstwa.")
@@ -75,7 +75,7 @@ class SaleFormService:
         replace_sale_rows(sale, row_formset)
 
     def parse_pdf_import(self, uploaded_pdf, post_data) -> SalePdfImportResult:
-        parsed = SaleSettlementParserFactory.create('pdf').parse(uploaded_pdf)
+        parsed = SaleSettlementPdfParser().parse(uploaded_pdf)
         initial = self.form_initial_from_post(post_data)
         initial.update(self.without_empty_values(parsed.sale_fields))
         initial['no_settlement'] = False
@@ -166,3 +166,8 @@ class SaleFormService:
         data['rows-0-weight'] = post_data.get('total_weight', '')
         data['rows-0-price_per_kg'] = post_data.get('price_per_kg', '')
         return SaleClassRowFormSet(data, prefix='rows')
+
+
+# Zgodność publicznego importu. Nowy kod powinien używać nazwy opisującej
+# rzeczywistą odpowiedzialność serwisu: import i przygotowanie formularza.
+SaleFormService = SaleImportService

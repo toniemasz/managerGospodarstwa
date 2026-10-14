@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+import uuid
 
 from farms.dashboard_registry import default_dashboard_stats
 from farms.defaults import (
@@ -125,6 +126,34 @@ class AuditLogModel(models.Model):
 
     def __str__(self):
         return f"{self.action}: {self.object_repr or self.model_label}"
+
+
+class FormSubmissionModel(models.Model):
+    """One-time key protecting critical create forms from duplicate submission."""
+
+    farm = models.ForeignKey(
+        FarmModel,
+        on_delete=models.CASCADE,
+        related_name="form_submissions",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="farm_form_submissions",
+    )
+    scope = models.CharField(max_length=80)
+    token = models.UUIDField(default=uuid.uuid4, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("farm", "user", "scope", "token"),
+                name="unique_form_submission_token",
+            ),
+        ]
+        verbose_name = "Klucz jednokrotnego zapisu formularza"
+        verbose_name_plural = "Klucze jednokrotnego zapisu formularzy"
 
 
 class BackupImportPreviewModel(models.Model):

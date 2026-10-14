@@ -15,6 +15,7 @@
     <section class="panel table-panel">
         <form method="post" id="delivery-form">
             {% csrf_token %}
+            <input type="hidden" name="submission_token" value="{{ submission_token }}">
 
             {% if formset.non_form_errors %}
             <div

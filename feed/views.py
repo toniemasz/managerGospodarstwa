@@ -6,6 +6,7 @@ from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.db.models.deletion import ProtectedError, RestrictedError
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from .models import RecipeModel, ProductionModel, IngredientModel, DeliveryModel
 from .forms import (
@@ -23,6 +24,7 @@ from common.date_range import PERIOD_OPTIONS, parse_date_range
 from common.filter_ui import filter_ui_state, parse_filter_date
 from common.units import format_mass
 from farms.services.current_farm import get_current_farm
+from farms.services.idempotency import execute_once, new_submission_token
 from farms.services.audit_log_service import log_action
 from feed.actions.deliveries import create_deliveries, delete_delivery, update_delivery
 from feed.actions.ingredients import (
@@ -52,7 +54,6 @@ from feed.actions.recipe_versions import (
 from feed.selectors.inventory import (
     full_inventory_context,
     ingredients_for_farm,
-    inventory_dashboard,
     inventory_page_context,
     latest_delivery_prices_map,
 )
@@ -68,7 +69,6 @@ from feed.selectors.recipes import (
     recipe_list_context,
     recipe_version_detail_context,
     recipe_version_for_farm_or_404,
-    recipes_with_items,
 )
 
 
@@ -133,24 +133,24 @@ def edit_ingredient_view(request, pk):
 
 
 @login_required
+@require_POST
 def delete_ingredient_view(request, pk):
     farm = get_current_farm(request)
     ingredient = get_object_or_404(IngredientModel, pk=pk, farm=farm)
-    if request.method == 'POST':
-        try:
-            deleted_ingredient = delete_ingredient(ingredient)
-            log_action(
-                farm=farm,
-                user=request.user,
-                action="DELETE",
-                model_label=deleted_ingredient.model_label,
-                object_id=deleted_ingredient.object_id,
-                object_repr=deleted_ingredient.object_repr,
-            )
-            messages.success(request, "Składnik usunięty.")
-        except (ProtectedError, RestrictedError):
-            messages.error(request,
-                           "Nie można usunąć składnika, ponieważ przypisane są do niego dostawy lub występuje w recepturze.")
+    try:
+        deleted_ingredient = delete_ingredient(ingredient)
+        log_action(
+            farm=farm,
+            user=request.user,
+            action="DELETE",
+            model_label=deleted_ingredient.model_label,
+            object_id=deleted_ingredient.object_id,
+            object_repr=deleted_ingredient.object_repr,
+        )
+        messages.success(request, "Składnik usunięty.")
+    except (ProtectedError, RestrictedError):
+        messages.error(request,
+                       "Nie można usunąć składnika, ponieważ przypisane są do niego dostawy lub występuje w recepturze.")
     return redirect('ingredient_list')
 
 
@@ -182,6 +182,7 @@ def add_delivery_view(request):
         "date": timezone.localdate(),
         **({"ingredient": selected_ingredient} if selected_ingredient else {}),
     }]
+    submission_token = request.POST.get("submission_token") or new_submission_token()
     if request.method == 'POST':
         formset = DeliveryFormSet(
             request.POST,
@@ -190,7 +191,17 @@ def add_delivery_view(request):
             form_kwargs={'farm': farm},
         )
         if formset.is_valid():
-            deliveries = create_deliveries(formset, farm=farm, user=request.user)
+            result = execute_once(
+                farm=farm,
+                user=request.user,
+                scope="feed.add_deliveries",
+                token=submission_token,
+                operation=lambda: create_deliveries(formset, farm=farm, user=request.user),
+            )
+            if not result.executed:
+                messages.info(request, "Te dostawy zostały już przyjęte. Nie utworzono duplikatów.")
+                return redirect('feed_inventory')
+            deliveries = result.value
             messages.success(request, f"Przyjęto dostawy na magazyn: {len(deliveries)}.")
             return redirect('feed_inventory')
         messages.error(request, "Nie przyjęto żadnej dostawy. Popraw oznaczone wiersze.")
@@ -200,7 +211,11 @@ def add_delivery_view(request):
             initial=initial,
             form_kwargs={'farm': farm},
         )
-    return render(request, 'feed/delivery_form.html', {'formset': formset})
+    return render(
+        request,
+        'feed/delivery_form.html',
+        {'formset': formset, 'submission_token': submission_token},
+    )
 
 
 @login_required
@@ -232,19 +247,19 @@ def edit_delivery_view(request, pk):
 
 
 @login_required
+@require_POST
 def delete_delivery_view(request, pk):
     farm = get_current_farm(request)
     delivery = get_object_or_404(DeliveryModel, pk=pk, ingredient__farm=farm)
-    if request.method == 'POST':
-        representation = str(delivery)
-        object_id = delivery.pk
-        try:
-            delete_delivery(delivery, farm=farm)
-        except ValidationError as error:
-            messages.error(request, error.messages[0])
-        else:
-            log_action(farm=farm, user=request.user, action="DELETE", model_label="feed.DeliveryModel", object_id=object_id, object_repr=representation)
-            messages.success(request, "Dostawa usunięta z historii.")
+    representation = str(delivery)
+    object_id = delivery.pk
+    try:
+        delete_delivery(delivery, farm=farm)
+    except ValidationError as error:
+        messages.error(request, error.messages[0])
+    else:
+        log_action(farm=farm, user=request.user, action="DELETE", model_label="feed.DeliveryModel", object_id=object_id, object_repr=representation)
+        messages.success(request, "Dostawa usunięta z historii.")
     return redirect('feed_inventory')
 
 
@@ -331,23 +346,23 @@ def edit_recipe_view(request, pk):
 
 
 @login_required
+@require_POST
 def delete_recipe_view(request, pk):
     farm = get_current_farm(request)
     recipe = get_object_or_404(RecipeModel, pk=pk, farm=farm)
-    if request.method == 'POST':
-        try:
-            deleted_recipe = delete_recipe_action(recipe)
-            log_action(
-                farm=farm,
-                user=request.user,
-                action="DELETE",
-                model_label=deleted_recipe["model_label"],
-                object_id=deleted_recipe["object_id"],
-                object_repr=deleted_recipe["object_repr"],
-            )
-            messages.success(request, "Receptura usunięta.")
-        except (ProtectedError, RestrictedError):
-            messages.error(request, "Nie można usunąć receptury, ponieważ zrealizowano z jej użyciem śrutowanie.")
+    try:
+        deleted_recipe = delete_recipe_action(recipe)
+        log_action(
+            farm=farm,
+            user=request.user,
+            action="DELETE",
+            model_label=deleted_recipe["model_label"],
+            object_id=deleted_recipe["object_id"],
+            object_repr=deleted_recipe["object_repr"],
+        )
+        messages.success(request, "Receptura usunięta.")
+    except (ProtectedError, RestrictedError):
+        messages.error(request, "Nie można usunąć receptury, ponieważ zrealizowano z jej użyciem śrutowanie.")
     return redirect('feed_recipes')
 
 
@@ -476,8 +491,16 @@ def feed_production_view(request):
 def add_production_view(request):
     farm = get_current_farm(request)
     if request.method == 'POST':
-        form = ProductionForm(request.POST, farm=farm)
-        if form.is_valid():
+        if "preview_recipe" in request.POST:
+            initial = {
+                key: value
+                for key, value in request.POST.items()
+                if key != "csrfmiddlewaretoken"
+            }
+            form = ProductionForm(farm=farm, initial=initial)
+        else:
+            form = ProductionForm(request.POST, farm=farm)
+        if "preview_recipe" not in request.POST and form.is_valid():
             production = create_production(form)
             try:
                 log_action(farm=farm, user=request.user, action="CREATE", obj=production)
@@ -501,8 +524,7 @@ def add_production_view(request):
         initial = default_production_initial(farm, selected_recipe=request.GET.get('recipe'))
         form = ProductionForm(farm=farm, initial=initial)
 
-    recipes = recipes_with_items(farm)
-    return render(request, 'feed/production_form.html', {'form': form, 'recipes': recipes, 'is_edit': False})
+    return render(request, 'feed/production_form.html', {'form': form, 'is_edit': False})
 
 @login_required
 def edit_production_view(request, pk):
@@ -523,39 +545,37 @@ def edit_production_view(request, pk):
     else:
         form = ProductionForm(instance=production, farm=farm)
 
-    recipes = recipes_with_items(farm)
     return render(request, 'feed/production_form.html', {
         'form': form,
-        'recipes': recipes,
         'is_edit': True,
         'production': production,
     })
 
 
 @login_required
+@require_POST
 def delete_production_view(request, pk):
     farm = get_current_farm(request)
     production = get_object_or_404(ProductionModel, pk=pk, recipe__farm=farm)
-    if request.method == 'POST':
-        representation = str(production)
-        object_id = production.pk
-        try:
-            deleted = delete_production_with_inventory(farm, production)
-        except ValidationError as error:
-            messages.error(request, error.messages[0])
+    representation = str(production)
+    object_id = production.pk
+    try:
+        deleted = delete_production_with_inventory(farm, production)
+    except ValidationError as error:
+        messages.error(request, error.messages[0])
+    else:
+        if deleted:
+            log_action(
+                farm=farm,
+                user=request.user,
+                action="DELETE",
+                model_label="feed.ProductionModel",
+                object_id=object_id,
+                object_repr=representation,
+            )
+            messages.success(request, "Usunięto śrutowanie.")
         else:
-            if deleted:
-                log_action(
-                    farm=farm,
-                    user=request.user,
-                    action="DELETE",
-                    model_label="feed.ProductionModel",
-                    object_id=object_id,
-                    object_repr=representation,
-                )
-                messages.success(request, "Usunięto śrutowanie.")
-            else:
-                messages.info(request, "Śrutowanie zostało już usunięte.")
+            messages.info(request, "Śrutowanie zostało już usunięte.")
     return redirect('feed_productions')
 
 

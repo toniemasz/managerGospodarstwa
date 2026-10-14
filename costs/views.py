@@ -18,6 +18,7 @@ from common.filter_ui import filter_ui_state
 from farms.services.accounting_year import get_available_years
 from farms.services.audit_log_service import log_action
 from farms.services.current_farm import get_current_farm
+from farms.services.idempotency import execute_once
 
 
 @login_required
@@ -50,8 +51,32 @@ def _cost_form_view(request, *, cost, is_edit):
     if request.method == "POST":
         form = CostForm(request.POST, instance=cost, farm=farm)
         if form.is_valid():
-            saved = save_manual_cost(farm=farm, form=form, user=request.user)
-            log_action(farm=farm, user=request.user, action="UPDATE" if is_edit else "CREATE", obj=saved)
+            def save_and_log():
+                saved_cost = save_manual_cost(farm=farm, form=form, user=request.user)
+                log_action(
+                    farm=farm,
+                    user=request.user,
+                    action="UPDATE" if is_edit else "CREATE",
+                    obj=saved_cost,
+                )
+                return saved_cost
+
+            result = (
+                execute_once(
+                    farm=farm,
+                    user=request.user,
+                    scope="costs.add_manual_cost",
+                    token=form.cleaned_data.get("submission_token"),
+                    operation=save_and_log,
+                )
+                if not is_edit
+                else None
+            )
+            if result is not None and not result.executed:
+                messages.info(request, "Ten koszt został już zapisany. Nie utworzono duplikatu.")
+                return redirect("cost_list")
+            if result is None:
+                save_and_log()
             messages.success(request, "Koszt został zapisany.")
             return redirect("cost_list")
     else:
@@ -124,11 +149,11 @@ def edit_cost_category_view(request, pk):
 
 
 @login_required
+@require_POST
 def deactivate_cost_category_view(request, pk):
     farm = get_current_farm(request)
     category = get_object_or_404(CostCategoryModel, pk=pk, farm=farm)
-    if request.method == "POST":
-        category = deactivate_cost_category(farm=farm, category_id=category.pk)
-        log_action(farm=farm, user=request.user, action="DEACTIVATE", obj=category)
-        messages.success(request, "Kategoria została dezaktywowana.")
+    category = deactivate_cost_category(farm=farm, category_id=category.pk)
+    log_action(farm=farm, user=request.user, action="DEACTIVATE", obj=category)
+    messages.success(request, "Kategoria została dezaktywowana.")
     return redirect("cost_categories")

@@ -148,6 +148,23 @@ def test_feed_get_views_load(auth_client, feed_objects, route_name, key, templat
 
 
 @pytest.mark.django_db
+def test_production_form_uses_one_recipe_selector_for_preview_and_save(auth_client, feed_objects):
+    response = auth_client.get(
+        reverse("add_production"),
+        {"recipe": feed_objects["recipe"].pk},
+    )
+    content = response.content.decode()
+
+    assert response.status_code == 200
+    assert content.count('name="recipe"') == 1
+    assert "Receptura do podglądu składników" not in content
+    assert 'name="preview_recipe"' in content
+    assert "Ten sam wybór zostanie użyty przy zapisie" not in content
+    assert "Jednorazowe proporcje" in content
+    assert "sticky-form-actions" in content
+
+
+@pytest.mark.django_db
 def test_add_recipe_does_not_save_when_formset_invalid(auth_client, feed_objects):
     response = auth_client.post(reverse('add_recipe'), {
         'name': 'Niepełna',

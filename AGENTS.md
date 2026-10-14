@@ -1,5 +1,26 @@
 # AGENTS.md — managerGospodarstwa
 
+## 0. Stała baza wiedzy repozytorium
+
+Przed szeroką analizą projektu przeczytaj `docs/assistant/README.md`, a następnie
+tylko dokumenty potrzebne do zadania:
+
+* `docs/assistant/PROJECT_STRUCTURE.md` — mapa modułów, modeli, wejść i przepływów,
+* `docs/assistant/TEST_COVERAGE.md` — stan oraz luki testów krytycznych,
+* `docs/assistant/UX_AUDIT.md` — stan i rekomendacje interfejsu,
+* `docs/assistant/DUPLICATION_AND_DEAD_CODE_AUDIT.md` — rekomendacje oczekujące
+  na akceptację dotyczące duplikacji, wspólnych wzorców UX i martwego kodu,
+* `docs/assistant/CHANGELOG.md` — ostatnie zmiany strukturalne.
+
+Mapa skraca rozpoznanie, ale nie zastępuje przeczytania plików konkretnego
+przepływu i znalezienia wszystkich użyć przez `rg`.
+
+Po każdej zmianie strukturalnej, modelu, migracji, publicznego kontraktu, URL-a,
+wspólnego komponentu, krytycznego procesu lub zakresu testów zaktualizuj
+odpowiednie pliki w `docs/assistant/` i dopisz wpis do `CHANGELOG.md` w tym samym
+zadaniu. Kod i przechodzące testy mają pierwszeństwo przed dokumentacją; wykrytą
+rozbieżność należy poprawić, a nie utrwalać.
+
 ## 1. Kontekst i priorytety
 
 Repozytorium zawiera produkcyjną aplikację Django `managerGospodarstwa` do zarządzania gospodarstwem trzody chlewnej.

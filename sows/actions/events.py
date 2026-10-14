@@ -309,39 +309,3 @@ class SowEventActions:
         data["piglet_balance_difference"] = difference
         data["automatic_pre_weaning_deaths"] = max(-difference, 0)
         data["unrecorded_piglet_inflow"] = max(difference, 0)
-
-
-def record_bulk_pregnancy_checks(
-    *,
-    farm,
-    sows,
-    results_by_sow_id: dict,
-    event_date=None,
-) -> list[SowEventModel]:
-    return SowEventActions(farm=farm).bulk_create_pregnancy_checks(
-        sows=sows,
-        results_by_sow_id=results_by_sow_id,
-        event_date=event_date,
-    )
-
-
-def record_bulk_vaccinations(
-    *,
-    farm,
-    sow_ids: list,
-    vaccine_name: str,
-    cycle_id: str,
-    event_date=None,
-    note: str = "",
-    plan_id: int | None = None,
-    scheduled_date=None,
-) -> list[SowEventModel]:
-    return SowEventActions(farm=farm).bulk_create_vaccinations(
-        sow_ids=sow_ids,
-        vaccine_name=vaccine_name,
-        cycle_id=cycle_id,
-        event_date=event_date,
-        note=note,
-        plan_id=plan_id,
-        scheduled_date=scheduled_date,
-    )

@@ -19,7 +19,3 @@ class CrossFarmAccessError(FeedDomainError):
 
 class FinishedFeedInsufficientStockError(FeedDomainError):
     pass
-
-
-class ProductionRollbackError(FeedDomainError):
-    pass

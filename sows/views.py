@@ -30,6 +30,7 @@ from common.date_range import PERIOD_OPTIONS, parse_date_range
 from common.filter_ui import filter_ui_state
 from common.cache import invalidate_farm_cache_on_commit
 from farms.services.current_farm import get_current_farm
+from farms.services.idempotency import execute_once, new_submission_token
 from farms.services.module_navigation import ModuleNavigationService
 from farms.services.audit_log_service import log_action
 from farms.services.settings_service import get_farm_settings
@@ -517,6 +518,7 @@ def bulk_sow_events_view(request):
     else:
         initial_count = max(2, min(20, requested_rows))
 
+    submission_token = request.POST.get("submission_token") or new_submission_token()
     if request.method == 'POST':
         formset = BulkSowEventFormSet(request.POST, prefix='events', form_kwargs={'farm': farm})
         if formset.is_valid():
@@ -527,15 +529,29 @@ def bulk_sow_events_view(request):
             else:
                 validation = service.validate_rows(rows)
                 if validation.is_valid:
-                    created_count = service.create_events(rows)
-                    for row in rows:
-                        log_action(
-                            farm=farm,
-                            user=request.user,
-                            action="CREATE",
-                            model_label="sows.SowEventModel",
-                            object_repr=f"{row.event_type} - {row.event_date} (Maciora: {row.sow.ear_tag})",
-                        )
+                    def create_and_log():
+                        count = service.create_events(rows)
+                        for row in rows:
+                            log_action(
+                                farm=farm,
+                                user=request.user,
+                                action="CREATE",
+                                model_label="sows.SowEventModel",
+                                object_repr=f"{row.event_type} - {row.event_date} (Maciora: {row.sow.ear_tag})",
+                            )
+                        return count
+
+                    result = execute_once(
+                        farm=farm,
+                        user=request.user,
+                        scope="sows.bulk_events",
+                        token=submission_token,
+                        operation=create_and_log,
+                    )
+                    if not result.executed:
+                        messages.info(request, "Te zdarzenia zostały już zapisane. Nie utworzono duplikatów.")
+                        return redirect('dashboard')
+                    created_count = result.value
                     _add_weaning_reconciliation_message(request, rows)
                     messages.success(request, f"Zapisano {created_count} zdarzeń.")
                     return redirect('dashboard')
@@ -559,6 +575,7 @@ def bulk_sow_events_view(request):
         'formset': formset,
         'sows': sows,
         'is_single': is_single,
+        'submission_token': submission_token,
     })
 
 
@@ -767,39 +784,38 @@ def cancel_piglet_transfer_view(request, transfer_id):
 
 
 @login_required
+@require_POST
 def delete_sow_view(request, sow_id):
     farm = get_current_farm(request)
-    if request.method == 'POST':
-        db_sow = get_object_or_404(SowModel, id=sow_id, farm=farm)
+    db_sow = get_object_or_404(SowModel, id=sow_id, farm=farm)
 
-        if request.POST.get('archive') == 'on':
-            db_sow.is_archived = True
-            db_sow.archived_at = timezone.now()
-            db_sow.archive_reason = SowModel.ARCHIVE_REASON_MANUAL
-            db_sow.death_date = None
-            db_sow.death_note = ""
-            db_sow.save()
-            invalidate_farm_cache_on_commit(farm, groups=("sows",))
-            log_action(farm=farm, user=request.user, action="ARCHIVE", obj=db_sow)
-            messages.success(request, "Maciora została zarchiwizowana.")
-        else:
-            representation = str(db_sow)
-            object_id = db_sow.pk
-            try:
-                db_sow.delete()
-            except ProtectedError:
-                messages.error(
-                    request,
-                    "Nie można usunąć maciory powiązanej z historią odchowu. "
-                    "Zamiast tego zarchiwizuj maciorę.",
-                )
-                return redirect('sow_detail', sow_id=sow_id)
-            invalidate_farm_cache_on_commit(farm, groups=("sows",))
-            log_action(farm=farm, user=request.user, action="DELETE", model_label="sows.SowModel", object_id=object_id, object_repr=representation)
-            messages.success(request, "Maciora została usunięta.")
+    if request.POST.get('archive') == 'on':
+        db_sow.is_archived = True
+        db_sow.archived_at = timezone.now()
+        db_sow.archive_reason = SowModel.ARCHIVE_REASON_MANUAL
+        db_sow.death_date = None
+        db_sow.death_note = ""
+        db_sow.save()
+        invalidate_farm_cache_on_commit(farm, groups=("sows",))
+        log_action(farm=farm, user=request.user, action="ARCHIVE", obj=db_sow)
+        messages.success(request, "Maciora została zarchiwizowana.")
+    else:
+        representation = str(db_sow)
+        object_id = db_sow.pk
+        try:
+            db_sow.delete()
+        except ProtectedError:
+            messages.error(
+                request,
+                "Nie można usunąć maciory powiązanej z historią odchowu. "
+                "Zamiast tego zarchiwizuj maciorę.",
+            )
+            return redirect('sow_detail', sow_id=sow_id)
+        invalidate_farm_cache_on_commit(farm, groups=("sows",))
+        log_action(farm=farm, user=request.user, action="DELETE", model_label="sows.SowModel", object_id=object_id, object_repr=representation)
+        messages.success(request, "Maciora została usunięta.")
 
-        return redirect('dashboard')
-    return redirect('sow_detail', sow_id=sow_id)
+    return redirect('dashboard')
 
 @login_required
 def archived_sows_view(request):
@@ -937,27 +953,25 @@ def general_statistics_view(request):
 
 
 @login_required
+@require_POST
 def delete_event_view(request, event_id):
-    if request.method == 'POST':
-        farm = get_current_farm(request)
-        event = get_object_or_404(SowEventModel.objects.filter(sow__farm=farm), pk=event_id)
-        try:
-            deleted_event = SowEventActions(farm=farm, user=request.user).delete_event(event_id)
-        except ValidationError as error:
-            messages.error(request, error.messages[0])
-            return redirect('sow_detail', sow_id=event.sow_id)
-        else:
-            log_action(
-                farm=farm,
-                user=request.user,
-                action="DELETE",
-                model_label=deleted_event.model_label,
-                object_id=deleted_event.object_id,
-                object_repr=deleted_event.object_repr,
-            )
-            messages.success(request, "Zdarzenie zostało usunięte.")
-            return redirect('sow_detail', sow_id=deleted_event.sow_id)
-    return redirect('dashboard')
+    farm = get_current_farm(request)
+    event = get_object_or_404(SowEventModel.objects.filter(sow__farm=farm), pk=event_id)
+    try:
+        deleted_event = SowEventActions(farm=farm, user=request.user).delete_event(event_id)
+    except ValidationError as error:
+        messages.error(request, error.messages[0])
+        return redirect('sow_detail', sow_id=event.sow_id)
+    log_action(
+        farm=farm,
+        user=request.user,
+        action="DELETE",
+        model_label=deleted_event.model_label,
+        object_id=deleted_event.object_id,
+        object_repr=deleted_event.object_repr,
+    )
+    messages.success(request, "Zdarzenie zostało usunięte.")
+    return redirect('sow_detail', sow_id=deleted_event.sow_id)
 
 
 def _get_event_initial_data(db_event: SowEventModel) -> dict:

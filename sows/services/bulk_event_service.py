@@ -10,6 +10,7 @@ from sows.domain.sow_state_machine import SowStateMachine
 from sows.services.sow_lifecycle import SowEvent
 from sows.services.sow_repository import SowRepository
 from sows.services.piglet_care import PigletCareError, PigletCareService
+from sows.services.event_details import build_event_details_for_farm
 
 
 @dataclass
@@ -49,7 +50,10 @@ class BulkSowEventService:
                 sow=form.cleaned_data['sow'],
                 event_type=form.cleaned_data['event_type'],
                 event_date=form.cleaned_data['event_date'],
-                details=form.build_details(),
+                details=build_event_details_for_farm(
+                    form.cleaned_data,
+                    farm=self.farm,
+                ),
             ))
         return rows
 

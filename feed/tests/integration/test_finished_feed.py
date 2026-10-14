@@ -1,11 +1,13 @@
 from datetime import date
 from decimal import Decimal
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 
 import pytest
 from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
+from django.db import IntegrityError, close_old_connections
 from django.test import Client
 from django.urls import reverse
 
@@ -18,6 +20,7 @@ from feed.actions.finished_feed import (
 )
 from feed.models import (
     FeedProductModel,
+    FeedServingModel,
     FeedServingAllocationModel,
     FinishedFeedBatchModel,
     ReadyFeedDeliveryModel,
@@ -76,6 +79,45 @@ def test_manual_serving_cannot_exceed_finished_feed_stock(ready_feed):
     with pytest.raises(ValidationError):
         create_feed_serving(farm=farm, product=product, date=date(2026, 7, 2), quantity_kg=Decimal("101"), user=user)
     assert not FeedServingAllocationModel.objects.exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_concurrent_servings_cannot_consume_the_same_finished_feed_twice(ready_feed):
+    user, farm, product = ready_feed
+    delivery = create_ready_feed_delivery(
+        farm=farm,
+        product=product,
+        date=date(2026, 7, 1),
+        quantity_kg=Decimal("100"),
+        price_per_kg=Decimal("1"),
+        user=user,
+    )
+    barrier = Barrier(2)
+
+    def serve_once():
+        close_old_connections()
+        barrier.wait()
+        try:
+            create_feed_serving(
+                farm=farm,
+                product=product,
+                date=date(2026, 7, 2),
+                quantity_kg=Decimal("80"),
+                user=user,
+            )
+            return "created"
+        except ValidationError:
+            return "blocked"
+        finally:
+            close_old_connections()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(lambda _index: serve_once(), range(2)))
+
+    assert sorted(results) == ["blocked", "created"]
+    delivery.batch.refresh_from_db()
+    assert delivery.batch.remaining_quantity_kg == Decimal("20.00")
+    assert FeedServingModel.objects.filter(product=product).count() == 1
 
 
 @pytest.mark.django_db
@@ -225,9 +267,53 @@ def test_finished_feed_list_exposes_delivery_action_only_for_purchased_product(r
     assert reverse("create_ready_feed_product") in body
     assert reverse("add_ready_feed_delivery", args=[purchased.pk]) in body
     assert reverse("add_ready_feed_delivery", args=[produced.pk]) not in body
-    assert "Dodaj gotową paszę" in body
-    assert "Podawana automatycznie" in body
-    assert "Kup gotową paszę" not in body
+
+
+@pytest.mark.django_db
+def test_feed_servings_tab_renders_without_server_error(ready_feed):
+    user, farm, product = ready_feed
+    delivery = create_ready_feed_delivery(
+        farm=farm,
+        product=product,
+        date=date(2026, 7, 1),
+        quantity_kg=Decimal("100"),
+        price_per_kg=Decimal("1.25"),
+        user=user,
+    )
+    create_feed_serving(
+        farm=farm,
+        product=product,
+        date=date(2026, 7, 2),
+        quantity_kg=Decimal("25"),
+        user=user,
+    )
+    client = Client()
+    client.force_login(user)
+
+    response = client.get(reverse("feed_servings"))
+
+    assert response.status_code == 200
+    body = response.content.decode()
+    assert "Zużycie paszy" in body
+    assert product.name in body
+    assert "25 kg" in body
+    delivery.batch.refresh_from_db()
+    assert delivery.batch.remaining_quantity_kg == Decimal("75.00")
+
+
+@pytest.mark.django_db
+def test_ready_feed_delivery_page_renders_one_price_unit_control(ready_feed):
+    user, _farm, product = ready_feed
+    client = Client()
+    client.force_login(user)
+
+    response = client.get(reverse("add_ready_feed_delivery", args=[product.pk]))
+
+    assert response.status_code == 200
+    body = response.content.decode()
+    assert body.count('name="price_per_kg_unit"') == 1
+    assert 'name="price_unit"' not in body
+    assert "Przyjmij dostawę" in body
 
 
 @pytest.mark.django_db

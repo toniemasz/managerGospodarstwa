@@ -118,4 +118,10 @@ feature branch
 ## Dokumentacja dodatkowa
 
 - [Architektura aplikacji](docs/architecture.md)
+- [Skrócona baza wiedzy dla kolejnych prac](docs/assistant/README.md)
+- [Mapa struktury projektu](docs/assistant/PROJECT_STRUCTURE.md)
+- [Dokumentacja testów i audyt pokrycia](docs/assistant/TEST_COVERAGE.md)
+- [Audyt UX i plan usprawnień](docs/assistant/UX_AUDIT.md)
+- [Audyt duplikacji, martwego kodu i spójności UX](docs/assistant/DUPLICATION_AND_DEAD_CODE_AUDIT.md)
+- [Rejestr zmian strukturalnych](docs/assistant/CHANGELOG.md)
 - [Planowane usprawnienia](docs/future-upgrades.md)

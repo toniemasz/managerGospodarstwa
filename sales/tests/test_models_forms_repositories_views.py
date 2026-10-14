@@ -1,6 +1,7 @@
 from datetime import date
 from decimal import Decimal
 from unittest.mock import patch
+from uuid import uuid4
 
 import pytest
 from django.contrib import admin
@@ -79,6 +80,25 @@ def test_sales_views_require_login_and_handle_create(auth_client, client):
     assert PigSaleModel.objects.filter(quantity=8, meat_class='R', farm=auth_client.farm).exists()
     sale = PigSaleModel.objects.get(quantity=8, meat_class='R', farm=auth_client.farm)
     assert AuditLogModel.objects.filter(farm=auth_client.farm, action="CREATE", object_id=str(sale.pk)).exists()
+
+
+@pytest.mark.django_db
+def test_repeated_sale_submission_creates_only_one_sale(auth_client):
+    data = {
+        "submission_token": str(uuid4()),
+        "sale_date": "2026-06-03",
+        "meat_class": "R",
+        "quantity": 8,
+        "total_weight": "760.00",
+        "price_per_kg": "7.80",
+    }
+
+    first = auth_client.post(reverse("add_sale"), data)
+    second = auth_client.post(reverse("add_sale"), data)
+
+    assert first.status_code == second.status_code == 302
+    assert PigSaleModel.objects.filter(farm=auth_client.farm).count() == 1
+    assert AuditLogModel.objects.filter(farm=auth_client.farm, action="CREATE").count() == 1
 
 
 @pytest.mark.django_db
@@ -561,3 +581,10 @@ def test_sale_form_renders_one_responsive_formset_and_process_choices(auth_clien
     assert "Więcej danych" in content
     assert "Nie mam jeszcze rozliczenia" in content
     assert "Zapisz podstawowe dane sprzedaży i uzupełnij rozliczenie później." in content
+    assert 'aria-label="Lp, pozycja 1"' in content
+    assert 'aria-label="Waga, pozycja 1"' in content
+    assert 'name="rows-0-line_no"' in content
+    assert 'name="rows-1-line_no"' not in content
+    assert "Dane dodatkowe" in content
+    assert 'id="settlement-rows-status"' in content
+    assert "sticky-form-actions" in content

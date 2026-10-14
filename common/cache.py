@@ -82,26 +82,6 @@ def invalidate_farm_cache_on_commit(farm, groups: Iterable[str] | None = None) -
     transaction.on_commit(lambda: invalidate_farm_cache(farm, groups=groups))
 
 
-def invalidate_inventory_cache(farm) -> None:
-    invalidate_farm_cache(farm, groups=("inventory",))
-
-
-def invalidate_dashboard_cache(farm) -> None:
-    invalidate_farm_cache(farm, groups=("dashboard",))
-
-
-def invalidate_task_cache(farm) -> None:
-    invalidate_farm_cache(farm, groups=("task_center",))
-
-
-def invalidate_profitability_cache(farm) -> None:
-    invalidate_farm_cache(farm, groups=("profitability",))
-
-
-def invalidate_statistics_cache(farm) -> None:
-    invalidate_farm_cache(farm, groups=("statistics",))
-
-
 def safe_cache_get(key: str, default=None):
     try:
         return cache.get(key, default)
@@ -116,16 +96,6 @@ def safe_cache_set(key: str, value, *, timeout: int | None) -> bool:
     except Exception:
         logger.warning("Cache set failed for key %s", key, exc_info=True)
         return False
-
-
-def safe_cache_delete_many(keys: Iterable[str]) -> None:
-    keys = list(keys)
-    if not keys:
-        return
-    try:
-        cache.delete_many(keys)
-    except Exception:
-        logger.warning("Cache delete_many failed for %d keys", len(keys), exc_info=True)
 
 
 def _farm_id(farm) -> int | None:

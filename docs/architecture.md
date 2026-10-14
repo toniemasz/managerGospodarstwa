@@ -19,7 +19,7 @@ Projekt jest modułowym monolitem Django. Aplikacje domenowe udostępniają jawn
 - `feed`: `IngredientModel`, `DeliveryModel`, `IngredientPriceConfigModel`, `RecipeModel`, `RecipeItemModel`, `RecipeVersionModel`, `RecipeVersionItemModel`, `ProductionModel`, `ProductionIngredientUsageModel`, `InventoryMovementModel`, `FeedProductModel`, `ReadyFeedDeliveryModel`, `FinishedFeedBatchModel`, `FeedServingModel`, `FeedServingAllocationModel`.
 - `costs`: `CostCategoryModel`, `CostModel`.
 - `sales`: `PigSaleModel`, `SaleClassRowModel`.
-- `sows`: `SowModel`, `SowEventModel`, `VaccinationPlanModel`, `MortalityReportModel`.
+- `sows`: `SowModel`, `SowEventModel`, `VaccinationPlanModel`, `VaccinationCycleModel`, `PigletTransferModel`, `MortalityReportModel`.
 
 ## Przepływ zakończenia produkcji
 
@@ -33,15 +33,13 @@ flowchart TD
     F --> G[snapshot ProductionModel]
     F --> H[costs.sync_production_cost]
     F --> I[FinishedFeedBatchModel]
-    I --> J{ustawienie lub jawny wybór}
-    J -->|tak| K[FeedServingModel i FIFO partii]
-    J -->|nie| L[partia pozostaje w magazynie]
-    K --> M[commit]
-    L --> M
-    M --> N[unieważnienie cache on_commit]
+    I --> J[automatyczny FeedServingModel]
+    J --> K[FIFO partii utworzonej przez produkcję]
+    K --> L[commit]
+    L --> M[unieważnienie cache on_commit]
 ```
 
-Całość działa w jednej transakcji. Produkcja jest blokowana przed walidacją, dostawy i partie są blokowane przed alokacją. Ponowne zakończenie nie księguje danych drugi raz. Przewidywalne błędy dziedziczą po `FeedDomainError`; błędy techniczne nie są maskowane i powodują rollback.
+Całość działa w jednej transakcji. Produkcja jest blokowana przed walidacją, dostawy i partie są blokowane przed alokacją. Zakończenie zawsze tworzy automatyczne podanie całej nowej partii. Ponowne zakończenie nie księguje danych drugi raz. Przewidywalne błędy dziedziczą po `FeedDomainError`; błędy techniczne nie są maskowane i powodują rollback.
 
 Dozwolone zwykłe przejścia to `QUEUED -> STAGE_1_DONE -> COMPLETED`. Pominięcie etapu jest jawną opcją przepływu natychmiastowego. Wymuszenie braków magazynowych jest dostępne właścicielowi gospodarstwa lub administratorowi, zapisuje częściowy koszt, braki i wpis audytu.
 
@@ -68,7 +66,7 @@ oraz `ProductionModel.feed_cost_per_kg = FinishedFeedBatchModel.cost_per_kg`.
 
 ## FIFO składników i gotowej paszy
 
-FIFO składników wybiera wycenione dostawy tego samego gospodarstwa z datą nie późniejszą niż produkcja, sortując po `date, id`. Wiersze dostaw są blokowane `select_for_update`; brak ilości przerywa transakcję, a jawne wymuszenie tworzy częściowy wynik bez ujemnego stanu dostawy. Wersja receptury i `custom_recipe_data` mają pierwszeństwo przed aktualnym składem.
+FIFO składników wybiera wycenione dostawy tego samego gospodarstwa z datą nie późniejszą niż produkcja, sortując po `date, id`. Wiersze dostaw są blokowane `select_for_update`; brak ilości w zwykłym przepływie przerywa transakcję. Tryb częściowy/forced istnieje wyłącznie dla kontrolowanej rekonsyliacji historycznej i nie jest dostępny w publicznym UI. Wersja receptury i `custom_recipe_data` mają pierwszeństwo przed aktualnym składem.
 
 FIFO gotowej paszy alokuje `FinishedFeedBatchModel` po `batch_date, id`. Koszt podania jest sumą kosztów `FeedServingAllocationModel`. Usunięcie podania przywraca dokładne ilości do tych samych partii. Relacja `automatic_for_production` zapewnia idempotencję podania automatycznego i odróżnia je od podania ręcznego.
 
@@ -114,7 +112,7 @@ Sygnały nie księgują FIFO, dostaw, kosztu ani partii. Dostawy są synchronizo
 
 `FeedIntegrityService` sprawdza zgodność kosztu FIFO, snapshotu produkcji, wpisu kosztowego, kosztu partii, bilansów partii, typów źródła produktu oraz wybranych relacji między gospodarstwami. Domyślnie działa tylko do odczytu. Naprawy wymagają jawnego `apply=True`; konflikty produktu używanego jednocześnie przez zakup i produkcję są raportowane, ale nigdy automatycznie zgadywane. Interfejsem operacyjnym jest polecenie `audit_feed_integrity --farm-id ...`, opcjonalnie z `--apply`.
 
-Kopie gospodarstwa mają wersję 3. Import obsługuje wersje 1–3: brakujące sekcje nowych, opcjonalnych danych są traktowane jako puste, a brakujące pola opcjonalne korzystają z domyślnych wartości modelu lub `NULL`. Brak wymaganego identyfikatora relacji albo pola biznesowego przerywa cały import przed zapisem. Kopia obejmuje również zgłoszenia upadków. Nieobsługiwana przyszła wersja jest odrzucana zamiast interpretowana heurystycznie.
+Kopie gospodarstwa mają wersję 6. Import obsługuje wersje 1–6: brakujące sekcje nowych, opcjonalnych danych są traktowane jako puste, a brakujące pola opcjonalne korzystają z domyślnych wartości modelu lub `NULL`. Brak wymaganego identyfikatora relacji albo pola biznesowego przerywa cały import przed zapisem. Kopia obejmuje również cykle szczepień, przeniesienia prosiąt, zgłoszenia upadków i dane gotowej paszy. Nieobsługiwana przyszła wersja jest odrzucana zamiast interpretowana heurystycznie.
 
 ## Audyt zależności przed refaktoryzacją
 

@@ -7,7 +7,6 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management import BaseCommand, CommandError
 from django.db import transaction
-from django.db.models import Sum
 from django.utils import timezone
 
 from costs.models import CostCategoryModel, CostModel

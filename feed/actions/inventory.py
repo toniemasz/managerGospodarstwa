@@ -6,7 +6,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import F, Sum
+from django.db.models import Sum
 
 from common.cache import invalidate_farm_cache_on_commit
 from feed.models import (

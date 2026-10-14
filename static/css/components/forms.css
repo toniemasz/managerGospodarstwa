@@ -207,6 +207,27 @@ input[type="date"] {
     padding-top: var(--space-sm);
 }
 
+.field-action-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    align-items: end;
+}
+
+.field-action-row > :first-child {
+    min-width: min(100%, 18rem);
+    flex: 1 1 18rem;
+}
+
+.production-schedule-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.production-completion-option {
+    border-color: var(--warning);
+    background: var(--warning-soft);
+}
+
 .field-hint,
 .help-text,
 .field-error,

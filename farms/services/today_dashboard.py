@@ -2,20 +2,22 @@ from __future__ import annotations
 
 import hashlib
 from datetime import date, datetime, time, timedelta
-from decimal import Decimal
 
 from django.urls import reverse
 from django.utils import timezone
 
 from costs.dashboard import CostDashboardProvider
 from common.cache import TODAY_DASHBOARD_TTL, cached_farm_value
+from farms.dashboard_registry import DASHBOARD_STAT_DEFINITIONS, normalize_dashboard_stats
 from farms.services.module_navigation import ModuleNavigationService, normalize_visible_modules
+from farms.services.profitability import ProfitabilityAnalyticsService
 from farms.services.settings_service import get_farm_settings
 from farms.services.task_center import TaskCenterService
 from feed.services.dashboard import FeedDashboardProvider
 from sales.dashboard import SalesDashboardProvider
 from sows.services.activity import SowActivityProvider
 from sows.services.sow_dashboard_service import SowDashboardService
+from common.number_formatting import format_money
 from common.units import format_mass
 
 
@@ -101,12 +103,12 @@ class TodayDashboardService:
     def __init__(self, farm):
         self.farm = farm
         self.today = timezone.localdate()
-        self.month_start = self.today.replace(day=1)
         self.settings = get_farm_settings(farm)
         self.visible_keys = set(normalize_visible_modules(self.settings.visible_modules))
         self._tasks = None
         self._sows = None
         self._inventory = None
+        self._profitability = None
         self.feed_provider = FeedDashboardProvider(farm)
         self.sales_provider = SalesDashboardProvider(farm)
         self.cost_provider = CostDashboardProvider(farm)
@@ -123,6 +125,8 @@ class TodayDashboardService:
 
     def _build_context(self) -> dict:
         tasks = self._visible_tasks()
+        today_tasks = [task for task in tasks if self._task_belongs_to_today(task)]
+        primary_mobile_tasks = today_tasks[:5]
         alerts = self._alert_items(tasks)
         recent_events = self._recent_events()
         return {
@@ -130,12 +134,14 @@ class TodayDashboardService:
             "today_tasks": tasks[:20],
             "today_quick_tasks": tasks[:6],
             "today_task_groups": self._today_task_groups(tasks),
+            "today_mobile_priority_tasks": primary_mobile_tasks,
+            "today_mobile_remaining_groups": self._today_task_groups(today_tasks[5:]),
             "today_task_count": len(tasks),
             "today_completable_task_count": len([task for task in tasks if task["can_quick_complete"]]),
             "today_alerts": alerts[:8],
             "today_quick_alerts": alerts[:4],
             "today_urgent_alert_count": len([item for item in alerts if item["priority"] in {"urgent", "today"}]),
-            "today_kpis": self._kpi_cards(),
+            "today_kpis": self._selected_kpi_cards(tasks),
             "today_recent_events": recent_events,
             "today_quick_recent_events": recent_events[:5],
             "today_full_links": self._full_links(),
@@ -322,27 +328,41 @@ class TodayDashboardService:
             for report in reports
         ]
 
-    def _kpi_cards(self) -> list[dict]:
+    def _selected_kpi_cards(self, tasks: list[dict]) -> list[dict]:
+        selected = normalize_dashboard_stats(
+            self.settings.dashboard_stats,
+            visible_keys=self.settings.visible_modules,
+        )
+        definitions = {item["key"]: item for item in DASHBOARD_STAT_DEFINITIONS}
+        calculators = {
+            "tasks_total": lambda: (len(tasks), "zadań", "Wymagają uwagi" if tasks else "Brak pilnych spraw", reverse("task_center")),
+            "total_sows": lambda: (self._sow_summary()["total_sows"], "szt.", "Aktywne stado", reverse("dashboard")),
+            "pregnant_sows": lambda: (self._sow_summary()["pregnant_count"], "szt.", "Potwierdzone ciąże", reverse("dashboard")),
+            "farrowing_due": lambda: (self._sow_summary()["farrowing_due_count"], "terminów", "W oknie alertu", reverse("farrowing_panel")),
+            "vaccinations_due": lambda: (self._sow_summary()["vaccinations_due_count"], "szczepień", "Do potwierdzenia", reverse("bulk_vaccinate")),
+            "low_stock": lambda: (len(self._inventory_summary()["low_stock_alerts"]), "składników", "Poniżej progu", reverse("feed_inventory")),
+            "inventory_total": lambda: (self._inventory_summary()["total_inventory_kg"], "kg", "Łączny stan magazynu", reverse("feed_full_inventory")),
+            "queued_productions": lambda: (self.feed_provider.queued().count(), "zleceń", "W kolejce pasz", reverse("feed_productions")),
+            "pending_sales": lambda: (self.sales_provider.pending_summary()["gross"], "zł", "Sprzedaże bez rozliczenia", reverse("sales_list")),
+            "unpaid_costs": lambda: (self.cost_provider.unpaid_summary()["total"], "zł", "Koszty nieopłacone", reverse("cost_list")),
+            "net_result": lambda: (self._profitability_summary()["net_result"], "zł", "Sprzedaż minus koszty", reverse("profitability")),
+        }
         cards = []
-        if self._module_visible("sows"):
-            summary = self._sow_summary()
-            cards.extend([
-                self._kpi("Aktywne maciory", summary["total_sows"], "szt.", "Stado bieżące.", "sow", "green", reverse("dashboard")),
-                self._kpi("Prośne", summary["pregnant_count"], "szt.", "Potwierdzone ciąże.", "sow", "green", reverse("dashboard")),
-                self._kpi("Karmiące", summary["lactating_count"], "szt.", "Maciory po oproszeniu.", "sow", "green", reverse("dashboard")),
-                self._kpi("Do kontroli", len(summary["sows_to_check_usg"]), "szt.", "Wymagają USG.", "tasks", "warning", reverse("bulk_pregnancy_check")),
-                self._kpi("Do porodu", summary["farrowing_due_count"], "szt.", "W oknie alertu.", "calendar", "warning", reverse("farrowing_panel")),
-                self._kpi("Upadki w miesiącu", self._mortality_month_total(), "szt.", "Upadki zgłoszone po odsadzeniu oraz automatycznie wyliczone przy odsadzeniu.", "warning", "danger", reverse("mortality_list")),
-            ])
-        if self._module_visible("inventory"):
-            cards.append(self._kpi("Niskie stany paszy", len(self._inventory_summary()["low_stock_alerts"]), "skł.", "Poniżej progu.", "warning", "danger", reverse("feed_inventory")))
-        if self._module_visible("production"):
-            cards.append(self._kpi("Produkcje w toku", self._production_in_progress_count(), "zleceń", "Po etapie 1.", "production", "amber", reverse("feed_productions")))
-        if self._module_visible("sales"):
-            cards.append(self._kpi("Sprzedaż netto", self._sales_net_this_month(), "zł", "Bieżący miesiąc.", "sales", "green", reverse("sales_list")))
-        if self._module_visible("costs"):
-            cards.append(self._kpi("Koszty", self._costs_this_month(), "zł", "Bieżący miesiąc.", "costs", "warning", reverse("cost_list")))
-        return cards[:10]
+        for key in selected:
+            definition = definitions.get(key)
+            calculator = calculators.get(key)
+            if not definition or not calculator:
+                continue
+            value, unit, note, url = calculator()
+            tone = definition["tone"]
+            if key in {"tasks_total", "low_stock"}:
+                tone = "danger" if value else "green"
+            elif key in {"farrowing_due", "vaccinations_due", "pending_sales", "unpaid_costs"}:
+                tone = "warning" if value else "green"
+            elif key == "net_result":
+                tone = "danger" if value < 0 else "green"
+            cards.append(self._kpi(definition["title"], value, unit, note, definition["icon_name"], tone, url))
+        return cards
 
     @staticmethod
     def _kpi(title, value, unit, note, icon_name, tone, url) -> dict:
@@ -441,7 +461,7 @@ class TodayDashboardService:
                 date_value=sale.sale_date,
                 type_label="Sprzedaż",
                 title=sale.document_number or f"{sale.quantity} szt.",
-                description=f"{sale.net_value} zł netto",
+                description=f"{format_money(sale.net_value, currency='zł')} netto",
                 url=reverse("edit_sale", args=[sale.id]),
                 icon_name="sales",
                 sort_value=sale.created_at,
@@ -456,7 +476,7 @@ class TodayDashboardService:
                 date_value=cost.date,
                 type_label="Koszt",
                 title=cost.description,
-                description=f"{cost.amount} zł",
+                description=format_money(cost.amount, currency="zł"),
                 url=reverse("edit_cost", args=[cost.id]),
                 icon_name="costs",
                 sort_value=cost.created_at,
@@ -503,17 +523,10 @@ class TodayDashboardService:
             self._inventory = self.feed_provider.inventory()
         return self._inventory
 
-    def _mortality_month_total(self) -> int:
-        return self.sow_activity_provider.mortality_total_between(self.month_start, self.today)
-
-    def _production_in_progress_count(self) -> int:
-        return self.feed_provider.in_progress_count()
-
-    def _sales_net_this_month(self) -> Decimal:
-        return self.sales_provider.net_between(self.month_start, self.today)
-
-    def _costs_this_month(self) -> Decimal:
-        return self.cost_provider.total_between(self.month_start, self.today)
+    def _profitability_summary(self) -> dict:
+        if self._profitability is None:
+            self._profitability = ProfitabilityAnalyticsService(self.farm).calculate()
+        return self._profitability
 
     def _module_visible(self, module_key: str | None) -> bool:
         return bool(module_key) and module_key in self.visible_keys

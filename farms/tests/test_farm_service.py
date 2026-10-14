@@ -90,6 +90,7 @@ def test_current_farm_context_processor_exposes_request_farm():
         'ui_font_scale_ratio': '1',
         'ui_notifications': [],
         'ui_notification_count': 0,
+        'ui_notification_total_count': 0,
         'ui_notification_more_count': 0,
     }
 

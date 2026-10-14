@@ -25,13 +25,23 @@
                 </div>
                 <a href="{% url 'task_center' %}" class="table-link">Zobacz wszystkie zadania</a>
             </div>
-            <div class="today-task-group-grid today-task-group-grid--quick">
-                {% for group in today_task_groups %}
-                    {% include 'components/today_task_group_card.html' with group=group compact=True %}
+            <div class="quick-list mobile-priority-task-list">
+                {% for task in today_mobile_priority_tasks %}
+                <a href="{{ task.action_url|default:task.object_url }}" class="quick-list-item priority-{{ task.priority }}">
+                    <span class="quick-list-marker" aria-hidden="true"></span>
+                    <span><strong>{{ task.title }}</strong><small>{{ task.status_label }}</small></span>
+                </a>
                 {% empty %}
                 <div class="quick-list-empty">Brak zadań zaplanowanych na dziś.</div>
                 {% endfor %}
             </div>
+            {% if today_mobile_remaining_groups %}
+            <div class="mobile-remaining-task-groups" aria-label="Pozostałe grupy zadań">
+                {% for group in today_mobile_remaining_groups %}
+                <a href="{{ group.panel_url }}"><span>{{ group.title }}</span><strong>{{ group.count }}</strong></a>
+                {% endfor %}
+            </div>
+            {% endif %}
         </section>
 
         <section class="panel mobile-quick-panel">

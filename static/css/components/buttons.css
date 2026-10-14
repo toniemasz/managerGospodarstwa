@@ -150,14 +150,6 @@
     flex: 0 0 auto;
 }
 
-.row-actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: flex-end;
-    gap: .45rem;
-}
-
 .link-button-danger {
     display: inline-flex;
     min-height: calc(var(--button-height) - .35rem);

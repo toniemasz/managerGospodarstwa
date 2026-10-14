@@ -5,16 +5,18 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
-from sales.actions import delete_sale
+from sales.actions import delete_sale, save_sale
 from .forms import PigSaleForm, SaleClassRowFormSet
 from .models import PigSaleModel
 from .services.sale_dashboard_service import SaleDashboardService
-from .services.sale_form_service import SaleFormService
+from .services.sale_form_service import SaleFormService, SaleImportService
 from common.filter_ui import filter_ui_state, parse_filter_date
 from farms.services.current_farm import get_current_farm
 from farms.services.accounting_year import get_available_years, parse_accounting_year
 from farms.services.audit_log_service import log_action
+from farms.services.idempotency import execute_once
 
 logger = logging.getLogger(__name__)
 
@@ -59,19 +61,19 @@ def edit_sale_view(request, pk):
 
 
 @login_required
+@require_POST
 def delete_sale_view(request, pk):
     farm = get_current_farm(request)
-    if request.method == 'POST':
-        deleted_sale = delete_sale(farm, pk)
-        log_action(
-            farm=farm,
-            user=request.user,
-            action="DELETE",
-            model_label=deleted_sale.model_label,
-            object_id=deleted_sale.object_id,
-            object_repr=deleted_sale.object_repr,
-        )
-        messages.success(request, "Sprzedaż została usunięta.")
+    deleted_sale = delete_sale(farm, pk)
+    log_action(
+        farm=farm,
+        user=request.user,
+        action="DELETE",
+        model_label=deleted_sale.model_label,
+        object_id=deleted_sale.object_id,
+        object_repr=deleted_sale.object_repr,
+    )
+    messages.success(request, "Sprzedaż została usunięta.")
     return redirect('sales_list')
 
 
@@ -85,7 +87,7 @@ def _sales_date_range_from_request(request):
 
 
 def _sale_form_view(request, sale: PigSaleModel, template_context: dict):
-    service = SaleFormService(farm=sale.farm)
+    service = SaleImportService(farm=sale.farm)
     if request.method == 'POST' and 'import_pdf' in request.POST:
         return _handle_pdf_import(request, sale, template_context, service)
 
@@ -93,7 +95,36 @@ def _sale_form_view(request, sale: PigSaleModel, template_context: dict):
         form, row_formset = _sale_forms_from_post(request, sale, service)
         if form.is_valid() and row_formset.is_valid():
             try:
-                saved_sale = service.save_sale(form, row_formset, sale)
+                def save_and_log():
+                    saved = save_sale(
+                        farm=sale.farm,
+                        form=form,
+                        row_formset=row_formset,
+                        sale=sale,
+                        user=request.user,
+                    )
+                    log_action(
+                        farm=saved.farm,
+                        user=request.user,
+                        action="UPDATE" if template_context.get('is_edit') else "CREATE",
+                        obj=saved,
+                    )
+                    return saved
+
+                if template_context.get('is_edit'):
+                    saved_sale = save_and_log()
+                else:
+                    result = execute_once(
+                        farm=sale.farm,
+                        user=request.user,
+                        scope="sales.add_sale",
+                        token=form.cleaned_data.get("submission_token"),
+                        operation=save_and_log,
+                    )
+                    if not result.executed:
+                        messages.info(request, "Ta sprzedaż została już zapisana. Nie utworzono duplikatu.")
+                        return redirect('sales_list')
+                    saved_sale = result.value
             except ValidationError as error:
                 if hasattr(error, 'message_dict'):
                     for field_name, field_errors in error.message_dict.items():
@@ -102,12 +133,6 @@ def _sale_form_view(request, sale: PigSaleModel, template_context: dict):
                 else:
                     form.add_error(None, error.messages[0])
             else:
-                log_action(
-                    farm=saved_sale.farm,
-                    user=request.user,
-                    action="UPDATE" if template_context.get('is_edit') else "CREATE",
-                    obj=saved_sale,
-                )
                 messages.success(request, "Sprzedaż została zapisana.")
                 return redirect('sales_list')
     else:
@@ -116,7 +141,7 @@ def _sale_form_view(request, sale: PigSaleModel, template_context: dict):
     return _render_sale_form(request, form, row_formset, sale, template_context)
 
 
-def _handle_pdf_import(request, sale: PigSaleModel, template_context: dict, service: SaleFormService):
+def _handle_pdf_import(request, sale: PigSaleModel, template_context: dict, service: SaleImportService):
     uploaded_pdf = request.FILES.get('settlement_pdf')
 
     if not uploaded_pdf:
@@ -159,21 +184,21 @@ def _handle_pdf_import(request, sale: PigSaleModel, template_context: dict, serv
     )
 
 
-def _sale_forms_from_post(request, sale: PigSaleModel, service: SaleFormService):
+def _sale_forms_from_post(request, sale: PigSaleModel, service: SaleImportService):
     return (
         PigSaleForm(request.POST, request.FILES, instance=sale, farm=sale.farm),
         service.row_formset_from_post(request.POST),
     )
 
 
-def _sale_forms_from_instance(sale: PigSaleModel, service: SaleFormService):
+def _sale_forms_from_instance(sale: PigSaleModel, service: SaleImportService):
     return (
         PigSaleForm(instance=sale, farm=sale.farm),
         SaleClassRowFormSet(prefix='rows', initial=service.initial_rows_for_sale(sale)),
     )
 
 
-def _render_posted_sale_form(request, sale: PigSaleModel, template_context: dict, service: SaleFormService):
+def _render_posted_sale_form(request, sale: PigSaleModel, template_context: dict, service: SaleImportService):
     form, row_formset = _sale_forms_from_post(request, sale, service)
     return _render_sale_form(request, form, row_formset, sale, template_context)
 

@@ -194,9 +194,10 @@ class VaccinationPlanRepository:
         return [('', '--- Wybierz szczepienie cykliczne ---')] + list(plans)
 
     def get_active_plan_by_name(self, name: str) -> VaccinationPlanModel | None:
+        normalized_name = (name or '').strip()
         return VaccinationPlanModel.objects.filter(
             farm=self.farm,
-            name=name,
+            name__iexact=normalized_name,
             is_active=True,
             requires_configuration=False,
         ).first()

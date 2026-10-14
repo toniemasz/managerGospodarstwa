@@ -1,6 +1,8 @@
 from django import forms
 from django.db.models import Q
 
+from farms.services.idempotency import new_submission_token
+
 from costs.models import CostCategoryModel, CostModel
 
 
@@ -35,6 +37,8 @@ class CostCategoryForm(forms.ModelForm):
 
 
 class CostForm(forms.ModelForm):
+    submission_token = forms.UUIDField(required=False, widget=forms.HiddenInput)
+
     class Meta:
         model = CostModel
         fields = (
@@ -55,6 +59,8 @@ class CostForm(forms.ModelForm):
     def __init__(self, *args, farm=None, **kwargs):
         self.farm = farm
         super().__init__(*args, **kwargs)
+        if not self.is_bound:
+            self.initial.setdefault("submission_token", new_submission_token())
         if farm:
             allowed = Q(is_active=True)
             if self.instance and self.instance.category_id:

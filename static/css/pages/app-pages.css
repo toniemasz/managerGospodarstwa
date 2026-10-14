@@ -205,6 +205,17 @@
     padding: 0;
 }
 
+.settings-secondary-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+}
+
+[data-font-scale-custom] {
+    display: grid;
+    gap: var(--space-sm);
+}
+
 .font-scale-slider {
     width: 100%;
     min-height: 1.6rem;

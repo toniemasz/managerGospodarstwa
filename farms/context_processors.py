@@ -36,18 +36,20 @@ def _topbar_notifications(farm):
             for item in section["items"]
         ]
         items.sort(key=lambda item: (priority_order.get(item["priority"], 9), item.get("due_date") or date.max))
-        return [
+        notifications = [
             {
                 **item,
                 "url": item.get("object_url") or item.get("action_url") or reverse("task_center"),
             }
             for item in items[:6]
-        ], len(items)
+        ]
+        urgent_count = sum(item["priority"] in {"urgent", "today"} for item in items)
+        return notifications, len(items), urgent_count
 
     return cached_farm_value(
         farm,
         "topbar_notifications",
-        (),
+        ("v2",),
         timeout=TOPBAR_NOTIFICATIONS_TTL,
         builder=build_notifications,
     )
@@ -65,6 +67,7 @@ def current_farm(request):
         'ui_font_scale_ratio': '1',
         'ui_notifications': [],
         'ui_notification_count': 0,
+        'ui_notification_total_count': 0,
         'ui_notification_more_count': 0,
     }
     if getattr(request, 'user', None) and request.user.is_authenticated and farm:
@@ -76,7 +79,7 @@ def current_farm(request):
         service = ModuleNavigationService(farm, active)
         modules = service.modules()
         mobile_modules = service.mobile_modules(modules)
-        notifications, notification_count = _topbar_notifications(farm)
+        notifications, notification_total_count, notification_count = _topbar_notifications(farm)
         context['ui_modules'] = modules
         context['ui_module_groups'] = service.grouped_modules(modules)
         context['ui_primary_modules'] = service.primary_modules(modules)
@@ -92,5 +95,6 @@ def current_farm(request):
         context['ui_font_scale_ratio'] = str(int(context['ui_font_scale']) / 100).rstrip('0').rstrip('.')
         context['ui_notifications'] = notifications
         context['ui_notification_count'] = notification_count
-        context['ui_notification_more_count'] = max(0, notification_count - len(notifications))
+        context['ui_notification_total_count'] = notification_total_count
+        context['ui_notification_more_count'] = max(0, notification_total_count - len(notifications))
     return context

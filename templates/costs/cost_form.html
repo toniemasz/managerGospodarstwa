@@ -8,7 +8,7 @@
     </section>
     <section class="panel">
         <form method="post" class="responsive-form">
-            {% csrf_token %}{% include 'components/form_errors.html' with form=form %}
+            {% csrf_token %}{{ form.submission_token }}{% include 'components/form_errors.html' with form=form %}
             <div class="form-section-heading"><h2>Dane podstawowe</h2><p>Data, kwota, kategoria i opis są najważniejsze dla rozliczenia.</p></div>
             <div class="form-grid two-columns">
                 {% include 'components/form_field.html' with field=form.date %}

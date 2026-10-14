@@ -3,7 +3,7 @@ import json
 from datetime import date, time
 from decimal import Decimal
 from io import BytesIO
-from zipfile import ZipFile
+from zipfile import ZIP_DEFLATED, ZipFile
 
 import pytest
 from django.contrib.auth.models import User
@@ -424,6 +424,35 @@ def test_backup_missing_required_field_is_rejected_without_partial_write():
         import_user_backup(backup_file, target_farm)
 
     assert not SowModel.objects.filter(farm=target_farm).exists()
+
+
+@pytest.mark.django_db
+def test_backup_rejects_uploaded_file_over_size_limit(monkeypatch):
+    from farms.services import data_backup
+
+    monkeypatch.setattr(data_backup, "MAX_UPLOAD_SIZE", 8)
+    user = User.objects.create_user(username="oversized-backup")
+    farm = get_or_create_user_farm(user)
+    uploaded = SimpleUploadedFile("large.json", b"{}" + b"0" * 7)
+
+    with pytest.raises(BackupImportError, match="zbyt duży"):
+        analyze_user_backup(uploaded, farm)
+
+
+@pytest.mark.django_db
+def test_backup_rejects_zip_with_excessive_uncompressed_json(monkeypatch):
+    from farms.services import data_backup
+
+    monkeypatch.setattr(data_backup, "MAX_UNCOMPRESSED_SIZE", 10)
+    archive = BytesIO()
+    with ZipFile(archive, "w", ZIP_DEFLATED) as backup_zip:
+        backup_zip.writestr("backup.json", b'{"payload":"too large"}')
+    user = User.objects.create_user(username="zip-bomb-backup")
+    farm = get_or_create_user_farm(user)
+    uploaded = SimpleUploadedFile("backup.zip", archive.getvalue(), content_type="application/zip")
+
+    with pytest.raises(BackupImportError, match="Rozpakowana kopia jest zbyt duża"):
+        analyze_user_backup(uploaded, farm)
 
 
 @pytest.mark.django_db(transaction=True)

@@ -8,7 +8,7 @@ from farms.services.settings_service import get_farm_settings
 from feed.calculators.feed_cost import ProductionCalculator
 from feed.domain.rules import DEFAULT_PRODUCTION_QUANTITY_KG
 from feed.models import DeliveryModel, ProductionModel, RecipeModel
-from feed.selectors.inventory import inventory_dashboard, latest_delivery_prices_map
+from feed.selectors.inventory import latest_delivery_prices_map
 from feed.selectors.recipe_requirements import recipe_item_dicts_for_production
 from common.units import format_mass
 

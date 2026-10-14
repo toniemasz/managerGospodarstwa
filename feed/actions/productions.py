@@ -4,7 +4,6 @@ from django.db import transaction
 from common.cache import invalidate_farm_cache_on_commit
 from feed.actions.inventory import InventoryActions
 from feed.domain.exceptions import FeedDomainError
-from feed.domain.production import completion_datetime_for
 from feed.models import ProductionModel
 from feed.selectors.productions import production_for_processing
 from feed.services.production_completion import ProductionCompletionWorkflow

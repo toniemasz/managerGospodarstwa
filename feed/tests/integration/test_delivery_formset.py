@@ -1,6 +1,7 @@
 from datetime import date
 from decimal import Decimal
 from unittest.mock import patch
+from uuid import uuid4
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -77,7 +78,7 @@ def test_add_delivery_get_uses_formset_template_and_initial_row(delivery_client)
     assert b'delivery-row-template' in response.content
     assert response.content.count(b'price_per_kg_unit') >= 2
     assert b'Jednostka ceny' in response.content
-    assert b'app.js?v=20260728-price-units' in response.content
+    assert b'app.js?v=20261014-audit' in response.content
 
 
 @pytest.mark.django_db
@@ -173,6 +174,24 @@ def test_multiple_rows_create_distinct_fifo_deliveries_and_movements(delivery_cl
     assert audits.count() == 3
     assert all("Dostawa:" in audit.object_repr for audit in audits)
     assert any("Pszenżyto" in audit.object_repr and "100 kg" in audit.object_repr for audit in audits)
+
+
+@pytest.mark.django_db
+def test_repeated_delivery_submission_creates_only_one_delivery(delivery_client):
+    client, _user, farm = delivery_client
+    ingredient = IngredientModel.objects.create(farm=farm, name="Jęczmień")
+    data = delivery_formset_data([valid_row(ingredient)])
+    data["submission_token"] = str(uuid4())
+
+    first = client.post(reverse("add_delivery"), data)
+    second = client.post(reverse("add_delivery"), data)
+
+    assert first.status_code == second.status_code == 302
+    assert DeliveryModel.objects.filter(ingredient=ingredient).count() == 1
+    assert InventoryMovementModel.objects.filter(
+        farm=farm,
+        movement_type=InventoryMovementModel.Types.DELIVERY,
+    ).count() == 1
 
 
 @pytest.mark.django_db

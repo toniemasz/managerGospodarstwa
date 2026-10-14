@@ -99,7 +99,7 @@
     .mobile-bottom-nav {
         position: fixed;
         right: .75rem;
-        bottom: .75rem;
+        bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
         left: .75rem;
         z-index: 40;
         display: flex;
@@ -130,7 +130,7 @@
     }
 
     body {
-        padding-bottom: 5.25rem;
+        padding-bottom: calc(5.25rem + env(safe-area-inset-bottom, 0px));
     }
 }
 
@@ -168,6 +168,43 @@
         --table-cell-padding-y: .62rem;
         --table-cell-padding-x: .68rem;
         --page-block-padding: .8rem 1rem;
+    }
+
+    .button,
+    .subnav a,
+    .pagination-controls a,
+    .pagination-controls button,
+    .row-actions a,
+    .row-actions button,
+    .table-link,
+    .link-button-danger {
+        min-height: 44px;
+    }
+
+    .topbar-icon-button,
+    .account-menu-trigger,
+    .mobile-nav-link {
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    .danger-zone .form-actions,
+    .settings-warning-row .settings-row-actions {
+        gap: .75rem;
+    }
+
+    .sticky-form-actions {
+        position: sticky;
+        bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+        z-index: 20;
+        border-top: 1px solid var(--border);
+        background: color-mix(in srgb, var(--surface) 96%, transparent);
+        padding: .65rem;
+        box-shadow: 0 -.35rem 1rem rgba(15, 23, 42, .08);
+    }
+
+    .production-schedule-grid {
+        grid-template-columns: 1fr;
     }
 
     .app-page,
@@ -321,38 +358,38 @@
         flex: 1 1 9rem;
     }
 
-    .settlement-form-cards {
+    .mobile-form-cards {
         width: 100%;
         min-width: 0;
     }
 
-    .settlement-form-cards thead {
+    .mobile-form-cards thead {
         display: none;
     }
 
-    .settlement-form-cards,
-    .settlement-form-cards tbody,
-    .settlement-form-cards tr,
-    .settlement-form-cards td {
+    .mobile-form-cards,
+    .mobile-form-cards tbody,
+    .mobile-form-cards tr,
+    .mobile-form-cards td {
         display: block;
         width: 100%;
     }
 
-    .settlement-form-cards tbody {
+    .mobile-form-cards tbody {
         display: grid;
         gap: .75rem;
         padding: .15rem;
     }
 
-    .settlement-form-cards tr {
+    .mobile-form-cards tr {
         overflow: hidden;
         border: 1px solid var(--border);
         border-radius: var(--radius);
         background: var(--surface);
     }
 
-    .settlement-form-cards td,
-    .settlement-form-cards td:first-child {
+    .mobile-form-cards td,
+    .mobile-form-cards td:first-child {
         position: static;
         display: grid;
         grid-template-columns: minmax(7.5rem, 38%) minmax(0, 1fr);
@@ -365,7 +402,7 @@
         white-space: normal;
     }
 
-    .settlement-form-cards td::before {
+    .mobile-form-cards td::before {
         content: attr(data-label);
         color: var(--muted);
         font-size: .72rem;
@@ -391,7 +428,7 @@
         min-width: 0;
     }
 
-    .settlement-form-cards .delete-cell {
+    .mobile-form-cards .delete-cell {
         display: flex;
         flex-wrap: wrap;
         align-items: stretch;
@@ -400,7 +437,7 @@
         border-bottom: 0;
     }
 
-    .settlement-form-cards .delete-cell::before {
+    .mobile-form-cards .delete-cell::before {
         content: none;
     }
 
@@ -413,77 +450,17 @@
         order: -1;
     }
 
-    .bulk-event-form-cards {
-        width: 100%;
-        min-width: 0;
-    }
-
-    .bulk-event-form-cards thead {
-        display: none;
-    }
-
-    .bulk-event-form-cards,
-    .bulk-event-form-cards tbody,
-    .bulk-event-form-cards tr,
-    .bulk-event-form-cards td {
-        display: block;
-        width: 100%;
-    }
-
-    .bulk-event-form-cards tbody {
-        display: grid;
-        gap: .75rem;
-        padding: .15rem;
-    }
-
     .bulk-event-form-cards tr {
-        overflow: hidden;
         counter-increment: bulk-event-card;
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        background: var(--surface);
-    }
-
-    .bulk-event-form-cards td,
-    .bulk-event-form-cards td:first-child {
-        position: static;
-        display: grid;
-        grid-template-columns: minmax(7.5rem, 38%) minmax(0, 1fr);
-        gap: .55rem;
-        align-items: center;
-        border-bottom: 1px solid var(--border);
-        background: var(--surface);
-        padding: .62rem;
-        box-shadow: none;
-        white-space: normal;
     }
 
     .bulk-event-form-cards td:first-child::before {
         content: "Pozycja " counter(bulk-event-card) " · " attr(data-label);
     }
 
-    .bulk-event-form-cards td::before {
-        content: attr(data-label);
-        color: var(--muted);
-        font-size: .72rem;
-        font-weight: 900;
-        letter-spacing: .04em;
-        text-transform: uppercase;
-    }
-
     .bulk-event-form-cards .bulk-cell-with-action {
         display: grid;
         gap: .4rem;
-    }
-
-    .bulk-event-form-cards .delete-cell {
-        display: flex;
-        justify-content: flex-end;
-        border-bottom: 0;
-    }
-
-    .bulk-event-form-cards .delete-cell::before {
-        content: none;
     }
 
     .selection-toolbar {

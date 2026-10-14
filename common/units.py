@@ -1,6 +1,6 @@
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
-from django.utils.formats import number_format
+from common.number_formatting import format_decimal
 
 
 KILOGRAM = "kg"
@@ -93,20 +93,6 @@ def mass_input_value(value_kg) -> tuple[str, str]:
     return normalized or "0", unit
 
 
-def _format_decimal(value: Decimal, max_decimals: int) -> str:
-    quantum = Decimal("1") if max_decimals <= 0 else Decimal("1").scaleb(-max_decimals)
-    rounded = value.quantize(quantum, rounding=ROUND_HALF_UP)
-    formatted = number_format(
-        rounded,
-        decimal_pos=max_decimals,
-        use_l10n=True,
-        force_grouping=True,
-    )
-    if max_decimals:
-        formatted = formatted.rstrip("0").rstrip(",").rstrip(".")
-    return formatted.replace("\xa0", " ")
-
-
 def format_mass(value_kg, *, max_decimals: int | None = None, empty="-") -> str:
     if value_kg in (None, ""):
         return empty
@@ -117,4 +103,4 @@ def format_mass(value_kg, *, max_decimals: int | None = None, empty="-") -> str:
     unit = preferred_mass_unit(amount_kg)
     amount = from_kilograms(amount_kg, unit)
     decimals = max_decimals if max_decimals is not None else (5 if unit == TONNE else 2)
-    return f"{_format_decimal(amount, decimals)} {unit}"
+    return f"{format_decimal(amount, max_decimals=decimals, empty=empty)} {unit}"

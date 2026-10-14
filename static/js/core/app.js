@@ -38,6 +38,92 @@
         }
     }
 
+    class FormsetController {
+        constructor({
+            rows,
+            rowSelector,
+            totalForms,
+            template,
+            addButton,
+            removeSelector,
+            emptyState = null,
+            liveRegion = null,
+            itemLabel = 'wiersz',
+            prepareRow = null,
+            afterAdd = null,
+            afterRemove = null
+        }) {
+            this.rows = rows;
+            this.rowSelector = rowSelector;
+            this.totalForms = totalForms;
+            this.template = template;
+            this.addButton = addButton;
+            this.removeSelector = removeSelector;
+            this.emptyState = emptyState;
+            this.liveRegion = liveRegion;
+            this.itemLabel = itemLabel;
+            this.prepareRow = prepareRow;
+            this.afterAdd = afterAdd;
+            this.afterRemove = afterRemove;
+        }
+
+        initialize() {
+            this.rows.querySelectorAll(this.rowSelector).forEach((row) => this.prepareRow?.(row));
+            this.rows.addEventListener('click', (event) => {
+                const removeButton = event.target.closest(this.removeSelector);
+                if (!removeButton) return;
+                event.preventDefault();
+                this.removeRow(removeButton.closest(this.rowSelector));
+            });
+            this.addButton.addEventListener('click', (event) => {
+                event.preventDefault();
+                this.addRow();
+            });
+            this.updateEmptyState();
+            return this;
+        }
+
+        addRow() {
+            const index = Number.parseInt(this.totalForms.value, 10);
+            if (!Number.isFinite(index)) return null;
+            const parsedTemplate = document.createElement('template');
+            parsedTemplate.innerHTML = this.template.innerHTML
+                .replaceAll('__prefix__', index)
+                .trim();
+            const row = parsedTemplate.content.firstElementChild;
+            if (!row) return null;
+
+            this.rows.appendChild(row);
+            this.totalForms.value = index + 1;
+            this.prepareRow?.(row);
+            window.enhanceAutoResizeFields?.(row);
+            this.afterAdd?.(row, index);
+            this.updateEmptyState();
+            const firstField = row.querySelector('input:not([type="hidden"]), select, textarea');
+            firstField?.focus({ preventScroll: true });
+            if (this.liveRegion) this.liveRegion.textContent = `Dodano ${this.itemLabel} ${index + 1}.`;
+            return row;
+        }
+
+        removeRow(row) {
+            if (!row) return;
+            const deleteCheckbox = row.querySelector('input[type="checkbox"][name$="-DELETE"]');
+            if (deleteCheckbox) deleteCheckbox.checked = true;
+            row.hidden = true;
+            row.classList.add('hidden');
+            this.afterRemove?.(row);
+            this.updateEmptyState();
+            if (this.liveRegion) this.liveRegion.textContent = `Usunięto ${this.itemLabel}. Zmiana zostanie zatwierdzona po zapisaniu formularza.`;
+        }
+
+        updateEmptyState() {
+            if (!this.emptyState) return;
+            const hasVisibleRows = Array.from(this.rows.querySelectorAll(this.rowSelector))
+                .some((row) => !row.hidden);
+            this.emptyState.hidden = hasVisibleRows;
+        }
+    }
+
     function initDateRangeFilters(root = document) {
         root.querySelectorAll('select[name="period"], select#period').forEach((periodSelect) => {
             if (periodSelect.dataset.dateRangeBound === 'true') return;
@@ -182,11 +268,10 @@
 
     function initBulkEventForm(root = document) {
         const rows = root.getElementById?.('bulk-event-rows') || document.getElementById('bulk-event-rows');
-        if (!rows || rows.dataset.bulkEventsBound === 'true') return;
-
         const totalForms = document.getElementById('id_events-TOTAL_FORMS');
         const template = document.getElementById('bulk-event-row-template');
         const addButton = document.getElementById('add-bulk-event-row');
+        if (!rows || !totalForms || !template || !addButton || rows.dataset.bulkEventsBound === 'true') return;
 
         const detailFieldRules = {
             INSEMINATION: ['technician'],
@@ -254,33 +339,21 @@
         };
 
         rows.dataset.bulkEventsBound = 'true';
-        rows.querySelectorAll('.bulk-event-row').forEach(prepareRow);
+
+        new FormsetController({
+            rows,
+            rowSelector: '.bulk-event-row',
+            totalForms,
+            template,
+            addButton,
+            removeSelector: '.remove-bulk-event-row',
+            prepareRow
+        }).initialize();
 
         rows.addEventListener('click', (event) => {
             const button = event.target.closest('.copy-sow');
             if (button) copyPreviousSow(button);
-            const removeButton = event.target.closest('.remove-bulk-event-row');
-            if (removeButton) {
-                const row = removeButton.closest('.bulk-event-row');
-                const checkbox = getField(row, 'DELETE');
-                if (checkbox) checkbox.checked = true;
-                if (row) row.hidden = true;
-            }
         });
-
-        if (addButton && template && totalForms && addButton.dataset.bulkEventAddBound !== 'true') {
-            addButton.dataset.bulkEventAddBound = 'true';
-            addButton.addEventListener('click', () => {
-                const index = parseInt(totalForms.value, 10);
-                const html = template.innerHTML.replaceAll('__prefix__', index);
-
-                rows.insertAdjacentHTML('beforeend', html);
-                totalForms.value = index + 1;
-
-                prepareRow(rows.lastElementChild);
-                window.enhanceAutoResizeFields?.(rows.lastElementChild);
-            });
-        }
 
         const form = rows.closest('form');
         if (form && form.dataset.bulkEventsSubmitBound !== 'true') {
@@ -569,6 +642,7 @@
         if (!addButton || !rows || !template || !totalForms || addButton.dataset.saleRowsBound === 'true') return;
 
         const emptyState = document.getElementById('settlement-rows-empty');
+        const liveRegion = document.getElementById('settlement-rows-status');
         const saleForm = document.getElementById('sale-form');
         const parseDecimal = (value) => {
             const parsed = Number.parseFloat(String(value || '').replace(/\s/g, '').replace(',', '.'));
@@ -597,11 +671,6 @@
                 setCalculatedValue(row.querySelector('input[name$="-gross_value"]'), net + vat);
             }
         };
-        const updateEmptyState = () => {
-            const hasVisibleRows = Array.from(rows.querySelectorAll('.settlement-row')).some((row) => !row.hidden);
-            if (emptyState) emptyState.hidden = hasVisibleRows;
-        };
-
         addButton.dataset.saleRowsBound = 'true';
         rows.addEventListener('click', (event) => {
             const moreButton = event.target.closest('.settlement-more-toggle');
@@ -613,13 +682,6 @@
                 row?.classList.toggle('is-expanded', !expanded);
                 return;
             }
-            const button = event.target.closest('.remove-settlement-row');
-            if (!button) return;
-            const row = button.closest('.settlement-row');
-            const checkbox = row?.querySelector('input[type="checkbox"][name$="-DELETE"]');
-            if (checkbox) checkbox.checked = true;
-            if (row) row.hidden = true;
-            updateEmptyState();
         });
         rows.addEventListener('input', (event) => {
             const input = event.target.closest('input');
@@ -630,23 +692,24 @@
             }
             calculateRow(input.closest('.settlement-row'));
         });
-        addButton.addEventListener('click', () => {
-            const index = parseInt(totalForms.value, 10);
-            const html = template.innerHTML.replaceAll('__prefix__', index);
-
-            rows.insertAdjacentHTML('beforeend', html);
-            totalForms.value = index + 1;
-
-            const newRow = rows.lastElementChild;
-            const lineInput = newRow.querySelector('input[name$="-line_no"]');
-            if (lineInput && !lineInput.value) {
-                lineInput.value = index + 1;
+        new FormsetController({
+            rows,
+            rowSelector: '.settlement-row',
+            totalForms,
+            template,
+            addButton,
+            removeSelector: '.remove-settlement-row',
+            emptyState,
+            liveRegion,
+            itemLabel: 'pozycję rozliczenia',
+            afterAdd: (newRow, index) => {
+                const lineInput = newRow.querySelector('input[name$="-line_no"]');
+                if (lineInput && !lineInput.value) {
+                    lineInput.value = index + 1;
+                }
+                window.enhanceDataTables?.();
             }
-
-            window.enhanceAutoResizeFields?.(newRow);
-            window.enhanceDataTables?.();
-            updateEmptyState();
-        });
+        }).initialize();
         saleForm?.querySelectorAll('[name="settlement_process"]').forEach((radio) => {
             radio.addEventListener('change', () => {
                 const mode = saleForm.querySelector('[name="settlement_process"]:checked')?.value || 'manual';
@@ -660,7 +723,6 @@
             });
         });
         saleForm?.querySelector('[name="settlement_process"]:checked')?.dispatchEvent(new Event('change'));
-        updateEmptyState();
     }
 
     function initRecipeFormset(root = document) {
@@ -679,11 +741,6 @@
         const totalElement = document.getElementById('recipe-percentage-total');
         const summaryElement = document.getElementById('recipe-percentage-summary');
         const emptyState = document.getElementById('ingredient-forms-empty');
-
-        const updateEmptyState = () => {
-            const hasVisibleRows = Array.from(container.querySelectorAll('.ingredient-row-card')).some((row) => !row.hidden);
-            if (emptyState) emptyState.hidden = hasVisibleRows;
-        };
 
         const updatePercentageSummary = () => {
             let total = 0;
@@ -710,45 +767,23 @@
             }
         };
 
-        addButton.addEventListener('click', (event) => {
-            event.preventDefault();
-            const currentFormCount = parseInt(totalFormsInput.value, 10);
-            const newRowHtml = template.innerHTML.replace(/__prefix__/g, currentFormCount);
-
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = newRowHtml.trim();
-            const newRow = tempDiv.firstElementChild;
-
-            container.appendChild(newRow);
-            totalFormsInput.value = currentFormCount + 1;
-            window.enhanceAutoResizeFields?.(newRow);
-            updatePercentageSummary();
-            updateEmptyState();
-        });
-
-        container.addEventListener('click', (event) => {
-            const removeButton = event.target.closest('.remove-row-btn');
-            if (!removeButton) return;
-
-            event.preventDefault();
-            const row = removeButton.closest('.ingredient-row-card');
-            const deleteCheckbox = row?.querySelector('input[type="checkbox"][name$="-DELETE"]');
-
-            if (deleteCheckbox) deleteCheckbox.checked = true;
-            if (row) {
-                row.hidden = true;
-                row.classList.add('hidden');
-            }
-            updatePercentageSummary();
-            updateEmptyState();
-        });
+        new FormsetController({
+            rows: container,
+            rowSelector: '.ingredient-row-card',
+            totalForms: totalFormsInput,
+            template,
+            addButton,
+            removeSelector: '.remove-row-btn',
+            emptyState,
+            afterAdd: updatePercentageSummary,
+            afterRemove: updatePercentageSummary
+        }).initialize();
 
         container.addEventListener('input', (event) => {
             if (event.target.matches('input[name$="-percentage"]')) updatePercentageSummary();
         });
 
         updatePercentageSummary();
-        updateEmptyState();
     }
 
     function initPriceUnitInputs(root = document) {
@@ -781,34 +816,19 @@
         const emptyState = document.getElementById('delivery-rows-empty');
         if (!rows || !totalForms || !template || !addButton) return;
 
-        const updateEmptyState = () => {
-            const hasVisibleRows = Array.from(rows.querySelectorAll('.delivery-row')).some((row) => !row.hidden);
-            if (emptyState) emptyState.hidden = hasVisibleRows;
-        };
-
         form.dataset.deliveryRowsBound = 'true';
-        rows.addEventListener('click', (event) => {
-            const button = event.target.closest('.remove-delivery-row');
-            if (!button) return;
-
-            const row = button.closest('.delivery-row');
-            const deleteCheckbox = row?.querySelector('input[type="checkbox"][name$="-DELETE"]');
-            if (deleteCheckbox) deleteCheckbox.checked = true;
-            if (row) row.hidden = true;
-            updateEmptyState();
-        });
-        addButton.addEventListener('click', () => {
-            const index = parseInt(totalForms.value, 10);
-            const html = template.innerHTML.replaceAll('__prefix__', index);
-            rows.insertAdjacentHTML('beforeend', html);
-            totalForms.value = index + 1;
-            window.enhanceAutoResizeFields?.(rows.lastElementChild);
-            initPriceUnitInputs(rows.lastElementChild);
-            updateEmptyState();
-        });
+        new FormsetController({
+            rows,
+            rowSelector: '.delivery-row',
+            totalForms,
+            template,
+            addButton,
+            removeSelector: '.remove-delivery-row',
+            emptyState,
+            afterAdd: initPriceUnitInputs
+        }).initialize();
 
         initPriceUnitInputs(rows);
-        updateEmptyState();
     }
 
     function initProductionStageChecklist(root = document) {
@@ -871,6 +891,60 @@
     }
 
     function initConfirmations(root = document) {
+        const dialog = root.querySelector('[data-confirmation-dialog]');
+        const dialogMessage = dialog?.querySelector('[data-confirmation-message]');
+        const acceptButton = dialog?.querySelector('[data-confirmation-accept]');
+        const cancelButton = dialog?.querySelector('[data-confirmation-cancel]');
+        let pendingConfirmation = null;
+
+        const markFormAsSubmitting = (form, submitter, message) => {
+            const pendingLabel = form.dataset.submitLabel || (
+                /usuń|usunąć|usunię/i.test(`${message || ''} ${submitter?.textContent || ''}`)
+                    ? 'Usuwanie…'
+                    : 'Przetwarzanie…'
+            );
+            form.dataset.submitting = 'true';
+            form.setAttribute('aria-busy', 'true');
+            if (submitter) {
+                submitter.dataset.originalLabel = submitter.textContent;
+                submitter.textContent = pendingLabel;
+                submitter.classList.add('is-submitting');
+                submitter.disabled = true;
+            }
+        };
+
+        const closeDialog = () => {
+            if (!dialog?.open) return;
+            dialog.close();
+        };
+
+        const cancelConfirmation = () => {
+            const trigger = pendingConfirmation?.trigger;
+            pendingConfirmation = null;
+            closeDialog();
+            trigger?.focus({ preventScroll: true });
+        };
+
+        if (dialog && acceptButton && cancelButton && dialog.dataset.confirmationBound !== 'true') {
+            dialog.dataset.confirmationBound = 'true';
+            cancelButton.addEventListener('click', cancelConfirmation);
+            dialog.addEventListener('cancel', (event) => {
+                event.preventDefault();
+                cancelConfirmation();
+            });
+            dialog.addEventListener('click', (event) => {
+                if (event.target === dialog) cancelConfirmation();
+            });
+            acceptButton.addEventListener('click', () => {
+                const pending = pendingConfirmation;
+                if (!pending) return;
+                pendingConfirmation = null;
+                closeDialog();
+                pending.form.dataset.confirmApproved = 'true';
+                pending.form.requestSubmit(pending.submitter || undefined);
+            });
+        }
+
         root.querySelectorAll('[data-confirm]').forEach((element) => {
             if (element.dataset.confirmBound === 'true') return;
 
@@ -883,27 +957,37 @@
                     return;
                 }
                 const message = element.dataset.confirm;
-                if (message && !window.confirm(message)) {
-                    event.preventDefault();
+                if (element.tagName !== 'FORM') return;
+                const submitter = event.submitter || element.querySelector('[type="submit"]');
+
+                if (element.dataset.confirmApproved === 'true') {
+                    delete element.dataset.confirmApproved;
+                    markFormAsSubmitting(element, submitter, message);
                     return;
                 }
 
-                if (element.tagName === 'FORM') {
-                    const submitter = event.submitter || element.querySelector('[type="submit"]');
-                    const pendingLabel = element.dataset.submitLabel || (
-                        /usuń|usunąć|usunię/i.test(`${message || ''} ${submitter?.textContent || ''}`)
-                            ? 'Usuwanie…'
-                            : 'Przetwarzanie…'
-                    );
-                    element.dataset.submitting = 'true';
-                    element.setAttribute('aria-busy', 'true');
-                    if (submitter) {
-                        submitter.dataset.originalLabel = submitter.textContent;
-                        submitter.textContent = pendingLabel;
-                        submitter.classList.add('is-submitting');
-                        submitter.disabled = true;
-                    }
+                if (!message) {
+                    markFormAsSubmitting(element, submitter, message);
+                    return;
                 }
+
+                event.preventDefault();
+                if (!dialog || !dialogMessage || !acceptButton || typeof dialog.showModal !== 'function') {
+                    if (window.confirm(message)) {
+                        element.dataset.confirmApproved = 'true';
+                        element.requestSubmit(submitter || undefined);
+                    }
+                    return;
+                }
+
+                const isDestructive = /usuń|usunąć|usunię|anulować|wyłączyć|cofnąć/i.test(message);
+                dialogMessage.textContent = message;
+                acceptButton.textContent = element.dataset.confirmAction || (isDestructive ? 'Potwierdź operację' : 'Potwierdź');
+                acceptButton.classList.toggle('button-danger', isDestructive);
+                acceptButton.classList.toggle('button-primary', !isDestructive);
+                pendingConfirmation = { form: element, submitter, trigger: submitter || element };
+                dialog.showModal();
+                window.requestAnimationFrame(() => cancelButton.focus({ preventScroll: true }));
             });
         });
     }
@@ -1137,6 +1221,18 @@
         });
     }
 
+    function initScrollableNavigation(root = document) {
+        root.querySelectorAll('.subnav').forEach((navigation) => {
+            const activeLink = navigation.querySelector('.is-active, [aria-current="page"]');
+            if (!activeLink) return;
+            window.requestAnimationFrame(() => activeLink.scrollIntoView({
+                behavior: 'auto',
+                block: 'nearest',
+                inline: 'center'
+            }));
+        });
+    }
+
     function initFormAccessibility(root = document) {
         root.querySelectorAll('[data-form-field]').forEach((container) => {
             const field = container.querySelector('input, select, textarea');
@@ -1216,6 +1312,7 @@
         initProductionStageChecklist();
         initConfirmations();
         initDisclosureMenus();
+        initScrollableNavigation();
         initFormAccessibility();
         initPriceUnitToggles();
         initTrendCharts();

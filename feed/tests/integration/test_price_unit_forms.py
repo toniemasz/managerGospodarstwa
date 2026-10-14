@@ -21,7 +21,7 @@ def test_delivery_form_converts_price_per_tonne_to_stored_price_per_kg():
         "quantity_kg": "2",
         "quantity_kg_unit": "t",
         "price_per_kg": "1250.00",
-        "price_unit": "t",
+        "price_per_kg_unit": "t",
     }, farm=farm)
 
     assert form.is_valid(), form.errors
@@ -55,9 +55,46 @@ def test_ready_feed_delivery_form_converts_price_per_tonne_to_price_per_kg():
         "quantity_kg": "1.5",
         "quantity_kg_unit": "t",
         "price_per_kg": "2100.00",
-        "price_unit": "t",
+        "price_per_kg_unit": "t",
     })
 
     assert form.is_valid(), form.errors
     assert form.cleaned_data["quantity_kg"] == Decimal("1500.00")
+    assert form.cleaned_data["price_per_kg"] == Decimal("2.10000")
+
+
+@pytest.mark.parametrize("form_class", [DeliveryForm, ReadyFeedDeliveryForm])
+def test_price_forms_expose_exactly_one_canonical_price_unit_field(form_class):
+    kwargs = {"farm": None} if form_class is DeliveryForm else {}
+    form = form_class(**kwargs)
+
+    assert "price_per_kg_unit" in form.fields
+    assert "price_unit" not in form.fields
+    assert [field.label for field in form.fields.values()].count("Jednostka ceny") == 1
+
+
+def test_ready_feed_delivery_prefers_canonical_unit_when_legacy_key_is_also_sent():
+    form = ReadyFeedDeliveryForm(data={
+        "date": date.today().isoformat(),
+        "quantity_kg": "1500",
+        "quantity_kg_unit": "kg",
+        "price_per_kg": "2100.00",
+        "price_per_kg_unit": "t",
+        "price_unit": "t",
+    })
+
+    assert form.is_valid(), form.errors
+    assert form.cleaned_data["price_per_kg"] == Decimal("2.10000")
+
+
+def test_ready_feed_delivery_accepts_legacy_price_unit_without_rendering_it():
+    form = ReadyFeedDeliveryForm(data={
+        "date": date.today().isoformat(),
+        "quantity_kg": "1500",
+        "quantity_kg_unit": "kg",
+        "price_per_kg": "2100.00",
+        "price_unit": "t",
+    })
+
+    assert form.is_valid(), form.errors
     assert form.cleaned_data["price_per_kg"] == Decimal("2.10000")

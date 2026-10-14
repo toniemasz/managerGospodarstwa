@@ -71,6 +71,12 @@ class PigSaleModel(models.Model):
             return self.gross_value
         return self.total_weight * self.price_per_kg
 
+    @property
+    def net_price(self) -> Decimal:
+        if self.net_value:
+            return self.net_value
+        return self.total_weight * self.price_per_kg
+
     def recalculate_from_rows(self) -> None:
         rows = list(self.rows.all())
         if not rows:

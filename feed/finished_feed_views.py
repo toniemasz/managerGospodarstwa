@@ -17,6 +17,7 @@ from feed.actions.finished_feed import (
 from feed.forms import FeedServingForm, PurchasedReadyFeedProductForm, ReadyFeedDeliveryForm
 from feed.models import FeedProductModel, FeedServingModel
 from feed.selectors.finished_feed import feed_servings_context, finished_feed_inventory_context
+from common.number_formatting import format_money
 from common.units import format_mass
 
 
@@ -68,11 +69,10 @@ def add_ready_feed_delivery_view(request, product_id):
             form.add_error(None, error.messages[0])
         else:
             log_action(farm=farm, user=request.user, action="READY_FEED_DELIVERY_CREATE", obj=delivery)
-            delivery_value = f"{delivery.total_cost:.2f}".replace(".", ",")
             messages.success(
                 request,
                 f"Przyjęto dostawę {format_mass(delivery.quantity_kg)} paszy „{product.name}” "
-                f"o wartości {delivery_value} zł.",
+                f"o wartości {format_money(delivery.total_cost, currency='zł')}.",
             )
             return redirect("finished_feed_inventory")
     stock_kg = product.batches.aggregate(total=Sum("remaining_quantity_kg"))["total"] or 0

@@ -9,7 +9,6 @@ from feed.models import (
     FeedServingAllocationModel,
     FeedServingModel,
     FinishedFeedBatchModel,
-    ProductionModel,
     ReadyFeedDeliveryModel,
 )
 from common.units import format_mass
@@ -70,11 +69,6 @@ def create_ready_feed_delivery(*, farm, product, date, quantity_kg, price_per_kg
     )
     invalidate_farm_cache_on_commit(farm, groups=("feed", "inventory"))
     return delivery
-
-
-def production_creates_produced_feed(production) -> bool:
-    """Typ produktu wynika z procesu produkcji, a nie ze składu receptury."""
-    return production.pk is not None
 
 
 def _refresh_batch_allocation_costs(batch) -> None:

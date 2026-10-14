@@ -7,6 +7,7 @@ from farms.services.module_navigation import ModuleNavigationService
 from feed.services.search import FeedSearchProvider
 from sales.search import search_sales
 from sows.services.search import search_sows, search_vaccination_plans
+from common.number_formatting import format_money
 from common.units import format_mass
 
 
@@ -145,7 +146,7 @@ def _sales_results(farm, query: str, active_url_name: str) -> dict:
     items = [
         {
             "title": sale.document_number or f"Sprzedaż {_date_label(sale.sale_date)}",
-            "subtitle": f"{sale.quantity} szt. • {sale.net_value:.2f} PLN netto",
+            "subtitle": f"{sale.quantity} szt. • {format_money(sale.net_value)} netto",
             "meta": sale.tattoo or "Brak tatuażu",
             "url": reverse("edit_sale", args=[sale.id]),
             "icon_name": "sales",
@@ -160,7 +161,7 @@ def _cost_results(farm, query: str, active_url_name: str) -> dict:
     costs = [
         {
             "title": cost.description,
-            "subtitle": f"{cost.amount:.2f} PLN • {cost.date:%d.%m.%Y}",
+            "subtitle": f"{format_money(cost.amount)} • {cost.date:%d.%m.%Y}",
             "meta": "Opłacony" if cost.is_paid else "Nieopłacony",
             "url": reverse("edit_cost", args=[cost.id]),
             "icon_name": "costs",

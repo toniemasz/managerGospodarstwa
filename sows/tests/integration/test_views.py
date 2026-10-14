@@ -1,5 +1,6 @@
 import json
 import re
+from uuid import uuid4
 
 import pytest
 from django.contrib.messages import get_messages
@@ -931,6 +932,31 @@ class TestSowViews:
             event_type='INSEMINATION',
             details={'technician': 'Jan'},
         ).exists()
+
+    def test_repeated_bulk_event_submission_creates_only_one_event(self, setup_client):
+        sow = SowModel.objects.create(ear_tag="BULK-ONCE", farm=setup_client.farm)
+        data = {
+            'submission_token': str(uuid4()),
+            'events-TOTAL_FORMS': '1',
+            'events-INITIAL_FORMS': '0',
+            'events-MIN_NUM_FORMS': '0',
+            'events-MAX_NUM_FORMS': '1000',
+            'events-0-sow_ear_tag': sow.ear_tag,
+            'events-0-event_type': 'INSEMINATION',
+            'events-0-event_date': sow.entry_date.isoformat(),
+            'events-0-technician': 'Jan',
+        }
+
+        first = setup_client.post(reverse('bulk_sow_events'), data)
+        second = setup_client.post(reverse('bulk_sow_events'), data)
+
+        assert first.status_code == second.status_code == 302
+        assert SowEventModel.objects.filter(sow=sow, event_type='INSEMINATION').count() == 1
+        assert AuditLogModel.objects.filter(
+            farm=setup_client.farm,
+            action="CREATE",
+            model_label="sows.SowEventModel",
+        ).count() == 1
 
     def test_bulk_sow_events_view_blocks_invalid_cycle_event(self, setup_client):
         sow = SowModel.objects.create(ear_tag="BULK-BLOCK", farm=setup_client.farm)

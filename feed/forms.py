@@ -19,6 +19,27 @@ def _apply_widget_class(field):
     field.widget.attrs['class'] = f'{existing} {FORM_FIELD_CLASS}'.strip()
 
 
+def _clean_farm_scoped_name(
+    *,
+    model,
+    farm,
+    value,
+    instance_pk=None,
+    duplicate_message: str,
+    empty_message: str | None = None,
+) -> str:
+    name = (value or "").strip()
+    if not name and empty_message:
+        raise forms.ValidationError(empty_message)
+    if farm is not None:
+        queryset = model.objects.filter(farm=farm, name__iexact=name)
+        if instance_pk:
+            queryset = queryset.exclude(pk=instance_pk)
+        if queryset.exists():
+            raise forms.ValidationError(duplicate_message)
+    return name
+
+
 class IngredientForm(KilogramStorageFormMixin, forms.ModelForm):
     mass_fields = ('low_stock_threshold_kg',)
     class Meta:
@@ -45,12 +66,13 @@ class IngredientForm(KilogramStorageFormMixin, forms.ModelForm):
             _apply_widget_class(field)
 
     def clean_name(self):
-        name = self.cleaned_data['name'].strip()
-        if self.farm is not None:
-            exists = IngredientModel.objects.filter(farm=self.farm, name__iexact=name).exclude(pk=self.instance.pk).exists()
-            if exists:
-                raise forms.ValidationError("Taki składnik istnieje już w tym gospodarstwie.")
-        return name
+        return _clean_farm_scoped_name(
+            model=IngredientModel,
+            farm=self.farm,
+            value=self.cleaned_data['name'],
+            instance_pk=self.instance.pk,
+            duplicate_message="Taki składnik istnieje już w tym gospodarstwie.",
+        )
 
     def clean_low_stock_threshold_kg(self):
         return self.cleaned_data.get('low_stock_threshold_kg') or LOW_STOCK_THRESHOLD_KG
@@ -68,18 +90,20 @@ class RecipeForm(forms.ModelForm):
             self.instance.farm = self.farm
 
     def clean_name(self):
-        name = self.cleaned_data['name'].strip()
-        if self.farm is not None:
-            exists = RecipeModel.objects.filter(farm=self.farm, name__iexact=name).exclude(pk=self.instance.pk).exists()
-            if exists:
-                raise forms.ValidationError("Taka receptura istnieje już w tym gospodarstwie.")
-        return name
+        return _clean_farm_scoped_name(
+            model=RecipeModel,
+            farm=self.farm,
+            value=self.cleaned_data['name'],
+            instance_pk=self.instance.pk,
+            duplicate_message="Taka receptura istnieje już w tym gospodarstwie.",
+        )
 
 
 class RecipeItemForm(forms.ModelForm):
     class Meta:
         model = RecipeItemModel
         fields = ['ingredient', 'percentage']
+        labels = {'percentage': 'Udział (%)'}
 
     def __init__(self, *args, farm=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -146,6 +170,7 @@ class RecipeVersionItemForm(forms.ModelForm):
     class Meta:
         model = RecipeVersionItemModel
         fields = ['ingredient', 'percentage']
+        labels = {'percentage': 'Udział (%)'}
 
     def __init__(self, *args, farm=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -306,12 +331,13 @@ class PurchasedReadyFeedProductForm(forms.Form):
             _apply_widget_class(field)
 
     def clean_name(self):
-        name = self.cleaned_data["name"].strip()
-        if not name:
-            raise forms.ValidationError("Nazwa gotowej paszy nie może być pusta.")
-        if FeedProductModel.objects.filter(farm=self.farm, name__iexact=name).exists():
-            raise forms.ValidationError("Produkt gotowej paszy o tej nazwie już istnieje.")
-        return name
+        return _clean_farm_scoped_name(
+            model=FeedProductModel,
+            farm=self.farm,
+            value=self.cleaned_data["name"],
+            duplicate_message="Produkt gotowej paszy o tej nazwie już istnieje.",
+            empty_message="Nazwa gotowej paszy nie może być pusta.",
+        )
 
 
 class ReadyFeedDeliveryForm(

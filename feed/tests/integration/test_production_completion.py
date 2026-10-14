@@ -1,9 +1,12 @@
 from datetime import date
 from decimal import Decimal
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 
 import pytest
 from unittest.mock import patch
 from django.core.exceptions import ValidationError
+from django.db import close_old_connections
 from django.contrib.auth.models import User
 from django.urls import reverse
 from django.utils import timezone
@@ -302,6 +305,41 @@ def test_stage_two_auto_mode_creates_exactly_one_feed_serving(authenticated_farm
     client.post(reverse("process_stage2", args=[production.pk]), {"create_feed_serving": "on"})
     assert FinishedFeedBatchModel.objects.filter(production=production).count() == 1
     assert FeedServingModel.objects.filter(automatic_for_production=production).count() == 1
+
+
+@pytest.mark.django_db(transaction=True)
+def test_concurrent_completion_of_same_production_is_idempotent(authenticated_farm):
+    _client, user, farm = authenticated_farm
+    recipe, ingredient = create_recipe(farm, stock_kg="500.00")
+    production = create_production(
+        recipe,
+        status=ProductionModel.Statuses.STAGE_1_DONE,
+        quantity="100.00",
+    )
+    barrier = Barrier(2)
+
+    def complete_once():
+        close_old_connections()
+        barrier.wait()
+        try:
+            return complete_production(farm, production.pk, user=user)[0]
+        finally:
+            close_old_connections()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(lambda _index: complete_once(), range(2)))
+
+    assert sorted(results) == [False, True]
+    assert ProductionIngredientUsageModel.objects.filter(production=production).count() == 1
+    assert InventoryMovementModel.objects.filter(
+        source_model=production._meta.label,
+        source_id=str(production.pk),
+        movement_type=InventoryMovementModel.Types.PRODUCTION_USAGE,
+    ).count() == 1
+    assert CostModel.objects.filter(production=production).count() == 1
+    assert FinishedFeedBatchModel.objects.filter(production=production).count() == 1
+    assert FeedServingModel.objects.filter(automatic_for_production=production).count() == 1
+    assert DeliveryModel.objects.get(ingredient=ingredient).remaining_quantity_kg == Decimal("400.00")
 
 
 @pytest.mark.django_db

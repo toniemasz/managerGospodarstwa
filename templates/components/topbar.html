@@ -78,13 +78,13 @@
             <summary class="topbar-icon-button" aria-label="Powiadomienia">
                 {% include 'components/app_icon.html' with name='bell' %}
                 {% if ui_notification_count %}
-                    <span class="notification-badge" aria-label="{{ ui_notification_count }} powiadomień">{{ ui_notification_count }}</span>
+                    <span class="notification-badge" aria-label="{{ ui_notification_count }} pilnych powiadomień">{% if ui_notification_count > 99 %}99+{% else %}{{ ui_notification_count }}{% endif %}</span>
                 {% endif %}
             </summary>
             <div class="notification-menu-panel">
                 <div class="notification-menu-header">
                     <strong>Powiadomienia</strong>
-                    <small>{{ ui_notification_count }} aktywnych</small>
+                    <small>{{ ui_notification_count }} pilnych / {{ ui_notification_total_count }} aktywnych</small>
                 </div>
                 {% if ui_notifications %}
                     <div class="notification-list">

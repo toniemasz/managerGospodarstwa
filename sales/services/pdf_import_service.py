@@ -481,13 +481,14 @@ class SaleSettlementPdfParser:
         warnings: list[str],
         context: str,
     ) -> Decimal | None:
-        parsed = self._parse_decimal(value)
-        if parsed is None and value and value.strip():
-            warnings.append(
-                f"Nie udało się rozpoznać wartości liczbowej pola '{label}' ({context}): {value}. "
-                "Uzupełnij ją ręcznie przed zapisem."
-            )
-        return parsed
+        return self._parse_number_field(
+            value,
+            label,
+            warnings,
+            context,
+            parser=self._parse_decimal,
+            value_kind="wartości liczbowej",
+        )
 
     def _parse_int_field(
         self,
@@ -496,10 +497,29 @@ class SaleSettlementPdfParser:
         warnings: list[str],
         context: str,
     ) -> int | None:
-        parsed = self._parse_int(value)
+        return self._parse_number_field(
+            value,
+            label,
+            warnings,
+            context,
+            parser=self._parse_int,
+            value_kind="liczby całkowitej",
+        )
+
+    @staticmethod
+    def _parse_number_field(
+        value,
+        label: str,
+        warnings: list[str],
+        context: str,
+        *,
+        parser,
+        value_kind: str,
+    ):
+        parsed = parser(value)
         if parsed is None and value and value.strip():
             warnings.append(
-                f"Nie udało się rozpoznać liczby całkowitej pola '{label}' ({context}): {value}. "
+                f"Nie udało się rozpoznać {value_kind} pola '{label}' ({context}): {value}. "
                 "Uzupełnij ją ręcznie przed zapisem."
             )
         return parsed

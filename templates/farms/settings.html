@@ -17,14 +17,12 @@
         </div>
     </section>
 
-    <nav class="subnav settings-section-nav" aria-label="Sekcje ustawień">
-        <a href="#settings-profile">Ogólne</a>
-        <a href="#settings-interface">Wygląd</a>
-        <a href="#settings-modules">Nawigacja i moduły</a>
-        <a href="#settings-sows">Maciory i alerty</a>
-        <a href="#settings-feed">Pasze</a>
-        <a href="#settings-data">Dane i kopie</a>
-        <a href="#settings-advanced">Zaawansowane</a>
+    <nav class="subnav settings-section-nav" aria-label="Sekcje ustawień" role="tablist">
+        <button type="button" role="tab" data-settings-tab="general" aria-controls="settings-panel-general">Ogólne</button>
+        <button type="button" role="tab" data-settings-tab="appearance" aria-controls="settings-panel-appearance">Wygląd</button>
+        <button type="button" role="tab" data-settings-tab="modules" aria-controls="settings-panel-modules">Moduły</button>
+        <button type="button" role="tab" data-settings-tab="rules" aria-controls="settings-panel-rules">Reguły</button>
+        <button type="button" role="tab" data-settings-tab="data" aria-controls="settings-panel-data">Dane</button>
     </nav>
 
     <div class="notice notice-warning settings-unsaved-notice" data-settings-unsaved hidden aria-live="polite">
@@ -35,6 +33,7 @@
         {% csrf_token %}
         {% include 'components/form_errors.html' with form=form %}
 
+        <div id="settings-panel-general" data-settings-panel="general" role="tabpanel">
         <section class="settings-card" id="settings-profile">
             <div class="settings-card-heading">
                 <h2>Dane gospodarstwa</h2>
@@ -48,7 +47,9 @@
                 </div>
             </div>
         </section>
+        </div>
 
+        <div id="settings-panel-appearance" data-settings-panel="appearance" role="tabpanel" hidden>
         <section class="settings-card" id="settings-interface">
             <div class="settings-card-heading">
                 <h2>Wygląd aplikacji</h2>
@@ -89,6 +90,17 @@
                     <strong data-font-scale-output>{{ form.font_scale.value|default:"100" }}%</strong>
                 </div>
                 <div class="font-scale-panel">
+                    <div class="settings-scale-presets" aria-label="Wybór rozmiaru tekstu">
+                        <button type="button" class="button button-secondary button-small" data-font-scale-preset="90">Mały · 90%</button>
+                        <button type="button" class="button button-secondary button-small" data-font-scale-preset="100">Standardowy · 100%</button>
+                        <button type="button" class="button button-secondary button-small" data-font-scale-preset="120">Duży · 120%</button>
+                        <button type="button" class="button button-secondary button-small" data-font-scale-preset="140">Bardzo duży · 140%</button>
+                    </div>
+                    <div class="settings-secondary-actions">
+                        <button type="button" class="button button-secondary button-small" data-font-scale-custom-toggle aria-expanded="false">Własny rozmiar</button>
+                        <button type="button" class="button button-link button-small" data-font-scale-preset="100">Przywróć 100%</button>
+                    </div>
+                    <div data-font-scale-custom hidden>
                     <input
                         type="range"
                         id="font-scale-slider"
@@ -112,21 +124,19 @@
                             </div>
                         </div>
                     </div>
-                    <div class="settings-scale-presets" aria-label="Szybki wybór rozmiaru tekstu">
-                        <button type="button" class="button button-secondary button-small" data-font-scale-preset="90">Mały</button>
-                        <button type="button" class="button button-secondary button-small" data-font-scale-preset="100">Standardowy</button>
-                        <button type="button" class="button button-secondary button-small" data-font-scale-preset="120">Duży</button>
-                        <button type="button" class="button button-secondary button-small" data-font-scale-preset="140">Bardzo duży</button>
-                        <button type="button" class="button button-secondary button-small" data-font-scale-preset="100">Przywróć 100%</button>
                     </div>
                 </div>
                 {{ form.font_scale.errors }}
             </div>
         </section>
+        </div>
 
+        <div id="settings-panel-modules" data-settings-panel="modules" role="tabpanel" hidden>
         {% include 'farms/_module_visibility.html' %}
         {% include 'farms/_dashboard_stats_visibility.html' %}
+        </div>
 
+        <div id="settings-panel-rules" data-settings-panel="rules" role="tabpanel" hidden>
         <section class="settings-card" id="settings-sows">
             <div class="settings-card-heading">
                 <h2>Maciory i alerty</h2>
@@ -184,12 +194,14 @@
                 </div>
             </div>
         </section>
+        </div>
 
         <div class="form-actions settings-save-bar">
             <button type="submit" class="button button-primary" data-settings-save disabled>Zapisz zmiany</button>
         </div>
     </form>
 
+    <div id="settings-panel-data" data-settings-panel="data" role="tabpanel" hidden>
     <section class="settings-card settings-data-section" id="settings-data">
         <div class="settings-card-heading">
             <h2>Kopia danych gospodarstwa</h2>
@@ -247,10 +259,11 @@
             {% endif %}
         </div>
     </section>
+    </div>
 </main>
 {% endblock %}
 
 {% block scripts %}
 {{ block.super }}
-<script src="{% static 'js/pages/settings.js' %}?v=20260726-ux" defer></script>
+<script src="{% static 'js/pages/settings.js' %}?v=20261014-audit2" defer></script>
 {% endblock %}

@@ -3,30 +3,11 @@
 
 {% block content %}
 <main class="app-page app-page-narrow">
-    <section class="page-header">
-        <div>
-            <p class="eyebrow">Pasza</p>
-            <h1>{% if is_edit %}Edycja śrutowania{% else %}Nowe śrutowanie{% endif %}</h1>
-            <p class="page-subtitle">Wybierz kg lub t. System zapisze ilość w kilogramach i dopilnuje proporcji receptury.</p>
-        </div>
-        <a href="{% url 'feed_productions' %}" class="button button-secondary">Wróć</a>
-    </section>
-
-    {% if not is_edit %}
-    <section class="panel compact-panel">
-        <form method="get" class="responsive-form inline-form">
-            <div class="form-field">
-                <label for="recipe-picker">Receptura do podglądu składników</label>
-                <select id="recipe-picker" name="recipe">
-                    <option value="">Wybierz recepturę</option>
-                    {% for recipe in recipes %}
-                    <option value="{{ recipe.id }}" {% if form.initial.recipe|stringformat:"s" == recipe.id|stringformat:"s" %}selected{% endif %}>{{ recipe.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <button type="submit" class="button button-secondary">Pokaż składniki</button>
-        </form>
-    </section>
+    {% url 'feed_productions' as productions_url %}
+    {% if is_edit %}
+        {% include 'components/page_header.html' with eyebrow='Pasza' title='Edycja śrutowania' subtitle='Wybierz kg lub t. System zapisze ilość w kilogramach i dopilnuje proporcji receptury.' back_url=productions_url %}
+    {% else %}
+        {% include 'components/page_header.html' with eyebrow='Pasza' title='Nowe śrutowanie' subtitle='Wybierz kg lub t. System zapisze ilość w kilogramach i dopilnuje proporcji receptury.' back_url=productions_url %}
     {% endif %}
 
     <section class="panel">
@@ -35,7 +16,19 @@
             {% include 'components/form_errors.html' with form=form %}
             <div class="form-section-heading"><h2>Plan śrutowania</h2><p>Termin, ilość i receptura bazowa.</p></div>
 
-            <div class="form-grid three-columns">
+            <div class="form-field production-recipe-picker">
+                <label for="{{ form.recipe.id_for_label }}">{{ form.recipe.label }}</label>
+                <div class="field-action-row">
+                    {{ form.recipe }}
+                    {% if not is_edit %}<button type="submit" name="preview_recipe" value="1" class="button button-secondary" formnovalidate>Pokaż skład</button>{% endif %}
+                </div>
+                {{ form.recipe.errors }}
+                {% if not form.recipe_item_fields %}
+                <p class="field-hint">Wybierz recepturę i pokaż skład. Ten sam wybór zostanie użyty przy zapisie śrutowania.</p>
+                {% endif %}
+            </div>
+
+            <div class="form-grid production-schedule-grid">
                 <div class="form-field">
                     <label for="{{ form.date.id_for_label }}">{{ form.date.label }}</label>
                     {{ form.date }}
@@ -56,15 +49,6 @@
                     {{ form.quantity_kg_unit }}
                     {{ form.quantity_kg_unit.errors }}
                 </div>
-            </div>
-
-            <div class="form-field">
-                <label for="{{ form.recipe.id_for_label }}">{{ form.recipe.label }}</label>
-                {{ form.recipe }}
-                {{ form.recipe.errors }}
-                {% if not form.recipe_item_fields %}
-                <p class="field-hint">Po wybraniu receptury możesz zapisać zlecenie z bazowymi proporcjami. Aby zmienić składniki jednorazowo, wybierz recepturę w podglądzie powyżej.</p>
-                {% endif %}
             </div>
 
             {% if form.recipe_item_fields %}
@@ -90,16 +74,16 @@
             {% endif %}
 
             {% if not is_edit %}
-            <div class="option-box">
+            <div class="option-box production-completion-option">
                 <label class="checkbox-row">
                     <input type="checkbox" name="instant_complete">
                     <span>Od razu zatwierdź i ukończ śrutowanie</span>
                 </label>
-                <p>System od razu zaksięguje zużycie składników z magazynu.</p>
+                <p>Ta operacja natychmiast uruchomi FIFO, zaksięguje koszt i zużycie składników oraz utworzy gotową paszę.</p>
             </div>
             {% endif %}
 
-            <div class="form-actions">
+            <div class="form-actions sticky-form-actions">
                 <a href="{% url 'feed_productions' %}" class="button button-secondary">Anuluj</a>
                 <button type="submit" class="button button-primary">Zapisz</button>
             </div>

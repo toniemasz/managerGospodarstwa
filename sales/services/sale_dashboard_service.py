@@ -1,7 +1,7 @@
 from farms.calculators.statistics import FeedEfficiencyCalculator
 from feed.services.reporting import FeedReportingService
+from sales.selectors import sales_for_farm
 from sales.services.reporting import SalesReportingService
-from sales.services.sale_repository import SaleRepository
 
 
 class SaleDashboardService:
@@ -11,15 +11,21 @@ class SaleDashboardService:
         if farm is None and (repository is None or reporting_service is None):
             raise ValueError("Dashboard sprzedaży wymaga gospodarstwa albo jawnych zależności testowych.")
         self.farm = farm
-        self.repository = repository or SaleRepository(farm=farm)
+        self.repository = repository
         self.reporting = reporting_service or SalesReportingService(farm)
         self.feed_reporting = feed_reporting_service or FeedReportingService(farm)
 
     def get_dashboard_summary(self, date_from=None, date_to=None) -> dict:
-        if date_from is not None or date_to is not None:
+        if self.repository is not None and (date_from is not None or date_to is not None):
             sales = self.repository.get_sales_between(date_from=date_from, date_to=date_to)
-        else:
+        elif self.repository is not None:
             sales = self.repository.get_all_sales()
+        else:
+            sales = sales_for_farm(
+                self.farm,
+                date_from=date_from,
+                date_to=date_to,
+            )
 
         report = self.reporting.summary(date_from=date_from, date_to=date_to)
         feed = self.feed_reporting.summary(date_from=date_from, date_to=date_to)

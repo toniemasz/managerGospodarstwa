@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from django import forms
 from django.core.exceptions import ValidationError
 from django.core.validators import DecimalValidator
@@ -14,20 +12,21 @@ from common.units import (
 )
 
 
-PRICE_UNIT_CHOICES = (("kg", "zł/kg"), ("t", "zł/t"))
-KILOGRAMS_PER_TONNE = Decimal("1000")
-PRICE_PER_KG_QUANT = Decimal("0.00001")
+def _place_field_after(fields, field_name: str, new_field_name: str) -> dict:
+    """Zwraca pola z polem technicznym umieszczonym obok wartości."""
 
-
-class UnitChoiceField(forms.ChoiceField):
-    """Pole jednostki nie powinno samo oznaczać formularza jako zmienionego."""
-
-    def has_changed(self, initial, data):
-        return False
+    ordered = {}
+    for name, field in fields.items():
+        if name == new_field_name:
+            continue
+        ordered[name] = field
+        if name == field_name:
+            ordered[new_field_name] = fields[new_field_name]
+    return ordered
 
 
 class KilogramStorageFormMixin:
-    """Obsługuje masę w kg/t i opcjonalnie cenę w zł/kg lub zł/t."""
+    """Obsługuje pola masy zapisywane kanonicznie w kilogramach."""
 
     mass_fields: tuple[str, ...] = ()
 
@@ -70,38 +69,11 @@ class KilogramStorageFormMixin:
                     display_value, unit = mass_input_value(stored_value)
                     self.initial[field_name] = display_value
                     self.initial[unit_name] = unit
-            self._place_field_after(field_name, unit_name)
-
-        self._configure_price_unit_field()
+            self.fields = _place_field_after(self.fields, field_name, unit_name)
 
     @staticmethod
     def mass_unit_field_name(field_name: str) -> str:
         return f"{field_name}_unit"
-
-    def _configure_price_unit_field(self):
-        price_field_name = "price_per_kg"
-        if price_field_name not in self.fields:
-            return
-
-        self.fields[price_field_name].label = "Cena"
-        self.fields["price_unit"] = UnitChoiceField(
-            label="Jednostka ceny",
-            choices=PRICE_UNIT_CHOICES,
-            initial="kg",
-            required=False,
-            widget=forms.Select(attrs={"class": "form-control price-unit-select"}),
-        )
-        self._place_field_after(price_field_name, "price_unit")
-
-    def _place_field_after(self, field_name, new_field_name):
-        ordered = {}
-        for name, field in self.fields.items():
-            if name == new_field_name:
-                continue
-            ordered[name] = field
-            if name == field_name:
-                ordered[new_field_name] = self.fields[new_field_name]
-        self.fields = ordered
 
     def clean(self):
         cleaned_data = super().clean()
@@ -130,13 +102,6 @@ class KilogramStorageFormMixin:
             cleaned_data[field_name] = value_kg
             cleaned_data.pop(unit_name, None)
 
-        price = cleaned_data.get("price_per_kg")
-        price_unit = cleaned_data.pop("price_unit", None) or "kg"
-        if price is not None and price_unit == "t":
-            cleaned_data["price_per_kg"] = (
-                price / KILOGRAMS_PER_TONNE
-            ).quantize(PRICE_PER_KG_QUANT)
-
         return cleaned_data
 
 
@@ -147,6 +112,13 @@ class PricePerKilogramStorageFormMixin:
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if self.is_bound and "price_unit" in self.data:
+            data = self.data.copy()
+            for field_name in self.price_per_kg_fields:
+                unit_name = self.price_unit_field_name(field_name)
+                if unit_name not in data:
+                    data[unit_name] = data.get("price_unit")
+            self.data = data
         self._price_decimal_specs = {}
         for field_name in self.price_per_kg_fields:
             if field_name not in self.fields:
@@ -192,21 +164,11 @@ class PricePerKilogramStorageFormMixin:
             )
             if not self.is_bound:
                 self.initial.setdefault(unit_name, KILOGRAM)
-            self._place_price_unit_after_field(field_name, unit_name)
+            self.fields = _place_field_after(self.fields, field_name, unit_name)
 
     @staticmethod
     def price_unit_field_name(field_name: str) -> str:
         return f"{field_name}_unit"
-
-    def _place_price_unit_after_field(self, field_name, unit_name):
-        ordered = {}
-        for name, field in self.fields.items():
-            if name == unit_name:
-                continue
-            ordered[name] = field
-            if name == field_name:
-                ordered[unit_name] = self.fields[unit_name]
-        self.fields = ordered
 
     def clean(self):
         cleaned_data = super().clean()

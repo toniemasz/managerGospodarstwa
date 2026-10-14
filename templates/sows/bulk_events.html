@@ -24,6 +24,7 @@
 
     <form method="post" class="responsive-form">
         {% csrf_token %}
+        <input type="hidden" name="submission_token" value="{{ submission_token }}">
         {% if not is_single %}
         <section class="notice notice-warning chronology-note">
             <div>
@@ -104,7 +105,7 @@
             </div>
             {% else %}
             <div class="table-scroll">
-                <table class="data-table bulk-event-table bulk-event-form-cards" data-no-pagination="true">
+                <table class="data-table bulk-event-table mobile-form-cards bulk-event-form-cards" data-no-pagination="true">
                     <thead>
                         <tr>
                             <th>Maciora</th>

@@ -65,52 +65,7 @@
                 <strong><span id="recipe-percentage-total">0,00</span>% / 100%</strong>
             </div>
 
-            {{ formset.management_form }}
-
-            <div id="ingredient-forms-container" class="ingredient-form-list">
-                {% for f in formset %}
-                <div class="ingredient-row-card{% if f.DELETE.value %} hidden{% endif %}">
-                    {{ f.id }}
-                    <div class="ingredient-row-fields">
-                        <div class="form-field">
-                            <label for="{{ f.ingredient.id_for_label }}">Składnik</label>
-                            {{ f.ingredient }}
-                            {{ f.ingredient.errors }}
-                        </div>
-                        <div class="form-field">
-                            <label for="{{ f.percentage.id_for_label }}">Udział (%)</label>
-                            {{ f.percentage }}
-                            {{ f.percentage.errors }}
-                        </div>
-                        <div class="form-actions">
-                            <span class="hidden">{{ f.DELETE }}</span>
-                            <button type="button" class="link-button-danger remove-row-btn">Usuń</button>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            <p id="ingredient-forms-empty" class="empty-inline" hidden>Brak składników. Dodaj pierwszą pozycję wersji.</p>
-
-            <template id="empty-form-template">
-                <div class="ingredient-row-card">
-                    {{ formset.empty_form.id }}
-                    <div class="ingredient-row-fields">
-                        <div class="form-field">
-                            <label for="{{ formset.empty_form.ingredient.id_for_label }}">Składnik</label>
-                            {{ formset.empty_form.ingredient }}
-                        </div>
-                        <div class="form-field">
-                            <label for="{{ formset.empty_form.percentage.id_for_label }}">Udział (%)</label>
-                            {{ formset.empty_form.percentage }}
-                        </div>
-                        <div class="form-actions">
-                            <span class="hidden">{{ formset.empty_form.DELETE }}</span>
-                            <button type="button" class="link-button-danger remove-row-btn">Usuń</button>
-                        </div>
-                    </div>
-                </div>
-            </template>
+            {% include 'feed/components/recipe_ingredient_formset.html' with formset=formset empty_message='Brak składników. Dodaj pierwszą pozycję wersji.' %}
 
             {% if requires_confirmation %}
             <div class="form-field">

@@ -12,9 +12,9 @@ from .models import (
     VaccinationPlanModel,
 )
 from django.core.exceptions import ValidationError
-from sows.domain.event_details import build_event_details
 from sows.domain.sow_state_machine import SowStateMachine
 from sows.services.piglet_care import PigletCareError, PigletCareService
+from sows.services.event_details import build_event_details_for_farm
 
 
 class VaccinationPlanForm(forms.ModelForm):
@@ -379,10 +379,7 @@ class SowEventForm(forms.ModelForm):
 
         instance.details = details
         if event_type == SowStateMachine.VACCINATION:
-            plan = VaccinationPlanRepository(self.farm).get_active_plan_by_name(
-                details.get('vaccine_name', '')
-            ) if self.farm is not None else None
-            instance.vaccination_plan = plan
+            instance.vaccination_plan_id = details.get('vaccination_plan_id')
             instance.vaccine_name = details.get('vaccine_name', '')
         if commit:
             instance.save()
@@ -390,7 +387,10 @@ class SowEventForm(forms.ModelForm):
 
     def _build_event_details(self, event_type: str) -> dict:
         """Mapuje dane dynamiczne do pola JSONB na podstawie typu zdarzenia."""
-        return build_event_details({**self.cleaned_data, 'event_type': event_type})
+        return build_event_details_for_farm(
+            {**self.cleaned_data, 'event_type': event_type},
+            farm=self.farm,
+        )
 
 
 class BulkSowEventRowForm(forms.Form):
@@ -469,17 +469,6 @@ class BulkSowEventRowForm(forms.Form):
                     self.add_error('event_date', "Data zdarzenia nie może być wcześniejsza niż data wprowadzenia maciory.")
 
         return cleaned_data
-
-    def build_details(self) -> dict:
-        details = build_event_details(self.cleaned_data)
-        if self.cleaned_data.get('event_type') == SowStateMachine.VACCINATION and self.farm is not None:
-            plan = VaccinationPlanRepository(self.farm).get_active_plan_by_name(
-                details.get('vaccine_name', '')
-            )
-            if plan:
-                details['vaccination_plan_id'] = plan.id
-        return details
-
 
 BulkSowEventFormSet = formset_factory(BulkSowEventRowForm, extra=0, can_delete=True)
 

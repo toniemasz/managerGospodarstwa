@@ -8,7 +8,6 @@ from costs.actions import sync_production_cost
 from common.cache import invalidate_farm_cache_on_commit
 from feed.actions.finished_feed import create_feed_serving, create_finished_feed_batch_for_production
 from feed.actions.inventory import InventoryActions
-from feed.domain.exceptions import FeedDomainError
 from feed.domain.production import ProductionCostResult, completion_datetime_for, validate_completion_transition
 from feed.models import ProductionModel
 from feed.selectors.productions import production_for_processing

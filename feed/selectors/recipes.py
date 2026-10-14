@@ -27,10 +27,6 @@ def recipe_list_context(farm) -> dict:
     return {"recipe_cards": recipe_cards}
 
 
-def recipe_exists(farm, recipe_id: int) -> bool:
-    return RecipeModel.objects.filter(pk=recipe_id, farm=farm).exists()
-
-
 def recipe_with_items_or_404(farm, recipe_id: int):
     queryset = RecipeModel.objects.prefetch_related(
         "items__ingredient",
