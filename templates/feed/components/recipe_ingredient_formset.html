@@ -1,0 +1,32 @@
+{{ formset.management_form }}
+
+<div id="ingredient-forms-container" class="ingredient-form-list">
+    {% for ingredient_form in formset %}
+    <div class="ingredient-row-card{% if ingredient_form.DELETE.value %} hidden{% endif %}">
+        {{ ingredient_form.id }}
+        <div class="ingredient-row-fields">
+            {% include 'components/form_field.html' with field=ingredient_form.ingredient %}
+            {% include 'components/form_field.html' with field=ingredient_form.percentage %}
+            <div class="form-actions">
+                <span class="hidden">{{ ingredient_form.DELETE }}</span>
+                <button type="button" class="link-button-danger remove-row-btn">Usuń</button>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+<p id="ingredient-forms-empty" class="empty-inline" hidden>{{ empty_message }}</p>
+
+<template id="empty-form-template">
+    <div class="ingredient-row-card">
+        {{ formset.empty_form.id }}
+        <div class="ingredient-row-fields">
+            {% include 'components/form_field.html' with field=formset.empty_form.ingredient %}
+            {% include 'components/form_field.html' with field=formset.empty_form.percentage %}
+            <div class="form-actions">
+                <span class="hidden">{{ formset.empty_form.DELETE }}</span>
+                <button type="button" class="link-button-danger remove-row-btn">Usuń</button>
+            </div>
+        </div>
+    </div>
+</template>
